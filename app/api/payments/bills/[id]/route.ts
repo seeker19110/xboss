@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { gioiHanGhiTaiChinh } from "@/lib/bao-mat/ratelimit";
 import { query, withProjectScope } from "@/lib/db";
 import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 import {
@@ -41,6 +42,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id: idStr } = await params;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  const gioiHan = await gioiHanGhiTaiChinh("phieu-sua", user.id);
+  if (gioiHan)
+    return NextResponse.json(
+      { error: gioiHan.error },
+      { status: 429, headers: { "Retry-After": gioiHan.retryAfter } },
+    );
   if (!CAN.editStructure(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được sửa bill thanh toán" }, { status: 403 });
 
@@ -145,6 +152,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { id: idStr } = await params;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  const gioiHan = await gioiHanGhiTaiChinh("phieu-xoa", user.id);
+  if (gioiHan)
+    return NextResponse.json(
+      { error: gioiHan.error },
+      { status: 429, headers: { "Retry-After": gioiHan.retryAfter } },
+    );
   if (!CAN.editStructure(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được xoá bill thanh toán" }, { status: 403 });
 

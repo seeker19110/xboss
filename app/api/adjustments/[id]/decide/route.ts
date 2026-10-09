@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { gioiHanGhiTaiChinh } from "@/lib/bao-mat/ratelimit";
 import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
 import { docIdempotencyKey, taoOperationId } from "@/lib/tai-chinh/ipc-quyet-dinh";
@@ -28,6 +29,12 @@ const MAX_LY_DO_TU_CHOI = 2000;
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  const gioiHan = await gioiHanGhiTaiChinh("dc-duyet", user.id);
+  if (gioiHan)
+    return NextResponse.json(
+      { error: gioiHan.error },
+      { status: 429, headers: { "Retry-After": gioiHan.retryAfter } },
+    );
   // Vai trò chỉ-xem (trừ cdt — có thể là bước của engine) không bao giờ quyết định được.
   if (NON_APPROVER_ROLES.includes(user.role))
     return NextResponse.json(

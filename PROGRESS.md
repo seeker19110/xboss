@@ -1,5 +1,38 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — Rate-limit route ghi chuỗi tiền IPC → điều chỉnh → phiếu → chi
+
+- Nợ ghi ở PR #619 (route ghi tài chính chưa rate-limit). Quyết định chủ dự án 2026-10-09: phạm vi **chuỗi
+  IPC + chi** (13 handler: lập/sửa/trình/duyệt đợt IPC; lập/sửa/xoá/trình/duyệt chứng từ điều chỉnh; lập/
+  sửa/xoá phiếu, đánh dấu đã chi; PATCH giá trị HĐ `/api/payments`), ngưỡng **60 lượt/15 phút/người/loại
+  thao tác**. Helper `gioiHanGhiTaiChinh(loai, userId)` (`lib/bao-mat/ratelimit.ts`, khoá
+  `tai-chinh:<loai>:<userId>` trên bảng `login_rate_limits` sẵn có, upsert atomic) → 429 + `Retry-After: 60`
+  ngay sau kiểm phiên, trước khi đọc body/ghi DB.
+- Test `tests/rate-limit-tai-chinh.test.ts` (15 ca: từng handler quota đầy → 429, người khác vẫn qua; lượt
+  61 bị chặn, loại khác đếm riêng) — 14 ca đỏ trước khi gắn vào route. 52 file test chạm các route này
+  chạy tuần tự trên DB sạch: 0 fail (không file nào vượt 60 lượt/loại/người).
+- Dọn dòng `login_rate_limits` hết hạn > 1 ngày (lấy mẫu 1%) chuyển vào `hitRateLimit` dùng chung — trước chỉ
+  dọn khi đăng nhập sai, khoá API/tài chính (người × loại) làm bảng phình → health-check >5000 dòng báo giả
+  (LOW từ audit). +1 ca test ép nhánh lấy mẫu.
+
+## 2026-10-09 — `DEPLOY.md`: yêu cầu PostgreSQL ≥ 15
+
+- Nợ ghi ở PR #619 (M128 ghim `search_path` hàm trigger): `DEPLOY.md` chưa nêu phiên bản Postgres, mà
+  `apt install postgresql` trên Ubuntu 22.04 ra bản 14 — mọi role còn quyền `CREATE` trên `public`. Nay ghi
+  rõ ≥ 15 (CI chạy 16), cách kiểm `SHOW server_version`, và lệnh `REVOKE CREATE ON SCHEMA public FROM PUBLIC`
+  nếu buộc dùng ≤ 14. Chỉ tài liệu.
+
+## 2026-10-09 — `/payments` chế độ "Người phụ trách": trả nợ a11y
+
+- `PersonSheetRow`: nút mở/thu chi tiết tầng có tên tiếng Việt + `aria-expanded`/`aria-controls`, vùng chạm
+  40px; "Đổi phụ trách" là `<label>` gắn ô nhập; ô giá trị HĐ từng tầng có `aria-label`; ô nhập ≥16px dưới `sm`.
+- Bảng kê thanh toán (`BillsSection`): mọi ô nhập (kỳ, ngày, ĐVT/KL/nhân công dòng sẵn có + dòng mới, tạm ứng,
+  phát sinh) có `aria-label`; vùng cuộn ngang `tabIndex=0` + `role=region` (axe `scrollable-region-focusable`
+  trên mobile); nút "Bảng thanh toán" có `aria-expanded`; link "In" có tên khi chỉ còn icon (mobile).
+- Chữ `zinc-600` (dưới AA) → `zinc-400`; nút chế độ xem có `aria-pressed`.
+- e2e `payments.spec.ts` +1 ca: chuyển chế độ, mở chi tiết hệ, axe sạch desktop + mobile (11/11 cục bộ; ca
+  mới đỏ trước khi sửa vùng cuộn).
+
 ## 2026-10-09 — Đóng 3 nợ S16: cache code-lists, `stageMissingList` theo dự án, email health-check
 
 - **`code-lists.getList`:** đọc kèm phạm vi GUC `app.org_id` trong cùng câu lệnh; kết quả RỖNG đọc ngoài
@@ -68,10 +101,10 @@
   SoD hai tổ chức xanh sẵn — chỉ thêm độ phủ); `s10c`/`payment-certs-money-ui` thêm hàm thuần; e2e
   `payment-certs-canh-bao` ca huỷ hiệu lực đã chi → người khác duyệt ở `/approvals` → `/payments` (axe,
   desktop + mobile). Mutation `--only=M128`: 6/6 bị bắt.
-- **Nợ:** `/payments` chế độ "Người phụ trách" còn nợ a11y có sẵn từ trước (chữ `zinc-600` dòng GL/HU/GTTTKT,
-  input LS/ngày thiếu nhãn, nút icon thiếu tên) — e2e axe khoanh vào dòng điều chỉnh; `cost-report` A4-AC04
+- **Nợ:** ~~`/payments` chế độ "Người phụ trách" còn nợ a11y có sẵn từ trước~~ (đã đóng 2026-10-09);
+  `cost-report` A4-AC04
   flaky có sẵn trên main khi chạy song song (poll `pg_stat_activity` trong transaction bị cache snapshot —
-  cần `pg_stat_clear_snapshot()` trước mỗi lần poll), chạy riêng xanh; A5-AC07 còn lớp M (UAT HĐ thật).
+  cần `pg_stat_clear_snapshot()` trước mỗi lần poll — đã sửa PR #620), chạy riêng xanh; A5-AC07 còn lớp M (UAT HĐ thật).
 
 ## 2026-10-09 — S16: test đường phụ bằng pool `xboss_app` (đóng nợ RLS strict)
 

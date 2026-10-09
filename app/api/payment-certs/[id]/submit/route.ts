@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run, withTransaction } from "@/lib/db";
 import { getCurrentUser, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { gioiHanGhiTaiChinh } from "@/lib/bao-mat/ratelimit";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
 import { log } from "@/lib/nen/log";
@@ -20,6 +21,12 @@ export async function POST(
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  const gioiHan = await gioiHanGhiTaiChinh("ipc-trinh", user.id);
+  if (gioiHan)
+    return NextResponse.json(
+      { error: gioiHan.error },
+      { status: 429, headers: { "Retry-After": gioiHan.retryAfter } },
+    );
   if (!isAdminOrPm(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được trình đợt thanh toán" }, { status: 403 });
 

@@ -53,6 +53,12 @@ export async function hitRateLimit(
     windowMinutes,
     windowMinutes,
   );
+  // Dọn rác entry hết hạn từ lâu — lấy mẫu xác suất thấp để không thêm round-trip mỗi lượt. Đặt ở đây
+  // (không chỉ ở đăng nhập sai) vì khoá API/tài chính sinh dòng theo người × loại thao tác: chỉ dọn khi
+  // có đăng nhập sai thì bảng phình, health-check (>5000 dòng) báo động giả.
+  if (Math.random() < 0.01) {
+    await run(`DELETE FROM login_rate_limits WHERE reset_at < NOW() - INTERVAL '1 day'`);
+  }
   return (rows[0]?.count ?? 1) > max;
 }
 
@@ -66,13 +72,26 @@ async function bump(key: string): Promise<void> {
 export async function recordLoginFailure(ip: string, email: string): Promise<void> {
   await bump(pairKey(ip, email));
   await bump(ipKey(ip));
-  // Dọn rác entry hết hạn từ lâu — lấy mẫu xác suất thấp để không thêm round-trip mỗi lần đăng nhập.
-  if (Math.random() < 0.01) {
-    await run(`DELETE FROM login_rate_limits WHERE reset_at < NOW() - INTERVAL '1 day'`);
-  }
 }
 
 // Đăng nhập đúng → xoá đếm của cặp IP+email (không xoá đếm theo IP).
 export async function recordLoginSuccess(ip: string, email: string): Promise<void> {
   await run(`DELETE FROM login_rate_limits WHERE key = ?`, pairKey(ip, email));
+}
+
+// Route ghi chuỗi tiền IPC → điều chỉnh → phiếu → chi (quyết định 2026-10-09): mỗi người dùng tối đa
+// 60 lượt/15 phút cho TỪNG loại thao tác (`loai`, vd "ipc-duyet") — đủ rộng cho PM nhập liệu dồn dập,
+// chặn script/bấm lặp vô hạn. Trả thông báo + Retry-After để route bọc 429; null = còn quota (đã đếm).
+export const GIOI_HAN_GHI_TAI_CHINH = { max: 60, windowMinutes: 15 } as const;
+
+export async function gioiHanGhiTaiChinh(
+  loai: string,
+  userId: number,
+): Promise<{ error: string; retryAfter: string } | null> {
+  const { max, windowMinutes } = GIOI_HAN_GHI_TAI_CHINH;
+  if (!(await hitRateLimit(`tai-chinh:${loai}:${userId}`, max, windowMinutes))) return null;
+  return {
+    error: `Thao tác quá nhanh — tối đa ${max} lượt/${windowMinutes} phút cho mỗi loại thao tác tài chính, thử lại sau ít phút`,
+    retryAfter: "60",
+  };
 }

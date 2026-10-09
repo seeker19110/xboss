@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { gioiHanGhiTaiChinh } from "@/lib/bao-mat/ratelimit";
 import { query, queryOne, withTransaction } from "@/lib/db";
 import { getCurrentProjectId, getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 import {
@@ -134,6 +135,12 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  const gioiHan = await gioiHanGhiTaiChinh("gia-tri-hd", user.id);
+  if (gioiHan)
+    return NextResponse.json(
+      { error: gioiHan.error },
+      { status: 429, headers: { "Retry-After": gioiHan.retryAfter } },
+    );
   if (!CAN.editStructure(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được sửa giá trị hợp đồng" }, { status: 403 });
 

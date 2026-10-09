@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { gioiHanGhiTaiChinh } from "@/lib/bao-mat/ratelimit";
 import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
 import { laLoiKhoaNgoai, phanHoiLoiCoStatus, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { isMoneyPrecisionError, moneyWireFormat, MONEY_FORMAT_HEADER } from "@/lib/nen/money";
@@ -31,6 +32,12 @@ function docId(s: string): number | null {
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return json({ error: "Chưa đăng nhập" }, 401);
+  const gioiHan = await gioiHanGhiTaiChinh("dc-sua", user.id);
+  if (gioiHan)
+    return NextResponse.json(
+      { error: gioiHan.error },
+      { status: 429, headers: { "Retry-After": gioiHan.retryAfter } },
+    );
   if (!CAN.manageContracts(user.role)) return json({ error: LOI_QUYEN }, 403);
   const id = docId((await params).id);
   if (id == null) return json({ error: "ID không hợp lệ" }, 400);
@@ -62,6 +69,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return json({ error: "Chưa đăng nhập" }, 401);
+  const gioiHan = await gioiHanGhiTaiChinh("dc-xoa", user.id);
+  if (gioiHan)
+    return NextResponse.json(
+      { error: gioiHan.error },
+      { status: 429, headers: { "Retry-After": gioiHan.retryAfter } },
+    );
   if (!CAN.manageContracts(user.role)) return json({ error: LOI_QUYEN }, 403);
   const id = docId((await params).id);
   if (id == null) return json({ error: "ID không hợp lệ" }, 400);

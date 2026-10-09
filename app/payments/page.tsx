@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useId } from "react";
 import {
   DollarSign,
   Users,
@@ -514,12 +514,14 @@ export default function PaymentsPage() {
           <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl shrink-0">
             <button
               onClick={() => setViewMode("floor")}
+              aria-pressed={viewMode === "floor"}
               className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition ${viewMode === "floor" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
             >
               <DollarSign className="w-3.5 h-3.5 shrink-0" /> Theo tầng
             </button>
             <button
               onClick={() => setViewMode("subcon")}
+              aria-pressed={viewMode === "subcon"}
               className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition ${viewMode === "subcon" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
             >
               <Users className="w-3.5 h-3.5 shrink-0" /> Người phụ trách
@@ -539,7 +541,7 @@ export default function PaymentsPage() {
             ))}
           </select>
           {editMode && (
-            <p className="text-[10px] text-zinc-600 hidden sm:block">
+            <p className="text-[10px] text-zinc-400 hidden sm:block">
               Bấm vào ô giá trị để nhập, tự lưu sau 1.5s
             </p>
           )}
@@ -609,7 +611,7 @@ export default function PaymentsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p
-                        className={`text-sm font-bold truncate ${isNone ? "text-zinc-500 italic" : "text-white"}`}
+                        className={`text-sm font-bold truncate ${isNone ? "text-zinc-400 italic" : "text-white"}`}
                       >
                         {isNone ? "Chưa phân công" : person}
                       </p>
@@ -635,6 +637,7 @@ export default function PaymentsPage() {
                         rel="noopener noreferrer"
                         className="shrink-0 flex items-center gap-1 text-[11px] border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded-lg transition"
                         title="In bảng kê thanh toán"
+                        aria-label={`In bảng kê thanh toán của ${person}`}
                       >
                         <Printer className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">In</span>
@@ -885,7 +888,9 @@ function BillsSection({
       {/* ── Summary bar + toggle ── */}
       <div className="flex items-center gap-2 px-4 py-2 flex-wrap">
         <button
+          type="button"
           onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
           className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition shrink-0"
         >
           <Receipt className="w-3.5 h-3.5 text-sky-400" />
@@ -929,10 +934,11 @@ function BillsSection({
           {/* ── Kỳ + Ngày + Ghi nhận ── */}
           {canEdit && (
             <div className="flex items-center gap-2 px-4 py-2 bg-zinc-900/50 border-b border-zinc-800/60 flex-wrap">
-              <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wide shrink-0">
+              <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wide shrink-0">
                 Kỳ:
               </span>
               <input
+                aria-label={"Kỳ thanh toán"}
                 type="text"
                 value={period}
                 onChange={(e) => setPeriod(e.target.value)}
@@ -940,6 +946,7 @@ function BillsSection({
                 className={`${inputCls} w-32 focus:border-sky-500`}
               />
               <input
+                aria-label={"Ngày thanh toán"}
                 type="date"
                 value={paidDate}
                 onChange={(e) => setPaidDate(e.target.value)}
@@ -991,8 +998,14 @@ function BillsSection({
             ))}
           </div>
 
-          {/* ── Bảng chính ── */}
-          <div className="overflow-x-auto">
+          {/* ── Bảng chính ── (cuộn ngang trên mobile: focus được bằng bàn phím — axe
+              scrollable-region-focusable khi bảng chưa có ô nhập/nút nào) */}
+          <div
+            className="overflow-x-auto"
+            tabIndex={0}
+            role="region"
+            aria-label={`Bảng kê thanh toán ${person}`}
+          >
             <table className="w-full text-[11px] min-w-[820px] border-collapse">
               <thead>
                 <tr className="bg-zinc-800 text-zinc-100 text-center">
@@ -1071,6 +1084,7 @@ function BillsSection({
                           <>
                             <td className="px-1 py-1">
                               <input
+                                aria-label={`ĐVT dòng ${i + 1}`}
                                 type="text"
                                 defaultValue={b.unit ?? "LS"}
                                 onBlur={(e) => {
@@ -1082,6 +1096,7 @@ function BillsSection({
                             </td>
                             <td className="px-1 py-1">
                               <input
+                                aria-label={`Khối lượng dòng ${i + 1}`}
                                 type="text"
                                 inputMode="decimal"
                                 defaultValue={b.quantity != null ? String(b.quantity) : ""}
@@ -1096,6 +1111,7 @@ function BillsSection({
                             </td>
                             <td className="px-1 py-1">
                               <input
+                                aria-label={`Nhân công dòng ${i + 1} (đồng)`}
                                 type="text"
                                 inputMode="numeric"
                                 defaultValue={b.labor != null ? soTienNhapThuan(b.labor) : ""}
@@ -1226,7 +1242,7 @@ function BillsSection({
                   const pctAfter = (fl?.pctPaid ?? 0) + pct;
                   return (
                     <tr key={d.key} className="border-b border-zinc-700/40 bg-zinc-900/50">
-                      <td className="px-1 py-1 text-center text-zinc-600">·</td>
+                      <td className="px-1 py-1 text-center text-zinc-400">·</td>
                       <td className="px-1 py-1" colSpan={2}>
                         <select
                           aria-label="Chọn tầng"
@@ -1273,6 +1289,7 @@ function BillsSection({
                       </td>
                       <td className="px-1 py-1">
                         <input
+                          aria-label={"% kỳ dòng mới"}
                           type="text"
                           inputMode="numeric"
                           value={d.pct}
@@ -1287,6 +1304,7 @@ function BillsSection({
                       </td>
                       <td className="px-1 py-1">
                         <input
+                          aria-label={"ĐVT dòng mới"}
                           type="text"
                           value={d.unit}
                           onChange={(e) =>
@@ -1300,6 +1318,7 @@ function BillsSection({
                       </td>
                       <td className="px-1 py-1">
                         <input
+                          aria-label={"Khối lượng dòng mới"}
                           type="text"
                           inputMode="decimal"
                           value={d.quantity}
@@ -1316,6 +1335,7 @@ function BillsSection({
                       </td>
                       <td className="px-1 py-1">
                         <input
+                          aria-label={"Nhân công dòng mới (đồng)"}
                           type="text"
                           inputMode="numeric"
                           value={d.labor}
@@ -1346,7 +1366,7 @@ function BillsSection({
                             aria-label="Xoá dòng"
                             onClick={() => setDraftA((p) => p.filter((r) => r.key !== d.key))}
                           >
-                            <X className="w-3.5 h-3.5 text-zinc-600 hover:text-red-400" />
+                            <X className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" />
                           </button>
                         </td>
                       )}
@@ -1385,12 +1405,12 @@ function BillsSection({
 
                 {/* GL */}
                 <tr className="bg-amber-400/10">
-                  <td className="px-1 py-1.5 text-center text-[10px] text-zinc-600">(GL)</td>
-                  <td className="px-2 py-1.5 text-zinc-600" colSpan={7}>
+                  <td className="px-1 py-1.5 text-center text-[10px] text-zinc-400">(GL)</td>
+                  <td className="px-2 py-1.5 text-zinc-400" colSpan={7}>
                     TIỀN GIỮ LẠI (NẾU CÓ)
                   </td>
                   <td
-                    className="px-2 py-1.5 text-right text-zinc-600 tabular-nums"
+                    className="px-2 py-1.5 text-right text-zinc-400 tabular-nums"
                     colSpan={canEdit ? 3 : 2}
                   >
                     {fmtVND(0n)}
@@ -1440,9 +1460,10 @@ function BillsSection({
 
                 {draftTU.map((d) => (
                   <tr key={d.key} className="border-b border-zinc-700/40 bg-zinc-900/50">
-                    <td className="px-1 py-1 text-center text-zinc-600">·</td>
+                    <td className="px-1 py-1 text-center text-zinc-400">·</td>
                     <td className="px-1 py-1" colSpan={7}>
                       <input
+                        aria-label={"Ghi chú tạm ứng"}
                         type="text"
                         value={d.description}
                         onChange={(e) =>
@@ -1458,6 +1479,7 @@ function BillsSection({
                     </td>
                     <td className="px-1 py-1">
                       <input
+                        aria-label={"Số tiền tạm ứng (đồng)"}
                         type="text"
                         inputMode="numeric"
                         value={d.amount}
@@ -1477,7 +1499,7 @@ function BillsSection({
                           aria-label="Xoá dòng"
                           onClick={() => setDraftTU((p) => p.filter((r) => r.key !== d.key))}
                         >
-                          <X className="w-3.5 h-3.5 text-zinc-600 hover:text-red-400" />
+                          <X className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" />
                         </button>
                       </td>
                     )}
@@ -1499,8 +1521,8 @@ function BillsSection({
 
                 {/* HU */}
                 <tr className="bg-amber-400/10">
-                  <td className="px-1 py-1.5 text-center text-[10px] text-zinc-600">(HU)</td>
-                  <td className="px-2 py-1.5 text-zinc-600" colSpan={7}>
+                  <td className="px-1 py-1.5 text-center text-[10px] text-zinc-400">(HU)</td>
+                  <td className="px-2 py-1.5 text-zinc-400" colSpan={7}>
                     KHẤU TRỪ TẠM ỨNG
                   </td>
                   <td
@@ -1554,9 +1576,10 @@ function BillsSection({
 
                 {draftB.map((d, idx) => (
                   <tr key={d.key} className="border-b border-zinc-700/40 bg-zinc-900/50">
-                    <td className="px-1 py-1 text-center text-zinc-600">·</td>
+                    <td className="px-1 py-1 text-center text-zinc-400">·</td>
                     <td className="px-1 py-1" colSpan={7}>
                       <input
+                        aria-label={`Nội dung khoản phát sinh ${idx + 1}`}
                         type="text"
                         value={d.description}
                         onChange={(e) =>
@@ -1572,6 +1595,7 @@ function BillsSection({
                     </td>
                     <td className="px-1 py-1">
                       <input
+                        aria-label={`Số tiền khoản phát sinh ${idx + 1} (đồng)`}
                         type="text"
                         inputMode="numeric"
                         value={d.amount}
@@ -1591,7 +1615,7 @@ function BillsSection({
                           aria-label="Xoá dòng"
                           onClick={() => setDraftB((p) => p.filter((r) => r.key !== d.key))}
                         >
-                          <X className="w-3.5 h-3.5 text-zinc-600 hover:text-red-400" />
+                          <X className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" />
                         </button>
                       </td>
                     )}
@@ -1629,8 +1653,8 @@ function BillsSection({
 
                 {/* GTTTKT */}
                 <tr className="bg-amber-400/10">
-                  <td className="px-1 py-1.5 text-center text-[10px] text-zinc-600">(GTTTKT)</td>
-                  <td className="px-2 py-1.5 text-zinc-600" colSpan={7}>
+                  <td className="px-1 py-1.5 text-center text-[10px] text-zinc-400">(GTTTKT)</td>
+                  <td className="px-2 py-1.5 text-zinc-400" colSpan={7}>
                     TỔNG GIÁ TRỊ ĐÃ THANH TOÁN ĐẾN KỲ TRƯỚC (GỒM TẠM ỨNG)
                   </td>
                   <td
@@ -1686,6 +1710,8 @@ function PersonSheetRow({
   onSaveResponsible: (sheetTypeId: number, value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const idPhuTrach = useId();
+  const idChiTiet = useId();
 
   const sContract = tongTien(rows, (r) => r.contractValue);
   const sEarned = tongTien(rows, (r) => r.earned);
@@ -1703,8 +1729,12 @@ function PersonSheetRow({
       <div className="px-4 py-3 hover:bg-zinc-800/20 transition">
         <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={() => setOpen((o) => !o)}
-            className="shrink-0 text-zinc-500 hover:text-zinc-300 transition"
+            aria-expanded={open}
+            aria-controls={idChiTiet}
+            aria-label={`${open ? "Thu gọn" : "Mở"} chi tiết từng tầng của hệ ${sheet}`}
+            className="shrink-0 -ml-3 -my-2 w-10 h-10 inline-flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-200 transition"
           >
             {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </button>
@@ -1737,8 +1767,11 @@ function PersonSheetRow({
           {sDelayed > 0 && <span className="text-[11px] text-red-400">{sDelayed} trễ</span>}
           {canEdit && (
             <div className="flex items-center gap-1.5 ml-auto">
-              <span className="text-[10px] text-zinc-600 shrink-0">Đổi phụ trách:</span>
+              <label htmlFor={idPhuTrach} className="text-[11px] text-zinc-400 shrink-0">
+                Đổi phụ trách:
+              </label>
               <input
+                id={idPhuTrach}
                 type="text"
                 list="payment-people"
                 key={responsible}
@@ -1751,10 +1784,13 @@ function PersonSheetRow({
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 }}
                 placeholder="Tên người phụ trách"
-                className="w-40 text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1 text-zinc-200 focus:outline-none"
+                className="w-40 text-base sm:text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1 text-zinc-200 focus:outline-none"
               />
               {savingResp === sheetTypeId && (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
+                <Loader2
+                  className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0"
+                  aria-label="Đang lưu người phụ trách"
+                />
               )}
             </div>
           )}
@@ -1763,7 +1799,10 @@ function PersonSheetRow({
 
       {/* Chi tiết từng tầng — nhập giá trị HĐ */}
       {open && (
-        <div className="border-t border-zinc-800/60 bg-zinc-950/40 divide-y divide-zinc-800/40">
+        <div
+          id={idChiTiet}
+          className="border-t border-zinc-800/60 bg-zinc-950/40 divide-y divide-zinc-800/40"
+        >
           {floorRows.map((r) => {
             const key = editKey(r);
             const displayVal =
@@ -1803,15 +1842,18 @@ function PersonSheetRow({
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-1.5">
-                  <span className="text-[11px] text-zinc-600 shrink-0">Giá trị HĐ:</span>
+                  <span className="text-[11px] text-zinc-400 shrink-0" aria-hidden={canEdit}>
+                    Giá trị HĐ:
+                  </span>
                   {canEdit ? (
                     <input
                       type="text"
                       inputMode="numeric"
+                      aria-label={`Giá trị HĐ hệ ${sheet} tầng ${r.floorLabel} (đồng)`}
                       value={displayVal}
                       onChange={(e) => onEdit(r, e.target.value)}
                       placeholder="Nhập giá trị (đ)"
-                      className="flex-1 sm:max-w-[160px] text-right text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none tabular-nums"
+                      className="flex-1 sm:max-w-[160px] text-right text-base sm:text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none tabular-nums"
                     />
                   ) : (
                     <span className="text-xs text-zinc-400 tabular-nums">
@@ -1939,12 +1981,12 @@ function FloorGroup({
                       <span className="text-[10px] text-red-400 shrink-0">{r.delayed} trễ</span>
                     )}
                   </div>
-                  <span className="text-xs text-zinc-600 shrink-0">{r.taskCount} task</span>
+                  <span className="text-xs text-zinc-400 shrink-0">{r.taskCount} task</span>
                 </div>
 
                 {/* Hàng 2: giá trị HĐ input + giá trị hoàn thành */}
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="text-[11px] text-zinc-600 shrink-0">Giá trị HĐ:</span>
+                  <span className="text-[11px] text-zinc-400 shrink-0">Giá trị HĐ:</span>
                   {canEdit ? (
                     <input
                       type="text"

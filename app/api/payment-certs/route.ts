@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, withTransaction, withProjectScope } from "@/lib/db";
 import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { gioiHanGhiTaiChinh } from "@/lib/bao-mat/ratelimit";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { isUniqueViolation, withUniqueRetry } from "@/lib/ha-tang/seqcode";
 import {
@@ -97,6 +98,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  const gioiHan = await gioiHanGhiTaiChinh("ipc-lap", user.id);
+  if (gioiHan)
+    return NextResponse.json(
+      { error: gioiHan.error },
+      { status: 429, headers: { "Retry-After": gioiHan.retryAfter } },
+    );
   if (!CAN.manageContracts(user.role))
     return NextResponse.json(
       { error: "Bạn không có quyền lập đợt thanh toán (chỉ Admin/PM)" },
