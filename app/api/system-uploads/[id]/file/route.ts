@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { queryOne } from "@/lib/db";
 import { storageGet } from "@/lib/nen/storage";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { PHAM_VI_UPLOAD } from "@/lib/tien-do/systems";
 
 export const dynamic = "force-dynamic";
 
@@ -28,19 +29,17 @@ export async function GET(_req: Request, { params: paramsP }: { params: Promise<
     original_name: string | null;
     project_id: number | null;
   }>(
-    `SELECT file_name, original_name, project_id AS "project_id" FROM system_uploads WHERE id = ?`,
+    `SELECT su.file_name, su.original_name, su.project_id AS "project_id"
+       FROM system_uploads su
+      WHERE su.id = ? AND ${PHAM_VI_UPLOAD}`,
     uploadId,
+    projectId,
+    user.orgId,
   );
 
+  // Khác dự án → 404 như không tồn tại (AUDIT-S16 nợ 8 — 403 cũ lộ id có thật).
   if (!upload) {
     return NextResponse.json({ error: "Không tìm thấy phiên bản upload này" }, { status: 404 });
-  }
-
-  if (upload.project_id != null && upload.project_id !== projectId) {
-    return NextResponse.json(
-      { error: "Bạn không có quyền truy cập dự án của file này" },
-      { status: 403 },
-    );
   }
 
   const buffer = await storageGet(user.orgId, upload.file_name);

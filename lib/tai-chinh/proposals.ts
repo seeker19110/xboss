@@ -8,7 +8,7 @@ import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { todayISO, daysFromTodayISO } from "@/lib/nen/date";
 import { nextSeqCode } from "@/lib/ha-tang/seqcode";
 import { CAN, isAdminOrPm, type User } from "@/lib/bao-mat/auth";
-import { overNormItems, type OverNormItem } from "@/lib/khoi-luong/norms";
+import { NORM_OVER_THRESHOLD_PCT, overNormItems, type OverNormItem } from "@/lib/khoi-luong/norms";
 
 export const PROPOSAL_KINDS = ["advance", "payment", "allocation", "other"] as const;
 export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
@@ -310,13 +310,19 @@ export async function decideProposal(opts: {
 // trong danh sách vật tư đang vượt định mức → trả dòng vượt để hiển thị cảnh báo mềm
 // (không chặn cứng, giống Σweight ở M1). Trả null khi không áp dụng/không vượt.
 export async function allocationOverNorm(proposalId: number): Promise<OverNormItem | null> {
-  const p = await queryOne<{ kind: string; materialId: number | null }>(
-    `SELECT kind, material_id AS "materialId" FROM proposals WHERE id = ?`,
+  const p = await queryOne<{
+    kind: string;
+    materialId: number | null;
+    projectId: number | null;
+  }>(
+    `SELECT kind, material_id AS "materialId", project_id AS "projectId" FROM proposals WHERE id = ?`,
     proposalId,
   );
-  if (!p || p.kind !== "allocation" || p.materialId == null) return null;
+  if (!p || p.kind !== "allocation" || p.materialId == null || p.projectId == null) return null;
 
-  const over = await overNormItems();
+  // Chỉ định mức thuộc dự án của đề xuất (AUDIT-S16 nợ 6 — trước quét toàn hệ: chậm, và vật tư
+  // vượt ở dự án khác cũng bật cảnh báo).
+  const over = await overNormItems(NORM_OVER_THRESHOLD_PCT, p.projectId);
   if (over.length === 0) return null;
   const norms = await query<{ id: number; materialId: number }>(
     `SELECT id, material_id AS "materialId" FROM boq_norms WHERE id = ANY(?)`,

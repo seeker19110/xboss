@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   // AUDIT-S16 (A1-AC03, D01): tổ chức của admin chưa có dự án → rỗng, không đọc audit toàn hệ.
   const projectId = await getCurrentProjectId(me);
   if (projectId == null) return NextResponse.json({ rows: [], total: 0 });
-  const { where, params } = buildAuditFilter(req.nextUrl.searchParams, projectId);
+  const { where, params } = buildAuditFilter(req.nextUrl.searchParams, projectId, me.orgId);
   const page = Math.max(Number(req.nextUrl.searchParams.get("page")) || 0, 0);
   const offset = page * PAGE_SIZE;
 

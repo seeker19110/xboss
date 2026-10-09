@@ -3098,7 +3098,7 @@
 
 **Index:**
 - `approval_flows_pkey`: UNIQUE INDEX approval_flows_pkey ON public.approval_flows USING btree (id)
-- `ux_flow_active`: UNIQUE INDEX ux_flow_active ON public.approval_flows USING btree (entity_type, COALESCE(project_id, 0)) WHERE active
+- `ux_flow_org_active`: UNIQUE INDEX ux_flow_org_active ON public.approval_flows USING btree (org_id, entity_type, COALESCE(project_id, 0)) WHERE active
 
 ### approval_steps
 
@@ -3587,8 +3587,8 @@
 - `project_id` → `projects(id)`
 
 **Index:**
+- `custom_field_defs_org_scope_key_uidx`: UNIQUE INDEX custom_field_defs_org_scope_key_uidx ON public.custom_field_defs USING btree (org_id, entity_type, COALESCE(project_id, 0), key)
 - `custom_field_defs_pkey`: UNIQUE INDEX custom_field_defs_pkey ON public.custom_field_defs USING btree (id)
-- `custom_field_defs_scope_key_uidx`: UNIQUE INDEX custom_field_defs_scope_key_uidx ON public.custom_field_defs USING btree (entity_type, COALESCE(project_id, 0), key)
 
 ### engineering_agent_claims
 

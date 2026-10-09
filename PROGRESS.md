@@ -1,5 +1,25 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — Đóng nốt nợ S16: phạm vi tổ chức cho thông báo menu, audit log, flow duyệt, upload
+
+Đóng các mục còn mở trong `docs/nang-cap/AUDIT-S16-NULL-SCOPE.md` §"Phát hiện ngoài phạm vi":
+
+- `PATCH /api/nav-settings` bật mục toàn cục: thông báo + push chỉ tới PM **cùng tổ chức** với admin
+  (trước: mọi PM toàn hệ, kể cả org khác).
+- `/api/admin/audit-log` (+ `/export`): bản ghi toàn cục (`project_id NULL`) chỉ hiện khi người thao
+  tác thuộc tổ chức người xem (`buildAuditFilter(…, orgId)`, lọc qua `users.org_id`, không thêm cột);
+  dòng không rõ người thao tác bị ẩn.
+- `allocationOverNorm` lọc định mức theo `proposals.project_id` (trước quét mọi dự án: chậm, và vật tư
+  vượt ở dự án khác bật cảnh báo cấp phát).
+- `system-uploads`: hàng legacy `project_id NULL` chỉ hiện/tải được khi người upload cùng tổ chức
+  (`PHAM_VI_UPLOAD` dùng chung cho tải file + lịch sử upload); khác dự án → **404** thay vì 403 lộ id.
+- Migration **0169**: unique index `ux_flow_active` / `custom_field_defs_scope_key_uidx` toàn hệ →
+  theo `(org_id, …)` (cùng mẫu `ux_alert_rule_org_active` ở 0161) — flow/trường toàn cục của org B không
+  còn chặn org A tạo cùng loại/key. **Đụng dữ liệu** (căn `org_id` dòng gắn dự án lệch về org của dự
+  án, idempotent) → qua staging + `db:migrate -- --dry-run` trước production.
+- Test `tests/s16-no-con-lai.test.ts` (6 ca, route thật): **6/6 đỏ trên code cũ**, xanh sau vá.
+  `audit-log-api.test.ts` cập nhật theo chữ ký mới. ERD sinh lại.
+
 ## 2026-10-09 — Rate-limit route ghi chuỗi tiền IPC → điều chỉnh → phiếu → chi
 
 - Nợ ghi ở PR #619 (route ghi tài chính chưa rate-limit). Quyết định chủ dự án 2026-10-09: phạm vi **chuỗi
@@ -244,10 +264,10 @@ schema_behind | db_unavailable`), `login`/`me` trả 503 JSON `schema_not_ready`
   18/18 đỏ trên code cũ. Bảng + nợ còn lại (~100 hàm lib còn nhánh null nhưng mọi route gọi đã chặn)
   ở `docs/nang-cap/AUDIT-S16-NULL-SCOPE.md`. **Phát hiện thêm, đã sửa:** `POST /api/dimensions/rename`
   nhận `packageId` không kiểm dự án → đổi tên cột của sheet bất kỳ (xuyên org); nay JOIN theo dự án
-  hiện hành, test hồi quy trong `route-tien-do-3`. **Phát hiện chưa sửa (nợ):** `PATCH /api/nav-
+  hiện hành, test hồi quy trong `route-tien-do-3`. **Phát hiện chưa sửa (nợ):** ~~`PATCH /api/nav-
 settings` thông báo mọi PM toàn hệ; `audit_log`/`custom_field_defs` không có `org_id`; unique
-  `ux_flow_active` toàn hệ; `allocationOverNorm` tính toàn hệ; ~~`stageMissingList` JOIN WP không ràng
-  dự án~~ (đã đóng 2026-10-09); `system-uploads` hàng `project_id NULL` legacy.
+  `ux_flow_active` toàn hệ; `allocationOverNorm` tính toàn hệ; `stageMissingList` JOIN WP không ràng
+  dự án; `system-uploads` hàng `project_id NULL` legacy~~ (đã đóng hết 2026-10-09).
 - **6(a) cutover membership (A1-AC02) — xong theo cờ:** `XBOSS_STRICT_MEMBERSHIP=1` tắt nhánh legacy
   "user_projects rỗng = thấy mọi dự án org" (`visibleProjectIds`, `/api/project` trả null,
   `reportRecipients`); script dry-run chỉ-đọc liệt kê người sẽ mất quyền; runbook
@@ -755,9 +775,10 @@ phiên/quyền/phạm vi.
 bill còn hoá đơn `payment_bill_id`). Users: gỡ giao việc + xoá thông báo + xoá user gói chung 1
 transaction nên 409 không để lại việc đã gỡ giao. Giữ nguyên kiểm phiên/quyền/org/dự án. Test
 `tests/route-xoa-xung-dot-phu-thuoc.test.ts` (route thật, đỏ 2/3 trên code cũ).
-**Nợ (ghi nhận, chưa sửa):** hơn 80 route DELETE khác chưa bắt 23503 (vd `tasks`, `projects`,
+~~**Nợ (ghi nhận, chưa sửa):** hơn 80 route DELETE khác chưa bắt 23503 (vd `tasks`, `projects`,
 `towers`, `sheets`, `workpackages`, `materials`, `purchase-orders`, `invoices`, `claims`, `payroll`,
-`personnel`, `crews`, `risks`…) — cần rà từng route xem FK nào còn chặn rồi áp cùng mẫu.
+`personnel`, `crews`, `risks`…) — cần rà từng route xem FK nào còn chặn rồi áp cùng mẫu.~~ (đã đóng ở
+mục "DATA-CONTRACTS: mọi DELETE còn tham chiếu -> 409", canh bằng `tests/delete-route-fk-guard.test.ts`)
 
 ## 2026-10-08 — QUALITY-FINAL-1 S13d: dọn phần còn lại của IPC/payment-certs
 

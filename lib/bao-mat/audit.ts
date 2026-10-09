@@ -33,9 +33,19 @@ export type AuditFilter = { where: string; params: unknown[] };
 // toàn cục (project_id IS NULL, vd đổi role_permissions xuyên dự án), nhất quán với cách scope
 // của M22. `projectId` BẮT BUỘC (AUDIT-S16 null-scope): trước đây null = không lọc → admin của
 // tổ chức chưa có dự án đọc audit trail mọi tổ chức; route tự trả rỗng/404 khi không có dự án.
-export function buildAuditFilter(searchParams: URLSearchParams, projectId: number): AuditFilter {
-  const wheres: string[] = [`(al.project_id = ? OR al.project_id IS NULL)`];
-  const params: unknown[] = [projectId];
+// `audit_log` không có cột org_id: bản ghi toàn cục chỉ hiện khi người thao tác thuộc `orgId`
+// (AUDIT-S16 nợ 3 — trước admin org A đọc được bản ghi toàn cục của org B; dòng không có
+// người thao tác bị ẩn vì không suy được tổ chức).
+export function buildAuditFilter(
+  searchParams: URLSearchParams,
+  projectId: number,
+  orgId: number,
+): AuditFilter {
+  const wheres: string[] = [
+    `(al.project_id = ? OR (al.project_id IS NULL AND EXISTS (
+       SELECT 1 FROM users ua WHERE ua.id = al.actor_id AND ua.org_id = ?)))`,
+  ];
+  const params: unknown[] = [projectId, orgId];
 
   const entity = searchParams.get("entity");
   if (entity) {

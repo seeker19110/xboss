@@ -58,7 +58,11 @@ export async function PATCH(req: NextRequest) {
   if (scope === "global" && user.role === "admin" && changed && enabled && !wasEnabled) {
     const found = flattenDashboards().find(({ dashboard }) => dashboard.id === nodeKey);
     const label = found?.dashboard.label ?? nodeKey;
-    const pms = await query<{ id: number }>(`SELECT id FROM users WHERE role = 'pm'`);
+    // Chỉ PM cùng tổ chức với admin (AUDIT-S16 nợ 2 — trước báo mọi PM toàn hệ).
+    const pms = await query<{ id: number }>(
+      `SELECT id FROM users WHERE role = 'pm' AND org_id = ?`,
+      user.orgId,
+    );
     const recipients = pms.map((p) => p.id);
     if (recipients.length > 0) {
       const values = recipients.map(() => `(?, 'nav_enabled', ?, ?)`).join(", ");

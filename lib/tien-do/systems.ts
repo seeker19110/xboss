@@ -36,6 +36,12 @@ export type SystemSummary = {
   floorsPending: number | null;
 };
 
+// Phạm vi đọc `system_uploads su` (2 tham số: projectId, orgId). Bản ghi `project_id NULL` là
+// lịch sử trước đa dự án — bảng không có org_id/RLS nên chỉ hiện khi người upload thuộc tổ chức
+// người xem (AUDIT-S16 nợ 8; dòng không rõ người upload bị ẩn).
+export const PHAM_VI_UPLOAD = `(su.project_id = ? OR (su.project_id IS NULL AND EXISTS (
+  SELECT 1 FROM users uu WHERE uu.id = su.uploaded_by AND uu.org_id = ?)))`;
+
 // Resolve `?system=<code>` (query param dùng chung cho các API tiến độ — M36) → id hệ.
 // - Không truyền code (null/rỗng) → null: không lọc, giữ nguyên hành vi cũ.
 // - Code không khớp hệ nào → -1 (sentinel không khớp id thật nào) để query lọc ra kết quả

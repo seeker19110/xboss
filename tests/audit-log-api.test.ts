@@ -10,14 +10,17 @@ import assert from "node:assert/strict";
 // SQL route dùng (buildAuditFilter + LIMIT/OFFSET) để kiểm lọc entity+entityId và phân trang.
 
 // AUDIT-S16: projectId bắt buộc — điều kiện dự án (kèm bản ghi toàn cục) luôn đứng đầu.
+// AUDIT-S16 nợ 3: bản ghi toàn cục chỉ hiện khi người thao tác thuộc tổ chức của người xem.
 const DU_AN = 7;
-const LOC_DU_AN = "(al.project_id = ? OR al.project_id IS NULL)";
+const TO_CHUC = 1;
+const LOC_DU_AN = `(al.project_id = ? OR (al.project_id IS NULL AND EXISTS (
+       SELECT 1 FROM users ua WHERE ua.id = al.actor_id AND ua.org_id = ?)))`;
 
 test("buildAuditFilter: chỉ điều kiện dự án khi không có param nào", async () => {
   const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
-  const { where, params } = buildAuditFilter(new URLSearchParams(), DU_AN);
+  const { where, params } = buildAuditFilter(new URLSearchParams(), DU_AN, TO_CHUC);
   assert.equal(where, `WHERE ${LOC_DU_AN}`);
-  assert.deepEqual(params, [DU_AN]);
+  assert.deepEqual(params, [DU_AN, TO_CHUC]);
 });
 
 test("buildAuditFilter: chỉ áp điều kiện cho param có mặt, giữ đúng thứ tự params", async () => {
@@ -25,26 +28,31 @@ test("buildAuditFilter: chỉ áp điều kiện cho param có mặt, giữ đú
   const { where, params } = buildAuditFilter(
     new URLSearchParams({ entity: "contracts", entityId: "5", from: "2026-01-01" }),
     DU_AN,
+    TO_CHUC,
   );
   assert.equal(
     where,
     `WHERE ${LOC_DU_AN} AND al.entity_type = ? AND al.entity_id = ? AND al.at::date >= ?`,
   );
-  assert.deepEqual(params, [DU_AN, "contracts", 5, "2026-01-01"]);
+  assert.deepEqual(params, [DU_AN, TO_CHUC, "contracts", 5, "2026-01-01"]);
 });
 
 test("buildAuditFilter: bỏ qua entityId/actorId không phải số", async () => {
   const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
-  const { where, params } = buildAuditFilter(new URLSearchParams({ entityId: "abc" }), DU_AN);
+  const { where, params } = buildAuditFilter(
+    new URLSearchParams({ entityId: "abc" }),
+    DU_AN,
+    TO_CHUC,
+  );
   assert.equal(where, `WHERE ${LOC_DU_AN}`);
-  assert.deepEqual(params, [DU_AN]);
+  assert.deepEqual(params, [DU_AN, TO_CHUC]);
 });
 
 test("buildAuditFilter: giới hạn dự án + bản ghi toàn cục (đứng đầu)", async () => {
   const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
-  const { where, params } = buildAuditFilter(new URLSearchParams({ entity: "contracts" }), 7);
-  assert.equal(where, "WHERE (al.project_id = ? OR al.project_id IS NULL) AND al.entity_type = ?");
-  assert.deepEqual(params, [7, "contracts"]);
+  const { where, params } = buildAuditFilter(new URLSearchParams({ entity: "contracts" }), 7, 3);
+  assert.equal(where, `WHERE ${LOC_DU_AN} AND al.entity_type = ?`);
+  assert.deepEqual(params, [7, 3, "contracts"]);
 });
 
 const S = Date.now().toString(36); // hậu tố duy nhất tránh đụng UNIQUE khi chạy lại trên cùng DB
@@ -58,6 +66,14 @@ test(
     const { runWithRequestContext } = await import("@/lib/nen/request-context");
     const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
 
+    // Người thao tác là user thật của tổ chức 1 — bản ghi toàn cục chỉ hiện cho tổ chức người
+    // thao tác (AUDIT-S16 nợ 3); không dùng id cứng vì DB test dùng chung, id 1 có thể thuộc org khác.
+    const actorId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role, org_id) VALUES (?, ?, 'x', 'admin', ?)`,
+      `Audit API ${S}`,
+      `audit-api-${S}@test.local`,
+      TO_CHUC,
+    );
     const cidA = await insertId(
       `INSERT INTO contracts (code, kind, title) VALUES (?, 'nhan_thau', 'HĐ A')`,
       `AUDAPI-A-${S}`,
@@ -67,18 +83,22 @@ test(
       `AUDAPI-B-${S}`,
     );
 
-    await runWithRequestContext({ userId: 1, role: "admin", requestId: `req-${S}` }, async () => {
-      await withTransaction(async () => {
-        await run(`UPDATE contracts SET title = ? WHERE id = ?`, "HĐ A sửa", cidA);
-      });
-      await withTransaction(async () => {
-        await run(`UPDATE contracts SET title = ? WHERE id = ?`, "HĐ B sửa", cidB);
-      });
-    });
+    await runWithRequestContext(
+      { userId: actorId, role: "admin", requestId: `req-${S}` },
+      async () => {
+        await withTransaction(async () => {
+          await run(`UPDATE contracts SET title = ? WHERE id = ?`, "HĐ A sửa", cidA);
+        });
+        await withTransaction(async () => {
+          await run(`UPDATE contracts SET title = ? WHERE id = ?`, "HĐ B sửa", cidB);
+        });
+      },
+    );
 
     const { where, params } = buildAuditFilter(
       new URLSearchParams({ entity: "contracts", entityId: String(cidA) }),
       DU_AN, // HĐ test không gắn dự án → bản ghi audit project_id NULL (toàn cục) vẫn hiện
+      TO_CHUC, // …vì người thao tác thuộc tổ chức 1
     );
     const rows = await query<{ entityId: number; entityType: string }>(
       `SELECT al.entity_id AS "entityId", al.entity_type AS "entityType"
