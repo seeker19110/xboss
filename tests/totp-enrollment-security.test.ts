@@ -7,6 +7,7 @@ import { generate } from "otplib";
 import { query, queryOne, insertId, run } from "@/lib/db";
 import { hashPassword, getCurrentUser } from "@/lib/bao-mat/auth";
 import { COOKIE, parseToken } from "@/lib/bao-mat/session-token";
+import { runWithRequestContext } from "@/lib/nen/request-context";
 import { decryptTotpSecret, encryptTotpSecret, generateNewTotpSecret } from "@/lib/bao-mat/totp";
 import { POST as setup } from "@/app/api/auth/totp/setup/route";
 import { POST as confirm } from "@/app/api/auth/totp/confirm/route";
@@ -235,12 +236,18 @@ test("sau khi tắt 2FA, đăng nhập lại vẫn áp dụng yêu cầu theo va
     const code = await generate({ secret: u.secret, digits: 6, period: 30 });
     assert.equal((await disable(yeuCau(code, "DELETE"))).status, 200);
     const { POST: login } = await import("@/app/api/auth/login/route");
-    const response = await login(
-      new NextRequest("http://localhost/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email: u.email, password }),
-        headers: { "x-forwarded-for": `totp-policy-test-${u.id}` },
-      }),
+    // Đăng nhập là một request MỚI: chạy trong ngữ cảnh request rỗng như production (mỗi request
+    // một async context). Nếu dùng chung ngữ cảnh của lời gọi DELETE ở trên (đã có orgId),
+    // withOrgScope('*') trong login bị bất biến S16 từ chối — đúng, vì request đã xác thực
+    // không được nâng phạm vi.
+    const response = await runWithRequestContext({}, () =>
+      login(
+        new NextRequest("http://localhost/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email: u.email, password }),
+          headers: { "x-forwarded-for": `totp-policy-test-${u.id}` },
+        }),
+      ),
     );
     assert.equal(response.status, 200);
     const token = parseToken(response.cookies.get(COOKIE)!.value);
