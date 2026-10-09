@@ -443,3 +443,32 @@ test(
     });
   },
 );
+
+test(
+  "S16 code-lists: đọc rỗng ngoài phạm vi tổ chức không nhiễm cache — require_2fa_roles không fail-open",
+  S,
+  async () => {
+    const { run, withOrgScope } = await import("@/lib/db");
+    const { getList, bumpCodeListVersion } = await import("@/lib/ha-tang/code-lists");
+    await run(
+      `INSERT INTO code_lists (org_id, domain, code, label) VALUES (?, 'require_2fa_roles', 'pm', 'PM')`,
+      A.org,
+    );
+    bumpCodeListVersion();
+    try {
+      await voiPoolApp(async () => {
+        // Lời gọi quên gắn phạm vi (không request, không withOrgScope): RLS trả 0 dòng.
+        assert.equal((await getList("require_2fa_roles", A.org)).length, 0);
+        // Lời gọi đúng phạm vi ngay sau đó phải thấy cấu hình thật, không lấy rỗng từ cache.
+        const dung = await withOrgScope(A.org, () => getList("require_2fa_roles", A.org));
+        assert.deepEqual(
+          dung.map((r) => r.code),
+          ["pm"],
+        );
+      });
+    } finally {
+      await run(`DELETE FROM code_lists WHERE org_id = ? AND domain = 'require_2fa_roles'`, A.org);
+      bumpCodeListVersion();
+    }
+  },
+);

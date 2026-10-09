@@ -3,6 +3,7 @@
 // getList() cache trong bộ nhớ + watermark version (bám pattern sheetVersion): mọi thao
 // tác ghi (tạo/sửa/xoá/sắp thứ tự) gọi bumpCodeListVersion() để vô hiệu cache lần đọc sau.
 import { query, queryOne, run } from "@/lib/db";
+import { log } from "@/lib/nen/log";
 
 export type CodeListItem = {
   id: number;
@@ -58,10 +59,39 @@ export async function getList(
   if (fresh) {
     rows = cached.rows;
   } else {
-    rows = await getListOfOrg(domain, orgId);
-    cache.set(key, { v: version, rows, loadedAt: Date.now() });
+    const { rows: loaded, scope } = await docTheoPhamVi(domain, orgId);
+    rows = loaded;
+    // S16: code_lists là bảng FORCE RLS theo tổ chức — đọc lúc phạm vi GUC không phải org này
+    // (quên gắn phạm vi) ra 0 dòng. Không đưa kết quả RỖNG ngoài phạm vi vào cache, kẻo một lời
+    // gọi sai phạm vi làm mọi request đúng của org thấy danh mục rỗng tới hết TTL (vd
+    // `require_2fa_roles` rỗng → không ai bị buộc 2FA = fail-open). Có dòng = RLS đã cho qua
+    // (hoặc role chủ bảng/superuser không chịu RLS) → kết quả đúng, cache bình thường.
+    if (rows.length > 0 || scope === String(orgId) || scope === "*") {
+      cache.set(key, { v: version, rows, loadedAt: Date.now() });
+    } else {
+      log.warn("code-lists: đọc rỗng ngoài phạm vi tổ chức, không cache", { domain, orgId, scope });
+    }
   }
   return opts?.includeInactive ? rows : rows.filter((r) => r.active);
+}
+
+// Đọc kèm phạm vi GUC `app.org_id` trong CÙNG câu lệnh (cùng snapshot/kết nối) — LEFT JOIN để
+// vẫn ra 1 dòng phạm vi khi danh mục rỗng.
+async function docTheoPhamVi(
+  domain: string,
+  orgId: number,
+): Promise<{ rows: CodeListItem[]; scope: string }> {
+  const raw = await query<CodeListItem & { scope: string | null; id: number | null }>(
+    `SELECT pv.scope, cl.id, cl.domain, cl.code, cl.label, cl.sort, cl.active, cl.meta
+       FROM (SELECT COALESCE(current_setting('app.org_id', true), '') AS scope) pv
+       LEFT JOIN code_lists cl ON cl.domain = ? AND cl.org_id = ?
+      ORDER BY cl.sort, cl.code`,
+    domain,
+    orgId,
+  );
+  const scope = raw[0]?.scope ?? "";
+  const rows = raw.filter((r) => r.id != null).map(({ scope: _scope, ...r }) => r as CodeListItem);
+  return { rows, scope };
 }
 
 // Trang quản trị (S02 — cô lập tenant): chỉ mục thuộc tổ chức `orgId`, kể cả mục đã tắt.

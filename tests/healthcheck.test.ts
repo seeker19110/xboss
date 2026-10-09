@@ -38,3 +38,12 @@ test(
     assert.equal(db?.status, "ok", db?.detail ?? "");
   },
 );
+
+test("nguoiNhanCanhBao: REPORT_EMAIL_TO → to; admin tra DB (mọi tổ chức) → bcc, không lộ nhau", async () => {
+  const { nguoiNhanCanhBao } = await import("@/lib/van-hanh/healthcheck");
+  assert.deepEqual(nguoiNhanCanhBao(["ops@x.vn"], ["a@org1.vn"]), { to: "ops@x.vn" });
+  assert.deepEqual(nguoiNhanCanhBao([], ["a@org1.vn", "b@org2.vn", "a@org1.vn"]), {
+    bcc: "a@org1.vn, b@org2.vn",
+  });
+  assert.equal(nguoiNhanCanhBao([], []), null);
+});

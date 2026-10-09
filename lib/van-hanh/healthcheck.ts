@@ -264,3 +264,15 @@ export async function runHealthChecks(): Promise<HealthCheckReport> {
     hasIssues: failCount > 0 || warnCount > 0,
   };
 }
+
+// Người nhận email cảnh báo sức khoẻ. `REPORT_EMAIL_TO` (do vận hành khai) → gửi `to` như cũ.
+// Không khai → gửi Admin tra từ DB qua `bcc`: cron bằng CRON_SECRET tra admin MỌI tổ chức, gom
+// chung vào `To:` thì mỗi admin thấy email admin của tổ chức khác (rò thông tin xuyên tenant — S16).
+export function nguoiNhanCanhBao(
+  cauHinh: string[],
+  admins: string[],
+): { to?: string; bcc?: string } | null {
+  if (cauHinh.length > 0) return { to: cauHinh.join(", ") };
+  const ds = [...new Set(admins)];
+  return ds.length > 0 ? { bcc: ds.join(", ") } : null;
+}

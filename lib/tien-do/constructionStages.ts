@@ -310,7 +310,11 @@ export async function pendingStageFloors(projectId: number): Promise<Set<string>
 // fsf.project_id (M123 · F6); JOIN work_packages/tasks vẫn giữ vì cần ngày bắt đầu của
 // task trên tầng đó. Copy tinh thần frontMissingList() cũ trong lib/workfronts.ts nhưng
 // bỏ trục sheet.
-export async function stageMissingList(projectId?: number): Promise<StageMissingItem[]> {
+// S16: thiếu dự án → [] (trước đây chạy phạm vi '*' đếm tầng chờ của MỌI tổ chức vào thông báo/
+// dashboard người dùng chưa chọn dự án); nhóm/task JOIN ràng cùng dự án với tầng qua tháp (trước
+// đây chỉ khớp floor_label → tầng '9F' dự án A đếm cả task tầng '9F' dự án B).
+export async function stageMissingList(projectId?: number | null): Promise<StageMissingItem[]> {
+  if (projectId == null) return [];
   const soon = daysFromTodayISO(3);
   const today = todayISO();
   // COALESCE(t.start_date, wp.start_date): task.start_date NULL = kế thừa ngày BĐ nhóm (lib/recompute.ts).
@@ -321,13 +325,10 @@ export async function stageMissingList(projectId?: number): Promise<StageMissing
     "COALESCE(t.start_date, wp.start_date) IS NOT NULL",
     "COALESCE(t.start_date, wp.start_date) <= ?",
     "t.status NOT IN ('hoan_thanh','nghiem_thu')",
+    "fsf.project_id = ?",
   ];
-  const args: unknown[] = [soon];
-  if (projectId != null) {
-    conds.push("fsf.project_id = ?");
-    args.push(projectId);
-  }
-  const rows = await withProjectScope(projectId ?? "*", () =>
+  const args: unknown[] = [soon, projectId];
+  const rows = await withProjectScope(projectId, () =>
     query<{
       floorStageFrontId: number;
       floorLabel: string;
@@ -340,6 +341,7 @@ export async function stageMissingList(projectId?: number): Promise<StageMissing
        JOIN construction_stages cs ON cs.id = fsf.stage_id
        JOIN work_packages wp ON wp.floor_label = fsf.floor_label
        JOIN sheet_types st ON st.id = wp.sheet_type_id
+       JOIN towers tw ON tw.id = st.tower_id AND tw.project_id = fsf.project_id
        JOIN tasks t ON t.package_id = wp.id
       WHERE ${conds.join(" AND ")}
       GROUP BY fsf.id, fsf.floor_label, cs.name`,

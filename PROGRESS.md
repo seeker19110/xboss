@@ -1,5 +1,23 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — Đóng 3 nợ S16: cache code-lists, `stageMissingList` theo dự án, email health-check
+
+- **`code-lists.getList`:** đọc kèm phạm vi GUC `app.org_id` trong cùng câu lệnh; kết quả RỖNG đọc ngoài
+  phạm vi tổ chức (quên gắn phạm vi → RLS ra 0 dòng) không vào cache + `log.warn` — trước đây một lời gọi
+  sai phạm vi làm `require_2fa_roles` rỗng cho mọi request đúng của org tới hết TTL 60s (fail-open 2FA).
+  Có dòng hoặc phạm vi đúng/`'*'` thì cache như cũ (không thêm query cho đường nóng).
+- **`stageMissingList`:** thiếu dự án → `[]` (trước đây phạm vi `'*'` đếm tầng chờ của MỌI tổ chức vào
+  thông báo `stage_missing`/dashboard của người chưa chọn dự án); nhóm/task JOIN ràng cùng dự án với tầng qua
+  `towers` (trước đây chỉ khớp `floor_label` → tầng `9F` dự án A đếm cả task tầng `9F` dự án B — nợ ghi ở
+  mục S16 null-scope). Ảnh hưởng: thông báo, dashboard `workfrontBlock`, báo cáo EOT (`claims`).
+- **Health-check cron:** người nhận tra từ DB (admin mọi tổ chức khi gọi bằng `CRON_SECRET`) gửi qua `bcc`
+  thay vì gom chung `To:` (lộ email admin xuyên tổ chức); `REPORT_EMAIL_TO` vẫn `to` như cũ. Helper thuần
+  `nguoiNhanCanhBao` (`lib/van-hanh/healthcheck.ts`).
+- **Test:** `s16-app-role-duong-phu` +1 ca bằng `xboss_app` (đọc sai phạm vi rồi đúng phạm vi phải thấy
+  cấu hình); `dashboardext` workfront dựng 3 dự án thật (đếm chính xác, `null` = 0, không JOIN task dự án
+  khác cùng tên tầng); `healthcheck` +1 ca. Hai ca đầu đỏ trên code cũ (đã gỡ bản vá để xác nhận).
+- **Còn lại của S16:** đo 3 lượt khứ hồi/câu lệnh ngoài transaction trên staging.
+
 ## 2026-10-09 — Sửa test chập chờn `cost-report` A4-AC04 (snapshot `pg_stat_activity`)
 
 - **Nguyên nhân:** ca "thanh toán + BOQ chèn đồng thời không cho hai snapshot trong một báo cáo" poll
@@ -150,9 +168,9 @@ bất biến và checklist staging ở `docs/nang-cap/AUDIT-S16-RLS-STRICT.md`; 
   bằng `xboss_app`~~ (đã đóng 2026-10-09 bởi `tests/s16-app-role-duong-phu.test.ts`; unit test cũ vẫn mock
   `withOrgScope`, nhưng đã có ca tích hợp thật) — còn lại: kiểm trên
   staging theo checklist; mỗi query ngoài transaction nay 3 lượt khứ hồi (BEGIN/câu/COMMIT) → đo
-  `poolStats`/dashboard trên staging; `code-lists.getList` cache kết quả rỗng theo org (fail-open 2FA
-  nếu sau này gọi sai phạm vi); `stageMissingList(undefined)` dùng `'*'` đếm tầng chờ mọi org (lỗi
-  sẵn có); health-check cron gửi 1 email `To:` chứa admin mọi org (hành vi cũ).
+  `poolStats`/dashboard trên staging; ~~`code-lists.getList` cache kết quả rỗng theo org;
+  `stageMissingList(undefined)` dùng `'*'`; health-check `To:` chứa admin mọi org~~ (đã đóng
+  2026-10-09, mục "Đóng 3 nợ S16").
 
 ## 2026-10-09 — Sau S15 (PR-A): đóng 6(a)/6(d)/6(f), A1-AC05 toàn diện, A1-AC03 null-scope, A2-AC07/08 lớp B + đặc tả M128/M129/M130
 
@@ -195,8 +213,8 @@ schema_behind | db_unavailable`), `login`/`me` trả 503 JSON `schema_not_ready`
   nhận `packageId` không kiểm dự án → đổi tên cột của sheet bất kỳ (xuyên org); nay JOIN theo dự án
   hiện hành, test hồi quy trong `route-tien-do-3`. **Phát hiện chưa sửa (nợ):** `PATCH /api/nav-
 settings` thông báo mọi PM toàn hệ; `audit_log`/`custom_field_defs` không có `org_id`; unique
-  `ux_flow_active` toàn hệ; `allocationOverNorm` tính toàn hệ; `stageMissingList` JOIN WP không ràng
-  dự án; `system-uploads` hàng `project_id NULL` legacy.
+  `ux_flow_active` toàn hệ; `allocationOverNorm` tính toàn hệ; ~~`stageMissingList` JOIN WP không ràng
+  dự án~~ (đã đóng 2026-10-09); `system-uploads` hàng `project_id NULL` legacy.
 - **6(a) cutover membership (A1-AC02) — xong theo cờ:** `XBOSS_STRICT_MEMBERSHIP=1` tắt nhánh legacy
   "user_projects rỗng = thấy mọi dự án org" (`visibleProjectIds`, `/api/project` trả null,
   `reportRecipients`); script dry-run chỉ-đọc liệt kê người sẽ mất quyền; runbook

@@ -3,7 +3,11 @@ import nodemailer from "nodemailer";
 import { query, insertId, withOrgScope } from "@/lib/db";
 import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
 import { sendTelegram } from "@/lib/tien-do/report";
-import { runHealthChecks, type HealthCheckReport } from "@/lib/van-hanh/healthcheck";
+import {
+  runHealthChecks,
+  nguoiNhanCanhBao,
+  type HealthCheckReport,
+} from "@/lib/van-hanh/healthcheck";
 import { acquireSyncLock, releaseSyncLock } from "@/lib/ha-tang/sync-locks";
 
 export const dynamic = "force-dynamic";
@@ -52,11 +56,12 @@ async function handleHealthCheck(bySecret: boolean): Promise<NextResponse> {
 
     const { SMTP_HOST, SMTP_USER, SMTP_PASS } = process.env;
     if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
-      let to = (process.env.REPORT_EMAIL_TO ?? "")
+      const cauHinh = (process.env.REPORT_EMAIL_TO ?? "")
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
-      if (to.length === 0) {
+      let admins: string[] = [];
+      if (cauHinh.length === 0) {
         // Cảnh báo sức khoẻ là của CẢ HỆ THỐNG: cron bằng CRON_SECRET (chưa có actor) gửi mọi
         // Admin với phạm vi '*' do server đặt; Admin/PM bấm tay bằng phiên thì request đã thuộc
         // một tổ chức → chỉ Admin của tổ chức đó (withOrgScope từ chối nâng lên '*' — D01, S16).
@@ -64,9 +69,10 @@ async function handleHealthCheck(bySecret: boolean): Promise<NextResponse> {
         const rows = bySecret
           ? await withOrgScope("*", () => query<{ email: string }>(sqlAdmin))
           : await query<{ email: string }>(sqlAdmin);
-        to = rows.map((r) => r.email);
+        admins = rows.map((r) => r.email);
       }
-      if (to.length > 0) {
+      const nguoiNhan = nguoiNhanCanhBao(cauHinh, admins);
+      if (nguoiNhan) {
         const transporter = nodemailer.createTransport({
           host: SMTP_HOST,
           port: Number(process.env.SMTP_PORT ?? 587),
@@ -75,7 +81,7 @@ async function handleHealthCheck(bySecret: boolean): Promise<NextResponse> {
         });
         await transporter.sendMail({
           from: process.env.SMTP_FROM ?? `"XBoss" <${SMTP_USER}>`,
-          to: to.join(", "),
+          ...nguoiNhan,
           subject: `⚠️ XBoss — kiểm tra hệ thống phát hiện ${report.failCount} lỗi, ${report.warnCount} cảnh báo`,
           html: reportToHtml(report),
         });
