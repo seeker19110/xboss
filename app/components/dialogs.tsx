@@ -1,9 +1,24 @@
 "use client";
-import { useEffect, useId, useState, useCallback, useRef, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useState,
+  useCallback,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+
+const khongDangKy = () => () => {};
 
 // ── Modal nền tảng: overlay + Escape để đóng + khoá scroll nền ──────────────
 // Dùng chung cho mọi modal trong app thay vì tự dựng overlay từng nơi.
+// Render qua portal vào <body>: overlay `fixed inset-0` đặt trong phần tử có `backdrop-filter`/
+// `transform`/`filter` (vd header sticky `backdrop-blur-md` của AppHeader) sẽ lấy phần tử đó làm
+// containing block → modal bị kẹt/cắt trong header. Portal chỉ bật sau hydrate (lượt render server
+// và lượt hydrate đầu vẫn render tại chỗ để không lệch HTML); modal mở sau đó portal ngay lần đầu.
 export function Modal({
   onClose,
   children,
@@ -27,6 +42,11 @@ export function Modal({
   const panelRef = useRef<HTMLDivElement>(null);
   const autoTitleId = useId();
   const [labelledBy, setLabelledBy] = useState<string | undefined>(undefined);
+  const laClient = useSyncExternalStore(
+    khongDangKy,
+    () => true,
+    () => false,
+  );
 
   // Không có ariaLabel → tìm tiêu đề đầu tiên trong panel làm tên truy cập (aria-labelledby).
   // Theo dõi panel bằng MutationObserver: modal có tiêu đề chỉ hiện sau khi tải dữ liệu vẫn
@@ -44,7 +64,8 @@ export function Modal({
     const observer = new MutationObserver(capNhat);
     observer.observe(panel, { childList: true, subtree: true });
     return () => observer.disconnect();
-  }, [ariaLabel, autoTitleId]);
+    // laClient: panel được dựng lại trong portal sau hydrate → theo dõi panel mới.
+  }, [ariaLabel, autoTitleId, laClient]);
 
   // onClose thường là hàm inline (tham chiếu đổi mỗi lần parent render).
   // Giữ trong ref để listener keydown luôn gọi bản mới mà KHÔNG phải đăng ký lại
@@ -116,7 +137,7 @@ export function Modal({
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  return (
+  const lop = (
     <div
       className={`fixed inset-0 ${zIndex} backdrop-blur-xs flex transition-opacity ${
         drawer ? "items-stretch justify-start" : "items-center justify-center p-4"
@@ -142,6 +163,7 @@ export function Modal({
       </div>
     </div>
   );
+  return laClient ? createPortal(lop, document.body) : lop;
 }
 
 // ── Dialog kiểu prompt/confirm/alert trả Promise — thay window.* ────────────

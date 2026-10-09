@@ -41,6 +41,38 @@ APPROVAL D03/D04, PLAN §S08). Không thêm dependency, không migration, không
   op cũ không giải mã được; xung đột tick/ảnh chỉ có "bỏ"; cache đọc ngoài lưới tracking (profile) chưa quyết;
   `scripts/seed-sample.ts` chạy lại trên DB đã có `offline_vault_keys` lỗi FK (CI dùng DB mới nên chưa đỏ).
 
+**Sau audit 3 trụ** (nhánh `s08-audit-fix`; mỗi lỗi logic có test hồi quy thấy ĐỎ trên code cũ trước khi sửa):
+
+- **H1 (logic) — "Giữ bản trên thiết bị" xoá im lặng bản nháp mới hơn (TOCTOU):** `themOp` nhận
+  `dieuKien` chạy TRONG vòng OCC trên đúng snapshot sẽ commit (op cũ còn `conflict`, không có
+  `diary_note` cùng ngày/cùng chủ có sequence lớn hơn) + `thayOpCu: false` (luồng này chỉ thêm, không
+  dedup). Có bản mới hơn → `{ok:false}` "Đã có bản nháp mới hơn…", không ghi/xoá gì.
+- **H2 (UI) — Modal kẹt trong header `backdrop-blur`:** `Modal` (`dialogs.tsx`) portal vào `<body>` sau
+  hydrate (`useSyncExternalStore`, lượt server/hydrate vẫn render tại chỗ); đã rà 59 nơi dùng (không
+  lồng `<form>`, không click-outside cha, e2e chỉ định vị theo trang). E2E (c) đo overlay phủ màn, hộp
+  thoại >50% màn (mobile), nút không bị bottombar che — ĐỎ trên Modal cũ (overlay cao 48px).
+- **M (UI):** panel render ở mọi nhánh của badge (kể cả tạm khoá) — chip "Chi tiết" không còn là nút
+  chết, thêm `aria-label`. Lỗi đọc IndexedDB không còn bị coi là 0: snapshot `docLoi`, badge cảnh báo,
+  màn phục hồi `role="alert"` + nút "Thử lại", không bao giờ hiện "đã lên máy chủ" khi không đọc được
+  (`demLegacy`/`danhSachThaoTac` reject thay vì 0/[]). Xung đột nhật ký có nút "Tải lại"; "Dùng bản máy
+  chủ" khoá khi chưa tải được bản máy chủ.
+- **M (bảo mật) — KEK test e2e:** `docKeyringKek` từ chối secret chứa `e2e-offline-kek` trừ khi
+  `choPhepKekE2E` (server đọc cờ tường minh `XBOSS_E2E=1`, chỉ `playwright.config.ts` đặt; khai trong
+  `lib/nen/env.ts`, ghi chú `DEPLOY.md`).
+- **`boThaoTac`:** chủ + dự án + trạng thái `conflict|rejected` kiểm TRONG transaction xoá
+  (`xoaTheoYeuCau(owner, ids, dieuKien)` trả số op đã xoá, không tăng `meta.rev` khi không xoá gì).
+  Ca "chập chờn" `true !== false` không tái hiện được (≥40 lần, kể cả chạy song song có tải) — dấu vết
+  khớp đúng mutation "chỉ bỏ op conflict/rejected" của `test:mutation` (script sửa file tại chỗ: chạy
+  test cùng lúc trên cùng working tree sẽ thấy đúng lỗi đó); file chạy 12 lần liên tiếp xanh.
+- **LOW:** "Gửi lại ngay" báo thất bại thật (mất mạng/kho khoá → false, lỗi thiết bị → reject); bỏ op cũ
+  lỗi sau khi op mới đã lưu → `{ok:true, canhBao}` riêng; các `.catch` nuốt lỗi ở màn phục hồi hiện
+  thông điệp tiếng Việt; `refreshStats` không bao giờ reject, chặn thêm race đăng xuất ở nhánh vault
+  khoá. `public/sw.js`: comment nêu an toàn cache API dựa vào `tag` ngẫu nhiên theo tab, không dựa
+  `generation` (không đổi logic, không tăng version).
+- **Test:** `audit-s08-offline-recovery` 9 → 15 ca; `offline-crypto` +1; `offline-vault-route` +KEK e2e.
+  `test:mutation` +4 (bỏ thao tác chỉ trong dự án hiện hành; kiểm "có bản mới hơn" trong OCC;
+  `refreshStats` bỏ kết quả khi chủ đổi; cập nhật 2 mutation S08 cũ theo code mới) — đều bị bắt.
+
 ## 2026-10-08 — QUALITY-FINAL-1 A4-AC08: đối chiếu báo cáo, query count và benchmark p95
 
 Đặc tả `docs/nang-cap/AUDIT-A4-AC08-BENCHMARK.md` (spec cha A4-AC08, APPROVAL §D09). Không đổi logic

@@ -172,15 +172,23 @@ export default function OfflineRecoveryPanel({ onClose }: { onClose: () => void 
   const [thongBao, setThongBao] = useState("");
   const [dangLam, setDangLam] = useState(false);
   const [xungDot, setXungDot] = useState<string | null>(null);
+  /** Lần đọc danh sách gần nhất lỗi (IndexedDB) — KHÔNG được hiển thị như "không còn gì". */
+  const [loiDoc, setLoiDoc] = useState(false);
   const tieuDeRef = useRef<HTMLHeadingElement>(null);
 
   const taiLai = useCallback(async () => {
-    const [list, soCu] = await Promise.all([
-      offlineQueue.danhSachThaoTac().catch(() => []),
-      offlineQueue.demLegacy(),
-    ]);
-    setDs(list);
-    setLegacy(soCu);
+    try {
+      const [list, soCu] = await Promise.all([
+        offlineQueue.danhSachThaoTac(),
+        offlineQueue.demLegacy(),
+      ]);
+      setDs(list);
+      setLegacy(soCu);
+      setLoiDoc(false);
+    } catch {
+      setDs(null);
+      setLoiDoc(true);
+    }
   }, []);
 
   // Tải lại mỗi khi trạng thái hàng đợi đổi (gửi xong, khoá/mở vault, mất/có mạng).
@@ -199,10 +207,26 @@ export default function OfflineRecoveryPanel({ onClose }: { onClose: () => void 
   const guiLai = async () => {
     setDangLam(true);
     setThongBao("Đang gửi lại các thao tác chờ…");
-    await offlineQueue.guiLaiNgay().catch(() => undefined);
+    let tb: string;
+    try {
+      tb = (await offlineQueue.guiLaiNgay())
+        ? "Đã thử gửi lại. Xem trạng thái từng thao tác bên dưới."
+        : "Chưa gửi lại được — cần có mạng và kho ngoại tuyến đang mở.";
+    } catch {
+      tb = "Gửi lại thất bại do lỗi đọc/ghi trên thiết bị — thao tác vẫn giữ nguyên, thử lại sau.";
+    }
     await taiLai();
     setDangLam(false);
-    setThongBao("Đã thử gửi lại. Xem trạng thái từng thao tác bên dưới.");
+    setThongBao(tb);
+  };
+
+  const thuLaiDoc = async () => {
+    setDangLam(true);
+    setThongBao("Đang đọc lại dữ liệu trên thiết bị…");
+    await offlineQueue.lamMoi();
+    await taiLai();
+    setDangLam(false);
+    setThongBao("");
   };
 
   const moKhoa = async () => {
@@ -225,26 +249,33 @@ export default function OfflineRecoveryPanel({ onClose }: { onClose: () => void 
     );
     if (!ok) return;
     setDangLam(true);
-    const xong = await offlineQueue.boThaoTac(op.operationId).catch(() => false);
+    let tb: string;
+    try {
+      tb = (await offlineQueue.boThaoTac(op.operationId))
+        ? "Đã bỏ 1 thao tác khỏi thiết bị."
+        : "Thao tác đã đổi trạng thái — đã tải lại danh sách.";
+    } catch {
+      tb = "Chưa bỏ được thao tác do lỗi trên thiết bị — thao tác vẫn còn, thử lại.";
+    }
     await taiLai();
     setDangLam(false);
-    setThongBao(
-      xong
-        ? "Đã bỏ 1 thao tác khỏi thiết bị."
-        : "Thao tác đã đổi trạng thái — đã tải lại danh sách.",
-    );
+    setThongBao(tb);
   };
 
+  const khongDocDuoc = loiDoc || snap.docLoi;
   const nhom = ds ? chiaNhom(ds) : [];
   const soMo = ds?.filter((o) => o.moDuoc).length ?? 0;
   // Mọi op của tài khoản này mà phiên hiện tại không đọc được (khoá chưa mở/hết hạn/khác dự án).
   const soKhoa = Math.max(0, snap.total - soMo);
-  const rong = ds !== null && snap.total === 0 && legacy === 0;
+  // Chỉ khẳng định "đã lên máy chủ" khi ĐỌC ĐƯỢC thiết bị và thật sự không còn gì.
+  const rong = ds !== null && !khongDocDuoc && snap.total === 0 && legacy === 0;
   const tomTat = snap.quarantined
     ? "Lưu ngoại tuyến đang tạm khoá."
-    : snap.total > 0
-      ? `${snap.total} thao tác đang lưu trên thiết bị, chưa lên máy chủ.`
-      : "Không có thao tác nào chờ gửi.";
+    : khongDocDuoc
+      ? "Không đọc được thao tác ngoại tuyến trên thiết bị — chưa xác định được còn gì chưa lên máy chủ."
+      : snap.total > 0
+        ? `${snap.total} thao tác đang lưu trên thiết bị, chưa lên máy chủ.`
+        : "Không có thao tác nào chờ gửi.";
 
   return (
     <Modal onClose={onClose} className="max-w-xl">
@@ -320,11 +351,30 @@ export default function OfflineRecoveryPanel({ onClose }: { onClose: () => void 
             )}
           </div>
 
-          {ds === null ? (
-            <div className="space-y-2" aria-hidden="true">
-              <Skeleton className="h-12" />
-              <Skeleton className="h-12" />
+          {khongDocDuoc && (
+            <div
+              role="alert"
+              className="rounded-xl border border-amber-800 bg-zinc-950/70 p-4 space-y-3"
+            >
+              <p className="flex items-start gap-2 text-sm text-amber-300">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+                Không đọc được dữ liệu ngoại tuyến trên thiết bị (bộ nhớ trình duyệt đang bị chặn,
+                bận hoặc lỗi). Có thể vẫn còn thao tác chưa lên máy chủ — đừng xoá dữ liệu trình
+                duyệt hay đăng xuất cho tới khi đọc lại được.
+              </p>
+              <Button variant="secondary" icon={RefreshCw} disabled={dangLam} onClick={thuLaiDoc}>
+                Thử lại
+              </Button>
             </div>
+          )}
+
+          {ds === null ? (
+            loiDoc ? null : (
+              <div className="space-y-2" aria-hidden="true">
+                <Skeleton className="h-12" />
+                <Skeleton className="h-12" />
+              </div>
+            )
           ) : rong ? (
             <p className="rounded-xl bg-zinc-950/70 border border-zinc-800 p-4 text-sm text-zinc-300">
               Không có thao tác nào trên thiết bị — mọi thay đổi đã lên máy chủ.
@@ -512,16 +562,34 @@ function XungDotNhatKy({
   const [dangTai, setDangTai] = useState(true);
   const [dangLam, setDangLam] = useState(false);
   const [thongBao, setThongBao] = useState("");
+  /** Tăng để tải lại cả bản thiết bị lẫn bản máy chủ (nút "Tải lại"). */
+  const [lanTai, setLanTai] = useState(0);
   const tieuDeRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     tieuDeRef.current?.focus();
   }, []);
 
+  const taiLai = () => {
+    setDangTai(true);
+    setLoi(null);
+    setMayChu(null);
+    setThongBao("");
+    setLanTai((n) => n + 1);
+  };
+
   useEffect(() => {
     let huy = false;
     (async () => {
-      const xem = await offlineQueue.xemNhatKyXungDot(operationId).catch(() => null);
+      let xem: NhatKyXungDot | null;
+      try {
+        xem = await offlineQueue.xemNhatKyXungDot(operationId);
+      } catch {
+        if (huy) return;
+        setLoi("Không đọc được dữ liệu ngoại tuyến trên thiết bị — bấm Tải lại để thử lại.");
+        setDangTai(false);
+        return;
+      }
       if (huy) return;
       if (!xem) {
         setLoi("Không đọc được bản trên thiết bị (kho đang khoá hoặc thao tác đã đổi trạng thái).");
@@ -550,7 +618,7 @@ function XungDotNhatKy({
     return () => {
       huy = true;
     };
-  }, [operationId]);
+  }, [operationId, lanTai]);
 
   const giuThietBi = async () => {
     if (!ban || !mayChu) return;
@@ -563,7 +631,8 @@ function XungDotNhatKy({
     setThongBao("Đang lưu lựa chọn trên thiết bị…");
     const kq = await offlineQueue.giuBanNhatKyThietBi(operationId, mayChu.etag);
     setDangLam(false);
-    if (kq.ok) onXong("Đã xếp bản trên thiết bị để gửi lại theo phiên bản máy chủ vừa xem.");
+    if (kq.ok)
+      onXong(kq.canhBao ?? "Đã xếp bản trên thiết bị để gửi lại theo phiên bản máy chủ vừa xem.");
     else setThongBao(kq.error);
   };
 
@@ -574,9 +643,16 @@ function XungDotNhatKy({
     );
     if (!ok) return;
     setDangLam(true);
-    const xong = await offlineQueue.boThaoTac(operationId).catch(() => false);
-    setDangLam(false);
-    onXong(xong ? "Đã bỏ bản trên thiết bị, giữ bản trên máy chủ." : "Thao tác đã đổi trạng thái.");
+    try {
+      const xong = await offlineQueue.boThaoTac(operationId);
+      onXong(
+        xong ? "Đã bỏ bản trên thiết bị, giữ bản trên máy chủ." : "Thao tác đã đổi trạng thái.",
+      );
+    } catch {
+      setThongBao("Chưa bỏ được bản trên thiết bị do lỗi đọc/ghi — bản này vẫn còn, thử lại.");
+    } finally {
+      setDangLam(false);
+    }
   };
 
   const chanGiu = !mayChu || mayChu.khoaSo || !!ban?.coBanMoiHon;
@@ -650,8 +726,12 @@ function XungDotNhatKy({
         <Button variant="primary" disabled={dangLam || chanGiu} onClick={giuThietBi}>
           Giữ bản trên thiết bị
         </Button>
-        <Button variant="secondary" disabled={dangLam || !ban} onClick={dungMayChu}>
+        {/* Chưa xem được bản máy chủ thì không cho "dùng" nó (người dùng chưa biết sẽ giữ gì). */}
+        <Button variant="secondary" disabled={dangLam || !ban || !mayChu} onClick={dungMayChu}>
           Dùng bản máy chủ
+        </Button>
+        <Button variant="ghost" icon={RefreshCw} disabled={dangLam || dangTai} onClick={taiLai}>
+          Tải lại
         </Button>
       </div>
     </div>

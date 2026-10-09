@@ -273,6 +273,19 @@ test(
       if (cu === undefined) delete process.env.XBOSS_SECRET;
       else process.env.XBOSS_SECRET = cu;
     }
+    // KEK giá trị TEST của e2e (công khai trong repo) lọt lên production → từ chối, trừ khi có cờ
+    // tường minh XBOSS_E2E=1 (chỉ playwright.config.ts đặt cho webServer e2e).
+    const coE2E = process.env.XBOSS_E2E;
+    delete process.env.XBOSS_E2E;
+    try {
+      await vao(F.u.a, F.p1);
+      batKek("e2e1:e2e-offline-kek-khong-bi-mat-du-32-ky-tu");
+      const e2e = await (await r.devices()).POST(req("POST", "/api/offline/devices"));
+      assert.equal(e2e.status, 503);
+      assert.equal((await e2e.json()).code, "offline_vault_misconfigured");
+    } finally {
+      if (coE2E !== undefined) process.env.XBOSS_E2E = coE2E;
+    }
     const { rows } = await own.query(`SELECT 1 FROM offline_devices WHERE user_id = $1`, [
       F.u.a.id,
     ]);

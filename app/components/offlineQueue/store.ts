@@ -18,6 +18,7 @@ import {
   LEASE_TTL_MS,
   PHOTO_QUOTA_BYTES,
   type ChuSoHuu,
+  type DieuKienXoa,
   type Lease,
   type QueueRecord,
   type QueueStore,
@@ -453,18 +454,25 @@ export class QueueDb implements QueueStore {
     });
   }
 
-  async xoaTheoYeuCau(owner: string, ids: string[]) {
-    if (!ids.length) return;
-    await this.db.tx([STORE_OPS, STORE_META], "readwrite", async (t) => {
+  async xoaTheoYeuCau(owner: string, ids: string[], dieuKien?: DieuKienXoa): Promise<number> {
+    if (!ids.length) return 0;
+    return this.db.tx([STORE_OPS, STORE_META], "readwrite", async (t) => {
       const meta = await docMeta(t);
       let photoBytes = meta.photoBytes;
+      let n = 0;
       for (const id of ids) {
         const r = await t.get<QueueRecord>(STORE_OPS, id);
         if (!r || r.owner !== owner) continue; // không bao giờ xoá op của chủ khác
+        // Điều kiện kiểm trên bản ghi ĐANG có trong transaction (không tin snapshot đọc trước).
+        if (dieuKien && r.projectId !== dieuKien.projectId) continue;
+        if (dieuKien && !dieuKien.states.includes(r.state)) continue;
         if (r.kind === "photo") photoBytes -= r.bytes;
         await t.delete(STORE_OPS, id);
+        n++;
       }
-      await t.put(STORE_META, { ...meta, rev: meta.rev + 1, photoBytes });
+      // Không xoá gì → không tăng rev (không làm enqueue/flush tab khác phải đọc lại vô ích).
+      if (n) await t.put(STORE_META, { ...meta, rev: meta.rev + 1, photoBytes });
+      return n;
     });
   }
 

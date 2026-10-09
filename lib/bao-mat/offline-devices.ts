@@ -46,7 +46,11 @@ export type TrangThaiVault =
 /** Đọc keyring mỗi lần gọi (đổi env khi xoay KEK có hiệu lực ngay). Thiếu → tắt; sai → tắt + log. */
 export function trangThaiVault(): TrangThaiVault {
   try {
-    const keyring = docKeyringKek(process.env.XBOSS_OFFLINE_KEK, process.env.XBOSS_SECRET);
+    // XBOSS_E2E=1: cờ tường minh chỉ webServer của playwright.config.ts đặt (e2e chạy bản build
+    // production nên không dựa NODE_ENV) — mới cho phép KEK giá trị TEST của e2e.
+    const keyring = docKeyringKek(process.env.XBOSS_OFFLINE_KEK, process.env.XBOSS_SECRET, {
+      choPhepKekE2E: process.env.XBOSS_E2E === "1",
+    });
     return keyring ? { bat: true, keyring } : { bat: false, code: "offline_vault_disabled" };
   } catch (e) {
     if (!(e instanceof OfflineKekConfigError)) throw e;

@@ -335,6 +335,8 @@ mục Nợ kỹ thuật nếu cần nâng cấp):**
       — secret RIÊNG, khác `XBOSS_SECRET`, sao lưu cùng bộ khoá khôi phục (mất KEK = không mở được
       bản nháp offline đã bọc). Xoay KEK: thêm version mới ở ĐẦU (`"v2:<mới>,v1:<cũ>"`), giữ version
       cũ tới khi không còn khoá phụ thuộc. Để trống = tính năng tắt (`/api/offline/*` trả 503).
+      KHÔNG chép KEK test của e2e (`e2e/constants.ts`) — server từ chối (misconfigured) trừ khi
+      có `XBOSS_E2E=1`, cờ chỉ dành cho server e2e; production không bao giờ đặt `XBOSS_E2E`.
 - [ ] Đổi mật khẩu 4 tài khoản demo (admin/pm/engineer/subcon).
 - [ ] Đổi mật khẩu role Postgres `xboss` khỏi giá trị mẫu nếu tự host DB.
 - [ ] Sao lưu định kỳ DB (Supabase tự backup; Postgres tự host: `pg_dump`).

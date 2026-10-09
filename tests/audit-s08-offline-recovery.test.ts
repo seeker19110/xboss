@@ -207,9 +207,9 @@ test("xung đột nhật ký → giữ bản thiết bị: op MỚI (operationId
   // Ghi nhận thời điểm bỏ op cũ: lúc đó op mới PHẢI đã commit trong store.
   const lucXoa: string[][] = [];
   const goc = m.store.xoaTheoYeuCau.bind(m.store);
-  m.store.xoaTheoYeuCau = async (owner, ids) => {
+  m.store.xoaTheoYeuCau = async (owner, ids, dieuKien) => {
     lucXoa.push(m.ops().map((o) => o.operationId));
-    return goc(owner, ids);
+    return goc(owner, ids, dieuKien);
   };
   m.datPhan((req) => ({ status: 200, receiptOperationId: req.headers["Idempotency-Key"] }));
   const kq = await ngoaiTuyen(() => m.q.giuBanNhatKyThietBi(cu.operationId, '"1-2"'));
@@ -381,4 +381,157 @@ test("gửi lại ngay: bỏ chờ backoff lỗi mạng nhưng GIỮ Retry-After
   );
   assert.equal(m.ops().length, 1);
   assert.equal(m.ops()[0].lastResult?.status, 429);
+});
+
+// ── Sau audit 3 trụ (S08) ──────────────────────────────────────────────────────────────────
+
+/** A có 1 nhật ký `conflict` (máy chủ trả 412) — điểm xuất phát của các ca giải quyết xung đột. */
+async function nhatKyXungDot(m: ReturnType<typeof moiTruong>, noiDung = "bản cũ") {
+  m.may.dangNhap(A);
+  await m.moTracking();
+  await m.q.chuanBiNhatKy(NGAY);
+  m.datPhan(() => ({ status: 412, code: "version_mismatch" }));
+  await m.q.enqueueDiaryNote(nhatKy(noiDung), '"1-1"');
+  await denLuc(() => m.ops()[0]?.state === "conflict");
+  return m.ops()[0];
+}
+
+const revHangDoi = (db: MemoryTxDb) =>
+  (db.data.get(STORE_META)!.get(JSON.stringify("queue")) as { rev: number } | undefined)?.rev ?? 0;
+
+test("H1: 'giữ bản thiết bị' KHÔNG xoá bản nháp MỚI HƠN cùng ngày mà tab khác xếp xen giữa (kiểm trong vòng OCC)", async () => {
+  const may = taoMayChuGia();
+  const db = new MemoryTxDb();
+  const a = moiTruong({ db, may });
+  const cu = await nhatKyXungDot(a);
+  // Tab B của CÙNG chủ A (cùng trình duyệt/thiết bị) đã mở kho nhật ký.
+  const b = moiTruong({ db, may });
+  await b.moTracking();
+  await b.q.chuanBiNhatKy(NGAY);
+
+  // Tab B xếp bản mới ngay SAU lần đọc thứ 2 của tab A (sau phép kiểm "có bản mới hơn" ban đầu,
+  // trước khi op mới được ghi) — đúng cửa sổ TOCTOU.
+  let lan = 0;
+  const goc = a.store.docChu.bind(a.store);
+  a.store.docChu = async (owner) => {
+    const kq = await goc(owner);
+    if (++lan === 2)
+      assert.deepEqual(await b.q.enqueueDiaryNote(nhatKy("BẢN MỚI"), '"1-2"'), { ok: true });
+    return kq;
+  };
+  let kq: Awaited<ReturnType<typeof a.q.giuBanNhatKyThietBi>>;
+  try {
+    kq = await ngoaiTuyen(() => a.q.giuBanNhatKyThietBi(cu.operationId, '"1-2"'));
+  } finally {
+    a.store.docChu = goc; // luôn gỡ hook (kể cả khi code bị phá ném lỗi) — không treo ca sau
+  }
+
+  assert.ok(lan >= 2, "hook đã chèn bản mới");
+  assert.equal(kq.ok, false, "có bản mới hơn → không cho giữ bản cũ");
+  assert.match(kq.ok ? "" : kq.error, /mới hơn/);
+  const ops = a.ops();
+  assert.equal(ops.length, 2, "không thêm op nào, không xoá op nào");
+  assert.equal(ops[0].operationId, cu.operationId, "op xung đột cũ còn nguyên");
+  assert.equal(ops[0].state, "conflict");
+  assert.equal((await b.q.getQueuedDiaryNote(NGAY))?.payload.workDone, "BẢN MỚI");
+});
+
+test("boThaoTac: op conflict/rejected của CHÍNH chủ ở dự án KHÁC → false, không xoá, không tăng rev", async () => {
+  const may = taoMayChuGia();
+  const db = new MemoryTxDb();
+  const m = moiTruong({ db, may });
+  const { conflict, rejected, pending } = await baTrangThai(m);
+  const rev = revHangDoi(db);
+  assert.equal(await m.q.boThaoTac(pending.operationId), false);
+  assert.equal(revHangDoi(db), rev, "không xoá gì thì không tăng rev");
+
+  may.datDuAn(2);
+  const m2 = moiTruong({ db, may });
+  await m2.moTracking();
+  assert.equal(m2.vault.chu()?.projectId, 2);
+  const rev2 = revHangDoi(db);
+  assert.equal(await m2.q.boThaoTac(conflict.operationId), false);
+  assert.equal(await m2.q.boThaoTac(rejected.operationId), false);
+  assert.equal(m.ops().length, 3, "op của dự án 1 còn nguyên");
+  assert.equal(revHangDoi(db), rev2);
+});
+
+test("refreshStats: đăng xuất xen giữa lúc đang đọc hàng đợi → không hiện lại số op của chủ cũ", async () => {
+  const m = moiTruong();
+  m.may.dangNhap(A);
+  await m.moTracking();
+  m.datPhan(() => ({ networkError: true }));
+  await ngoaiTuyen(async () => {
+    assert.equal(await m.q.enqueueTick(DIM[0], true), true);
+    assert.equal(await m.q.enqueueTick(DIM[1], true), true);
+  });
+  assert.equal(m.q.getSnapshot().total, 2);
+  const goc = m.store.docChu.bind(m.store);
+  m.store.docChu = async (owner) => {
+    const kq = await goc(owner);
+    m.q.khoaPhien(true); // trang tài khoản đăng xuất đúng lúc lần đọc này đang chạy
+    return kq;
+  };
+  try {
+    await (m.q as unknown as { refreshStats(): Promise<void> }).refreshStats();
+  } finally {
+    m.store.docChu = goc;
+  }
+  await new Promise((r) => setImmediate(r));
+  assert.equal(m.q.getSnapshot().total, 0, "badge không đếm lại op của chủ cũ");
+});
+
+test("lỗi đọc IndexedDB KHÔNG bị coi là 0: snapshot bật docLoi, danh sách/legacy báo lỗi", async () => {
+  const db = new MemoryTxDb([STORE_OPS, STORE_META, LEGACY_STORE]);
+  const m = moiTruong({ db });
+  m.may.dangNhap(A);
+  await m.moTracking();
+  m.datPhan(() => ({ networkError: true }));
+  await ngoaiTuyen(() => m.q.enqueueTick(DIM[0], true));
+  assert.equal(m.q.getSnapshot().total, 1);
+  assert.equal(m.q.getSnapshot().docLoi, false);
+
+  db.hongKhiCommit = () => new Error("UnknownError: IndexedDB hỏng");
+  await m.q.lamMoi();
+  assert.equal(m.q.getSnapshot().docLoi, true);
+  assert.equal(m.q.getSnapshot().total, 1, "không hạ về 0 khi không đọc được");
+  await assert.rejects(m.q.danhSachThaoTac());
+  await assert.rejects(m.q.demLegacy());
+  // Vault khoá (đổi dự án, cùng người) mà vẫn không đọc được → vẫn là lỗi, không phải "0 chờ".
+  m.q.khoaPhien(false);
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+  assert.equal(m.q.getSnapshot().docLoi, true);
+  assert.notEqual(m.q.getSnapshot().total, 0);
+
+  db.hongKhiCommit = null;
+  await m.q.lamMoi();
+  assert.equal(m.q.getSnapshot().docLoi, false);
+  assert.equal(m.q.getSnapshot().locked, 1);
+});
+
+test("gửi lại ngay: báo thất bại khi không gửi được (mất mạng / lỗi thiết bị), không luôn 'đã thử'", async () => {
+  const m = moiTruong();
+  m.may.dangNhap(A);
+  await m.moTracking();
+  m.datPhan(() => ({ networkError: true }));
+  await ngoaiTuyen(() => m.q.enqueueTick(DIM[0], true));
+  assert.equal(await ngoaiTuyen(() => m.q.guiLaiNgay()), false);
+  m.db.hongKhiCommit = (_s, mode) =>
+    mode === "readwrite" ? new Error("QuotaExceededError") : null;
+  await assert.rejects(m.q.guiLaiNgay());
+  m.db.hongKhiCommit = null;
+  assert.equal(await m.q.guiLaiNgay(), true);
+});
+
+test("giữ bản thiết bị: op mới đã lưu nhưng bỏ op cũ lỗi → ok kèm cảnh báo riêng, không im lặng", async () => {
+  const m = moiTruong();
+  const cu = await nhatKyXungDot(m);
+  m.store.xoaTheoYeuCau = async () => {
+    throw new Error("AbortError");
+  };
+  const kq = await ngoaiTuyen(() => m.q.giuBanNhatKyThietBi(cu.operationId, '"1-2"'));
+  assert.equal(kq.ok, true);
+  assert.match((kq.ok && kq.canhBao) || "", /chưa bỏ được bản xung đột cũ/);
+  assert.equal(m.ops().length, 2, "op cũ (conflict) vẫn chặn trước op mới — không mất gì");
 });

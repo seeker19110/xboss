@@ -178,6 +178,26 @@ test("(c) màn phục hồi: focus tiêu đề, aria-live, Esc trả focus, axe 
   await expect(vung).toContainText("lưu trên thiết bị, chưa lên máy chủ");
   await expect(hop.getByRole("heading", { name: /Chờ gửi lại|Chờ gửi/ })).toBeVisible();
 
+  // Modal phải thoát khỏi header sticky `backdrop-blur` (portal vào body): overlay phủ cả màn,
+  // hộp thoại đủ cao, nằm trọn trong viewport và nút hành động bấm được (không bị bottombar che).
+  const vp = page.viewportSize()!;
+  const phu = await hop.evaluate((el) => el.parentElement!.getBoundingClientRect().height);
+  expect(phu).toBeGreaterThanOrEqual(vp.height - 1);
+  const hopBox = (await hop.boundingBox())!;
+  // Mobile: hộp thoại kẹt trong header chỉ cao bằng header (~1/10 màn) — phải chiếm hơn nửa màn.
+  if (info.project.name.includes("mobile")) expect(hopBox.height).toBeGreaterThan(vp.height * 0.5);
+  expect(hopBox.y).toBeGreaterThanOrEqual(0);
+  expect(hopBox.y + hopBox.height).toBeLessThanOrEqual(vp.height + 1);
+  for (const ten of ["Gửi lại ngay", "Đóng"]) {
+    const nut = hop.getByRole("button", { name: ten });
+    const trungNut = await nut.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const o = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return !!o && el.contains(o);
+    });
+    expect(trungNut, `nút "${ten}" không bị phần tử khác che`).toBe(true);
+  }
+
   for (const theme of ["light", "darkblue"]) {
     await page.evaluate((t) => {
       document.documentElement.classList.remove("light", "darkblue");

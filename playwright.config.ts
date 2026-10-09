@@ -80,6 +80,8 @@ export default defineConfig({
       XBOSS_ADMIN_PASSWORD: ADMIN_PW,
       // S08: bật vault offline (thiếu KEK → 503 fail-closed, hàng đợi không lưu được).
       XBOSS_OFFLINE_KEK: E2E_OFFLINE_KEK,
+      // Cờ tường minh cho phép KEK giá trị TEST ở trên (lib/nen/offline-crypto.ts từ chối nếu thiếu).
+      XBOSS_E2E: "1",
       PORT: port,
     },
   },

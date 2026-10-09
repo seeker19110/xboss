@@ -107,7 +107,13 @@ async function xoaApi(request) {
   await cache.delete(request);
 }
 
-/** Bản cache chỉ hợp lệ cho đúng tab, đúng phiên vault, đúng generation, còn trong lease. */
+/**
+ * Bản cache chỉ hợp lệ cho đúng tab, đúng phiên vault, đúng generation, còn trong lease.
+ * Cache API dùng chung theo URL cho mọi tab: an toàn giữa các tab/phiên dựa vào `tag` NGẪU NHIÊN
+ * mỗi phiên vault của từng tab (UUID, tab khác/người khác không đoán được nên không đọc được bản
+ * của nhau) — KHÔNG dựa vào `generation` (chỉ là bộ đếm CLEAR_CACHE trong SW, đoán được và về 0
+ * khi SW khởi động lại). Hai tab cùng URL ghi đè bản của nhau → tab kia chỉ mất cache (fail-closed).
+ */
 async function docApi(request, clientId) {
   const now = Date.now();
   const ctx = nguCanhCon(clientId, now);

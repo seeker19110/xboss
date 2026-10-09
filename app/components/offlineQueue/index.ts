@@ -21,6 +21,7 @@ import {
   FLUSH_INTERVAL_MS,
   giaiMaCo,
   khoaChu,
+  LoiDieuKienThem,
   themOp,
   THONG_KE_RONG,
   type BoNhoGiaiMa,
@@ -41,6 +42,11 @@ export const OFFLINE_SAVE_ERROR = "Chưa lưu được trên thiết bị. Hãy 
 const SW_NHIP_MS = 20_000;
 /** Trần số task mỗi khoá vault (khớp MAX_MANIFEST_TASKS phía server). */
 const TASK_MOI_KHOA = 500;
+/** Chỉ op máy chủ đã trả lời dứt điểm mới được người dùng bỏ (A2-AC06/AC10). */
+const TRANG_THAI_BO_DUOC: readonly QueueState[] = ["conflict", "rejected"];
+const LOI_KHONG_CON_XUNG_DOT = "Thao tác này không còn ở trạng thái xung đột — tải lại danh sách.";
+const LOI_CO_BAN_MOI_HON =
+  "Đã có bản nháp mới hơn cho ngày này trên thiết bị — bản mới hơn sẽ được gửi thay, không giữ bản cũ.";
 
 // Gửi một request hàng đợi. Chỉ đọc body để lấy receipt (2xx) hoặc mã lỗi (4xx/5xx).
 async function guiYeuCau(req: YeuCauGui): Promise<SendOutcome> {
@@ -91,6 +97,11 @@ export type QueueSnapshot = QueueStats & {
   /** Còn hàng đợi v1 không chủ trên thiết bị (cách ly, chờ đối soát thủ công — D03). */
   legacy: boolean;
   vault: VaultTrangThai;
+  /**
+   * Lần đọc hàng đợi gần nhất LỖI (IndexedDB bị chặn/hỏng/bận): các số đếm là của lần đọc được
+   * trước đó, KHÔNG được hiểu là "0 chờ" hay "đã lên máy chủ".
+   */
+  docLoi: boolean;
 };
 
 /** Trạng thái một thao tác (đọc qua API, không mang payload) — S08 dựng UI phục hồi trên đây. */
@@ -145,6 +156,7 @@ export class OfflineQueueManager {
     quarantined: OFFLINE_QUEUE_QUARANTINED,
     legacy: false,
     vault: "unknown",
+    docLoi: false,
   };
   private listeners = new Set<() => void>();
   private flushedListeners = new Set<() => void>();
@@ -218,22 +230,35 @@ export class OfflineQueueManager {
     for (const l of this.listeners) l();
   }
 
+  /** Không bao giờ reject: lỗi đọc IndexedDB → `docLoi` (giữ số lần đọc trước, không hạ về 0). */
   private async refreshStats(extra: Partial<QueueSnapshot> = {}) {
     const chu = this.vault.chu();
-    if (!chu) {
-      // Vault khoá (hết lease/401/đổi ngữ cảnh) nhưng op vẫn nằm trên thiết bị: báo `locked` để
-      // badge/banner không hiện "0 chờ" (người dùng tưởng đã đồng bộ xong) và poll vẫn kích mở lại.
-      const n =
-        this.userCuoi === null ? 0 : await this.store.demOpCuaUser(this.userCuoi).catch(() => 0);
-      this.setSnap({ ...THONG_KE_RONG, total: n, locked: n, ...extra });
-      return;
+    try {
+      if (!chu) {
+        // Vault khoá (hết lease/401/đổi ngữ cảnh) nhưng op vẫn nằm trên thiết bị: báo `locked` để
+        // badge/banner không hiện "0 chờ" (người dùng tưởng đã đồng bộ xong) và poll vẫn kích mở lại.
+        const user = this.userCuoi;
+        const n = user === null ? 0 : await this.store.demOpCuaUser(user);
+        // Đăng xuất/mở vault xen giữa lúc đếm → kết quả này đã cũ, lần refresh sau đã đặt đúng.
+        if (this.userCuoi !== user || this.vault.chu()) return;
+        this.setSnap({ ...THONG_KE_RONG, total: n, locked: n, docLoi: false, ...extra });
+        return;
+      }
+      this.userCuoi = chu.ownerUserId;
+      const { ops } = await this.store.docChu(khoaChu(chu));
+      // Vault vừa khoá/đổi chủ trong lúc đọc (đăng xuất giữa chừng) → bỏ kết quả cũ, không hiện lại
+      // số op của chủ trước (lần refresh của khoaPhien đã đặt trạng thái đúng).
+      if (this.vault.chu() !== chu) return;
+      const st = computeStats(ops, chu, (k) => this.vault.coKhoa(k));
+      this.setSnap({ ...st, docLoi: false, ...extra });
+    } catch {
+      this.setSnap({ docLoi: true, ...extra });
     }
-    this.userCuoi = chu.ownerUserId;
-    const { ops } = await this.store.docChu(khoaChu(chu));
-    // Vault vừa khoá/đổi chủ trong lúc đọc (đăng xuất giữa chừng) → bỏ kết quả cũ, không hiện lại
-    // số op của chủ trước (lần refresh của khoaPhien đã đặt trạng thái đúng).
-    if (this.vault.chu() !== chu) return;
-    this.setSnap({ ...computeStats(ops, chu, (k) => this.vault.coKhoa(k)), ...extra });
+  }
+
+  /** Đọc lại trạng thái hàng đợi (nút "Thử lại" của màn phục hồi sau lỗi đọc thiết bị). */
+  lamMoi(): Promise<void> {
+    return this.refreshStats();
   }
 
   /** Kích gửi nền — lỗi IDB/mạng đã được giữ nguyên trạng thái, chỉ chờ lần kích sau. */
@@ -640,25 +665,30 @@ export class OfflineQueueManager {
     return out;
   }
 
-  /** Số bản ghi queue v1 không chủ trên thiết bị — chỉ đếm, không đọc nội dung (D03). */
+  /**
+   * Số bản ghi queue v1 không chủ trên thiết bị — chỉ đếm, không đọc nội dung (D03). Lỗi đọc →
+   * reject (KHÔNG coi là 0 — màn phục hồi báo lỗi thay vì khẳng định không còn dữ liệu cũ).
+   */
   demLegacy(): Promise<number> {
-    return this.store.demLegacy().catch(() => 0);
+    return this.store.demLegacy();
   }
 
   /**
    * Bỏ MỘT thao tác `conflict`/`rejected` của chủ hiện hành ở dự án hiện hành — chỉ gọi sau khi
    * người dùng xác nhận. Không xoá hàng loạt, không xoá op đang chờ/đang gửi, không đụng legacy
-   * hay op của chủ khác. Trả false khi op không còn/không đủ điều kiện (UI tải lại danh sách).
+   * hay op của chủ khác. Chủ + dự án + trạng thái kiểm TRONG transaction xoá (op vừa đổi trạng
+   * thái ở tab khác không bị xoá nhầm). Trả false khi op không còn/không đủ điều kiện.
    */
   async boThaoTac(operationId: string): Promise<boolean> {
     const chu = this.vault.chu();
     if (!chu) return false;
-    const { ops } = await this.store.docChu(khoaChu(chu));
-    const r = ops.find((o) => o.operationId === operationId);
-    if (!r || !cungChu(r, chu) || (r.state !== "conflict" && r.state !== "rejected")) return false;
-    await this.store.xoaTheoYeuCau(khoaChu(chu), [r.operationId]);
-    this.cache.delete(r.operationId);
-    await this.refreshStats().catch(() => undefined);
+    const n = await this.store.xoaTheoYeuCau(khoaChu(chu), [operationId], {
+      projectId: chu.projectId,
+      states: TRANG_THAI_BO_DUOC,
+    });
+    if (n === 0) return false;
+    this.cache.delete(operationId);
+    await this.refreshStats();
     return true;
   }
 
@@ -687,20 +717,27 @@ export class OfflineQueueManager {
   async giuBanNhatKyThietBi(
     operationId: string,
     etagMayChu: string | null,
-  ): Promise<{ ok: true } | { ok: false; error: string }> {
+  ): Promise<{ ok: true; canhBao?: string } | { ok: false; error: string }> {
     const loi = (error: string) => ({ ok: false as const, error });
     if (OFFLINE_QUEUE_QUARANTINED || this.tamDungNguCanh) return loi(OFFLINE_SAVE_ERROR);
     const chu = this.vault.chu();
     if (!chu) return loi("Kho ngoại tuyến đang khoá — kết nối mạng rồi mở khoá trước.");
-    const xem = await this.xemNhatKyXungDot(operationId);
-    if (!xem) return loi("Thao tác này không còn ở trạng thái xung đột — tải lại danh sách.");
-    if (xem.coBanMoiHon)
-      return loi("Có bản nháp mới hơn cho ngày này trên thiết bị — bản mới hơn sẽ được gửi thay.");
-    const { ops } = await this.store.docChu(khoaChu(chu));
-    const cu = ops.find((o) => o.operationId === operationId);
+    let xem: NhatKyXungDot | null;
+    let keyCu: string | undefined;
+    try {
+      // Kiểm sớm để báo ngay cho người dùng; kiểm QUYẾT ĐỊNH nằm trong vòng OCC của themOp.
+      xem = await this.xemNhatKyXungDot(operationId);
+      const { ops } = await this.store.docChu(khoaChu(chu));
+      keyCu = ops.find((o) => o.operationId === operationId)?.vaultKeyId;
+    } catch {
+      return loi("Không đọc được dữ liệu ngoại tuyến trên thiết bị — thử lại.");
+    }
+    if (!xem) return loi(LOI_KHONG_CON_XUNG_DOT);
+    if (xem.coBanMoiHon) return loi(LOI_CO_BAN_MOI_HON);
+    const ngay = xem.payload.date;
     const keyId =
-      this.vault.timKhoa("diary_note", { date: xem.payload.date }) ??
-      (cu && this.vault.coKhoa(cu.vaultKeyId) ? cu.vaultKeyId : null);
+      this.vault.timKhoa("diary_note", { date: ngay }) ??
+      (keyCu && this.vault.coKhoa(keyCu) ? keyCu : null);
     if (!keyId) return loi(OFFLINE_SAVE_ERROR);
     try {
       await themOp({
@@ -711,26 +748,55 @@ export class OfflineQueueManager {
         now: Date.now,
         uuid: taoId,
         cache: this.cache,
+        // Luồng này chỉ THÊM bản người dùng chọn giữ; không âm thầm thay bản nháp nào khác.
+        thayOpCu: false,
+        // Kiểm trên ĐÚNG snapshot sẽ commit: op cũ còn conflict và chưa có bản nháp mới hơn cùng
+        // ngày (tab khác vừa xếp) — có thì bản mới thắng, không ghi gì.
+        dieuKien: (banChup) => {
+          const cu = banChup.find((o) => o.rec.operationId === operationId);
+          if (!cu || cu.rec.state !== "conflict") return LOI_KHONG_CON_XUNG_DOT;
+          const coBanMoiHon = banChup.some(
+            (o) =>
+              o.rec.sequence > cu.rec.sequence &&
+              o.body?.kind === "diary_note" &&
+              o.body.payload.date === ngay,
+          );
+          return coBanMoiHon ? LOI_CO_BAN_MOI_HON : null;
+        },
       });
-    } catch {
+    } catch (e) {
       // Op mới CHƯA lưu → giữ nguyên op xung đột cũ, người dùng thử lại được.
-      await this.refreshStats().catch(() => undefined);
-      return loi(OFFLINE_SAVE_ERROR);
+      await this.refreshStats();
+      return loi(e instanceof LoiDieuKienThem ? e.message : OFFLINE_SAVE_ERROR);
     }
-    // Op mới đã commit: bỏ op xung đột cũ. Lỗi ở bước này không mất gì — op cũ (conflict) vẫn
-    // chặn FIFO cùng ngày trước op mới cho tới khi người dùng bỏ nó lần nữa.
-    await this.store.xoaTheoYeuCau(khoaChu(chu), [operationId]).catch(() => undefined);
-    this.cache.delete(operationId);
-    await this.refreshStats().catch(() => undefined);
+    // Op mới đã commit: bỏ op xung đột cũ (chỉ khi vẫn còn conflict). Lỗi ở bước này không mất gì
+    // — op cũ (conflict) vẫn chặn FIFO cùng ngày trước op mới — nhưng phải báo người dùng bỏ tay.
+    let canhBao: string | undefined;
+    try {
+      await this.store.xoaTheoYeuCau(khoaChu(chu), [operationId], {
+        projectId: chu.projectId,
+        states: ["conflict"],
+      });
+      this.cache.delete(operationId);
+    } catch {
+      canhBao =
+        'Đã xếp bản trên thiết bị để gửi, nhưng chưa bỏ được bản xung đột cũ — bản cũ vẫn chặn trước bản mới. Hãy bấm "Bỏ thao tác này" ở bản cũ.';
+    }
+    await this.refreshStats();
     this.afterEnqueue();
-    return { ok: true };
+    return canhBao ? { ok: true, canhBao } : { ok: true };
   }
 
-  /** "Gửi lại ngay": bỏ chờ backoff (giữ Retry-After của 429/503) rồi kích gửi. */
-  async guiLaiNgay(): Promise<void> {
+  /**
+   * "Gửi lại ngay": bỏ chờ backoff (giữ Retry-After của 429/503) rồi kích gửi. false = không gửi
+   * được lúc này (mất mạng / kho khoá); lỗi đọc-ghi thiết bị → reject để UI báo lỗi thật.
+   */
+  async guiLaiNgay(): Promise<boolean> {
     const chu = this.vault.chu();
-    if (chu) await this.store.datLaiHanGui(chu, Date.now()).catch(() => 0);
+    if (!chu || !this.dangOnline()) return false;
+    await this.store.datLaiHanGui(chu, Date.now());
     await this.flush();
+    return true;
   }
 
   /**

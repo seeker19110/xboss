@@ -10,26 +10,32 @@ import OfflineRecoveryPanel, {
 } from "@/app/components/OfflineRecoveryPanel";
 
 export default function OfflineQueueBadge() {
-  const { total, failed, online, sending, quarantined, legacy, locked } = useOfflineQueueStatus();
+  const { total, failed, online, sending, quarantined, legacy, locked, docLoi } =
+    useOfflineQueueStatus();
   const [mo, dong] = useManPhucHoiMo();
+  // Panel render ở MỌI nhánh (kể cả tạm khoá/0 thao tác): nút "Chi tiết" trên lưới tracking mở
+  // màn qua host này — không có panel thì nút đó thành nút chết.
   const panel = mo ? <OfflineRecoveryPanel onClose={dong} /> : null;
 
   if (quarantined) {
     const label =
       "Lưu ngoại tuyến đang tạm khóa. Dữ liệu queue cũ được giữ nguyên và cách ly; hãy kết nối mạng để lưu trực tiếp.";
     return (
-      <span
-        role="status"
-        aria-label={label}
-        title={label}
-        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-amber-800 bg-amber-950 px-2 text-xs font-medium text-amber-200"
-      >
-        <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <span className="hidden lg:inline">Lưu offline tạm khóa</span>
-      </span>
+      <>
+        <span
+          role="status"
+          aria-label={label}
+          title={label}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-amber-800 bg-amber-950 px-2 text-xs font-medium text-amber-200"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="hidden lg:inline">Lưu offline tạm khóa</span>
+        </span>
+        {panel}
+      </>
     );
   }
-  if (total === 0 && !legacy) return panel;
+  if (total === 0 && !legacy && !docLoi) return panel;
 
   // Ưu tiên: mất mạng → có lỗi/khoá/dữ liệu cũ → đang gửi → đang chờ.
   let Icon = CloudUpload;
@@ -37,7 +43,13 @@ export default function OfflineQueueBadge() {
   let label: string;
   let animate = "";
 
-  if (!online) {
+  if (docLoi) {
+    // Không đọc được hàng đợi: không được im lặng như "không còn gì chờ gửi".
+    Icon = AlertTriangle;
+    tone = "text-amber-400 border-amber-800 bg-amber-950/40";
+    label =
+      "Không đọc được thao tác ngoại tuyến trên thiết bị — chưa chắc mọi thay đổi đã lên máy chủ";
+  } else if (!online) {
     Icon = WifiOff;
     tone = "text-amber-400 border-amber-800 bg-amber-950/40";
     label = `Mất mạng — ${total} thao tác lưu trên thiết bị, chưa lên máy chủ`;
@@ -67,7 +79,7 @@ export default function OfflineQueueBadge() {
         className={`inline-flex items-center gap-1 px-1.5 min-h-10 rounded-lg border text-xs font-medium transition hover:bg-zinc-900 focus-visible:outline-2 focus-visible:outline-offset-2 ${tone}`}
       >
         <Icon className={`w-4 h-4 shrink-0 ${animate}`} strokeWidth={1.75} aria-hidden="true" />
-        <span className="tabular-nums">{total}</span>
+        <span className="tabular-nums">{docLoi && total === 0 ? "?" : total}</span>
       </button>
       {panel}
     </>

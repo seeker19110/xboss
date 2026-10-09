@@ -92,13 +92,23 @@ export async function sha256Hex(data: Uint8Array<ArrayBuffer> | string): Promise
 export type KekKeyring = { active: string; secrets: ReadonlyMap<string, string> };
 
 /**
+ * Dấu của KEK giá trị TEST trong `e2e/constants.ts` (công khai trong repo). Secret chứa chuỗi này
+ * chỉ hợp lệ khi caller bật `choPhepKekE2E` (server e2e đặt cờ tường minh `XBOSS_E2E=1`) — lỡ
+ * chép cấu hình e2e lên production thì vault offline tắt (misconfigured) thay vì dùng khoá ai
+ * cũng biết để bọc DEK.
+ */
+const DAU_KEK_E2E = "e2e-offline-kek";
+
+/**
  * Đọc keyring `XBOSS_OFFLINE_KEK`. Thiếu/rỗng → null (tính năng TẮT, caller fail-closed).
- * Có giá trị mà sai định dạng, secret < 32 ký tự, trùng version/secret hoặc trùng XBOSS_SECRET
- * → throw OfflineKekConfigError (fail-fast; thông điệp không chứa secret).
+ * Có giá trị mà sai định dạng, secret < 32 ký tự, trùng version/secret, trùng XBOSS_SECRET hoặc
+ * là KEK test e2e (khi không có `choPhepKekE2E`) → throw OfflineKekConfigError (fail-fast;
+ * thông điệp không chứa secret).
  */
 export function docKeyringKek(
   raw: string | undefined,
   xbossSecret: string | undefined,
+  opts: { choPhepKekE2E?: boolean } = {},
 ): KekKeyring | null {
   if (raw == null || raw.trim() === "") return null;
   const secrets = new Map<string, string>();
@@ -119,6 +129,10 @@ export function docKeyringKek(
     if (daThay.has(secret)) throw new OfflineKekConfigError("XBOSS_OFFLINE_KEK lặp secret");
     if (xbossSecret && secret === xbossSecret.trim())
       throw new OfflineKekConfigError("XBOSS_OFFLINE_KEK không được trùng XBOSS_SECRET");
+    if (!opts.choPhepKekE2E && secret.includes(DAU_KEK_E2E))
+      throw new OfflineKekConfigError(
+        "XBOSS_OFFLINE_KEK đang là khoá TEST của e2e — chỉ dùng được khi XBOSS_E2E=1",
+      );
     secrets.set(version, secret);
     daThay.add(secret);
     active ??= version;

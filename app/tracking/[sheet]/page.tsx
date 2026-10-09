@@ -679,6 +679,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
               type="button"
               onClick={moManPhucHoiNgoaiTuyen}
               aria-haspopup="dialog"
+              aria-label="Xem chi tiết thao tác ngoại tuyến"
               className="min-h-10 -my-2 px-2 rounded-lg font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               Chi tiết
