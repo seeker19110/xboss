@@ -24,9 +24,10 @@
   `offlineQueue.ganLaiTheoKhoiPhuc`, mã hoá lại trong bộ nhớ; dự án khác gắn khi mở dự án đó).
 - Test: `offline-recovery-route.test.ts` (13 ca, route thật bằng role `xboss_app`; bỏ kiểm
   `wrong_device` → 2 ca đỏ), `offline-queue-khoi-phuc.test.ts` (4 ca client). e2e
-  `e2e/authed/thiet-bi-offline.spec.ts` (axe 2 tab × 2 theme, desktop + mobile) — **chưa chạy
+  `e2e/authed/thiet-bi-offline-admin.spec.ts` (axe 2 tab × 2 theme, desktop + mobile) — **chưa chạy
   cục bộ** (thiếu chỗ đĩa cho `npm run build`), chờ CI. CI bắt lỗi tương phản có sẵn ở `AppHeader`: nhãn vai trò
-  dưới tên người dùng `text-zinc-500` trên `zinc-950` (4,12:1) → `text-zinc-400`.
+  dưới tên người dùng `text-zinc-500` trên `zinc-950` (4,12:1) → `text-zinc-400`. Spec đổi tên `…-admin.spec.ts`: tên cũ khớp
+  `/(login|offline)\.spec\.ts$/` của project public nên bị chạy khi chưa đăng nhập.
 - Đánh đổi đã ghi: complete không nguyên tử xuyên dự án (GUC dự án không đổi giữa transaction) —
   lỗi giữa chừng để `approved`, gọi lại tạo khoá trùng CÙNG DEK (vô hại).
 
