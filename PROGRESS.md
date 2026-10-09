@@ -42,6 +42,8 @@
   `type` lạ → 400; không `type` giữ nguyên hành vi cũ.
 - Tách 2 câu SQL của `GET /api/payments` sang `lib/tai-chinh/gia-tri-tang.ts`
   (`giaTriTheoTangHe`) dùng chung. Test: `tests/export-thanh-toan.test.ts`.
+- Luật review OCR: mục mới `xuat-file-tai-chinh` (`app/api/export/excel/**`) ghép luật xuất file và
+  tài chính, vì route này giờ import `lib/tai-chinh/`.
 
 ## 2026-10-09 — Dọn nợ nhỏ: seed mẫu xoá bảng offline, S00 nhận resolver Strict, bỏ `payrollTotals`
 
