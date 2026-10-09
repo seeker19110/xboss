@@ -28,6 +28,16 @@ export async function GET(req: NextRequest) {
   const minTasks = Math.max(2, parseInt(sp.get("minTasks") ?? "5") || 5);
 
   const projectId = await getCurrentProjectId(user);
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → rỗng đúng shape, không tổng hợp toàn hệ.
+  if (projectId == null)
+    return NextResponse.json({
+      from,
+      to,
+      workload: [],
+      manpower: [],
+      ...(view === "equipment" ? { equipmentUsage: [] } : {}),
+      ...(view === "conflicts" ? { conflicts: [] } : {}),
+    });
   const subconUserId = user.role === "subcon" ? user.id : undefined;
 
   const [workload, manpower] = await Promise.all([

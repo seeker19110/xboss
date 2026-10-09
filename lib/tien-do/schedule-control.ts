@@ -42,16 +42,14 @@ export type ScheduleControlData = {
   groupProgress: Record<string, number>;
 };
 
+// `projectId` BẮT BUỘC (AUDIT-S16 null-scope) — route không có dự án khả kiến tự trả rỗng.
 export async function getScheduleControlData(
   systemId: number | null,
-  projectId?: number,
+  projectId: number,
 ): Promise<ScheduleControlData> {
   const today = todayISO();
   const systemFilterAnd = systemId !== null ? "AND st.system_id = ?" : "";
   const systemParams = systemId !== null ? [systemId] : [];
-  // Lọc theo dự án để tránh rò rỉ chéo dự án (M22+); undefined = không lọc.
-  const projectFilterAnd = projectId != null ? "AND tw.project_id = ?" : "";
-  const projectParams = projectId != null ? [projectId] : [];
 
   // Đường găng: CPM trên tập nhóm việc đã lọc theo hệ (nhất quán với /api/gantt).
   const { nodes, edges, meta } = await getCpmData(systemId, projectId);
@@ -85,16 +83,16 @@ export async function getScheduleControlData(
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-       LEFT JOIN towers tw ON st.tower_id = tw.id
+       JOIN towers tw ON st.tower_id = tw.id
       WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ?
         AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')
         ${systemFilterAnd}
-        ${projectFilterAnd}
+        AND tw.project_id = ?
       ORDER BY COALESCE(t.end_date, wp.end_date)`,
     today,
     ...systemParams,
-    ...projectParams,
+    projectId,
   );
 
   // Pareto lý do trễ — cùng cách đếm với panel Pareto trên Dashboard (app/page.tsx):

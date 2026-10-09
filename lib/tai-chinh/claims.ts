@@ -257,12 +257,11 @@ export type EotEvidenceSuggestion = { suggestedDays: number; waitingFloors: numb
 // Gợi ý số ngày EOT khi tạo claim kind='eot' — tái dùng số ngày chờ mặt bằng luỹ kế
 // (lib/constructionStages.ts:stageMissingList, cùng công thức dùng cho dashboard/
 // notification stage_missing — model tầng×công tác của M46, thay cho work_fronts cũ).
-// Chỉ là GỢI Ý — người dùng tự nhập số cuối, không ép buộc.
-export async function eotEvidenceSuggestion(
-  projectId?: number | null,
-): Promise<EotEvidenceSuggestion> {
+// Chỉ là GỢI Ý — người dùng tự nhập số cuối, không ép buộc. `projectId` BẮT BUỘC (AUDIT-S16
+// null-scope: trước đây null → stageMissingList toàn hệ, cộng số ngày chờ mọi tổ chức).
+export async function eotEvidenceSuggestion(projectId: number): Promise<EotEvidenceSuggestion> {
   const { stageMissingList } = await import("@/lib/tien-do/constructionStages");
-  const items = await stageMissingList(projectId ?? undefined);
+  const items = await stageMissingList(projectId);
   return {
     suggestedDays: items.reduce((sum, it) => sum + it.waitingDays, 0),
     waitingFloors: items.length,

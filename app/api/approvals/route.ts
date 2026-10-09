@@ -95,7 +95,11 @@ export async function POST(req: NextRequest) {
   // sheetTypeId của dự án khác vẫn nghiệm thu được cả tầng dự án đó. Sửa: bắt buộc sheet type
   // phải thuộc đúng dự án hiện hành (qua towers.project_id), không thì 404 như tài nguyên
   // không tồn tại (không lộ thông tin sheet đó thuộc dự án khác).
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → 404 trước mọi truy vấn nghiệp vụ — trước
+  // đây tháp legacy project_id NULL khớp null === null nên nghiệm thu được tầng không thuộc ai.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy loại sheet này" }, { status: 404 });
   const blocked = await assertModuleEnabled("field", projectId);
   if (blocked) return blocked;
 

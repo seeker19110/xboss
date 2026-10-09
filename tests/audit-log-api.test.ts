@@ -9,41 +9,42 @@ import assert from "node:assert/strict";
 // withTransaction + runWithRequestContext (như tests/audit-log.test.ts), rồi chạy đúng câu
 // SQL route dùng (buildAuditFilter + LIMIT/OFFSET) để kiểm lọc entity+entityId và phân trang.
 
-test("buildAuditFilter: rỗng khi không có param nào", async () => {
+// AUDIT-S16: projectId bắt buộc — điều kiện dự án (kèm bản ghi toàn cục) luôn đứng đầu.
+const DU_AN = 7;
+const LOC_DU_AN = "(al.project_id = ? OR al.project_id IS NULL)";
+
+test("buildAuditFilter: chỉ điều kiện dự án khi không có param nào", async () => {
   const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
-  const { where, params } = buildAuditFilter(new URLSearchParams());
-  assert.equal(where, "");
-  assert.deepEqual(params, []);
+  const { where, params } = buildAuditFilter(new URLSearchParams(), DU_AN);
+  assert.equal(where, `WHERE ${LOC_DU_AN}`);
+  assert.deepEqual(params, [DU_AN]);
 });
 
 test("buildAuditFilter: chỉ áp điều kiện cho param có mặt, giữ đúng thứ tự params", async () => {
   const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
   const { where, params } = buildAuditFilter(
     new URLSearchParams({ entity: "contracts", entityId: "5", from: "2026-01-01" }),
+    DU_AN,
   );
-  assert.equal(where, "WHERE al.entity_type = ? AND al.entity_id = ? AND al.at::date >= ?");
-  assert.deepEqual(params, ["contracts", 5, "2026-01-01"]);
+  assert.equal(
+    where,
+    `WHERE ${LOC_DU_AN} AND al.entity_type = ? AND al.entity_id = ? AND al.at::date >= ?`,
+  );
+  assert.deepEqual(params, [DU_AN, "contracts", 5, "2026-01-01"]);
 });
 
 test("buildAuditFilter: bỏ qua entityId/actorId không phải số", async () => {
   const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
-  const { where, params } = buildAuditFilter(new URLSearchParams({ entityId: "abc" }));
-  assert.equal(where, "");
-  assert.deepEqual(params, []);
+  const { where, params } = buildAuditFilter(new URLSearchParams({ entityId: "abc" }), DU_AN);
+  assert.equal(where, `WHERE ${LOC_DU_AN}`);
+  assert.deepEqual(params, [DU_AN]);
 });
 
-test("buildAuditFilter: projectId != null → giới hạn dự án + bản ghi toàn cục (đứng đầu)", async () => {
+test("buildAuditFilter: giới hạn dự án + bản ghi toàn cục (đứng đầu)", async () => {
   const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
   const { where, params } = buildAuditFilter(new URLSearchParams({ entity: "contracts" }), 7);
   assert.equal(where, "WHERE (al.project_id = ? OR al.project_id IS NULL) AND al.entity_type = ?");
   assert.deepEqual(params, [7, "contracts"]);
-});
-
-test("buildAuditFilter: projectId null → không thêm điều kiện dự án (tương thích ngược)", async () => {
-  const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
-  const { where, params } = buildAuditFilter(new URLSearchParams(), null);
-  assert.equal(where, "");
-  assert.deepEqual(params, []);
 });
 
 const S = Date.now().toString(36); // hậu tố duy nhất tránh đụng UNIQUE khi chạy lại trên cùng DB
@@ -77,6 +78,7 @@ test(
 
     const { where, params } = buildAuditFilter(
       new URLSearchParams({ entity: "contracts", entityId: String(cidA) }),
+      DU_AN, // HĐ test không gắn dự án → bản ghi audit project_id NULL (toàn cục) vẫn hiện
     );
     const rows = await query<{ entityId: number; entityType: string }>(
       `SELECT al.entity_id AS "entityId", al.entity_type AS "entityType"

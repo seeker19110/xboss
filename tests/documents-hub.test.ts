@@ -75,9 +75,10 @@ test(
     );
 
     const contractId = await insertId(
-      `INSERT INTO contracts (code, kind, party_name, title, value, status, system_id)
-       VALUES ('HD-HUB-TEST', 'nhan_thau', 'CĐT Hub', 'Hợp đồng test hub', 0, 'active', ?)`,
+      `INSERT INTO contracts (code, kind, party_name, title, value, status, system_id, project_id)
+       VALUES ('HD-HUB-TEST', 'nhan_thau', 'CĐT Hub', 'Hợp đồng test hub', 0, 'active', ?, ?)`,
       dien!.id,
+      projectId,
     );
     const contractDocId = await insertId(
       `INSERT INTO contract_documents (contract_id, file_name, original_name, mime_type, uploaded_by)
@@ -88,7 +89,7 @@ test(
 
     // PM (viewPayments=true): thấy cả 2 nguồn, cả 2 task.
     const pmUser = { id: pmId, name: "PM", email: "x", role: "pm" as const, orgId: 1 };
-    const pmDocs = await listAllDocuments(pmUser, null);
+    const pmDocs = await listAllDocuments(pmUser, projectId);
     const pmIds = pmDocs.map((d) => `${d.source}:${d.id}`);
     assert.ok(pmIds.includes(`task:${assignedDocId}`));
     assert.ok(pmIds.includes(`task:${otherDocId}`));
@@ -102,7 +103,7 @@ test(
       role: "subcon" as const,
       orgId: 1,
     };
-    const subconDocs = await listAllDocuments(subconUser, null);
+    const subconDocs = await listAllDocuments(subconUser, projectId);
     const subconIds = subconDocs.map((d) => `${d.source}:${d.id}`);
     assert.ok(subconIds.includes(`task:${assignedDocId}`));
     assert.ok(!subconIds.includes(`task:${otherDocId}`));
@@ -116,35 +117,35 @@ test(
       role: "viewer" as const,
       orgId: 1,
     };
-    const viewerDocs = await listAllDocuments(viewerUser, null);
+    const viewerDocs = await listAllDocuments(viewerUser, projectId);
     const viewerIds = viewerDocs.map((d) => `${d.source}:${d.id}`);
     assert.ok(viewerIds.includes(`task:${assignedDocId}`));
     assert.ok(!viewerIds.includes(`contract:${contractDocId}`));
 
     // Lọc theo hệ 'dien': cả 2 nguồn đều thuộc hệ điện.
-    const bySystem = await listAllDocuments(pmUser, null, { system: "dien" });
+    const bySystem = await listAllDocuments(pmUser, projectId, { system: "dien" });
     const bySystemIds = bySystem.map((d) => `${d.source}:${d.id}`);
     assert.ok(bySystemIds.includes(`task:${assignedDocId}`));
     assert.ok(bySystemIds.includes(`contract:${contractDocId}`));
 
     // Lọc theo hệ khác: không còn dòng nào của test này.
-    const byOtherSystem = await listAllDocuments(pmUser, null, { system: "nuoc" });
+    const byOtherSystem = await listAllDocuments(pmUser, projectId, { system: "nuoc" });
     const byOtherIds = byOtherSystem.map((d) => `${d.source}:${d.id}`);
     assert.ok(!byOtherIds.includes(`task:${assignedDocId}`));
 
     // Lọc theo tầng T05: chỉ 2 dòng task (có tầng); hợp đồng không có tầng nên bị ẩn.
-    const byFloor = await listAllDocuments(pmUser, null, { floor: "T05" });
+    const byFloor = await listAllDocuments(pmUser, projectId, { floor: "T05" });
     const byFloorIds = byFloor.map((d) => `${d.source}:${d.id}`);
     assert.ok(byFloorIds.includes(`task:${assignedDocId}`));
     assert.ok(!byFloorIds.includes(`contract:${contractDocId}`));
 
     // Lọc theo nguồn 'contract': chỉ còn dòng hợp đồng.
-    const bySource = await listAllDocuments(pmUser, null, { source: "contract" });
+    const bySource = await listAllDocuments(pmUser, projectId, { source: "contract" });
     assert.ok(bySource.every((d) => d.source === "contract"));
     assert.ok(bySource.some((d) => d.id === contractDocId));
 
     // Tìm kiếm theo tiêu đề (title = tên task/hợp đồng).
-    const bySearch = await listAllDocuments(pmUser, null, { q: "test hub" });
+    const bySearch = await listAllDocuments(pmUser, projectId, { q: "test hub" });
     const bySearchIds = bySearch.map((d) => `${d.source}:${d.id}`);
     assert.ok(bySearchIds.includes(`contract:${contractDocId}`));
 
@@ -168,8 +169,11 @@ test(
       (await import("@/lib/hien-truong/documents-hub")).listAllDocuments,
     );
 
+    // AUDIT-S16: hub luôn lọc theo dự án (không còn nhánh "projectId null = mọi dự án").
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test Hub bản vẽ')`);
     const drawingId = await insertId(
-      `INSERT INTO drawings (code, name, kind) VALUES ('DWG-HUB-TEST', 'Bản vẽ test hub', 'shop')`,
+      `INSERT INTO drawings (code, name, kind, project_id) VALUES ('DWG-HUB-TEST', 'Bản vẽ test hub', 'shop', ?)`,
+      projectId,
     );
     const revId = await insertId(
       `INSERT INTO drawing_revisions (drawing_id, rev, file_name, mime_type, status)
@@ -184,10 +188,11 @@ test(
       role: "subcon" as const,
       orgId: 1,
     };
-    const docs = await listAllDocuments(subconUser, null);
+    const docs = await listAllDocuments(subconUser, projectId);
     assert.ok(docs.some((d) => d.source === "drawing" && d.id === revId));
 
     await run(`DELETE FROM drawings WHERE id = ?`, drawingId); // cascade xoá drawing_revisions
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
   },
 );
 
@@ -338,11 +343,10 @@ test(
     assert.ok(!idsA.includes(`drawing:${b.drawingRevId}`));
     assert.ok(!idsA.includes(`project:${b.projectDocId}`));
 
-    // projectId = null: không lọc, thấy tài liệu cả 2 dự án (tương thích ngược).
-    const docsAll = await listAllDocuments(pmUser, null);
-    const idsAll = docsAll.map((d) => `${d.source}:${d.id}`);
-    assert.ok(idsAll.includes(`task:${a.taskDocId}`));
-    assert.ok(idsAll.includes(`task:${b.taskDocId}`));
+    // Dự án B → ngược lại: chỉ tài liệu B (AUDIT-S16: không còn nhánh null = mọi dự án).
+    const idsB = (await listAllDocuments(pmUser, b.projectId)).map((d) => `${d.source}:${d.id}`);
+    assert.ok(idsB.includes(`task:${b.taskDocId}`));
+    assert.ok(!idsB.includes(`task:${a.taskDocId}`));
 
     for (const p of [a, b]) {
       await run(`DELETE FROM contracts WHERE id = ?`, p.contractId); // cascade contract_documents

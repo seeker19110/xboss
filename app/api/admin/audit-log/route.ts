@@ -17,7 +17,9 @@ export async function GET(req: NextRequest) {
   if (!CAN.viewAudit(me.role))
     return NextResponse.json({ error: "Không có quyền xem audit trail" }, { status: 403 });
 
+  // AUDIT-S16 (A1-AC03, D01): tổ chức của admin chưa có dự án → rỗng, không đọc audit toàn hệ.
   const projectId = await getCurrentProjectId(me);
+  if (projectId == null) return NextResponse.json({ rows: [], total: 0 });
   const { where, params } = buildAuditFilter(req.nextUrl.searchParams, projectId);
   const page = Math.max(Number(req.nextUrl.searchParams.get("page")) || 0, 0);
   const offset = page * PAGE_SIZE;

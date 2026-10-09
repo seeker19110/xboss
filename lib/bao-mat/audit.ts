@@ -24,20 +24,13 @@ export const AUDIT_ENTITY_TYPES = [
 export type AuditFilter = { where: string; params: unknown[] };
 
 // Dựng mệnh đề WHERE + mảng params (placeholder `?`) từ query params của request —
-// chỉ áp điều kiện cho param thực sự có mặt. projectId != null → giới hạn theo dự án
-// đang chọn + bản ghi toàn cục (project_id IS NULL, vd đổi role_permissions xuyên dự án),
-// nhất quán với cách scope của M22; projectId = null → không lọc (tương thích ngược).
-export function buildAuditFilter(
-  searchParams: URLSearchParams,
-  projectId?: number | null,
-): AuditFilter {
-  const wheres: string[] = [];
-  const params: unknown[] = [];
-
-  if (projectId != null) {
-    wheres.push(`(al.project_id = ? OR al.project_id IS NULL)`);
-    params.push(projectId);
-  }
+// chỉ áp điều kiện cho param thực sự có mặt. Luôn giới hạn theo dự án đang chọn + bản ghi
+// toàn cục (project_id IS NULL, vd đổi role_permissions xuyên dự án), nhất quán với cách scope
+// của M22. `projectId` BẮT BUỘC (AUDIT-S16 null-scope): trước đây null = không lọc → admin của
+// tổ chức chưa có dự án đọc audit trail mọi tổ chức; route tự trả rỗng/404 khi không có dự án.
+export function buildAuditFilter(searchParams: URLSearchParams, projectId: number): AuditFilter {
+  const wheres: string[] = [`(al.project_id = ? OR al.project_id IS NULL)`];
+  const params: unknown[] = [projectId];
 
   const entity = searchParams.get("entity");
   if (entity) {
@@ -65,5 +58,5 @@ export function buildAuditFilter(
     params.push(to);
   }
 
-  return { where: wheres.length ? `WHERE ${wheres.join(" AND ")}` : "", params };
+  return { where: `WHERE ${wheres.join(" AND ")}`, params };
 }

@@ -14,8 +14,10 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const systemId = await resolveSystemId(req.nextUrl.searchParams.get("system"));
-  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc.
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → rỗng đúng shape, không đọc toàn hệ.
   const projectId = await getCurrentProjectId(user);
-  const data = await getScheduleControlData(systemId, projectId ?? undefined);
+  if (projectId == null)
+    return NextResponse.json({ critical: [], delayed: [], delayPareto: [], groupProgress: {} });
+  const data = await getScheduleControlData(systemId, projectId);
   return NextResponse.json(data);
 }

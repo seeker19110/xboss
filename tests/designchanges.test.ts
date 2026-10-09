@@ -125,17 +125,23 @@ test(
     const pmId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('PM DC Test', 'dc-pm@xboss.vn', 'x', 'pm')`,
     );
+    // AUDIT-S16: hàm quyết/đánh dấu luôn lọc theo dự án (không còn nhánh "projectId null = mọi dự án").
+    const pj = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA test DC vòng đời', 'PJT-DCLC')`,
+    );
 
     // DC không có tác động chi phí/tiến độ → duyệt không cần ghi chú.
     const dc1 = await insertId(
-      `INSERT INTO design_changes (code, title, reason, status)
-       VALUES ('DC-TEST-D1', 'DC không tác động', 'Lý do', 'submitted')`,
+      `INSERT INTO design_changes (project_id, code, title, reason, status)
+       VALUES (?, 'DC-TEST-D1', 'DC không tác động', 'Lý do', 'submitted')`,
+      pj,
     );
     const r1 = await decideDesignChange({
       designChangeId: dc1,
       decision: "approved",
       decisionNote: null,
       decidedBy: pmId,
+      projectId: pj,
     });
     assert.ok(typeof r1 !== "string");
     const dc1Row = await queryOne<{ status: string }>(
@@ -146,14 +152,16 @@ test(
 
     // DC có tác động chi phí → duyệt thiếu ghi chú bị chặn, có ghi chú thì qua.
     const dc2 = await insertId(
-      `INSERT INTO design_changes (code, title, reason, impact_cost, status)
-       VALUES ('DC-TEST-D2', 'DC có tác động chi phí', 'Lý do', 'Phát sinh vật tư', 'submitted')`,
+      `INSERT INTO design_changes (project_id, code, title, reason, impact_cost, status)
+       VALUES (?, 'DC-TEST-D2', 'DC có tác động chi phí', 'Lý do', 'Phát sinh vật tư', 'submitted')`,
+      pj,
     );
     const noNote = await decideDesignChange({
       designChangeId: dc2,
       decision: "approved",
       decisionNote: null,
       decidedBy: pmId,
+      projectId: pj,
     });
     assert.equal(typeof noNote, "string");
     const withNote = await decideDesignChange({
@@ -161,18 +169,20 @@ test(
       decision: "approved",
       decisionNote: "Đã thống nhất chi phí phát sinh với CĐT",
       decidedBy: pmId,
+      projectId: pj,
     });
     assert.ok(typeof withNote !== "string");
 
     // markDrawingUpdated: chỉ hợp lệ khi DC đã 'approved'; DC1 (approved) → OK; DC còn
     // 'submitted' → lỗi.
     const dc3 = await insertId(
-      `INSERT INTO design_changes (code, title, reason, status)
-       VALUES ('DC-TEST-D3', 'DC chưa duyệt', 'Lý do', 'submitted')`,
+      `INSERT INTO design_changes (project_id, code, title, reason, status)
+       VALUES (?, 'DC-TEST-D3', 'DC chưa duyệt', 'Lý do', 'submitted')`,
+      pj,
     );
-    const errPending = await markDrawingUpdated(dc3);
+    const errPending = await markDrawingUpdated(dc3, pj);
     assert.ok(errPending);
-    const okApproved = await markDrawingUpdated(dc1);
+    const okApproved = await markDrawingUpdated(dc1, pj);
     assert.equal(okApproved, null);
     const dc1After = await queryOne<{ status: string }>(
       `SELECT status FROM design_changes WHERE id = ?`,
@@ -186,11 +196,13 @@ test(
       decision: "rejected",
       decisionNote: "x",
       decidedBy: pmId,
+      projectId: pj,
     });
     assert.equal(typeof again, "string");
 
     await run(`DELETE FROM design_changes WHERE id IN (?, ?, ?)`, dc1, dc2, dc3);
     await run(`DELETE FROM users WHERE id = ?`, pmId);
+    await run(`DELETE FROM projects WHERE id = ?`, pj);
   },
 );
 

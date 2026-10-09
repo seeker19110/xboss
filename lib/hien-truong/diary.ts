@@ -167,11 +167,12 @@ export type DiaryPrefill = {
 
 // Gộp task_history + task_photos trong ngày `date` thành nội dung nhật ký gợi ý — thuần tính
 // toán lúc GET (không ghi DB); người lập vẫn sửa được, hoặc bấm "Lấy lại từ hệ thống" để tính lại.
-// projectId (M22): undefined = không lọc dự án (dùng nội bộ/test cũ); có giá trị → chỉ gộp
-// hoạt động của task thuộc dự án đó (qua work_package → sheet_type → tower.project_id).
-export async function buildDiaryPrefill(date: string, projectId?: number): Promise<DiaryPrefill> {
-  const projectCond = projectId != null ? " AND tw.project_id = ?" : "";
-  const projectArgs = projectId != null ? [projectId] : [];
+// projectId (M22) BẮT BUỘC: chỉ gộp hoạt động của task thuộc dự án đó (qua work_package →
+// sheet_type → tower.project_id). AUDIT-S16 null-scope: trước đây undefined = không lọc → nhật
+// ký gợi ý gộp hoạt động mọi tổ chức; route không có dự án khả kiến tự trả prefill rỗng.
+export async function buildDiaryPrefill(date: string, projectId: number): Promise<DiaryPrefill> {
+  const projectCond = " AND tw.project_id = ?";
+  const projectArgs = [projectId];
 
   const groups = await query<{
     systemName: string | null;

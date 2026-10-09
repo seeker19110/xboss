@@ -32,7 +32,9 @@ export async function PATCH(
     return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const action = await getMeetingAction(aid);
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → 404; họp legacy project_id NULL không
+  // được coi là "cùng dự án" với người dùng chưa có dự án (null === null).
+  const action = projectId != null ? await getMeetingAction(aid) : null;
   if (!action || action.meetingId !== meetingId || action.projectId !== projectId)
     return NextResponse.json({ error: "Không tìm thấy việc sau họp" }, { status: 404 });
 
@@ -106,7 +108,9 @@ export async function DELETE(
       return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
     const projectId = await getCurrentProjectId(user);
-    const action = await getMeetingAction(aid);
+    // AUDIT-S16 (A1-AC03): không có dự án khả kiến → 404; họp legacy project_id NULL không
+    // được coi là "cùng dự án" với người dùng chưa có dự án (null === null).
+    const action = projectId != null ? await getMeetingAction(aid) : null;
     if (!action || action.meetingId !== meetingId || action.projectId !== projectId)
       return NextResponse.json({ error: "Không tìm thấy việc sau họp" }, { status: 404 });
 

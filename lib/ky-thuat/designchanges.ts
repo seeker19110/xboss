@@ -59,8 +59,13 @@ export function validateDesignChangeInput(input: DesignChangeInput): string | nu
   return null;
 }
 
-// Kiểm FK system/drawing tồn tại — trả thông điệp lỗi hoặc null.
-export async function checkDesignChangeRefs(input: DesignChangeInput): Promise<string | null> {
+// Kiểm FK system/drawing tồn tại — trả thông điệp lỗi hoặc null. Bản vẽ liên quan phải thuộc
+// ĐÚNG dự án của DC (A1-AC03 — id bản vẽ dự án/tổ chức khác không gắn được, và không lộ tên/mã
+// bản vẽ đó qua JOIN của listDesignChanges). `systems` là danh mục dùng chung (seed migration).
+export async function checkDesignChangeRefs(
+  input: DesignChangeInput,
+  projectId: number,
+): Promise<string | null> {
   if (input.systemId != null) {
     if (
       !Number.isInteger(input.systemId) ||
@@ -71,7 +76,11 @@ export async function checkDesignChangeRefs(input: DesignChangeInput): Promise<s
   if (input.drawingId != null) {
     if (
       !Number.isInteger(input.drawingId) ||
-      !(await queryOne(`SELECT id FROM drawings WHERE id = ?`, input.drawingId))
+      !(await queryOne(
+        `SELECT id FROM drawings WHERE id = ? AND project_id = ?`,
+        input.drawingId,
+        projectId,
+      ))
     )
       return "Bản vẽ liên quan không tồn tại";
   }
@@ -103,31 +112,25 @@ export type DesignChangeRow = DesignChangeInput & {
 
 export type DesignChangeFilters = {
   id?: number;
-  projectId?: number | null;
+  projectId: number;
   status?: DesignChangeStatus;
 };
 
-// Danh sách DC kèm tên hệ/bản vẽ liên quan. projectId truyền vào để scoping đa dự án
-// (M22) — không lọc khi undefined/null. getDesignChange (dùng ở route [id]) BẮT BUỘC
-// truyền projectId để chặn thao tác xuyên dự án theo id đoán được.
-export async function listDesignChanges(
-  filters: DesignChangeFilters = {},
-): Promise<DesignChangeRow[]> {
-  const clauses: string[] = [];
-  const params: unknown[] = [];
+// Danh sách DC kèm tên hệ/bản vẽ liên quan, LUÔN trong đúng 1 dự án (AUDIT-S16 null-scope:
+// trước đây projectId null/undefined = không lọc → PM chưa được gán dự án đọc được DC mọi tổ
+// chức). Route không có dự án khả kiến phải tự trả rỗng/404 trước khi gọi.
+export async function listDesignChanges(filters: DesignChangeFilters): Promise<DesignChangeRow[]> {
+  const clauses: string[] = ["dc.project_id = ?"];
+  const params: unknown[] = [filters.projectId];
   if (filters.id != null) {
     clauses.push("dc.id = ?");
     params.push(filters.id);
-  }
-  if (filters.projectId != null) {
-    clauses.push("dc.project_id = ?");
-    params.push(filters.projectId);
   }
   if (filters.status) {
     clauses.push("dc.status = ?");
     params.push(filters.status);
   }
-  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  const where = `WHERE ${clauses.join(" AND ")}`;
 
   return query<DesignChangeRow>(
     `SELECT dc.id, dc.code, dc.project_id AS "projectId", dc.title,
@@ -153,7 +156,7 @@ export async function listDesignChanges(
 
 export async function getDesignChange(
   id: number,
-  projectId?: number | null,
+  projectId: number,
 ): Promise<DesignChangeRow | undefined> {
   const rows = await listDesignChanges({ id, projectId });
   return rows[0];
@@ -189,17 +192,17 @@ export async function decideDesignChange(opts: {
   decision: "approved" | "rejected";
   decisionNote: string | null;
   decidedBy: number;
-  projectId?: number | null;
+  projectId: number;
 }): Promise<{ ok: true } | string> {
-  const projectClause = opts.projectId != null ? " AND project_id = ?" : "";
   const dc = await queryOne<{
     status: string;
     impactCost: string | null;
     impactSchedule: string | null;
   }>(
     `SELECT status, impact_cost AS "impactCost", impact_schedule AS "impactSchedule"
-       FROM design_changes WHERE id = ?${projectClause}`,
-    ...(opts.projectId != null ? [opts.designChangeId, opts.projectId] : [opts.designChangeId]),
+       FROM design_changes WHERE id = ? AND project_id = ?`,
+    opts.designChangeId,
+    opts.projectId,
   );
   if (!dc) return "Không tìm thấy thay đổi thiết kế";
   if (dc.status !== "submitted" && dc.status !== "assessing")
@@ -211,30 +214,29 @@ export async function decideDesignChange(opts: {
 
   await run(
     `UPDATE design_changes SET status = ?, decision_note = ?, decided_by = ?, decided_at = NOW()
-      WHERE id = ?${projectClause}`,
+      WHERE id = ? AND project_id = ?`,
     opts.decision,
     opts.decisionNote?.trim() || null,
     opts.decidedBy,
-    ...(opts.projectId != null ? [opts.designChangeId, opts.projectId] : [opts.designChangeId]),
+    opts.designChangeId,
+    opts.projectId,
   );
   return { ok: true };
 }
 
 // Đánh dấu đã cập nhật bản vẽ xong sau khi duyệt — thao tác tay, không tự động (spec M32).
-export async function markDrawingUpdated(
-  id: number,
-  projectId?: number | null,
-): Promise<string | null> {
-  const projectClause = projectId != null ? " AND project_id = ?" : "";
+export async function markDrawingUpdated(id: number, projectId: number): Promise<string | null> {
   const dc = await queryOne<{ status: string }>(
-    `SELECT status FROM design_changes WHERE id = ?${projectClause}`,
-    ...(projectId != null ? [id, projectId] : [id]),
+    `SELECT status FROM design_changes WHERE id = ? AND project_id = ?`,
+    id,
+    projectId,
   );
   if (!dc) return "Không tìm thấy thay đổi thiết kế";
   if (dc.status !== "approved") return "Chỉ đánh dấu được sau khi thay đổi thiết kế đã được duyệt";
   await run(
-    `UPDATE design_changes SET status = 'drawing_updated' WHERE id = ?${projectClause}`,
-    ...(projectId != null ? [id, projectId] : [id]),
+    `UPDATE design_changes SET status = 'drawing_updated' WHERE id = ? AND project_id = ?`,
+    id,
+    projectId,
   );
   return null;
 }

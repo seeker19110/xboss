@@ -11,8 +11,10 @@
 //  - Scope dự án cho task suy qua `sheet_types → towers.project_id` (không có project_id
 //    trực tiếp) — copy pattern JOIN của lib/dashboardext.ts / lib/assignments.ts.
 //  - `attendance.project_id` có sẵn → lọc thẳng.
-//  - `equipment`/`equipment_logs` KHÔNG có cột project_id (migrations/0021) → khối
-//    equipmentUsageByWeek KHÔNG scope được theo dự án (xem ghi chú tại hàm).
+//  - `equipment.project_id` có từ migrations/0027 (equipment_logs suy dự án qua equipment_id)
+//    → equipmentUsageByWeek lọc theo dự án (AUDIT-S16; ghi chú cũ "không scope được" đã sai).
+//  - Mọi hàm nhận `projectId: number` BẮT BUỘC (AUDIT-S16 null-scope): trước đây null = không
+//    lọc → route trả tải nhân lực/thiết bị mọi tổ chức cho người chưa được gán dự án.
 //  - PR1 KHÔNG làm xung đột THIẾT BỊ: equipment_logs chỉ ghi điểm sự kiện (`action` tại 1
 //    `created_at`), không có dải ngày phân bổ → không đủ dữ liệu tính "2 phân bổ giao nhau".
 import { query, todayISO } from "@/lib/db";
@@ -40,12 +42,11 @@ export async function workloadByWeek({
   to,
   subconUserId,
 }: {
-  projectId: number | null;
+  projectId: number;
   from: string;
   to: string;
   subconUserId?: number;
 }): Promise<WorkloadWeekRow[]> {
-  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
   const subconFilter = subconUserId != null ? " AND t.assigned_to = ?" : "";
   const rows = await query<WorkloadWeekRow>(
     `SELECT g.week::date AS week,
@@ -63,12 +64,12 @@ export async function workloadByWeek({
         AND COALESCE(t.end_date, wp.end_date) IS NOT NULL
         AND COALESCE(t.start_date, wp.start_date) <= g.week + interval '6 days'
         AND COALESCE(t.end_date, wp.end_date) >= g.week
-      WHERE t.assigned_to IS NOT NULL AND ${EXCLUDE_DONE}${projectFilter}${subconFilter}
+      WHERE t.assigned_to IS NOT NULL AND ${EXCLUDE_DONE} AND tw.project_id = ?${subconFilter}
       GROUP BY g.week, t.assigned_to, u.name, s.code, s.color
       ORDER BY g.week, t.assigned_to`,
     from,
     to,
-    ...(projectId != null ? [projectId] : []),
+    projectId,
     ...(subconUserId != null ? [subconUserId] : []),
   );
   return rows.map((r) => ({ ...r, userId: Number(r.userId), taskCount: Number(r.taskCount) }));
@@ -93,11 +94,10 @@ export async function manpowerByWeek({
   from,
   to,
 }: {
-  projectId: number | null;
+  projectId: number;
   from: string;
   to: string;
 }): Promise<ManpowerWeekRow[]> {
-  const projectFilter = projectId != null ? " AND a.project_id = ?" : "";
   const rows = await query<ManpowerWeekRow>(
     `SELECT date_trunc('week', a.work_date)::date AS week,
             a.crew_id AS "crewId", c.name AS "crewName",
@@ -105,12 +105,12 @@ export async function manpowerByWeek({
               + COUNT(*) FILTER (WHERE a.personnel_id IS NOT NULL AND a.present) AS "manpower"
        FROM attendance a
        LEFT JOIN crews c ON c.id = a.crew_id
-      WHERE a.work_date >= ? AND a.work_date <= ?${projectFilter}
+      WHERE a.work_date >= ? AND a.work_date <= ? AND a.project_id = ?
       GROUP BY date_trunc('week', a.work_date), a.crew_id, c.name
       ORDER BY week, a.crew_id`,
     from,
     to,
-    ...(projectId != null ? [projectId] : []),
+    projectId,
   );
   return rows.map((r) => ({
     ...r,
@@ -126,14 +126,14 @@ export type EquipmentUsageWeekRow = {
 };
 
 // Mật độ dùng thiết bị: đếm SỐ SỰ KIỆN equipment_logs theo tuần × loại `action` (issue/
-// return/move/maintain/calibrate) — KHÔNG phải dải ngày phân bổ (schema không có). KHÔNG
-// scope theo dự án: bảng `equipment`/`equipment_logs` (migrations/0021) không có cột
-// project_id nên không suy được dự án — cố JOIN sẽ sai; bỏ scope, ghi rõ lý do tại đây.
+// return/move/maintain/calibrate) — KHÔNG phải dải ngày phân bổ (schema không có). Scope dự án
+// qua `equipment.project_id` (migrations/0027) — trước đây đếm nhật ký thiết bị mọi tổ chức.
 export async function equipmentUsageByWeek({
+  projectId,
   from,
   to,
 }: {
-  projectId: number | null;
+  projectId: number;
   from: string;
   to: string;
 }): Promise<EquipmentUsageWeekRow[]> {
@@ -141,11 +141,14 @@ export async function equipmentUsageByWeek({
     `SELECT date_trunc('week', el.created_at)::date AS week,
             el.action, COUNT(*) AS "eventCount"
        FROM equipment_logs el
+       JOIN equipment e ON e.id = el.equipment_id
       WHERE el.created_at::date >= ?::date AND el.created_at::date <= ?::date
+        AND e.project_id = ?
       GROUP BY date_trunc('week', el.created_at), el.action
       ORDER BY week, el.action`,
     from,
     to,
+    projectId,
   );
   return rows.map((r) => ({ ...r, eventCount: Number(r.eventCount) }));
 }
@@ -176,17 +179,12 @@ export async function assignmentConflicts({
   minTasks = 5,
   subconUserId,
 }: {
-  projectId: number | null;
+  projectId: number;
   minTasks?: number;
   subconUserId?: number;
 }): Promise<AssignmentConflict[]> {
-  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
   const subconFilter = subconUserId != null ? " AND t.assigned_to = ?" : "";
-  const params = [
-    ...(projectId != null ? [projectId] : []),
-    ...(subconUserId != null ? [subconUserId] : []),
-    minTasks,
-  ];
+  const params = [projectId, ...(subconUserId != null ? [subconUserId] : []), minTasks];
   const rows = await query<{
     userId: number;
     userName: string;
@@ -209,7 +207,7 @@ export async function assignmentConflicts({
           JOIN towers tw ON tw.id = st.tower_id
          WHERE t.assigned_to IS NOT NULL AND ${EXCLUDE_DONE}
            AND COALESCE(t.start_date, wp.start_date) IS NOT NULL
-           AND COALESCE(t.end_date, wp.end_date) IS NOT NULL${projectFilter}${subconFilter}
+           AND COALESCE(t.end_date, wp.end_date) IS NOT NULL AND tw.project_id = ?${subconFilter}
       ),
       overlap AS (
         SELECT a.id, a.user_id, COUNT(*) AS concurrent

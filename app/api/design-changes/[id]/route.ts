@@ -25,7 +25,10 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → 404 trước mọi truy vấn nghiệp vụ.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy thay đổi thiết kế" }, { status: 404 });
   const designChange = await getDesignChange(id, projectId);
   if (!designChange)
     return NextResponse.json({ error: "Không tìm thấy thay đổi thiết kế" }, { status: 404 });
@@ -54,6 +57,8 @@ export async function PATCH(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy thay đổi thiết kế" }, { status: 404 });
   const existing = await getDesignChange(id, projectId);
   if (!existing)
     return NextResponse.json({ error: "Không tìm thấy thay đổi thiết kế" }, { status: 404 });
@@ -89,7 +94,7 @@ export async function PATCH(
 
   const invalid = validateDesignChangeInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
-  const refErr = await checkDesignChangeRefs(input);
+  const refErr = await checkDesignChangeRefs(input, projectId);
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
 
   // status='assessing' là chuyển tiếp hợp lệ trước khi quyết (đang đánh giá tác động).
@@ -98,7 +103,7 @@ export async function PATCH(
   await run(
     `UPDATE design_changes SET title = ?, system_id = ?, drawing_id = ?, requested_by_note = ?,
             reason = ?, impact_technical = ?, impact_cost = ?, impact_schedule = ?, status = ?
-      WHERE id = ?`,
+      WHERE id = ? AND project_id = ?`,
     input.title,
     input.systemId,
     input.drawingId,
@@ -109,6 +114,7 @@ export async function PATCH(
     input.impactSchedule,
     nextStatus,
     id,
+    projectId,
   );
   return NextResponse.json({ updated: id });
 }
@@ -133,6 +139,8 @@ export async function DELETE(
     if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
     const projectId = await getCurrentProjectId(user);
+    if (projectId == null)
+      return NextResponse.json({ error: "Không tìm thấy thay đổi thiết kế" }, { status: 404 });
     const existing = await getDesignChange(id, projectId);
     if (!existing)
       return NextResponse.json({ error: "Không tìm thấy thay đổi thiết kế" }, { status: 404 });
@@ -141,7 +149,7 @@ export async function DELETE(
     if (!isPending && user.role !== "admin")
       return NextResponse.json({ error: "Đã có quyết định — chỉ Admin xoá được" }, { status: 403 });
 
-    await run(`DELETE FROM design_changes WHERE id = ?`, id);
+    await run(`DELETE FROM design_changes WHERE id = ? AND project_id = ?`, id, projectId);
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

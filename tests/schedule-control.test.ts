@@ -19,9 +19,14 @@ test(
     const xayTo = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'xay_to'`);
     assert.ok(ketCau && xayTo, "cần systems seed sẵn ket_cau/xay_to");
 
+    // AUDIT-S16: dữ liệu luôn lọc theo dự án (không còn nhánh "không truyền dự án = toàn hệ").
+    const pj = await insertId(`INSERT INTO projects (name) VALUES ('DA test schedule-control')`);
+    const tw = await insertId(`INSERT INTO towers (project_id, name) VALUES (?, 'Tháp SC')`, pj);
+
     // Hệ A (ket_cau): sheet + 3 nhóm việc nối chuỗi A→B→C tạo đường găng.
     const sheetAId = await insertId(
-      `INSERT INTO sheet_types (code, name, slug, system_id) VALUES ('SC-A', 'Sheet SC hệ A', 'sc-a', ?)`,
+      `INSERT INTO sheet_types (tower_id, code, name, slug, system_id) VALUES (?, 'SC-A', 'Sheet SC hệ A', 'sc-a', ?)`,
+      tw,
       ketCau!.id,
     );
     const wpAId = await insertId(
@@ -69,7 +74,8 @@ test(
 
     // Hệ B (xay_to): sheet + 1 nhóm riêng, không liên quan gì đến hệ A.
     const sheetBId = await insertId(
-      `INSERT INTO sheet_types (code, name, slug, system_id) VALUES ('SC-B', 'Sheet SC hệ B', 'sc-b', ?)`,
+      `INSERT INTO sheet_types (tower_id, code, name, slug, system_id) VALUES (?, 'SC-B', 'Sheet SC hệ B', 'sc-b', ?)`,
+      tw,
       xayTo!.id,
     );
     const wpEId = await insertId(
@@ -111,14 +117,14 @@ test(
     );
 
     try {
-      // ── Không lọc: cả 2 hệ đều xuất hiện ──
-      const all = await getScheduleControlData(null);
+      // ── Không lọc hệ: cả 2 hệ đều xuất hiện ──
+      const all = await getScheduleControlData(null, pj);
       const allDelayedCodes = all.delayed.map((t) => t.code);
       assert.ok(allDelayedCodes.includes("SC-T-A1"));
       assert.ok(allDelayedCodes.includes("SC-T-B1"));
 
       // ── Lọc hệ A (ket_cau): task hệ B không lọt kết quả ──
-      const filtered = await getScheduleControlData(ketCau!.id);
+      const filtered = await getScheduleControlData(ketCau!.id, pj);
       const filteredCodes = filtered.delayed.map((t) => t.code);
       assert.ok(filteredCodes.includes("SC-T-A1"));
       assert.ok(filteredCodes.includes("SC-T-A2"));
@@ -155,7 +161,7 @@ test(
       assert.equal(noneRow, filtered.delayPareto[filtered.delayPareto.length - 1]);
 
       // ── system không tồn tại → resolveSystemId trả -1 → rỗng, không lỗi ──
-      const empty = await getScheduleControlData(-1);
+      const empty = await getScheduleControlData(-1, pj);
       assert.equal(empty.critical.length, 0);
       assert.equal(empty.delayed.length, 0);
     } finally {
@@ -170,13 +176,15 @@ test(
         wpEId,
       );
       await run(`DELETE FROM sheet_types WHERE id IN (?, ?)`, sheetAId, sheetBId);
+      await run(`DELETE FROM towers WHERE id = ?`, tw);
+      await run(`DELETE FROM projects WHERE id = ?`, pj);
     }
   },
 );
 
 // M22 — getScheduleControlData/getCpmData lọc theo dự án đang chọn (suy qua sheet_types →
 // towers.project_id): 2 dự án riêng, mỗi dự án có tháp/sheet/nhóm/task trễ → truyền projectId
-// chỉ trả đúng dự án đó (đường găng + task trễ), không lẫn; không truyền = toàn bộ (tương thích ngược).
+// chỉ trả đúng dự án đó (đường găng + task trễ), không lẫn. projectId bắt buộc (AUDIT-S16).
 test(
   "getScheduleControlData(systemId, projectId): tách đúng đường găng + task trễ theo dự án (M22+)",
   { skip: !HAS_TEST_DB },
@@ -233,12 +241,6 @@ test(
     );
 
     try {
-      // ── Không lọc dự án → cả 2 xuất hiện (tương thích ngược) ──
-      const all = await getScheduleControlData(ketCau!.id);
-      const allCodes = all.delayed.map((t) => t.code);
-      assert.ok(allCodes.includes("SCP-T1"));
-      assert.ok(allCodes.includes("SCP-T2"));
-
       // ── Lọc dự án 1 → chỉ task/nhóm dự án 1 ──
       const only1 = await getScheduleControlData(ketCau!.id, p1);
       const codes1 = only1.delayed.map((t) => t.code);
@@ -263,9 +265,6 @@ test(
       const cpm2 = await getCpmData(ketCau!.id, p2);
       assert.ok(cpm2.meta.has(wp2));
       assert.ok(!cpm2.meta.has(wp1));
-      // Không truyền projectId → cả 2 nhóm (tương thích ngược).
-      const cpmAll = await getCpmData(ketCau!.id);
-      assert.ok(cpmAll.meta.has(wp1) && cpmAll.meta.has(wp2));
     } finally {
       await run(`DELETE FROM tasks WHERE id IN (?, ?)`, t1, t2);
       await run(`DELETE FROM work_packages WHERE id IN (?, ?)`, wp1, wp2);

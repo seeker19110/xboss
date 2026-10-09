@@ -18,8 +18,10 @@ export async function GET(req: NextRequest) {
   if (!Number.isFinite(thresholdPct) || thresholdPct < 0)
     return NextResponse.json({ error: "thresholdPct không hợp lệ" }, { status: 422 });
 
-  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc.
+  // Lọc theo dự án đang chọn (M22+). AUDIT-S16 (A1-AC03): không có dự án khả kiến → rỗng —
+  // trước đây null = không lọc, lộ định mức/vật tư mọi tổ chức.
   const projectId = await getCurrentProjectId(user);
-  const items = await overNormItems(thresholdPct, projectId ?? undefined);
+  if (projectId == null) return NextResponse.json({ items: [] });
+  const items = await overNormItems(thresholdPct, projectId);
   return NextResponse.json({ items });
 }

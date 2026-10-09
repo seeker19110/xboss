@@ -199,9 +199,11 @@ export async function GET(req: NextRequest) {
     buildTrackingTab(wb.addWorksheet(safeTabName(code)), tasks, dims);
   }
 
-  // Tên file theo mã dự án trong DB (fallback "XBoss" khi chưa seed).
+  // Tên file theo mã DỰ ÁN ĐANG CHỌN (fallback "XBoss" khi dự án chưa có mã). AUDIT-S16
+  // (A1-AC03): không đọc "dự án đầu tiên của DB" — có thể thuộc tổ chức khác.
   const project = await queryOne<{ code: string | null }>(
-    `SELECT code FROM projects ORDER BY id LIMIT 1`,
+    `SELECT code FROM projects WHERE id = ?`,
+    projectId,
   );
   const fileTag = (project?.code ?? "XBoss").replace(/[^\w-]/g, "-");
 

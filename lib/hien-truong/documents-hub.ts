@@ -39,13 +39,10 @@ export type HubDocument = {
 // được giao (lọc thẳng bằng SQL, tương đương canTouchTask nhưng tránh N truy vấn).
 // task_documents không có project_id trực tiếp — suy qua work_packages → sheet_types
 // → towers (đúng pattern lib/projects.ts / app/api/notifications/route.ts).
-async function listTaskDocuments(user: User, projectId: number | null): Promise<HubDocument[]> {
+async function listTaskDocuments(user: User, projectId: number): Promise<HubDocument[]> {
   const subconFilter = user.role === "subcon" ? " AND t.assigned_to = ?" : "";
-  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
-  const params = [
-    ...(user.role === "subcon" ? [user.id] : []),
-    ...(projectId != null ? [projectId] : []),
-  ];
+  const projectFilter = " AND tw.project_id = ?";
+  const params = [...(user.role === "subcon" ? [user.id] : []), projectId];
   const rows = await query<{
     id: number;
     title: string;
@@ -93,10 +90,10 @@ async function listTaskDocuments(user: User, projectId: number | null): Promise<
 }
 
 // Hợp đồng (contract_documents) — nhạy cảm thương mại, cùng quyền trang /contracts.
-async function listContractDocuments(user: User, projectId: number | null): Promise<HubDocument[]> {
+async function listContractDocuments(user: User, projectId: number): Promise<HubDocument[]> {
   if (!CAN.viewPayments(user.role)) return [];
-  const projectFilter = projectId != null ? " WHERE c.project_id = ?" : "";
-  const params = projectId != null ? [projectId] : [];
+  const projectFilter = " WHERE c.project_id = ?";
+  const params = [projectId];
   const rows = await query<{
     id: number;
     title: string;
@@ -140,10 +137,10 @@ async function listContractDocuments(user: User, projectId: number | null): Prom
 }
 
 // Phát sinh/VO (vo_documents) — giá trị thương mại nhạy cảm, cùng quyền trang /variations.
-async function listVoDocuments(user: User, projectId: number | null): Promise<HubDocument[]> {
+async function listVoDocuments(user: User, projectId: number): Promise<HubDocument[]> {
   if (!CAN.viewVariations(user.role)) return [];
-  const projectFilter = projectId != null ? " WHERE vo.project_id = ?" : "";
-  const params = projectId != null ? [projectId] : [];
+  const projectFilter = " WHERE vo.project_id = ?";
+  const params = [projectId];
   const rows = await query<{
     id: number;
     title: string;
@@ -189,9 +186,9 @@ async function listVoDocuments(user: User, projectId: number | null): Promise<Hu
 // Bản vẽ (drawing_revisions) — mọi vai trò đăng nhập kể cả subcon (cần bản vẽ tại
 // hiện trường, đúng quyền xem của M8). system_group là nhãn tự do (không FK cứng vào
 // systems) nên không lọc chéo bảng — chỉ hiển thị đúng label người dùng đã nhập.
-async function listDrawingDocuments(projectId: number | null): Promise<HubDocument[]> {
-  const projectFilter = projectId != null ? " WHERE d.project_id = ?" : "";
-  const params = projectId != null ? [projectId] : [];
+async function listDrawingDocuments(projectId: number): Promise<HubDocument[]> {
+  const projectFilter = " WHERE d.project_id = ?";
+  const params = [projectId];
   const rows = await query<{
     id: number;
     name: string;
@@ -231,9 +228,9 @@ async function listDrawingDocuments(projectId: number | null): Promise<HubDocume
 }
 
 // File tự do cấp dự án (project_documents, mới ở M20) — mọi vai trò đăng nhập xem được.
-async function listProjectDocuments(projectId: number | null): Promise<HubDocument[]> {
-  const projectFilter = projectId != null ? " WHERE pd.project_id = ?" : "";
-  const params = projectId != null ? [projectId] : [];
+async function listProjectDocuments(projectId: number): Promise<HubDocument[]> {
+  const projectFilter = " WHERE pd.project_id = ?";
+  const params = [projectId];
   const rows = await query<{
     id: number;
     title: string;
@@ -276,10 +273,11 @@ export type DocumentHubFilters = {
 
 // Hợp nhất mọi nguồn (mỗi hàm nguồn tự lọc quyền của mình) rồi lọc hệ/tầng/nguồn/tìm
 // kiếm trong bộ nhớ — dữ liệu 1 dự án xây dựng không đủ lớn để cần đẩy lọc xuống SQL
-// cho từng nguồn khác cấu trúc, giữ đúng KISS.
+// cho từng nguồn khác cấu trúc, giữ đúng KISS. `projectId` BẮT BUỘC (AUDIT-S16 null-scope:
+// trước đây null = không lọc → hub liệt kê tài liệu mọi tổ chức); route tự trả rỗng khi null.
 export async function listAllDocuments(
   user: User,
-  projectId: number | null,
+  projectId: number,
   filters: DocumentHubFilters = {},
 ): Promise<HubDocument[]> {
   const results = await Promise.all([

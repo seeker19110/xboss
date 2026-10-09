@@ -28,17 +28,26 @@ function isChecked(v: unknown): boolean {
   return false;
 }
 
+// Mọi hàm xuất/nhập theo hệ LUÔN trong đúng 1 dự án (AUDIT-S16 null-scope): trước đây projectId
+// null = không lọc → mẫu xuất task mọi tổ chức, và upload GHI ngày/tiến độ vào task mọi dự án
+// trùng BOQCODE. Route không có dự án khả kiến trả 404 trước khi gọi.
+function locDuAn(projectId: number) {
+  return {
+    projectJoin: " JOIN towers tw ON tw.id = st.tower_id",
+    projectFilter: " AND tw.project_id = ?",
+    projectParam: [projectId],
+  };
+}
+
 /**
- * Dựng workbook mẫu "kế hoạch" (1 tab): mỗi dòng là 1 task thuộc hệ `systemId` (lọc theo `projectId` nếu có).
+ * Dựng workbook mẫu "kế hoạch" (1 tab): mỗi dòng là 1 task thuộc hệ `systemId` trong dự án `projectId`.
  * Cột: BOQCODE | Sheet | Nhóm | Mã | Tên công việc | Ngày bắt đầu KH | Ngày kết thúc KH
  */
 export async function buildPlanTemplate(
   systemId: number,
-  projectId?: number | null,
+  projectId: number,
 ): Promise<ExcelJS.Workbook> {
-  const projectJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
-  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
-  const projectParam = projectId != null ? [projectId] : [];
+  const { projectJoin, projectFilter, projectParam } = locDuAn(projectId);
 
   const tasks = await query<{
     boqCode: string | null;
@@ -103,11 +112,9 @@ export async function buildPlanTemplate(
  */
 export async function buildTrackingTemplate(
   systemId: number,
-  projectId?: number | null,
+  projectId: number,
 ): Promise<ExcelJS.Workbook> {
-  const projectJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
-  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
-  const projectParam = projectId != null ? [projectId] : [];
+  const { projectJoin, projectFilter, projectParam } = locDuAn(projectId);
 
   const allTasks = await query<TrackTask>(
     `SELECT t.id AS "taskId", t.boq_code AS "boqCode", t.code, t.name, t.status,
@@ -160,7 +167,7 @@ export async function buildTrackingTemplate(
  */
 export async function parsePlanUpload(
   systemId: number,
-  projectId: number | null,
+  projectId: number,
   buffer: Buffer,
   changedBy: string,
 ): Promise<UploadResult> {
@@ -184,9 +191,7 @@ export async function parsePlanUpload(
   if (startIdx === -1) throw new Error("File không đúng mẫu — thiếu cột Ngày bắt đầu KH");
   if (endIdx === -1) throw new Error("File không đúng mẫu — thiếu cột Ngày kết thúc KH");
 
-  const projectJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
-  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
-  const projectParam = projectId != null ? [projectId] : [];
+  const { projectJoin, projectFilter, projectParam } = locDuAn(projectId);
 
   let matched = 0;
   let unmatched = 0;
@@ -267,7 +272,7 @@ export async function parsePlanUpload(
  */
 export async function parseTrackingUpload(
   systemId: number,
-  projectId: number | null,
+  projectId: number,
   buffer: Buffer,
   changedBy: string,
   // id người tải file — dùng làm `installed_by` cho ô được đánh dấu đã lắp (M120 FR4).
@@ -279,9 +284,7 @@ export async function parseTrackingUpload(
     throw new Error("File rỗng hoặc không có worksheet");
   }
 
-  const projectJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
-  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
-  const projectParam = projectId != null ? [projectId] : [];
+  const { projectJoin, projectFilter, projectParam } = locDuAn(projectId);
 
   let matched = 0;
   let unmatched = 0;
