@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
@@ -10,15 +10,12 @@ export const dynamic = "force-dynamic";
 
 // POST /api/workpackages
 // body: { sheetTypeId, code, name, floorLabel?, boqCode?, afterId? }
-// afterId: chÃ¨n sau work package cÃ³ id nÃ y (null = thÃªm vÃ o cuá»‘i).
+// afterId: chèn sau work package có id này (null = thêm vào cuối).
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "ChÆ°a Ä‘Äƒng nháº­p" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role))
-    return NextResponse.json(
-      { error: "Chá»‰ Admin/PM má»›i thÃªm Ä‘Æ°á»£c nhÃ³m" },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: "Chỉ Admin/PM mới thêm được nhóm" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const sheetTypeId = Number(body.sheetTypeId);
@@ -33,24 +30,21 @@ export async function POST(req: NextRequest) {
   if (sheetProjectId == null || !visible.includes(sheetProjectId))
     return NextResponse.json({ error: "sheetTypeId không tồn tại" }, { status: 404 });
 
-  // Kiá»ƒm trÃ¹ng code trong sheet.
+  // Kiểm trùng code trong sheet.
   const dup = await queryOne(
     `SELECT id FROM work_packages WHERE sheet_type_id = ? AND code = ?`,
     sheetTypeId,
     code,
   );
   if (dup)
-    return NextResponse.json(
-      { error: `MÃ£ "${code}" Ä‘Ã£ tá»“n táº¡i trong sheet nÃ y` },
-      { status: 409 },
-    );
+    return NextResponse.json({ error: `Mã "${code}" đã tồn tại trong sheet này` }, { status: 409 });
 
   const boqCode = String(body.boqCode ?? "").trim() || null;
   if (boqCode) {
     const taken = await boqTakenBy(boqCode, user.orgId);
     if (taken)
       return NextResponse.json(
-        { error: `MÃ£ BOQ "${boqCode}" Ä‘Ã£ Ä‘Æ°á»£c dÃ¹ng bá»Ÿi ${taken}` },
+        { error: `Mã BOQ "${boqCode}" đã được dùng bởi ${taken}` },
         { status: 409 },
       );
   }
@@ -72,7 +66,7 @@ export async function POST(req: NextRequest) {
             afterId,
             sheetTypeId,
           );
-          if (!after) return { loi: "afterId khÃ´ng há»£p lá»‡" } as const;
+          if (!after) return { loi: "afterId không hợp lệ" } as const;
           sortOrder = after.sort_order + 1;
           await run(
             `UPDATE work_packages SET sort_order = sort_order + 1 WHERE sheet_type_id = ? AND sort_order >= ?`,
@@ -101,10 +95,7 @@ export async function POST(req: NextRequest) {
       },
     );
     if (!kq.ok)
-      return NextResponse.json(
-        { error: "Chá»‰ Admin/PM má»›i thÃªm Ä‘Æ°á»£c nhÃ³m" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Chỉ Admin/PM mới thêm được nhóm" }, { status: 403 });
     if ("loi" in kq.value) return NextResponse.json({ error: kq.value.loi }, { status: 400 });
     id = kq.value.id;
   } catch (err) {
