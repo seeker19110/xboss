@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   symlinkSync,
@@ -148,18 +149,21 @@ test("A6-AC06: --apply xoá đúng {PASS 40 ngày, run-a}, idempotent, tệp l�
     join(f.ev, "pass10.json"),
     join(f.ev, "pitr-b.json"),
     join(f.ev, "note.txt"),
-    join(f.ev, "link.json"),
     join(f.drill, "run-b"),
     join(f.drill, "khac"),
     join(f.ev, "package.json"),
   ]) {
-    assert.ok(existsSync(p) || p.endsWith("link.json"), p);
+    assert.ok(existsSync(p), p);
   }
+  // Symlink phải còn nguyên (đích pass40.json đã xoá nên existsSync trả false → kiểm bằng lstat).
+  assert.ok(lstatSync(join(f.ev, "link.json")).isSymbolicLink());
   assert.match(lines.join("\n"), /Đã xoá 1 tệp evidence, 1 thư mục run-\*/);
+  const lan2: string[] = [];
   assert.equal(
-    runRetention(base(f, ["--apply"]), {}, () => {}, NOW),
+    runRetention(base(f, ["--apply"]), {}, (l) => lan2.push(l), NOW),
     0,
   );
+  assert.match(lan2.join("\n"), /Đã xoá 0 tệp evidence, 0 thư mục run-\*/);
 });
 
 test("A6-AC06: --force-run xoá sớm đúng run chỉ định; --json có đủ trường", () => {
