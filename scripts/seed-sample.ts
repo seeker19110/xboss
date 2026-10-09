@@ -1,6 +1,6 @@
 // Dữ liệu mẫu mô phỏng cấu trúc Excel AVIO Tháp A (chạy khi chưa có file Excel thật).
 import "./env";
-import { run, insertId, queryOne, todayISO } from "@/lib/db";
+import { run, insertId, query, queryOne, todayISO } from "@/lib/db";
 import type { StatusSlug } from "@/lib/tien-do/status";
 import { slugFromCode, toSlug } from "@/lib/nen/sheets";
 import { trongToChuc } from "@/lib/ha-tang/to-chuc";
@@ -81,15 +81,26 @@ function deriveStatus(progress: number, endDate: string): StatusSlug {
 async function main() {
   console.log("🌱 Seeding dữ liệu mẫu AVIO Tháp A...");
 
-  // Xoá các bảng nghiệp vụ mang project_id (M22) trước — TRUNCATE CASCADE tự xoá theo
-  // đúng thứ tự FK (kể cả bảng con không mang project_id riêng như payment_certs,
-  // po_items, qc_inspections...) mà không cần liệt kê tay từng cấp con.
-  await run(`TRUNCATE TABLE
-    contracts, variation_orders, materials, boq_items, purchase_orders, purchase_requests,
-    meetings, risks, proposals, correspondences, drawings, qc_checklists, ncrs,
-    hse_records, site_diaries, equipment, vehicle_logs, tender_packages, project_documents,
-    offline_vault_keys, audit_operation_receipts
-    CASCADE`);
+  // Xoá dữ liệu nghiệp vụ gắn dự án trước khi xoá `projects`. Danh sách bảng lấy từ catalog (mọi
+  // FK trỏ vào projects KHÔNG ON DELETE CASCADE) thay vì liệt kê tay — liệt kê tay luôn thiếu bảng
+  // mới (vd tech_links) và seed chạy lại trên DB có dữ liệu sẽ lỗi FK. TRUNCATE CASCADE tự xoá bảng
+  // con không mang project_id (payment_certs, po_items…). Bảng FK ON DELETE CASCADE (cấu hình theo
+  // dự án: nav_settings, alert_rules, approval_flows…) tự dọn khi xoá projects, dòng toàn cục giữ.
+  // `integrations` là cấu hình: chỉ xoá dòng gắn dự án, giữ dòng toàn cục.
+  const GIU_DONG_TOAN_CUC = ["integrations"];
+  const bangDuAn = await query<{ t: string }>(
+    `SELECT DISTINCT c.conrelid::regclass::text AS t
+       FROM pg_constraint c
+      WHERE c.contype = 'f' AND c.confrelid = 'projects'::regclass AND c.confdeltype <> 'c'
+      ORDER BY 1`,
+  );
+  for (const t of GIU_DONG_TOAN_CUC) {
+    if (bangDuAn.some((b) => b.t === t)) {
+      await run(`DELETE FROM ${t} WHERE project_id IS NOT NULL`);
+    }
+  }
+  const canTruncate = bangDuAn.map((b) => b.t).filter((t) => !GIU_DONG_TOAN_CUC.includes(t));
+  if (canTruncate.length > 0) await run(`TRUNCATE TABLE ${canTruncate.join(", ")} CASCADE`);
 
   // Reset (theo thứ tự FK).
   for (const t of [

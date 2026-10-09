@@ -1,5 +1,14 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — `seed-sample` chạy lại được trên DB đã có dữ liệu
+
+- `scripts/seed-sample.ts`: danh sách bảng xoá trước `projects` lấy từ catalog (mọi FK trỏ vào
+  `projects` không ON DELETE CASCADE) thay vì liệt kê tay — trước đây thiếu bảng mới (vd `tech_links`)
+  nên chạy lại lỗi FK (mục "còn mở" của đợt offline vault). `integrations` chỉ xoá dòng gắn dự án, giữ
+  dòng toàn cục; cấu hình theo dự án FK CASCADE (`nav_settings`, `alert_rules`…) giữ dòng toàn cục.
+- Kiểm: chạy seed 2 lần liên tiếp trên DB test có dữ liệu sót của bộ test → cả 2 lần xanh, `users`
+  không bị đụng.
+
 ## 2026-10-09 — Tạm tính tiền IPC phía client tính exact như server
 
 - `/payment-certs` gửi `X-XBoss-Money-Format: decimal-string-v1` cho `/api/contracts` và
