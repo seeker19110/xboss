@@ -61,9 +61,13 @@ APPROVAL D03/D04, PLAN §S08). Không thêm dependency, không migration, không
   `lib/nen/env.ts`, ghi chú `DEPLOY.md`).
 - **`boThaoTac`:** chủ + dự án + trạng thái `conflict|rejected` kiểm TRONG transaction xoá
   (`xoaTheoYeuCau(owner, ids, dieuKien)` trả số op đã xoá, không tăng `meta.rev` khi không xoá gì).
-  Ca "chập chờn" `true !== false` không tái hiện được (≥40 lần, kể cả chạy song song có tải) — dấu vết
-  khớp đúng mutation "chỉ bỏ op conflict/rejected" của `test:mutation` (script sửa file tại chỗ: chạy
-  test cùng lúc trên cùng working tree sẽ thấy đúng lỗi đó); file chạy 12 lần liên tiếp xanh.
+  **Test chập chờn — nguyên nhân thật:** ca `danhSachThaoTac` kiểm "không lộ payload" bằng
+  `!JSON.stringify(ds).includes("501")` — UUID/mốc thời gian ngẫu nhiên đôi khi chứa "501" (≈3/64 lần
+  khi chạy song song có tải; làm baseline `test:mutation` đỏ giả). Nay kiểm theo khoá/giá trị: 64/64
+  xanh (8 tiến trình song song × 8). Ca `boThaoTac … op đang chờ gửi` (`true !== false`) không tái
+  hiện được ở >100 lần — thông điệp đó khớp đúng mutation "chỉ bỏ op conflict/rejected" (script sửa
+  file tại chỗ, chạy test song song trên cùng working tree sẽ thấy); vẫn chuyển điều kiện vào
+  transaction như trên.
 - **LOW:** "Gửi lại ngay" báo thất bại thật (mất mạng/kho khoá → false, lỗi thiết bị → reject); bỏ op cũ
   lỗi sau khi op mới đã lưu → `{ok:true, canhBao}` riêng; các `.catch` nuốt lỗi ở màn phục hồi hiện
   thông điệp tiếng Việt; `refreshStats` không bao giờ reject, chặn thêm race đăng xuất ở nhánh vault
@@ -72,6 +76,11 @@ APPROVAL D03/D04, PLAN §S08). Không thêm dependency, không migration, không
 - **Test:** `audit-s08-offline-recovery` 9 → 15 ca; `offline-crypto` +1; `offline-vault-route` +KEK e2e.
   `test:mutation` +4 (bỏ thao tác chỉ trong dự án hiện hành; kiểm "có bản mới hơn" trong OCC;
   `refreshStats` bỏ kết quả khi chủ đổi; cập nhật 2 mutation S08 cũ theo code mới) — đều bị bắt.
+  Khi chạy lại các mutation offline phát hiện 2 lỗ **có sẵn từ S07** (cũng có trên base `dd5f9ae`):
+  "fencing: tab mất lease không được ghi kết quả" SỐNG SÓT (vòng flush tab cũ tự dừng qua gia hạn
+  hỏng, che lỗi) và "lease: không chiếm lease còn hạn" TREO (assert hỏng không thả request đang chờ →
+  `setInterval` gia hạn giữ tiến trình). Sửa trong `offline-queue-vault.test.ts`: kiểm `apKetQua` của
+  tab mất lease trực tiếp + thả promise trong `finally` — nay cả hai bị bắt, không treo.
 
 ## 2026-10-08 — QUALITY-FINAL-1 A4-AC08: đối chiếu báo cáo, query count và benchmark p95
 

@@ -186,8 +186,30 @@ test("danhSachThaoTac: trạng thái + lý do máy chủ + mô tả tối thiể
   );
   assert.equal(ds[0].operationId, conflict.operationId);
   assert.equal(ds[1].operationId, rejected.operationId);
+  // Kiểm theo KHOÁ/GIÁ TRỊ, không tìm chuỗi "501" trong JSON: operationId (UUID) và mốc thời gian
+  // ngẫu nhiên có thể chứa "501" → test chập chờn (đã gặp thật ở baseline test:mutation).
+  const KHOA_CHO_PHEP = new Set([
+    "operationId",
+    "kind",
+    "state",
+    "queuedAt",
+    "tries",
+    "nextAttemptAt",
+    "lastResult",
+    "moDuoc",
+    "ngayNhatKy",
+    "soO",
+  ]);
+  for (const o of ds) {
+    assert.deepEqual(
+      Object.keys(o).filter((k) => !KHOA_CHO_PHEP.has(k)),
+      [],
+      "không lộ payload (chỉ metadata trạng thái)",
+    );
+    assert.ok(!Object.values(o).includes(DIM[0]), "không lộ id ô");
+  }
   const s = JSON.stringify(ds);
-  assert.ok(!s.includes(String(DIM[0])) && !s.includes("installed"), "không lộ payload");
+  assert.ok(!s.includes("installed") && !s.includes("dimId"), "không lộ payload");
 });
 
 test("xung đột nhật ký → giữ bản thiết bị: op MỚI (operationId mới) với If-Match = etag máy chủ mới; op cũ chỉ bỏ SAU khi op mới đã lưu", async () => {
