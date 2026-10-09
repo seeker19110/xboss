@@ -97,16 +97,16 @@ lớp B/M vẫn thiếu. Lớp B thật hiện chỉ có `e2e/authed/offline-rec
 
 ### A4 — Báo cáo
 
-| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                                    | @e5ce67b | @98520f6 | Còn thiếu                   |
-| ------- | ------- | --------------------------------------------------------------- | -------- | -------- | --------------------------- |
-| A4-AC01 | P/H     | CR                                                              | PASS     | PASS     | —                           |
-| A4-AC02 | P/H     | CR                                                              | PASS     | PASS     | —                           |
-| A4-AC03 | P/H     | CR (+ ca NaN/±Inf)                                              | PASS     | PASS     | —                           |
-| A4-AC04 | P/H     | CR (snapshot REPEATABLE READ)                                   | PASS     | PASS     | —                           |
-| A4-AC05 | U/P/H/B | PKPI; e2e portfolio-kpi (10%/"Chưa có dữ liệu", không NaN/100%) | GAP      | PASS     | —                           |
-| A4-AC06 | P/H/B   | PKPI (khớp status/visibility); CR (nhãn T1 trùng, 403)          | GAP      | PARTIAL  | B                           |
-| A4-AC07 | P/H     | PKPI (ngày VN, kế thừa ngày KT nhóm)                            | PASS     | PASS     | —                           |
-| A4-AC08 | P/H/M   | bao-cao-a4-ac08; `npm run bench:reports`                        | PARTIAL  | PARTIAL  | baseline ±10%, dữ liệu thật |
+| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                                    | @e5ce67b | @98520f6 | Còn thiếu                                                       |
+| ------- | ------- | --------------------------------------------------------------- | -------- | -------- | --------------------------------------------------------------- |
+| A4-AC01 | P/H     | CR                                                              | PASS     | PASS     | —                                                               |
+| A4-AC02 | P/H     | CR                                                              | PASS     | PASS     | —                                                               |
+| A4-AC03 | P/H     | CR (+ ca NaN/±Inf)                                              | PASS     | PASS     | —                                                               |
+| A4-AC04 | P/H     | CR (snapshot REPEATABLE READ)                                   | PASS     | PASS     | —                                                               |
+| A4-AC05 | U/P/H/B | PKPI; e2e portfolio-kpi (10%/"Chưa có dữ liệu", không NaN/100%) | GAP      | PASS     | —                                                               |
+| A4-AC06 | P/H/B   | PKPI (khớp status/visibility); CR (nhãn T1 trùng, 403)          | GAP      | PARTIAL  | B                                                               |
+| A4-AC07 | P/H     | PKPI (ngày VN, kế thừa ngày KT nhóm)                            | PASS     | PASS     | —                                                               |
+| A4-AC08 | P/H/M   | bao-cao-a4-ac08; `npm run bench:reports`                        | PARTIAL  | PARTIAL  | baseline đã ghi (PR-A, role app); so ±10% lần sau; dữ liệu thật |
 
 Ghi chú A4-AC08: p95 đạt ngưỡng D09 trên fixture tổng hợp (xem
 [AUDIT-A4-AC08-BENCHMARK](AUDIT-A4-AC08-BENCHMARK.md)); so baseline ±10% là NOT_RUN vì chưa có baseline trước
@@ -230,7 +230,7 @@ Không mục nào dưới đây được tự quyết hoặc code trong S15.
 - **(d)** → **xong** (M130, `scripts/retention-cleanup.ts`, `docs/ops/backup.md`).
 - **(e)** → đặc tả `M129-ipc-da-chi-tach-cam-ket-thuc-chi.md` (Approved).
 - **(f)** → **xong** (`/api/ready`, login/me 503 `schema_not_ready`).
-- **(i)** → đo lại khi máy rảnh (lần đo đầu chạy song song 5 agent, không dùng).
+- **(i)** → **xong**: `bench/a4-ac08-baseline.json` ghi khi máy rảnh, role `xboss_app`; lần đo sau so ±10%.
 - A1-AC05/Q-AC01: ca stale snapshot đã có, mở rộng 72 handler (`AUDIT-S16-QUYEN-LUC-GHI.md`).
 - A2-AC07/AC08: lớp B xong (`e2e/authed/offline-deep.spec.ts`), còn M Safari/iOS.
 

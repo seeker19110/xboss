@@ -56,6 +56,10 @@ settings` thông báo mọi PM toàn hệ; `audit_log`/`custom_field_defs` khôn
   như `package.json` không đụng), từ chối `/`, `$HOME`, `BACKUP_DIR`/WAL và cả thư mục CHA của chúng,
   `--now` không đi cùng `--apply`. `tests/retention-cleanup.test.ts` 7 ca. `docs/ops/backup.md` thay
   `rm -rf` thủ công bằng quy trình dry-run → đọc → `--apply`.
+- **6(i) A4-AC08 baseline — xong:** `docs/nang-cap/bench/a4-ac08-baseline.json` ghi bằng
+  `npm run bench:reports` với **role `xboss_app`** (RLS như production), máy rảnh (load 0.5, 4 CPU),
+  fixture 5 dự án/10.000 task/20 phiên: p95 costs 217ms, kpi 105ms, dashboard 464ms (đều ≤2000ms D09).
+  Lần đo sau so `--baseline` ±10% trên cùng cấu hình (`roleApp/cpus/tasks/concurrency` khớp).
 - **Sửa nhỏ theo review:** cache danh sách dự án khả kiến (`app/lib/duAnKhaKien.ts`) xoá khi đổi ngữ
   cảnh org/dự án (`contextEpoch`); `tenders` POST bắt lỗi có `status`.
 - **Đặc tả mới (chủ dự án chốt 2026-10-09):** `M128` chứng từ điều chỉnh IPC (sau M129), `M129` tách
@@ -63,7 +67,7 @@ settings` thông báo mọi PM toàn hệ; `audit_log`/`custom_field_defs` khôn
   for implementation".
 - **Tiếp theo:** PR-B 6(b) RLS strict (migration 0165 bỏ nhánh GUC rỗng, scope `'*'` tường minh ở
   login/cron/script; nhánh `s16-rls-strict` đã code, rebase lên main sau PR-A; Metabase view cần GUC);
-  6(i) đo lại bench baseline khi máy rảnh (`BENCH_APP_DATABASE_URL`, role app); M129 rồi M128; nợ
+  M129 rồi M128; nợ
   null-scope ở trên; `.env.example` (người có quyền) thêm `XBOSS_STRICT_MEMBERSHIP=0`,
   `XBOSS_OFFLINE_KEK`, `GOOGLE_SHEET_PROJECT_ID`.
 
