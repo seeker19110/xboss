@@ -428,3 +428,217 @@ test(
     assert.equal(await daLap(F.d[2]), 0);
   },
 );
+
+// ── S15: A2-AC03 (nhật ký độc lập theo dự án/chủ) + A2-AC06 (403/404/422 → rejected bền) ─────
+
+const NOI_DUNG_NHAT_KY = {
+  weatherAm: null,
+  weatherPm: null,
+  obstacles: null,
+  safetyNote: null,
+  manpower: [],
+  photoIds: [],
+};
+
+const docNhatKy = async (projectId: number, ngay: string) =>
+  (
+    await own.query<{ work_done: string }>(
+      `SELECT work_done FROM site_diaries WHERE project_id = $1 AND diary_date = $2`,
+      [projectId, ngay],
+    )
+  ).rows[0]?.work_done;
+
+const layEtag = async (ngay: string) =>
+  (await (await trinhDuyetFetch(`/api/diaries/${ngay}`)).json()).etag as string;
+
+test(
+  "A2-AC03: nhật ký CÙNG ngày ở 2 dự án khác nhau (2 chủ khác nhau) độc lập — route thật, không ghi đè lẫn nhau",
+  S,
+  async () => {
+    const ngay = "2026-10-08";
+    const eng2 = await taoUser("eng2", "engineer");
+    const t2 = await taoTask(F.p2, 0);
+    const gui: YeuCauGui[] = [];
+
+    const xepHang = async (u: U, projectId: number, taskId: number, noiDung: string) => {
+      await dangNhapDuAn(u, projectId);
+      proof = null;
+      const m = taoManager(async (req) => (gui.push(req), guiThat(req)));
+      await m.q.chuanBiTracking([{ id: taskId }]);
+      await m.q.chuanBiNhatKy(ngay);
+      datOnline(false);
+      try {
+        const r = await m.q.enqueueDiaryNote(
+          { date: ngay, ...NOI_DUNG_NHAT_KY, workDone: noiDung },
+          null,
+        );
+        assert.deepEqual(r, { ok: true });
+      } finally {
+        datOnline(true);
+      }
+      return m;
+    };
+
+    // Hai thiết bị (2 chủ, 2 dự án) cùng xếp hàng nhật ký ngày `ngay` khi mất mạng.
+    const m1 = await xepHang(F.eng, F.p1, F.t1, "nhật ký dự án 1");
+    const m2 = await xepHang(eng2, F.p2, t2, "nhật ký dự án 2");
+    assert.equal(m1.ops().length, 1);
+    assert.equal(m2.ops().length, 1);
+    assert.notEqual(m1.ops()[0].operationId, m2.ops()[0].operationId);
+
+    // Có mạng: mỗi chủ gửi dưới phiên + dự án của mình.
+    await dangNhapDuAn(F.eng, F.p1);
+    await m1.q.flush();
+    await dangNhapDuAn(eng2, F.p2);
+    await m2.q.flush();
+
+    assert.equal(m1.ops().length, 0, "op dự án 1 đã giao");
+    assert.equal(m2.ops().length, 0, "op dự án 2 đã giao");
+    assert.equal(await docNhatKy(F.p1, ngay), "nhật ký dự án 1");
+    assert.equal(await docNhatKy(F.p2, ngay), "nhật ký dự án 2", "không bị dự án 1 ghi đè");
+    assert.equal(gui.length, 2, "mỗi op đúng 1 request");
+
+    // Etag của dự án 1 không dùng được để ghi vào nhật ký dự án 2 (không lẫn bản ghi).
+    await dangNhapDuAn(F.eng, F.p1);
+    const etagP1 = await layEtag(ngay);
+    await dangNhapDuAn(eng2, F.p2);
+    assert.notEqual(etagP1, await layEtag(ngay), "etag mỗi dự án khác nhau");
+    const cheo = await trinhDuyetFetch(`/api/diaries/${ngay}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", "If-Match": etagP1 },
+      body: JSON.stringify({ ...NOI_DUNG_NHAT_KY, workDone: "ghi chéo" }),
+    });
+    assert.equal(cheo.status, 412);
+    assert.equal(await docNhatKy(F.p2, ngay), "nhật ký dự án 2");
+    assert.equal(await docNhatKy(F.p1, ngay), "nhật ký dự án 1");
+  },
+);
+
+test(
+  "A2-AC03: hai chủ khác nhau cùng dự án + cùng ngày — người đến sau (If-None-Match) bị conflict, bản người trước KHÔNG bị đè",
+  S,
+  async () => {
+    const ngay = "2026-10-09";
+    const eng3 = await taoUser("eng3", "engineer");
+    // Người 1 lưu trực tiếp trước.
+    await dangNhapDuAn(F.eng, F.p1);
+    const tao = await trinhDuyetFetch(`/api/diaries/${ngay}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", "If-None-Match": "*" },
+      body: JSON.stringify({ ...NOI_DUNG_NHAT_KY, workDone: "chủ 1 lưu trước" }),
+    });
+    assert.equal(tao.status, 200);
+
+    // Người 2 (thiết bị khác) lập offline cùng ngày, chưa biết có bản của người 1.
+    await dangNhapDuAn(eng3, F.p1);
+    proof = null;
+    const m = taoManager(guiThat);
+    await m.q.chuanBiTracking([{ id: F.t1 }]);
+    await m.q.chuanBiNhatKy(ngay);
+    datOnline(false);
+    try {
+      assert.deepEqual(
+        await m.q.enqueueDiaryNote(
+          { date: ngay, ...NOI_DUNG_NHAT_KY, workDone: "chủ 2 offline" },
+          null,
+        ),
+        { ok: true },
+      );
+    } finally {
+      datOnline(true);
+    }
+    await m.q.flush();
+    assert.equal(m.ops().length, 1);
+    assert.equal(m.ops()[0].state, "conflict");
+    assert.equal(m.ops()[0].lastResult?.status, 412);
+    assert.equal(await docNhatKy(F.p1, ngay), "chủ 1 lưu trước", "không ghi đè bản đã có");
+  },
+);
+
+test(
+  "A2-AC06 (H): op offline nhận 404/422/403 từ route THẬT → rejected bền vững, không retry",
+  S,
+  async () => {
+    const ngay = "2026-10-10";
+    const eng4 = await taoUser("eng4", "engineer");
+    await dangNhapDuAn(eng4, F.p1);
+    proof = null;
+    const gui: YeuCauGui[] = [];
+    const m = taoManager(async (req) => (gui.push(req), guiThat(req)));
+
+    // Ô riêng cho ca 404 — sẽ bị xoá trước khi flush.
+    const dim404 = (
+      await own.query<{ id: number }>(
+        `INSERT INTO progress_dimensions (task_id, dimension_label, installed) VALUES ($1, 'Ô404', 0) RETURNING id`,
+        [F.t1],
+      )
+    ).rows[0].id;
+    m.q.dangKyLuoi([{ id: F.t1, cells: { a: { id: dim404 } } }]);
+    await m.q.chuanBiTracking([{ id: F.t1 }]);
+    await m.q.chuanBiNhatKy(ngay);
+
+    datOnline(false);
+    try {
+      // 404: tick ô sẽ bị xoá.
+      assert.equal(await m.q.enqueueTick(dim404, true), true);
+      // 422: nhật ký có tổ đội lặp tên (route trả 422 "bị lặp lại").
+      assert.deepEqual(
+        await m.q.enqueueDiaryNote(
+          {
+            date: ngay,
+            ...NOI_DUNG_NHAT_KY,
+            workDone: "sẽ bị từ chối",
+            manpower: [
+              { crew: "Tổ A", headcount: 1 },
+              { crew: "Tổ A", headcount: 2 },
+            ],
+          },
+          null,
+        ),
+        { ok: true },
+      );
+    } finally {
+      datOnline(true);
+    }
+    await own.query(`DELETE FROM progress_dimensions WHERE id = $1`, [dim404]);
+
+    await m.q.flush();
+    const dump = JSON.stringify(m.ops().map((o) => [o.state, o.lastResult]));
+    const trangThai = Object.fromEntries(m.ops().map((o) => [o.lastResult?.status, o.state]));
+    assert.equal(trangThai[404], "rejected", dump);
+    assert.equal(trangThai[422], "rejected", dump);
+    assert.equal(m.ops().length, 2, "op bị từ chối được giữ lại cho người dùng xem");
+    const soGui = gui.length;
+    await m.q.flush();
+    assert.equal(gui.length, soGui, "rejected không bị retry");
+    assert.equal(await docNhatKy(F.p1, ngay), undefined, "nhật ký bị 422 không được ghi");
+
+    // 403: vai trò mất quyền sửa tiến độ (chỉ-xem) trước khi flush.
+    const dimMoi = (
+      await own.query<{ id: number }>(
+        `INSERT INTO progress_dimensions (task_id, dimension_label, installed) VALUES ($1, 'Ô403', 0) RETURNING id`,
+        [F.t1],
+      )
+    ).rows[0].id;
+    const m403 = taoManager(async (req) => (gui.push(req), guiThat(req)));
+    m403.q.dangKyLuoi([{ id: F.t1, cells: { a: { id: dimMoi } } }]);
+    await m403.q.chuanBiTracking([{ id: F.t1 }]);
+    datOnline(false);
+    try {
+      assert.equal(await m403.q.enqueueTick(dimMoi, true), true);
+    } finally {
+      datOnline(true);
+    }
+    await own.query(`UPDATE users SET role = 'viewer' WHERE id = $1`, [eng4.id]);
+    await m403.q.flush();
+    const op403 = m403.ops()[0];
+    assert.equal(op403.lastResult?.status, 403, JSON.stringify(op403));
+    assert.equal(op403.state, "rejected");
+    const lap = await own.query<{ installed: number }>(
+      `SELECT installed FROM progress_dimensions WHERE id = $1`,
+      [dimMoi],
+    );
+    assert.equal(lap.rows[0].installed, 0, "403 không ghi gì");
+    await own.query(`DELETE FROM progress_dimensions WHERE id = $1`, [dimMoi]);
+  },
+);
