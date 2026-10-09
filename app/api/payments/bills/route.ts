@@ -21,6 +21,7 @@ import {
   nhanDinhDangTien,
   tienTextToWire,
 } from "@/lib/nen/money-dto";
+import { isValidDateISO, todayISO } from "@/lib/nen/date";
 import type { PayStatus } from "@/lib/tai-chinh/payment-bills";
 
 export const dynamic = "force-dynamic";
@@ -204,6 +205,13 @@ export async function POST(req: NextRequest) {
   if (b?.payStatus != null && b.payStatus !== "paid" && b.payStatus !== "committed")
     return NextResponse.json({ error: "Trạng thái chi chỉ nhận paid/committed" }, { status: 400 });
   const daChi = b?.payStatus !== "committed";
+  // M129: phiếu nhập tay 'paid' = đã chi tại paidDate → cùng luật ngày chi với /pay (không sau
+  // hôm nay); 'committed' cho phép ngày dự kiến tương lai.
+  if (daChi && (!isValidDateISO(paidDate) || paidDate > todayISO()))
+    return NextResponse.json(
+      { error: "Ngày chi không hợp lệ hoặc sau hôm nay", code: "paid_at_invalid" },
+      { status: 422 },
+    );
 
   const period = (b?.period ?? "").trim() || null;
   const description = (b?.description ?? "").trim() || null;

@@ -24,6 +24,7 @@ import {
   parseFixedDecimalExact,
   type MoneyWireFormat,
 } from "@/lib/nen/money";
+import { PB_TONG_HOP_JOINS, PB_TONG_HOP_OK } from "@/lib/tai-chinh/payment-bills";
 
 export type CostGroupBy = "system" | "floor";
 
@@ -177,22 +178,14 @@ async function loadPayments(projectId: number): Promise<PaymentAgg[]> {
   return query<PaymentAgg>(
     `SELECT pb.sheet_type_id AS "sheetTypeId", st.code AS "sheetCode",
             pb.floor_label AS "floorLabel", st.system_id AS "systemId",
-            CASE WHEN COALESCE(pb.project_id = p.id
-                               AND (pb.contract_id IS NULL OR c.project_id = p.id)
-                               AND (pb.payment_cert_id IS NULL OR pcc.project_id = p.id)
-                               AND (pb.sheet_type_id IS NULL OR tw.project_id = p.id), false)
-                 THEN 'ok' ELSE 'invalid_scope' END AS state,
+            CASE WHEN ${PB_TONG_HOP_OK} THEN 'ok' ELSE 'invalid_scope' END AS state,
             COUNT(*) AS n,
             ROUND(COALESCE(SUM(pb.amount) FILTER (WHERE pb.pay_status = 'paid'), 0), 2)::text AS amount,
             ROUND(COALESCE(SUM(pb.amount) FILTER (WHERE pb.pay_status = 'committed'), 0), 2)::text
               AS unpaid
        FROM (SELECT ?::int AS id) p
        CROSS JOIN payment_bills pb
-       LEFT JOIN sheet_types st ON st.id = pb.sheet_type_id
-       LEFT JOIN towers tw ON tw.id = st.tower_id
-       LEFT JOIN contracts c ON c.id = pb.contract_id
-       LEFT JOIN payment_certs pc ON pc.id = pb.payment_cert_id
-       LEFT JOIN contracts pcc ON pcc.id = pc.contract_id
+       ${PB_TONG_HOP_JOINS}
       WHERE pb.project_id = p.id OR c.project_id = p.id OR pcc.project_id = p.id
          OR tw.project_id = p.id
       GROUP BY 1, 2, 3, 4, 5`,

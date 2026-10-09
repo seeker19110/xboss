@@ -25,6 +25,9 @@
   `alert_rules`, mặc định 30). **UI:** `CertDocument` chip "Đã duyệt · chưa chi"/"Đã chi dd/mm/yyyy" + hộp
   "Đánh dấu đã chi" (`DanhDauDaChiDialog`, ẩn với chính người duyệt); `/payments` chip + bộ lọc Tất cả/Chưa
   chi/Đã chi; KPI "Đã duyệt chưa chi" cạnh "Thực chi" ở `/costs`; e2e `payment-certs-canh-bao` thêm ca M129.
+- **Hậu audit (m129b-api):** xoá phiếu gắn IPC → 409 `bill_ipc_locked`; POST phiếu `paid` ngày tương lai
+  → 422; migration `0167` dựng lại `mv_cost_by_month` (chỉ `paid`) + `bi.cash_fin` thêm `pay_status`/`paid_at`;
+  `approvedUnpaid` dùng chung phạm vi `PB_TONG_HOP_OK`; +3 mutation M129.
 - **Test:** `tests/m129-ipc-da-chi.test.ts` 9 ca (8 ca §4 spec + thông báo), ca (1)(2) đỏ trên code cũ;
   cập nhật kỳ vọng `s13a-chuoi-ipc-thanh-toan`, `cost`, `audit-cost-query-reuse`, `alerts`.
 - **Lệch spec (ghi nhận):** route đặt ở `/api/payments/bills/:id/pay` (bám cây route sẵn có); `/finance` không

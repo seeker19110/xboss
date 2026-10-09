@@ -402,6 +402,30 @@ const MUTATIONS = [
     tests: ["tests/offline-receipt-route.test.ts"],
     why: "Xoá ảnh đồng thời với lưu nhật ký gắn ảnh đó → deadlock (trigger version 0164), một bên 500.",
   },
+  {
+    key: "M129: thực chi chỉ gồm phiếu đã chi (paid)",
+    file: "lib/tai-chinh/cost.ts",
+    find: "SUM(pb.amount) FILTER (WHERE pb.pay_status = 'paid')",
+    replace: "SUM(pb.amount)",
+    tests: ["tests/m129-ipc-da-chi.test.ts"],
+    why: "Phiếu IPC đã duyệt chưa chi lọt vào thực chi → báo cáo chi phí phình, 'đã duyệt' = 'đã chi'.",
+  },
+  {
+    key: "M129: duyệt IPC sinh phiếu committed, không phải paid",
+    file: "app/api/payment-certs/[id]/decide/route.ts",
+    find: "?, ?, ?, ?, 'committed')`,",
+    replace: "?, ?, ?, ?, 'paid')`,",
+    tests: ["tests/m129-ipc-da-chi.test.ts"],
+    why: "Duyệt đợt thanh toán tự thành đã chi → thực chi tăng khi tiền chưa ra khỏi tài khoản.",
+  },
+  {
+    key: "M129 SoD: người duyệt IPC không tự đánh dấu đã chi",
+    file: "lib/tai-chinh/payment-bills.ts",
+    find: "if (cert?.decidedBy === userId)",
+    replace: "if (false)",
+    tests: ["tests/m129-ipc-da-chi.test.ts"],
+    why: "Một người vừa duyệt vừa xác nhận chi — mất phân tách nhiệm vụ ở khâu tiền ra.",
+  },
 ];
 
 const only = process.argv.find((a) => a.startsWith("--only="))?.slice("--only=".length);

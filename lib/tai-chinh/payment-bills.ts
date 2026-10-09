@@ -34,6 +34,21 @@ export const BILL_SCOPE = `id = ? AND project_id = ?
       WHERE pst.id = payment_bills.sheet_type_id AND pt.project_id = ? AND pp.org_id = ?
    ))`;
 
+// Phạm vi phiếu khi TỔNG HỢP tiền (thực chi / cam kết chưa chi): dùng chung cho cost.ts
+// loadPayments và finance.ts approvedUnpaidByMonth để hai nơi không lệch nhau. Quy ước bí danh:
+// `p.id` = dự án đang xét, `pb` = payment_bills; PB_TONG_HOP_JOINS cung cấp st/tw/c/pc/pcc.
+// Dòng có cha (hợp đồng/IPC/sheet) thuộc dự án khác → không 'ok' (invalid_scope).
+export const PB_TONG_HOP_JOINS = `LEFT JOIN sheet_types st ON st.id = pb.sheet_type_id
+       LEFT JOIN towers tw ON tw.id = st.tower_id
+       LEFT JOIN contracts c ON c.id = pb.contract_id
+       LEFT JOIN payment_certs pc ON pc.id = pb.payment_cert_id
+       LEFT JOIN contracts pcc ON pcc.id = pc.contract_id`;
+
+export const PB_TONG_HOP_OK = `COALESCE(pb.project_id = p.id
+                               AND (pb.contract_id IS NULL OR c.project_id = p.id)
+                               AND (pb.payment_cert_id IS NULL OR pcc.project_id = p.id)
+                               AND (pb.sheet_type_id IS NULL OR tw.project_id = p.id), false)`;
+
 export function billScopeParams(id: number, projectId: number, orgId: number): unknown[] {
   return [id, projectId, projectId, orgId, projectId, orgId, projectId, orgId];
 }
@@ -60,6 +75,17 @@ export async function khoaPhieu(
 export function phieuDaChot(b: BillLock): boolean {
   return b.payStatus === "paid" && b.paymentCertId != null;
 }
+
+/**
+ * Phiếu gắn đợt IPC (committed lẫn paid) không xoá được — huỷ/sửa phải qua chứng từ điều chỉnh
+ * (M128), để chuỗi IPC → phiếu → thực chi không mất dấu.
+ */
+export function phieuGanIpc(b: BillLock): boolean {
+  return b.paymentCertId != null;
+}
+
+export const LOI_PHIEU_GAN_IPC =
+  "Phiếu gắn đợt IPC — không xoá được, huỷ/sửa phải qua chứng từ điều chỉnh (M128)";
 
 export const LOI_PHIEU_DA_CHOT =
   "Phiếu đã chi của đợt IPC đã chốt — không xoá/sửa số tiền được, cần lập chứng từ điều chỉnh";
@@ -209,7 +235,7 @@ export async function unpaidBillsOverdue(
     `SELECT pb.id, pb.responsible, pb.paid_date AS "paidDate", pc.code AS "certCode"
        FROM payment_bills pb
        LEFT JOIN payment_certs pc ON pc.id = pb.payment_cert_id
-      WHERE pb.project_id = ? AND pb.pay_status = 'committed' AND pb.paid_date <= ?
+      WHERE pb.project_id = ? AND pb.pay_status = 'committed' AND pb.paid_date < ?
       ORDER BY pb.paid_date, pb.id`,
     projectId,
     daysFromTodayISO(-days),

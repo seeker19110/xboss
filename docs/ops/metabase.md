@@ -21,6 +21,11 @@
   `bi.cash_fin`, `bi.materials`, `bi.purchase_orders`, `bi.material_transactions`, `bi.ncrs`,
   `bi.inspections`, `bi.hse_records`, `bi.diaries`, `bi.projects`, `bi.systems`, `bi.users_dim`
   (nhóm hậu tố `_fin` là view tài chính — chứa cột tiền; các view còn lại không lộ tiền).
+- **M129 — đã duyệt ≠ đã chi** (migration `0167`): `bi.cash_fin` thêm 2 cột cuối `pay_status`
+  (`committed` = đã duyệt IPC, CHƯA chi — không phải tiền đã ra; `paid` = đã chi; `void` = huỷ)
+  và `paid_at` (ngày chi thật, NULL khi chưa chi). Câu hỏi "thực chi" phải lọc
+  `pay_status = 'paid'` và gom tháng theo `COALESCE(paid_at, paid_date)`; tổng không lọc là
+  "đã duyệt + đã chi". `bi.cost_by_month_fin.actual` đã chỉ gồm phiếu `paid` theo ngày chi thật.
 
 ## 0. Kiểm tra VPS đủ RAM trước khi cài
 

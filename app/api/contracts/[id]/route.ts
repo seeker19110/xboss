@@ -85,7 +85,8 @@ export async function GET(
               id,
             ),
             query(
-              `SELECT id, responsible, type, amount::text AS amount, paid_date AS "paidDate", description
+              `SELECT id, responsible, type, amount::text AS amount, paid_date AS "paidDate", description,
+                      pay_status AS "payStatus", paid_at AS "paidAt"
                  FROM payment_bills WHERE contract_id = ? ORDER BY paid_date DESC, id DESC`,
               id,
             ),

@@ -13,9 +13,11 @@ import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import {
   BILL_SCOPE,
   LOI_PHIEU_DA_CHOT,
+  LOI_PHIEU_GAN_IPC,
   billScopeParams,
   khoaPhieu,
   phieuDaChot,
+  phieuGanIpc,
 } from "@/lib/tai-chinh/payment-bills";
 
 export const dynamic = "force-dynamic";
@@ -126,8 +128,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({ ok: true }, { headers: PRIVATE_NO_STORE });
 }
 
-// DELETE /api/payments/bills/:id — xoá bill thanh toán. M129: phiếu đã chi gắn IPC → 409
-// `bill_paid_locked` (phải qua chứng từ điều chỉnh M128).
+// DELETE /api/payments/bills/:id — xoá bill thanh toán. M129: MỌI phiếu gắn IPC (committed lẫn
+// paid) → 409 `bill_ipc_locked` (huỷ/sửa phải qua chứng từ điều chỉnh M128).
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = await params;
   const user = await getCurrentUser();
@@ -152,7 +154,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
           () => CAN.editStructure(user.role),
           async () => {
             const phieu = await khoaPhieu(id, projectId, user.orgId);
-            if (phieu && phieuDaChot(phieu)) return "locked" as const;
+            if (phieu && phieuGanIpc(phieu)) return "locked" as const;
             return query<{ id: number }>(
               `DELETE FROM payment_bills WHERE ${BILL_SCOPE} RETURNING id`,
               ...billScopeParams(id, projectId, user.orgId),
@@ -176,7 +178,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   }
   if (deleted === "locked")
     return NextResponse.json(
-      { error: LOI_PHIEU_DA_CHOT, code: "bill_paid_locked" },
+      { error: LOI_PHIEU_GAN_IPC, code: "bill_ipc_locked" },
       { status: 409, headers: PRIVATE_NO_STORE },
     );
   if (deleted.length === 0) return notFound();

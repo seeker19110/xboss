@@ -124,6 +124,17 @@ async function phieuCuaDot(certId: number) {
   );
 }
 
+/** Oracle SQL độc lập: thực chi = Σ phiếu 'paid' của dự án (chuỗi decimal exact). */
+async function oracleThucChi(projectId: number) {
+  const { queryOne } = await import("@/lib/db");
+  const r = await queryOne<{ s: string }>(
+    `SELECT COALESCE(SUM(amount), 0.00)::text AS s
+       FROM payment_bills WHERE project_id = ? AND pay_status = 'paid'`,
+    projectId,
+  );
+  return r!.s;
+}
+
 /** Dự án + PM (người lập & duyệt IPC) + Admin khác (người chi) + 1 đợt đã duyệt. */
 async function dungDot(f: SoFixture) {
   const projectId = await f.duAn("m129");
@@ -158,6 +169,7 @@ test(
         { amount: "12345.60", payStatus: "committed", paidAt: null, paidBy: null },
       );
       assert.deepEqual(await tongChiPhi(), { actual: "0.00", approvedUnpaid: "12345.60" });
+      assert.equal((await tongChiPhi()).actual, await oracleThucChi(c.projectId), "oracle SQL");
 
       // Hợp đồng API cho UI: đợt mang `bill` + `decidedBy`; danh sách phiếu mang payStatus/paidAt.
       const { GET: XEM } = await import("@/app/api/payment-certs/[id]/route");
@@ -228,6 +240,7 @@ test(
         { payStatus: "paid", paidAt: hom, paidBy: c.admin.id },
       );
       assert.deepEqual(await tongChiPhi(), { actual: "12345.60", approvedUnpaid: "0.00" });
+      assert.equal((await tongChiPhi()).actual, await oracleThucChi(c.projectId), "oracle SQL");
 
       const { GET: XEM } = await import("@/app/api/payment-certs/[id]/route");
       const xem = await goi(XEM(jreq(`/x`, undefined, "GET"), P(c.certId)));
@@ -435,7 +448,7 @@ test(
       const { PATCH, DELETE } = await import("@/app/api/payments/bills/[id]/route");
       const xoa = await goi(DELETE(jreq(`/x`, undefined, "DELETE"), P(c.billId)));
       assert.equal(xoa.status, 409, JSON.stringify(xoa.body));
-      assert.equal(xoa.body?.code, "bill_paid_locked");
+      assert.equal(xoa.body?.code, "bill_ipc_locked");
       const sua = await goi(PATCH(jreq(`/x`, { amount: "1.00" }, "PATCH"), P(c.billId)));
       assert.equal(sua.status, 409, JSON.stringify(sua.body));
       assert.equal(sua.body?.code, "bill_paid_locked");
@@ -443,6 +456,63 @@ test(
       assert.equal(note.status, 200, JSON.stringify(note.body));
       const bill = await phieuCuaDot(c.certId);
       assert.deepEqual([bill!.amount, bill!.payStatus], ["12345.60", "paid"]);
+    } finally {
+      await f.don();
+    }
+  },
+);
+
+// ── (9) khoá xoá phiếu committed gắn IPC ────────────────────────────────────────────────
+
+test(
+  "M129 (9): người duyệt xoá phiếu committed của IPC → 409 bill_ipc_locked; phiếu + tổng giữ nguyên",
+  S,
+  async () => {
+    const f = new SoFixture();
+    try {
+      const c = await dungDot(f);
+      const truoc = await tongChiPhi();
+      const { DELETE } = await import("@/app/api/payments/bills/[id]/route");
+      const xoa = await goi(DELETE(jreq(`/x`, undefined, "DELETE"), P(c.billId)));
+      assert.equal(xoa.status, 409, JSON.stringify(xoa.body));
+      assert.equal(xoa.body?.code, "bill_ipc_locked");
+      const bill = await phieuCuaDot(c.certId);
+      assert.equal(bill?.payStatus, "committed");
+      assert.deepEqual(await tongChiPhi(), truoc);
+      assert.equal(truoc.approvedUnpaid, "12345.60");
+    } finally {
+      await f.don();
+    }
+  },
+);
+
+// ── (10) POST phiếu paid nhập tay: ngày chi không sau hôm nay ──────────────────────────
+
+test(
+  "M129 (10): POST phiếu paid ngày mai → 422 paid_at_invalid; committed ngày tương lai → 200",
+  S,
+  async () => {
+    const f = new SoFixture();
+    try {
+      const projectId = await f.duAn("m129-post");
+      const pm = await f.user("pm");
+      await f.vao(pm, projectId);
+      const { POST } = await import("@/app/api/payments/bills/route");
+      const mai = addDaysISO(todayISO(), 1);
+      const than = { responsible: "NTP M129", type: "advance", amount: "1000.00", paidDate: mai };
+      const loi = await goi(POST(jreq(`/api/payments/bills`, { ...than, payStatus: "paid" })));
+      assert.equal(loi.status, 422, JSON.stringify(loi.body));
+      assert.equal(loi.body?.code, "paid_at_invalid");
+      const macDinh = await goi(POST(jreq(`/api/payments/bills`, than)));
+      assert.equal(macDinh.status, 422, "mặc định là paid");
+      const ok = await goi(POST(jreq(`/api/payments/bills`, { ...than, payStatus: "committed" })));
+      assert.equal(ok.status, 200, JSON.stringify(ok.body));
+      const { queryOne } = await import("@/lib/db");
+      const n = await queryOne<{ n: number }>(
+        `SELECT COUNT(*)::int AS n FROM payment_bills WHERE project_id = ?`,
+        projectId,
+      );
+      assert.equal(n?.n, 1);
     } finally {
       await f.don();
     }
@@ -459,6 +529,14 @@ test(
     try {
       const c = await dungDot(f);
       const { run, query } = await import("@/lib/db");
+      // Biên: phiếu đúng 30 ngày chưa "quá 30 ngày" → chưa báo.
+      await run(
+        `UPDATE payment_bills SET paid_date = ? WHERE id = ?`,
+        addDaysISO(todayISO(), -30),
+        c.billId,
+      );
+      const { unpaidBillsOverdue } = await import("@/lib/tai-chinh/payment-bills");
+      assert.deepEqual(await unpaidBillsOverdue(30, c.projectId), []);
       // Phiếu duyệt 31 ngày trước (ngày lập phiếu = ngày duyệt).
       await run(
         `UPDATE payment_bills SET paid_date = ? WHERE id = ?`,
