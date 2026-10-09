@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import * as money from "../lib/nen/money";
+import * as ngay from "../lib/nen/date";
 
 // Hợp đồng truy vấn của báo cáo chi phí chuẩn (S11, A4-FR06/AC08): một snapshot REPEATABLE READ
 // READ ONLY, số query cố định không theo số nhóm/dòng (không N+1), mọi query trong scope đã kiểm.
@@ -95,7 +96,14 @@ function fixture(
       }
     },
   };
-  const costs = load<Costs>("lib/tai-chinh/cost.ts", { "@/lib/db": db, "@/lib/nen/money": money });
+  // M129: cost.ts dùng chung điều kiện phạm vi phiếu (PB_TONG_HOP_*) với finance — nạp module thật
+  // qua cùng DB giả để hợp đồng "số query cố định" vẫn đo trên đúng SQL production.
+  const phieu = load("lib/tai-chinh/payment-bills.ts", { "@/lib/db": db, "@/lib/nen/date": ngay });
+  const costs = load<Costs>("lib/tai-chinh/cost.ts", {
+    "@/lib/db": db,
+    "@/lib/nen/money": money,
+    "@/lib/tai-chinh/payment-bills": phieu,
+  });
   const route = load<Route>("app/api/costs/route.ts", {
     "next/server": {
       NextResponse: {
