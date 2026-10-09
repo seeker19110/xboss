@@ -755,7 +755,7 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
       </Section>
 
       {vuotHopDong.length > 0 && (
-        <div className="bento-card border-rose-900/60 bg-rose-950/20 px-4 py-3 text-xs text-rose-200 space-y-1.5">
+        <div className="bento-card border-rose-900/60 bg-rose-950/20 px-4 py-3 text-xs text-rose-300 space-y-1.5">
           <p className="font-semibold">
             {vuotHopDong.length} dòng có khối lượng luỹ kế VƯỢT khối lượng hợp đồng
           </p>

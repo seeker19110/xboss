@@ -97,15 +97,6 @@ html.light {
      tinh (--color-zinc-900), dưới ngưỡng 4.5:1 WCAG AA — bắt bởi axe. Các màu còn lại
      (violet/rose/red/blue/purple/indigo/pink/fuchsia) giữ -400 nhạt hơn -300 vì đã đủ
      tương phản (kiểm bằng contrast ratio calculator trước khi đổi). */
-  /* Chữ -200 (khối cảnh báo/ghi chú tông màu, nền -950/xx) ở theme sáng cùng giá trị -300:
-     giá trị gốc -200 (rất nhạt) gần như vô hình trên nền sáng (ví dụ rose-200 = 1,3:1). */
-  --color-emerald-200: #065f46;
-  --color-sky-200: #075985;
-  --color-amber-200: #92400e;
-  --color-violet-200: #6d28d9;
-  --color-rose-200: #be123c;
-  --color-red-200: #b91c1c;
-  --color-orange-200: #9a3412;
   --color-emerald-300: #065f46;
   --color-emerald-400: #065f46;
   --color-sky-300: #075985;

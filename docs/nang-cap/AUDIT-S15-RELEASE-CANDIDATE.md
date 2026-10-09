@@ -302,6 +302,8 @@ tuyệt đối (spec authed chạy song song trên cùng DB). CI xác nhận l�
 | A2-AC05 | `e2e/authed/offline-idb-abort.spec.ts`      | PASS         | IDB thật abort → không báo "đã lưu", giữ form    |
 
 Lỗi UI thật lộ ra khi viết e2e (đã sửa trong cùng PR, `test.fixme` đã gỡ, e2e xanh desktop+mobile):
-tương phản khối cảnh báo vượt HĐ ở theme sáng (`text-rose-200` không có token override — sửa ở
-`globals.css` theo ADR-0010); Esc trên hộp xác nhận đóng luôn chứng từ và mất focus; chứng từ IPC tràn
-ngang trên mobile 393px. Ngoài ra `ProjectCard` dự án rỗng hiện "0% tiến độ" (COALESCE 0) — chỉ ghi nhận.
+tương phản khối cảnh báo vượt HĐ ở theme sáng (`text-rose-200` không có token sáng — đổi 3 khối IPC sang
+`text-rose-300`; **không** thêm override `--color-*-200` vào `globals.css` vì `-200` là chữ nhạt trên nền
+`-900/-950` của ~180 chip, override toàn cục làm CI e2e đỏ 4 shard — ADR-0010); Esc trên hộp xác nhận
+đóng luôn chứng từ và mất focus; chứng từ IPC tràn ngang trên mobile 393px (lưới + select hợp đồng
+`min-w-[260px]` không co). Ngoài ra `ProjectCard` dự án rỗng hiện "0% tiến độ" (COALESCE 0) — chỉ ghi nhận.

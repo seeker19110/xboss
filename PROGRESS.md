@@ -43,9 +43,13 @@ A2 / A3+A4 / A5+A6 (+ Q-AC01..08): 13 PASS · 28 PARTIAL (tự động xanh, cò
   tự ack/không retry ngầm, bàn phím Tab/Enter/Esc, axe; A3-AC05: "100.50"/"9999999999999.99" exact trên
   màn, kỹ sư 403 không lộ số), `offline-idb-abort.spec.ts` (A2-AC05: IDB thật abort → toast
   OFFLINE_SAVE_ERROR, không "đã lưu", form giữ, ops2 = 0). Helper `e2e/helpers/co-lap.ts` (org/dự án/user
-  riêng cho spec cần số tuyệt đối). **3 lỗi UI thật lộ ra, đã sửa cùng PR** (fixme đã gỡ; token `--color-*-200` theme sáng cho 7 màu, Modal `preventDefault` Esc, lưới `grid-cols-1`+`min-w-0`): cảnh báo vượt HĐ ở theme
-  sáng tương phản 1,32:1 (`text-rose-200` thiếu token override — sửa `globals.css` ADR-0010); Esc trên hộp
-  xác nhận đóng luôn chứng từ + mất focus; chứng từ IPC tràn ngang mobile 393px.
+  riêng cho spec cần số tuyệt đối). **3 lỗi UI thật lộ ra, đã sửa cùng PR** (fixme đã gỡ): cảnh báo vượt
+  HĐ ở theme sáng tương phản 1,32:1 — 3 khối IPC dùng `text-rose-200` (mức không có token sáng) đổi sang
+  `text-rose-300` theo ADR-0010; Modal `preventDefault` Esc (hộp xác nhận không đóng luôn chứng từ, giữ
+  focus); lưới `grid-cols-1`+`min-w-0` + select hợp đồng `min-w-0 flex-1` trên mobile (hết tràn ngang
+  393px). **Bài học CI đỏ 4 shard:** lần đầu sửa bằng cách thêm override `--color-*-200` cho theme sáng
+  trong `globals.css` → vỡ ~180 chip `bg-*-900 text-*-200` ở mọi trang (axe 1,25–1,97:1); `-200` là chữ
+  nhạt trên nền tối, **không** được override toàn cục — đã hoàn tác, chỉ sửa class tại chỗ.
 - **Kết quả sau vá (@5a36ff2, chờ CI xác nhận):** 19 PASS · 32 PARTIAL · 3 GAP (A1-AC02 chờ cutover,
   A2-AC07/AC08 offline sâu B/M) · 0 FAIL. State S15 = **CODE_COMPLETE có điều kiện / WAITING_RELEASE**
   (`docs/nang-cap/AUDIT-S15-RELEASE-CANDIDATE.md`). Bộ test đầy đủ `--release-gate`: 4662 pass, chỉ 2 file

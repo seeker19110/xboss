@@ -64,7 +64,7 @@ export default function XacNhanCanhBaoDialog({
             CHƯA được duyệt — xem lại danh sách dưới đây rồi xác nhận lại.
           </p>
         )}
-        <ul className="rounded-lg border border-rose-900/60 bg-rose-950/20 divide-y divide-rose-900/40 text-xs text-rose-200">
+        <ul className="rounded-lg border border-rose-900/60 bg-rose-950/20 divide-y divide-rose-900/40 text-xs text-rose-300">
           {yeuCau.vuotHopDong.map((d) => (
             <li key={d.boqItemId} className="flex gap-2 px-3 py-2">
               <span className="font-mono shrink-0">{d.code}</span>
