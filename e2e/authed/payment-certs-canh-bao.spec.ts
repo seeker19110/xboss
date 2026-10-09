@@ -508,7 +508,8 @@ test.describe("IPC đã duyệt — đánh dấu đã chi (M129, lớp B)", () =
     await daDuocDuyet(page);
     await expect(tieuDeDot(page)).toContainText("Đã duyệt · chưa chi", { timeout: 20_000 });
 
-    await bam(page.getByRole("button", { name: /Đánh dấu đã chi đợt/ }));
+    // Hành động đợt hiện ở cả thanh trên lẫn thanh đáy (CertBottomActions) — lấy nút đầu như nutDuyet.
+    await bam(page.getByRole("button", { name: /Đánh dấu đã chi đợt/ }).first());
     const dlg = hop(page);
     await expect(dlg.getByRole("heading", { name: /Đánh dấu đã chi/ })).toBeVisible();
     const axeDlg = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
