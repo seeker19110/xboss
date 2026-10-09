@@ -41,11 +41,14 @@ test("A6-AC06: bảng quyết định PASS/FAIL x tuổi x ngưỡng", () => {
   assert.equal(decide("drill-run", "FAIL", 10, LIMITS).verdict, "keep");
 });
 
-test("A6-AC06: JSON hỏng/thiếu cờ → FAIL (giữ dài); cờ tổng hợp true → PASS", () => {
-  assert.equal(classifyEvidence("{không phải json").outcome, "FAIL");
-  assert.equal(classifyEvidence("[]").outcome, "FAIL");
-  assert.equal(classifyEvidence("{}").outcome, "FAIL");
-  assert.equal(classifyEvidence('{"completeDrVerified":false}').outcome, "FAIL");
+test("A6-AC06: JSON hỏng/thiếu cờ → không nhận (không đụng); cờ false → FAIL; true → PASS", () => {
+  assert.equal(classifyEvidence("{không phải json").recognized, false);
+  assert.equal(classifyEvidence("[]").recognized, false);
+  assert.equal(classifyEvidence("{}").recognized, false);
+  assert.equal(classifyEvidence('{"name":"xboss","version":"0.3.0"}').recognized, false);
+  const fail = classifyEvidence('{"completeDrVerified":false}');
+  assert.equal(fail.recognized, true);
+  assert.equal(fail.outcome, "FAIL");
   assert.equal(classifyEvidence('{"completeDrVerified":true}').outcome, "PASS");
   const pitr = classifyEvidence(
     '{"completePitrVerified":true,"completedAt":"2026-10-01T00:00:00Z","drillRunDir":"run-1"}',
@@ -85,6 +88,12 @@ function fixture() {
   put("pass10.json", { completeDrVerified: true, completedAt: ago(10) });
   put("pitr-b.json", { completePitrVerified: true, completedAt: ago(10), drillRunDir: "run-b" });
   put("note.txt", "tệp lạ");
+  // Không phải evidence (gõ nhầm --evidence-dir vào repo): JSON hợp lệ, rất cũ — KHÔNG được xoá.
+  put("package.json", { name: "xboss", version: "0.3.0" });
+  {
+    const t = new Date(NOW - 900 * DAY);
+    utimesSync(join(ev, "package.json"), t, t);
+  }
   symlinkSync(join(ev, "pass40.json"), join(ev, "link.json"));
   for (const [name, days] of [
     ["run-a", 40],
@@ -104,8 +113,6 @@ const base = (f: { ev: string; drill: string }, extra: string[] = []) => [
   f.ev,
   "--drill-dir",
   f.drill,
-  "--now",
-  new Date(NOW).toISOString(),
   ...extra,
 ];
 
@@ -113,7 +120,7 @@ test("A6-AC06: dry-run mặc định không xoá gì", () => {
   const f = fixture();
   const lines: string[] = [];
   assert.equal(
-    runRetention(base(f), {}, (l) => lines.push(l)),
+    runRetention(base(f), {}, (l) => lines.push(l), NOW),
     0,
   );
   for (const p of [
@@ -131,7 +138,7 @@ test("A6-AC06: --apply xoá đúng {PASS 40 ngày, run-a}, idempotent, tệp l�
   const f = fixture();
   const lines: string[] = [];
   assert.equal(
-    runRetention(base(f, ["--apply"]), {}, (l) => lines.push(l)),
+    runRetention(base(f, ["--apply"]), {}, (l) => lines.push(l), NOW),
     0,
   );
   assert.equal(existsSync(join(f.ev, "pass40.json")), false);
@@ -144,12 +151,13 @@ test("A6-AC06: --apply xoá đúng {PASS 40 ngày, run-a}, idempotent, tệp l�
     join(f.ev, "link.json"),
     join(f.drill, "run-b"),
     join(f.drill, "khac"),
+    join(f.ev, "package.json"),
   ]) {
     assert.ok(existsSync(p) || p.endsWith("link.json"), p);
   }
   assert.match(lines.join("\n"), /Đã xoá 1 tệp evidence, 1 thư mục run-\*/);
   assert.equal(
-    runRetention(base(f, ["--apply"]), {}, () => {}),
+    runRetention(base(f, ["--apply"]), {}, () => {}, NOW),
     0,
   );
 });
@@ -157,13 +165,13 @@ test("A6-AC06: --apply xoá đúng {PASS 40 ngày, run-a}, idempotent, tệp l�
 test("A6-AC06: --force-run xoá sớm đúng run chỉ định; --json có đủ trường", () => {
   const f = fixture();
   const out: string[] = [];
-  runRetention(base(f, ["--json", "--force-run", "run-b"]), {}, (l) => out.push(l));
+  runRetention(base(f, ["--json", "--force-run", "run-b"]), {}, (l) => out.push(l), NOW);
   const data = JSON.parse(out.join(""));
   assert.equal(data.dryRun, true);
   const runB = data.items.find((i: { path: string }) => i.path.endsWith("run-b"));
   assert.equal(runB.verdict, "delete");
   assert.ok(existsSync(join(f.drill, "run-b")));
-  runRetention(base(f, ["--apply", "--force-run", "run-b"]), {}, () => {});
+  runRetention(base(f, ["--apply", "--force-run", "run-b"]), {}, () => {}, NOW);
   assert.equal(existsSync(join(f.drill, "run-b")), false);
   assert.ok(existsSync(join(f.ev, "pitr-b.json")));
 });
@@ -198,5 +206,19 @@ test("A6-AC06: từ chối thư mục nguy hiểm (exit 2, không xoá)", () => 
     runRetention(["--apply"], {}, () => {}),
     2,
   );
+  // Thư mục CHA của kho backup (quét run-* ở đó có thể chạm kho) và --now đi cùng --apply.
+  assert.equal(
+    runRetention(["--evidence-dir", sub, "--drill-dir", f.root, "--apply"], env, () => {}),
+    2,
+  );
+  assert.equal(
+    runRetention(
+      ["--evidence-dir", sub, "--apply", "--now", new Date(NOW).toISOString()],
+      {},
+      () => {},
+    ),
+    2,
+  );
+  assert.ok(existsSync(join(sub, "x.json")));
   assert.ok(existsSync(join(sub, "x.json")));
 });

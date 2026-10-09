@@ -7,6 +7,12 @@ import type { ProjectListItem } from "@/lib/ha-tang/projects";
 
 let _promise: Promise<ProjectListItem[] | null> | null = null;
 
+/** Quên danh sách đã tải — gọi khi ngữ cảnh đổi (đổi dự án/đăng xuất/đổi tài khoản) để lần
+ *  dùng sau không trả dự án của phiên/trạng thái cũ. */
+export function xoaCacheDuAnKhaKien(): void {
+  _promise = null;
+}
+
 /** `null` = không tải được (lỗi mạng/401…) — KHÔNG đồng nghĩa "không có dự án". */
 export function fetchDuAnKhaKien(): Promise<ProjectListItem[] | null> {
   if (!_promise) {

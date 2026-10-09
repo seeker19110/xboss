@@ -46,25 +46,35 @@ export type RetentionItem = {
 export class RetentionArgError extends Error {}
 
 /** PASS chỉ khi JSON parse được và cờ tổng hợp của verify-dr-restore/verify-pitr === true. */
+/** `recognized` = đúng là JSON do verify-dr-restore/verify-pitr ghi (có khoá cờ tổng hợp). File
+ *  `.json` khác (package.json, tsconfig, JSON hỏng…) KHÔNG bao giờ bị xoá — verdict `skip`. */
 export function classifyEvidence(text: string): {
+  recognized: boolean;
   outcome: Outcome;
   timestampMs: number | null;
   drillRunDir: string | null;
 } {
+  const khongNhan = {
+    recognized: false,
+    outcome: "FAIL" as const,
+    timestampMs: null,
+    drillRunDir: null,
+  };
   let data: unknown;
   try {
     data = JSON.parse(text);
   } catch {
-    return { outcome: "FAIL", timestampMs: null, drillRunDir: null };
+    return khongNhan;
   }
-  if (typeof data !== "object" || data === null || Array.isArray(data)) {
-    return { outcome: "FAIL", timestampMs: null, drillRunDir: null };
-  }
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return khongNhan;
   const rec = data as Record<string, unknown>;
+  if (typeof rec.completeDrVerified !== "boolean" && typeof rec.completePitrVerified !== "boolean")
+    return khongNhan;
   const pass = rec.completeDrVerified === true || rec.completePitrVerified === true;
   const stamp = typeof rec.completedAt === "string" ? Date.parse(rec.completedAt) : NaN;
   const run = typeof rec.drillRunDir === "string" && RUN_DIR_PATTERN.test(rec.drillRunDir);
   return {
+    recognized: true,
     outcome: pass ? "PASS" : "FAIL",
     timestampMs: Number.isFinite(stamp) ? stamp : null,
     drillRunDir: run ? (rec.drillRunDir as string) : null,
@@ -114,7 +124,10 @@ export function dangerousDirReason(dir: string, protectedDirs: readonly string[]
   if (target === resolve("/")) return "là thư mục gốc /";
   if (target === real(homedir())) return "là thư mục HOME";
   for (const guarded of protectedDirs) {
-    if (isInside(target, real(guarded))) return `trùng/nằm trong thư mục được bảo vệ ${guarded}`;
+    const g = real(guarded);
+    if (isInside(target, g)) return `trùng/nằm trong thư mục được bảo vệ ${guarded}`;
+    // Thư mục CHA của kho backup/WAL cũng bị từ chối: quét `run-*` ở đó có thể chạm vào kho.
+    if (isInside(g, target)) return `chứa thư mục được bảo vệ ${guarded}`;
   }
   return null;
 }
@@ -169,6 +182,9 @@ export function parseRetentionArgs(
   const nowRaw = values.get("--now")?.[0];
   const nowMs = nowRaw === undefined ? defaultNowMs : Date.parse(nowRaw);
   if (!Number.isFinite(nowMs)) throw new RetentionArgError("--now phải là ISO hợp lệ.");
+  // Giả thời gian chỉ để xem trước; đi cùng --apply sẽ xoá cả evidence FAIL chưa tới hạn thật.
+  if (nowRaw !== undefined && apply)
+    throw new RetentionArgError("--now chỉ dùng cho dry-run, không đi cùng --apply.");
   return {
     evidenceDir,
     drillDir,
@@ -217,6 +233,18 @@ export function planRetention(opts: RetentionOptions): {
     const info = classifyEvidence(readFileSync(path, "utf8"));
     if (info.drillRunDir) runOutcome.set(info.drillRunDir, info.outcome);
     const ageDays = ageOf(opts.nowMs, info.timestampMs ?? st.mtimeMs);
+    if (!info.recognized) {
+      items.push({
+        path,
+        kind: "evidence",
+        ageDays,
+        bytes: st.size,
+        verdict: "skip",
+        reason:
+          "không phải evidence của verify-dr-restore/verify-pitr (thiếu cờ tổng hợp) — không đụng",
+      });
+      continue;
+    }
     items.push({
       path,
       kind: "evidence",
