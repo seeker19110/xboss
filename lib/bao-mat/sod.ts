@@ -8,7 +8,7 @@
 // Mỗi rule = 1 câu SQL (qua lib/db, placeholder `?`, KHÔNG nối chuỗi giá trị) + mô tả
 // tiếng Việt. Chỉ dựa cột CÓ THẬT trong schema — rule nào thiếu cột người-thực-hiện cần
 // đối chiếu thì BỊ BỎ, ghi chú ngay bên dưới (không tạo migration mới để chế thêm cột).
-import { query } from "@/lib/db";
+import { query, withProjectScope } from "@/lib/db";
 
 export type SodViolation = Record<string, unknown>;
 export type SodRuleResult = {
@@ -29,9 +29,10 @@ const RULES: SodRule[] = [
     description:
       "Cùng một người vừa tạo vừa duyệt cùng 1 hồ sơ: qua Approval Engine (M46, " +
       "approval_requests.created_by = approval_actions.actor_id khi decision='approve') " +
-      "hoặc dữ liệu thanh toán khối lượng (IPC) từ trước M46 (payment_certs.created_by = decided_by).",
+      "hoặc dữ liệu thanh toán khối lượng (IPC) từ trước M46 (payment_certs.created_by = decided_by), " +
+      "hoặc chứng từ điều chỉnh/huỷ hiệu lực IPC (M128, payment_cert_adjustments.created_by = decided_by).",
     run: async (days, orgId) => {
-      const [engineRows, ipcRows] = await Promise.all([
+      const [engineRows, ipcRows, adjRows] = await Promise.all([
         query<SodViolation>(
           `SELECT 'approval_engine' AS source, ar.entity_type AS "entityType",
                   ar.entity_id AS "entityId", ar.created_by AS "userId",
@@ -61,8 +62,27 @@ const RULES: SodRule[] = [
           orgId,
           days,
         ),
+        // M128: bảng FORCE RLS theo dự án (0168, không nhánh GUC rỗng) — báo cáo liên dự án của
+        // tổ chức nên mở phạm vi '*' rồi tự lọc org qua projects, như 2 nguồn trên.
+        withProjectScope("*", () =>
+          query<SodViolation>(
+            `SELECT 'payment_cert_adjustment' AS source,
+                    'payment_cert_adjustment' AS "entityType", a.id AS "entityId",
+                    a.created_by AS "userId", u.name AS "userName", NULL::int AS "stepSeq",
+                    a.decided_at AS "at"
+               FROM payment_cert_adjustments a
+               JOIN users u ON u.id = a.created_by
+               JOIN projects p ON p.id = a.project_id AND p.org_id = ?
+              WHERE a.decided_by IS NOT NULL
+                AND a.decided_by = a.created_by
+                AND a.created_at >= now() - make_interval(days => ?)
+              ORDER BY a.decided_at DESC`,
+            orgId,
+            days,
+          ),
+        ),
       ]);
-      return [...engineRows, ...ipcRows];
+      return [...engineRows, ...ipcRows, ...adjRows];
     },
   },
   {

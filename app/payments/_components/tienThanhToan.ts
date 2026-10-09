@@ -25,7 +25,8 @@ export type FloorRow = {
 };
 export type DuLieuThanhToan = { rows: FloorRow[]; totalContract: bigint; totalEarned: bigint };
 
-export type BillType = "bill" | "advance" | "item";
+/** M128: 'adjustment' = phiếu sinh từ chứng từ điều chỉnh/huỷ hiệu lực IPC (amount ±). */
+export type BillType = "bill" | "advance" | "item" | "adjustment";
 export type Bill = {
   id: number;
   responsible: string;
@@ -116,6 +117,31 @@ export function docFloors(body: unknown): FloorData[] | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Phiếu tính vào KPI/tổng "công việc hoàn thành": phiếu thường/IPC ('bill') + phiếu điều chỉnh
+ * IPC ('adjustment', ±, M128). Bỏ phiếu đã huỷ (void). Tạm ứng/phát sinh là nội bộ từng đợt.
+ */
+export function laPhieuThanhToan(b: Pick<Bill, "type" | "payStatus">): boolean {
+  return (b.type === "bill" || b.type === "adjustment") && b.payStatus !== "void";
+}
+
+/** Phiếu đã chi thật: paid, hoặc thiếu payStatus (API/phiếu cũ). committed/void bị loại. */
+export function daChi(b: Pick<Bill, "payStatus">): boolean {
+  return b.payStatus === "paid" || b.payStatus == null;
+}
+
+/** KPI phiếu: Σ đã chi + Σ đã duyệt chưa chi (committed) — bigint exact, gồm phiếu điều chỉnh ±. */
+export function tongPhieu(bills: readonly Bill[]): { daChi: bigint; chuaChi: bigint } {
+  const phieu = bills.filter(laPhieuThanhToan);
+  return {
+    daChi: tongTien(phieu.filter(daChi), (b) => b.amount),
+    chuaChi: tongTien(
+      phieu.filter((b) => b.payStatus === "committed"),
+      (b) => b.amount,
+    ),
+  };
 }
 
 /** Σ tiền bigint theo hàm lấy giá trị. */

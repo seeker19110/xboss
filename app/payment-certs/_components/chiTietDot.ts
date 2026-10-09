@@ -26,7 +26,16 @@ export type DongVuot = {
   qtyCumulative: number;
 };
 
+/** M128: tóm tắt chứng từ điều chỉnh của đợt (GET /api/payment-certs/:id). */
+export type TomTatDieuChinhDot = {
+  open: number;
+  approvedCount: number;
+  reversed: boolean;
+  netAmount?: string | number | null;
+};
+
 export type ChiTietDot = {
+  adjustmentsSummary?: TomTatDieuChinhDot | null;
   approvalStatus: EntityApprovalStatus | null;
   vuotHopDong: DongVuot[];
   /** Phiên bản cảnh báo server dựng (S13c) — gửi kèm khi xác nhận duyệt; null nếu không có. */
@@ -55,6 +64,7 @@ export async function docChiTietDot(res: Response): Promise<ChiTietDot> {
     const thongBao = typeof body?.error === "string" ? body.error : null;
     return {
       approvalStatus: null,
+      adjustmentsSummary: null,
       vuotHopDong,
       warningVersion,
       totals: null,
@@ -63,6 +73,7 @@ export async function docChiTietDot(res: Response): Promise<ChiTietDot> {
   }
   return {
     approvalStatus: (body?.approvalStatus as EntityApprovalStatus | null) ?? null,
+    adjustmentsSummary: (body?.adjustmentsSummary as TomTatDieuChinhDot | null) ?? null,
     vuotHopDong,
     warningVersion,
     totals: (body?.totals as CertTotalsView | null) ?? null,

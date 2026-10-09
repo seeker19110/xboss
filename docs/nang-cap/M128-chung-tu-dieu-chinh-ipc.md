@@ -118,3 +118,28 @@ chính chạy, worker không chạy).
 - [ ] Luỹ kế/cảnh báo vượt HĐ/cost report nhất quán sau adjustment (test oracle SQL độc lập).
 - [ ] Tiền exact; SoD; RLS FORCE; route kiểm quyền đối xứng (`check:route-perms`).
 - [ ] Migration thêm thuần; `docs/ERD.md`, `PROGRESS.md`, `docs/nang-cap/README.md` cập nhật; gate xanh.
+
+## 6. Quyết định bổ sung 2026-10-09
+
+Chủ dự án chốt 3 điểm nghiệp vụ còn mở sau audit M128 (truyền qua coordinator, thi hành ở nhánh
+`m128-fix`). Các quyết định này **thay** phần tương ứng ở §2.2 khi mâu thuẫn.
+
+1. **Luỹ kế hiệu lực của đợt.** Luỹ kế của đợt kỳ N = luỹ kế IPC kỳ N + Σ `qty_delta` của chứng từ
+   điều chỉnh **đã duyệt** gắn đợt có `period_no ≤ N` (cùng hợp đồng, cùng dòng BOQ). Áp cho MỌI đường
+   đọc: `certTotals().cumulativeValue`, `dongLuyKeHieuLuc` (kể cả đợt đã duyệt — cảnh báo vượt HĐ),
+   `certLinesExact`/`certItemsExact`/`certItemsExactByContract`/`fetchCerts` (chi tiết, danh sách,
+   export Excel/PDF, `CertDocument`, `/payment-certs`). Một biểu thức SQL dùng chung
+   (`LUY_KE_HIEU_LUC_SQL`, `lib/tai-chinh/paymentcerts.ts`), tiền cộng NUMERIC trong SQL, làm tròn
+   2 số lẻ sau khi cộng. `qty_cumulative` **lưu** của đợt vẫn là chuỗi IPC thuần (không ghi đè snapshot
+   đã duyệt) — chỉ cách đọc cộng sổ điều chỉnh, nên không đếm lặp.
+2. **Phiếu ròng.** Số tiền phiếu `payment_bills.type='adjustment'` sinh từ chứng từ điều chỉnh tính
+   **ròng** cùng công thức `ipcSumV1` với phiếu gốc: round(Σ `qty_delta` × đơn giá gốc, 2) −
+   round(tạm ứng) − round(giữ lại) theo tỷ lệ HĐ — để −toàn bộ KL của đợt = −đúng giá trị phiếu gốc.
+   Giá trị **chứng từ** `adjustment` (`payment_cert_adjustments.amount`) và luỹ kế KL vẫn **gộp**
+   (KL × giá). Reversal: `amount` = −Σ phiếu còn hiệu lực của đợt (đều ròng); khi duyệt, phiếu
+   `committed` của đợt → `void`, phần đã chi (`paid`) bù bằng một phiếu âm = −Σ phiếu `paid`.
+3. **Đợt legacy không có phiếu gốc.** Đợt đã duyệt không có phiếu `type='bill'` → lập chứng từ điều
+   chỉnh/huỷ hiệu lực trả **409 `ipc_no_bill`** ("cần nhập phiếu gốc trước"); kiểm lại lúc **duyệt**
+   (mọi bước duyệt, dưới khoá HĐ → đợt). Từ chối vẫn được (không sinh tiền).
+
+Test: `tests/m128-dieu-chinh-ipc.test.ts` ca "M128 §6 (10)/(11)/(12)" + ca tạm ứng/giữ lại ≠ 0.

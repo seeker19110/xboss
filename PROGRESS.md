@@ -1,5 +1,25 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — M128 hậu audit (nhánh m128-fix, chưa PR)
+
+Sửa các phát hiện audit M128 không cần quyết định nghiệp vụ (`docs/nang-cap/M128-chung-tu-dieu-chinh-ipc.md`):
+
+- **SoD nháp:** PATCH `/api/adjustments/:id` chỉ người lập (Admin sửa nháp PM rồi tự duyệt = lách SoD);
+  Admin chỉ còn xoá nháp người khác. Báo cáo SoD `create_and_approve` thêm nguồn `payment_cert_adjustment`.
+- **0168 (chưa merge, sửa tại chỗ):** trigger hồ sơ chốt — chứng từ `approved/rejected` + dòng của nó không
+  UPDATE/DELETE được; chỉ cho đúng luồng (nháp→trình→duyệt/từ chối, dòng chỉ ghi khi nháp, chỉ xoá nháp);
+  cờ bảo trì `xboss.bao_tri_chung_tu` chỉ có tác dụng với role chủ bảng. `_decisions` FK kép
+  `(adjustment_id, project_id)`.
+- **Reversal đợt lẫn trạng thái:** void MỌI phiếu committed của đợt, phiếu âm = −Σ phiếu `paid` (SQL exact);
+  không phiếu paid → không phiếu âm.
+- **Quyết định chủ dự án 2026-10-09 (spec M128 §6):** (a) luỹ kế HIỆU LỰC đợt kỳ N = luỹ kế IPC + Σ điều
+  chỉnh đã duyệt kỳ ≤ N ở mọi đường đọc (tổng/dòng/danh sách/Excel/PDF/cảnh báo, `LUY_KE_HIEU_LUC_SQL`);
+  (b) phiếu sinh từ chứng từ điều chỉnh tính RÒNG `ipcSumV1` (giá trị chứng từ + luỹ kế KL vẫn gộp);
+  (c) đợt legacy không có phiếu gốc → 409 `ipc_no_bill` khi lập và khi duyệt.
+- `/payments` KPI/tổng tính cả phiếu `adjustment` (bỏ void); hộp thư `/approvals` thêm `adjustmentKind`
+  (chỉ reversal cảnh báo đỏ); xoá BOQ thuộc đợt đã huỷ hiệu lực → 409 nêu hồ sơ lưu trữ (hết vòng lặp);
+  hộp thư không còn nuốt lỗi độ chính xác thành `amount: null` (422 có mã + log); DR snapshot thêm 3 bảng;
+  +3 mutation M128.
 ## 2026-10-09 — S16: test đường phụ bằng pool `xboss_app` (đóng nợ RLS strict)
 
 Đóng phần đầu dòng "Nợ ghi nhận" của mục S16 (PR-B 6(b), migration 0165): 4 đường chưa có ca chạy

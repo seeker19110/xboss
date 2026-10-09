@@ -529,3 +529,58 @@ test.describe("IPC đã duyệt — đánh dấu đã chi (M129, lớp B)", () =
     expect(nang, JSON.stringify(nang, null, 2)).toEqual([]);
   });
 });
+
+// M128 — đợt đã duyệt chỉ đổi được qua chứng từ điều chỉnh/huỷ hiệu lực.
+test.describe("IPC đã duyệt — chứng từ điều chỉnh (M128, lớp B)", () => {
+  test("M128: đợt đã duyệt → mở form 'Điều chỉnh' có bảng KL ±; axe sạch", async ({ page }) => {
+    await theme(page, "darkblue");
+    const co = await dungToChucCoLap(["pm"]);
+    await dangNhapCoLap(page, co.nguoi.pm.email);
+    const hd = await dungHopDong(page, { value: 100000, qtyContract: 100, unitPrice: 1000 });
+    const d = await lapDot(page, hd.contractId, hd.boqId, 90);
+    await trinh(page, d.id);
+    await ok(
+      goiApi(page, "POST", `/api/payment-certs/${d.id}/decide`, { decision: "approved" }),
+      200,
+      "duyệt đợt",
+    );
+    await moDot(page, d);
+    await daDuocDuyet(page);
+
+    await bam(page.getByRole("button", { name: "Điều chỉnh", exact: true }));
+    const dlg = hop(page);
+    await expect(dlg.getByRole("heading", { name: /Điều chỉnh đợt/ })).toBeVisible();
+    await expect(dlg.getByLabel(/Lý do/)).toBeVisible();
+    await expect(dlg.getByRole("columnheader", { name: "KL điều chỉnh ±" })).toBeVisible();
+    const axe = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+    const nang = axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(nang, JSON.stringify(nang, null, 2)).toEqual([]);
+  });
+
+  test("M128: khối 'Chứng từ điều chỉnh' không tràn ngang trên mobile", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(!isMobile, "chỉ áp dụng cho viewport mobile");
+    await theme(page, "darkblue");
+    const co = await dungToChucCoLap(["pm"]);
+    await dangNhapCoLap(page, co.nguoi.pm.email);
+    const hd = await dungHopDong(page, { value: 100000, qtyContract: 100, unitPrice: 1000 });
+    const d = await lapDot(page, hd.contractId, hd.boqId, 90);
+    await trinh(page, d.id);
+    await ok(
+      goiApi(page, "POST", `/api/payment-certs/${d.id}/decide`, { decision: "approved" }),
+      200,
+      "duyệt đợt",
+    );
+    await moDot(page, d);
+    await daDuocDuyet(page);
+    await bam(page.getByRole("button", { name: "Điều chỉnh", exact: true }));
+    await expect(hop(page).getByRole("columnheader", { name: "KL điều chỉnh ±" })).toBeVisible();
+    const rong = await page.evaluate(() => ({
+      cuon: document.documentElement.scrollWidth,
+      hienThi: document.documentElement.clientWidth,
+    }));
+    expect(rong.cuon).toBeLessThanOrEqual(rong.hienThi + 1);
+  });
+});

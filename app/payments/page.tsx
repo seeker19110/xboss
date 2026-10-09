@@ -37,6 +37,7 @@ import {
   thanhTienTheoPct,
   tienNhapGuiServer,
   tienNhapSangMinor,
+  tongPhieu,
   tongTien,
   type Bill,
   type BillType,
@@ -44,11 +45,6 @@ import {
   type FloorData,
   type FloorRow,
 } from "./_components/tienThanhToan";
-
-// Phiếu đã chi thật: paid, hoặc thiếu payStatus (API/phiếu cũ). committed/void bị loại.
-function daChi(b: Bill): boolean {
-  return b.payStatus === "paid" || b.payStatus == null;
-}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 // S10c: kiểu tiền là bigint đồng×100 — xem ./_components/tienThanhToan.ts.
@@ -411,16 +407,9 @@ export default function PaymentsPage() {
     list.push(b);
     billsByPerson.set(b.responsible, list);
   }
-  // KPI toàn dự án: chỉ tính type='bill' (tạm ứng & phát sinh là nội bộ từng đợt).
-  // Chỉ phiếu ĐÃ CHI (paid hoặc payStatus thiếu = phiếu/API cũ); committed/void không tính.
-  const totalPaid = tongTien(
-    bills.filter((b) => b.type === "bill" && daChi(b)),
-    (b) => b.amount,
-  );
-  const totalCommitted = tongTien(
-    bills.filter((b) => b.type === "bill" && b.payStatus === "committed"),
-    (b) => b.amount,
-  );
+  // KPI toàn dự án: phiếu thường/IPC + phiếu điều chỉnh IPC ± (M128), bỏ void — tạm ứng &
+  // phát sinh là nội bộ từng đợt. Đã chi = paid hoặc thiếu payStatus (phiếu/API cũ).
+  const { daChi: totalPaid, chuaChi: totalCommitted } = tongPhieu(bills);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -604,10 +593,7 @@ export default function PaymentsPage() {
               const isNone = person === NONE;
               const personBills = isNone ? [] : (billsByPerson.get(person) ?? []);
               // Chỉ tính bills thực để hiển thị đã TT trên header.
-              const paid = tongTien(
-                personBills.filter((b) => b.type === "bill" && daChi(b)),
-                (b) => b.amount,
-              );
+              const paid = tongPhieu(personBills).daChi;
               return (
                 <div
                   key={person}
@@ -757,9 +743,11 @@ function BillsSection({
   }, [person, bills]); // reload khi bills thay đổi
 
   const [locChi, setLocChi] = useState<"all" | "committed" | "paid">("all");
+  // Mục A gồm cả phiếu điều chỉnh IPC (M128) để dòng hiển thị khớp tổng; phiếu void vẫn hiện
+  // (chip "Đã huỷ") nhưng không vào tổng.
   const billRows = bills.filter(
     (b) =>
-      b.type === "bill" &&
+      (b.type === "bill" || b.type === "adjustment") &&
       (locChi === "all" ||
         (locChi === "committed"
           ? b.payStatus === "committed"
@@ -768,10 +756,7 @@ function BillsSection({
   const itemRows = bills.filter((b) => b.type === "item");
   const advRows = bills.filter((b) => b.type === "advance");
   // Tổng trên TOÀN BỘ bills (không theo bộ lọc hiển thị), chỉ phiếu đã chi.
-  const sumBills = tongTien(
-    bills.filter((b) => b.type === "bill" && daChi(b)),
-    (b) => b.amount,
-  );
+  const sumBills = tongPhieu(bills).daChi;
   const sumItems = tongTien(itemRows, (b) => b.amount);
   const sumAdvs = tongTien(advRows, (b) => b.amount);
 

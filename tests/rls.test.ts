@@ -510,6 +510,15 @@ test(
     // Hành vi kiểm riêng ở tests/s13c-ipc-quyet-dinh.test.ts bằng role xboss_app.
     const IPC_SNAPSHOT = ["payment_cert_decision_snapshots"];
 
+    // Chứng từ điều chỉnh IPC (M128, migration 0168): 2 bảng khuôn 0077 (project_id = GUC hoặc
+    // '*', FORCE) + snapshot quyết định khuôn 0160 (org + dự án, ghi đúng actor, không UPDATE/
+    // DELETE). Hành vi kiểm bằng role xboss_app ở tests/m128-dieu-chinh-ipc.test.ts.
+    const IPC_DIEU_CHINH = [
+      "payment_cert_adjustments",
+      "payment_cert_adjustment_items",
+      "payment_cert_adjustment_decisions",
+    ];
+
     // Thiết bị + khoá vault offline (QUALITY-FINAL-1 S05, migration 0163): policy nghiêm ngặt theo
     // app.user_id/org_id (+ app.role admin cho đọc/duyệt thiết bị cùng org, + app.project_id cho
     // khoá), không nhánh '*'/GUC rỗng; xboss_app không DELETE, chỉ UPDATE 4 cột duyệt/thu hồi thiết
@@ -534,6 +543,7 @@ test(
       ...CAD,
       ...KE_HOACH,
       ...IPC_SNAPSHOT,
+      ...IPC_DIEU_CHINH,
       ...OFFLINE,
       ...eng,
     ]);
@@ -552,6 +562,7 @@ test(
       ...CAD,
       ...KE_HOACH,
       ...IPC_SNAPSHOT,
+      ...IPC_DIEU_CHINH,
       ...OFFLINE,
     ].filter((t) => !thucTe.includes(t));
     assert.deepEqual(

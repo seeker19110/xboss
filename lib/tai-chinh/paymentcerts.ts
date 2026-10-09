@@ -103,7 +103,7 @@ async function fetchCerts(where: string, ...params: unknown[]): Promise<PaymentC
                 json_build_object(
                   'id', i.id, 'boqItemId', i.boq_item_id, 'boqCode', bi.code, 'boqName', bi.name,
                   'boqUnit', bi.unit, 'boqQtyContract', bi.qty_contract,
-                  'qtyPeriod', i.qty_period, 'qtyCumulative', i.qty_cumulative,
+                  'qtyPeriod', i.qty_period, 'qtyCumulative', ${LUY_KE_HIEU_LUC_SQL},
                   'unitPrice', i.unit_price
                 ) ORDER BY bi.code
               ) FILTER (WHERE i.id IS NOT NULL),
@@ -189,6 +189,17 @@ export async function suggestQtyForContract(contractId: number): Promise<
     contractId,
   );
   const cumMap = new Map(lastCumulative.map((r) => [r.boqItemId, Number(r.qtyCumulative)]));
+  // M128: điều chỉnh/huỷ hiệu lực đã duyệt đổi phần đã nghiệm thu của dòng (reversal trả lại KL).
+  const dieuChinh = await query<{ boqItemId: number; qtyDelta: number }>(
+    `SELECT ai.boq_item_id AS "boqItemId", SUM(ai.qty_delta) AS "qtyDelta"
+       FROM payment_cert_adjustment_items ai
+       JOIN payment_cert_adjustments a ON a.id = ai.adjustment_id
+      WHERE a.contract_id = ? AND a.status = 'approved'
+      GROUP BY ai.boq_item_id`,
+    contractId,
+  );
+  for (const d of dieuChinh)
+    cumMap.set(d.boqItemId, (cumMap.get(d.boqItemId) ?? 0) + Number(d.qtyDelta));
 
   const result = [];
   for (const it of items) {
@@ -341,10 +352,34 @@ const LUY_KE_KY_TRUOC_SQL = `COALESCE((
         ORDER BY pc.period_no DESC
         LIMIT 1), 0)`;
 
+// M128 — Σ qty_delta của chứng từ điều chỉnh ĐÃ DUYỆT gắn đợt có kỳ ≤ kỳ đang xét, cùng HĐ + cùng
+// dòng BOQ. `qty_cumulative` lưu của đợt là chuỗi IPC THUẦN (không bao giờ gồm điều chỉnh —
+// `tinhLaiLuyKeDot`/`ghiDongKlDot` không đổi) nên cộng sổ điều chỉnh vào đúng một lần, không đếm
+// lặp dù điều chỉnh được duyệt trước hay sau kỳ sau. Đợt còn mở không có chứng từ điều chỉnh nào
+// (chỉ lập cho đợt đã duyệt) nên với đợt mở "≤" trùng "<" kỳ đang xét.
+const DIEU_CHINH_DEN_KY_SQL = `COALESCE((
+       SELECT SUM(ai.qty_delta)
+         FROM payment_cert_adjustment_items ai
+         JOIN payment_cert_adjustments a ON a.id = ai.adjustment_id
+         JOIN payment_certs pa ON pa.id = a.cert_id
+        WHERE a.status = 'approved' AND pa.contract_id = c.contract_id
+          AND pa.period_no <= c.period_no AND ai.boq_item_id = i.boq_item_id), 0)`;
+
 /**
- * Dòng KL + luỹ kế hiệu lực của một đợt. Đợt còn mở (nháp/đã trình) → luỹ kế tính lại theo
- * `LUY_KE_KY_TRUOC_SQL` (đúng con số mà quyết định sẽ chốt); đợt đã duyệt/từ chối → snapshot đã
- * lưu, không tính lại bằng dữ liệu hôm nay. Cảnh báo vượt HĐ (`vuot`) so trong SQL bằng NUMERIC.
+ * LUỸ KẾ HIỆU LỰC của dòng `i` thuộc đợt `c` (quyết định chủ dự án 2026-10-09, spec M128 §6):
+ * luỹ kế IPC kỳ N + Σ qty_delta điều chỉnh ĐÃ DUYỆT của các đợt kỳ ≤ N. Luỹ kế IPC: đợt còn mở →
+ * tính lại theo `LUY_KE_KY_TRUOC_SQL` (đúng con số quyết định sẽ chốt); đợt đã duyệt/từ chối →
+ * `qty_cumulative` đã lưu (snapshot IPC không bị ghi đè — điều chỉnh là chứng từ riêng, chỉ cách
+ * ĐỌC cộng thêm). Dùng cho MỌI đường đọc luỹ kế đợt (chi tiết/danh sách/export/tổng/cảnh báo).
+ * Biểu thức SQL tĩnh, cần alias `i` (payment_cert_items) và `c` (payment_certs).
+ */
+const LUY_KE_HIEU_LUC_SQL = `(CASE WHEN c.status IN ('draft', 'submitted')
+                     THEN i.qty_period + ${LUY_KE_KY_TRUOC_SQL}
+                     ELSE i.qty_cumulative END + ${DIEU_CHINH_DEN_KY_SQL})`;
+
+/**
+ * Dòng KL + luỹ kế HIỆU LỰC (`LUY_KE_HIEU_LUC_SQL`) của một đợt. Cảnh báo vượt HĐ (`vuot`) so
+ * trong SQL bằng NUMERIC.
  */
 export async function dongLuyKeHieuLuc(certId: number): Promise<DongLuyKe[]> {
   return query<DongLuyKe>(
@@ -355,11 +390,7 @@ export async function dongLuyKeHieuLuc(certId: number): Promise<DongLuyKe[]> {
        FROM payment_cert_items i
        JOIN payment_certs c ON c.id = i.cert_id
        JOIN boq_items b ON b.id = i.boq_item_id
-       CROSS JOIN LATERAL (
-         SELECT CASE WHEN c.status IN ('draft', 'submitted')
-                     THEN i.qty_period + ${LUY_KE_KY_TRUOC_SQL}
-                     ELSE i.qty_cumulative END AS cum
-       ) lk
+       CROSS JOIN LATERAL (SELECT ${LUY_KE_HIEU_LUC_SQL} AS cum) lk
       WHERE i.cert_id = ?
       ORDER BY b.code, i.boq_item_id`,
     certId,
@@ -406,11 +437,13 @@ export type CertLineExact = {
   unitPrice: string;
 };
 
+/** `qtyCumulative` = luỹ kế HIỆU LỰC (M128 §6), không phải `qty_cumulative` lưu. */
 export async function certLinesExact(certId: number): Promise<CertLineExact[]> {
   return query<CertLineExact>(
-    `SELECT id, qty_period::text AS "qtyPeriod", qty_cumulative::text AS "qtyCumulative",
-            unit_price::text AS "unitPrice"
-       FROM payment_cert_items WHERE cert_id = ? ORDER BY id`,
+    `SELECT i.id, i.qty_period::text AS "qtyPeriod",
+            ${LUY_KE_HIEU_LUC_SQL}::text AS "qtyCumulative", i.unit_price::text AS "unitPrice"
+       FROM payment_cert_items i JOIN payment_certs c ON c.id = i.cert_id
+      WHERE i.cert_id = ? ORDER BY i.id`,
     certId,
   );
 }
@@ -418,8 +451,9 @@ export async function certLinesExact(certId: number): Promise<CertLineExact[]> {
 // Giá trị đợt theo quy tắc chứng từ ipc-sum-v1 (A3-FR05, `ipcSumV1`): periodValue =
 // round(Σ qty_period×unit_price, 2) — không round từng dòng; tạm ứng/giữ lại = round(periodValue
 // × % hợp đồng) từng khoản, tỷ lệ là phân số exact (10,25% = 1025/10000), không nhân float;
-// approvedValue = periodValue − tạm ứng − giữ lại. cumulativeValue = round(Σ qty_cumulative ×
-// unit_price, 2) cộng trong SQL. Mọi số đọc về bằng `::text` (parser NUMERIC toàn cục là float).
+// approvedValue = periodValue − tạm ứng − giữ lại. cumulativeValue = round(Σ luỹ kế HIỆU LỰC dòng
+// (M128 §6: gồm điều chỉnh đã duyệt kỳ ≤ N) × unit_price, 2) cộng trong SQL. Mọi số đọc về bằng
+// `::text` (parser NUMERIC toàn cục là float).
 export async function certTotals(certId: number): Promise<CertTotals> {
   const cert = await queryOne<{ advancePct: string | null; retentionPct: string | null }>(
     `SELECT ct.advance_pct::text AS "advancePct", ct.retention_pct::text AS "retentionPct"
@@ -437,8 +471,9 @@ export async function certTotals(certId: number): Promise<CertTotals> {
 
   const lines = await certLinesExact(certId);
   const agg = await queryOne<{ cumulative: string }>(
-    `SELECT COALESCE(SUM(qty_cumulative * unit_price), 0)::text AS cumulative
-       FROM payment_cert_items WHERE cert_id = ?`,
+    `SELECT ROUND(COALESCE(SUM(${LUY_KE_HIEU_LUC_SQL} * i.unit_price), 0), 2)::text AS cumulative
+       FROM payment_cert_items i JOIN payment_certs c ON c.id = i.cert_id
+      WHERE i.cert_id = ?`,
     certId,
   );
   const v1 = ipcSumV1(lines, { advancePct: cert.advancePct, retentionPct: cert.retentionPct });
@@ -497,9 +532,12 @@ export type CertItemExact = CertLineExact & { boqQtyContract: string };
 
 export async function certItemsExact(certId: number): Promise<CertItemExact[]> {
   return query<CertItemExact>(
-    `SELECT i.id, i.qty_period::text AS "qtyPeriod", i.qty_cumulative::text AS "qtyCumulative",
+    `SELECT i.id, i.qty_period::text AS "qtyPeriod",
+            ${LUY_KE_HIEU_LUC_SQL}::text AS "qtyCumulative",
             i.unit_price::text AS "unitPrice", bi.qty_contract::text AS "boqQtyContract"
-       FROM payment_cert_items i JOIN boq_items bi ON bi.id = i.boq_item_id
+       FROM payment_cert_items i
+       JOIN payment_certs c ON c.id = i.cert_id
+       JOIN boq_items bi ON bi.id = i.boq_item_id
       WHERE i.cert_id = ? ORDER BY i.id`,
     certId,
   );
@@ -514,7 +552,7 @@ export async function certItemsExactByContract(
 ): Promise<Map<number, CertItemExact[]>> {
   const rows = await query<CertItemExact & { certId: number }>(
     `SELECT i.cert_id AS "certId", i.id, i.qty_period::text AS "qtyPeriod",
-            i.qty_cumulative::text AS "qtyCumulative", i.unit_price::text AS "unitPrice",
+            ${LUY_KE_HIEU_LUC_SQL}::text AS "qtyCumulative", i.unit_price::text AS "unitPrice",
             bi.qty_contract::text AS "boqQtyContract"
        FROM payment_cert_items i
        JOIN payment_certs c ON c.id = i.cert_id
@@ -569,16 +607,22 @@ export function certItemsToWire(
 
 // Giá trị luỹ kế đã nghiệm thu của 1 hợp đồng (biểu thức SQL theo `contractIdExpr` — hằng `?`
 // hoặc cột `c.id`, không bao giờ là giá trị người dùng) = Σ qty_cumulative × unit_price của đợt
-// 'approved' mới nhất mỗi dòng BOQ, cộng NUMERIC trong SQL rồi làm tròn 2 số lẻ SAU khi cộng (như
-// ipc-sum-v1) — không qua float JS (S13d, M45).
+// 'approved' mới nhất mỗi dòng BOQ + Σ qty_delta × unit_price gốc của MỌI chứng từ điều chỉnh đã
+// duyệt của HĐ (M128 — snapshot đợt là chuỗi IPC thuần nên không đếm lặp), cộng NUMERIC trong SQL
+// rồi làm tròn 2 số lẻ SAU khi cộng (như ipc-sum-v1) — không qua float JS (S13d, M45).
 function luyKeHopDongSql(contractIdExpr: string): string {
   return `ROUND(COALESCE((
        SELECT SUM(v) FROM (
-         SELECT DISTINCT ON (i.boq_item_id) i.qty_cumulative * i.unit_price AS v
+         (SELECT DISTINCT ON (i.boq_item_id) i.qty_cumulative * i.unit_price AS v
            FROM payment_cert_items i
            JOIN payment_certs pc ON pc.id = i.cert_id
           WHERE pc.contract_id = ${contractIdExpr} AND pc.status = 'approved'
-          ORDER BY i.boq_item_id, pc.period_no DESC
+          ORDER BY i.boq_item_id, pc.period_no DESC)
+         UNION ALL
+         SELECT ai.qty_delta * ai.unit_price AS v
+           FROM payment_cert_adjustment_items ai
+           JOIN payment_cert_adjustments a ON a.id = ai.adjustment_id
+          WHERE a.contract_id = ${contractIdExpr} AND a.status = 'approved'
        ) t), 0), 2)`;
 }
 
@@ -586,7 +630,8 @@ function luyKeHopDongSql(contractIdExpr: string): string {
 export async function contractCumulativeValue(contractId: number): Promise<bigint> {
   const row = await queryOne<{ total: string }>(
     `SELECT ${luyKeHopDongSql("?")}::text AS total`,
-    contractId,
+    contractId, // phần snapshot đợt
+    contractId, // phần sổ điều chỉnh (M128)
   );
   return parseMoneyExact(row?.total ?? "0");
 }

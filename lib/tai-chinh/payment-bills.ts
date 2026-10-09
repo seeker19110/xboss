@@ -3,7 +3,7 @@
 // M129 (docs/nang-cap/M129-ipc-da-chi-tach-cam-ket-thuc-chi.md): "đã duyệt" ≠ "đã chi".
 //   committed = đã duyệt, chưa chi (phiếu sinh khi duyệt IPC) — KHÔNG vào thực chi;
 //   paid      = đã chi (paid_at/paid_by) — nguồn sự thật của thực chi;
-//   void      = huỷ (chỉ qua điều chỉnh M128).
+//   void      = huỷ (chỉ qua chứng từ huỷ hiệu lực M128 khi phiếu gốc chưa chi).
 // Đánh dấu chi chỉ đi một chiều committed → paid; quay lại phải qua chứng từ điều chỉnh (M128).
 import { query, queryOne } from "@/lib/db";
 import { daysFromTodayISO, isValidDateISO, todayISO } from "@/lib/nen/date";
@@ -138,7 +138,8 @@ export type KetQuaDanhDauChi =
  * Chuyển phiếu committed → paid. GỌI TRONG transaction của request (withProjectScope ghi) SAU khi
  * route đã tái kiểm quyền lúc ghi. Khoá dòng phiếu (FOR UPDATE) rồi mới kiểm trạng thái/SoD/ngày:
  * hai lượt đồng thời xếp hàng, lượt sau thấy 'paid' → 409 (idempotent, không cần Idempotency-Key).
- * SoD: người chi ≠ người quyết định bước cuối của IPC gốc (payment_certs.decided_by).
+ * SoD: người chi ≠ người quyết định bước cuối của IPC gốc (payment_certs.decided_by) — phiếu
+ * sinh từ chứng từ điều chỉnh (M128): ≠ người duyệt chứng từ đó.
  * Ngày chi: không sau hôm nay (giờ VN) và không trước ngày duyệt IPC.
  */
 export async function danhDauDaChi(
@@ -160,10 +161,18 @@ export async function danhDauDaChi(
 
   let decidedAt: string | null = null;
   if (phieu.paymentCertId != null) {
-    const cert = await queryOne<{ decidedBy: number | null; decidedAt: string | null }>(
-      `SELECT decided_by AS "decidedBy", decided_at AS "decidedAt" FROM payment_certs WHERE id = ?`,
-      phieu.paymentCertId,
-    );
+    // M128: phiếu sinh từ chứng từ điều chỉnh → SoD/ngày so với NGƯỜI DUYỆT CHỨNG TỪ ĐÓ (không
+    // phải người duyệt IPC gốc); phiếu IPC thường → người quyết định bước cuối của đợt.
+    const cert =
+      (await queryOne<{ decidedBy: number | null; decidedAt: string | null }>(
+        `SELECT decided_by AS "decidedBy", decided_at AS "decidedAt"
+           FROM payment_cert_adjustments WHERE bill_id = ?`,
+        billId,
+      )) ??
+      (await queryOne<{ decidedBy: number | null; decidedAt: string | null }>(
+        `SELECT decided_by AS "decidedBy", decided_at AS "decidedAt" FROM payment_certs WHERE id = ?`,
+        phieu.paymentCertId,
+      ));
     if (cert?.decidedBy === userId)
       return {
         ok: false,

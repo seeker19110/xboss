@@ -44,6 +44,12 @@
 //   items.unitPrice    đơn giá từng dòng KL (payment_cert_items.unit_price)
 //   (Tổng tiền đợt nằm ở object `totals` riêng — che qua entity certTotals.)
 //
+// [paymentCertAdjustment] — perm: viewPayments — route: GET /api/payment-certs/[id]/adjustments,
+//   POST/PATCH trả chứng từ (M128)
+//   amount             giá trị ± của chứng từ điều chỉnh/huỷ hiệu lực (SQL tính)
+//   items.unitPrice    đơn giá gốc từng dòng điều chỉnh (payment_cert_adjustment_items.unit_price)
+//   → Gate route ĐÃ là viewPayments (đọc) / manageContracts (ghi) — phòng thủ/nhất quán.
+//
 // [certTotals] — perm: viewPayments — route: GET /api/payment-certs/[id] (object totals)
 //   periodValue        giá trị đợt này
 //   cumulativeValue    giá trị luỹ kế
@@ -108,6 +114,7 @@ export const SENSITIVE: Record<string, SensitiveRule[]> = {
   paymentBill: [{ fields: ["amount"], perm: "viewPayments" }],
   floorContract: [{ fields: ["contractValue"], perm: "viewPayments" }],
   paymentCert: [{ fields: ["items.unitPrice"], perm: "viewPayments" }],
+  paymentCertAdjustment: [{ fields: ["amount", "items.unitPrice"], perm: "viewPayments" }],
   certTotals: [
     {
       fields: [

@@ -82,17 +82,36 @@ export async function boqExecutedQty(boqItemId: number): Promise<number> {
   return row?.executed ?? 0;
 }
 
+/** Đợt `c` đã có chứng từ huỷ hiệu lực (reversal) được duyệt — M128, bất biến uq_pca_reversal. */
+const DOT_DA_HUY_SQL = `SELECT 1 FROM payment_cert_adjustments x
+                         WHERE x.cert_id = c.id AND x.kind = 'reversal' AND x.status = 'approved'`;
+
 /**
  * Chứng từ hạ nguồn tham chiếu một dòng BOQ mà FK KHÔNG cascade (S13c, A5-FR10): dòng KL đợt IPC
  * (`payment_cert_items`), phạm vi gói thầu (`tender_items`), giá chào theo dòng
  * (`tender_bid_prices`). Còn bất kỳ → xoá dòng BOQ phải trả 409 `dependency_conflict` (điều
  * chỉnh/huỷ chứng từ hạ nguồn trước), không để Postgres ném 23503 thành 500. Chỉ trả SỐ LƯỢNG
- * theo loại — không id/tiền của chứng từ.
+ * theo loại — không tiền của chứng từ. M128: kèm số đợt ĐÃ DUYỆT còn hiệu lực + đợt đầu tiên
+ * trong số đó (`dotDaDuyetDau`, cùng hợp đồng của dòng — route dựng link "lập chứng từ điều
+ * chỉnh"), và số đợt đã duyệt nhưng ĐÃ HUỶ HIỆU LỰC (`dotDaHuy`, reversal đã duyệt) — đợt đó
+ * không lập thêm chứng từ được nữa (409 cert_reversed) nên KHÔNG được đếm vào `dotDaDuyet`, nếu
+ * không route sẽ chỉ người dùng vòng lặp "lập chứng từ điều chỉnh".
  */
-export async function phuThuocDongBoq(
-  boqItemId: number,
-): Promise<{ dotThanhToan: number; goiThau: number }> {
-  const row = await queryOne<{ dotThanhToan: number; goiThau: number }>(
+export async function phuThuocDongBoq(boqItemId: number): Promise<{
+  dotThanhToan: number;
+  goiThau: number;
+  dotDaDuyet: number;
+  dotDaHuy: number;
+  dotDaDuyetDau: { certId: number; contractId: number } | null;
+}> {
+  const row = await queryOne<{
+    dotThanhToan: number;
+    goiThau: number;
+    dotDaDuyet: number;
+    dotDaHuy: number;
+    certId: number | null;
+    contractId: number | null;
+  }>(
     `SELECT (SELECT COUNT(DISTINCT cert_id)::int FROM payment_cert_items WHERE boq_item_id = ?)
               AS "dotThanhToan",
             (SELECT COUNT(*)::int FROM (
@@ -100,12 +119,40 @@ export async function phuThuocDongBoq(
                UNION
                SELECT b.tender_id FROM tender_bid_prices p JOIN tender_bids b ON b.id = p.bid_id
                 WHERE p.boq_item_id = ?
-             ) t) AS "goiThau"`,
+             ) t) AS "goiThau",
+            (SELECT COUNT(DISTINCT i.cert_id) FILTER (WHERE NOT EXISTS (${DOT_DA_HUY_SQL}))::int
+               FROM payment_cert_items i
+               JOIN payment_certs c ON c.id = i.cert_id
+              WHERE i.boq_item_id = ? AND c.status = 'approved') AS "dotDaDuyet",
+            (SELECT COUNT(DISTINCT i.cert_id) FILTER (WHERE EXISTS (${DOT_DA_HUY_SQL}))::int
+               FROM payment_cert_items i
+               JOIN payment_certs c ON c.id = i.cert_id
+              WHERE i.boq_item_id = ? AND c.status = 'approved') AS "dotDaHuy",
+            d.id AS "certId", d.contract_id AS "contractId"
+       FROM (SELECT 1) one
+       LEFT JOIN LATERAL (
+         SELECT c.id, c.contract_id FROM payment_cert_items i
+           JOIN payment_certs c ON c.id = i.cert_id
+          WHERE i.boq_item_id = ? AND c.status = 'approved' AND NOT EXISTS (${DOT_DA_HUY_SQL})
+          ORDER BY c.period_no, c.id LIMIT 1
+       ) d ON true`,
+    boqItemId,
+    boqItemId,
+    boqItemId,
     boqItemId,
     boqItemId,
     boqItemId,
   );
-  return { dotThanhToan: row?.dotThanhToan ?? 0, goiThau: row?.goiThau ?? 0 };
+  return {
+    dotThanhToan: row?.dotThanhToan ?? 0,
+    goiThau: row?.goiThau ?? 0,
+    dotDaDuyet: row?.dotDaDuyet ?? 0,
+    dotDaHuy: row?.dotDaHuy ?? 0,
+    dotDaDuyetDau:
+      row?.certId != null && row.contractId != null
+        ? { certId: row.certId, contractId: row.contractId }
+        : null,
+  };
 }
 
 /** Một dòng trong danh mục BOQ của dự án — CHỈ phần mô tả, không có cột tiền nào. */

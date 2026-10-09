@@ -49,6 +49,8 @@ test("docChiTietDot: 200 → totals chuỗi + cảnh báo vượt KL, không l�
   );
   assert.deepEqual(ct, {
     approvalStatus: null,
+    // M128: server chưa trả tóm tắt chứng từ điều chỉnh → null (không bịa).
+    adjustmentsSummary: null,
     vuotHopDong: vuot,
     warningVersion,
     totals,

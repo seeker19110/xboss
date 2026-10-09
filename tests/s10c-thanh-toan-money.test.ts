@@ -10,7 +10,9 @@ import {
   phanTram,
   thanhTienTheoPct,
   tienNhapSangMinor,
+  tongPhieu,
   tongTien,
+  type Bill,
 } from "@/app/payments/_components/tienThanhToan";
 import { soTienNhapThuan, tienTextToWire } from "@/lib/nen/money-dto";
 import { isMoneyPrecisionError } from "@/lib/nen/money";
@@ -317,4 +319,19 @@ test("tienTextToWire: chuỗi ::text → wire; dạng mũ float8 bị từ chố
     (e) => isMoneyPrecisionError(e),
   );
   assert.throws(() => tienTextToWire("1.999999999999998e+16", "decimal-string-v1"), TypeError);
+});
+
+test("M128 tongPhieu: KPI /payments gồm phiếu điều chỉnh IPC ± (bỏ void), không gồm tạm ứng/phát sinh", () => {
+  const p = (type: Bill["type"], amount: bigint, payStatus?: Bill["payStatus"]) =>
+    ({ type, amount, payStatus }) as Bill;
+  const kq = tongPhieu([
+    p("bill", 900000n, "paid"), // 9.000,00 đ đã chi
+    p("adjustment", 200000n, "void"), // điều chỉnh đã huỷ — không tính
+    p("adjustment", -900000n, "committed"), // phiếu âm của reversal — chưa chi
+    p("adjustment", 50000n, "paid"), // điều chỉnh đã chi
+    p("bill", 10000n), // phiếu cũ thiếu payStatus = đã chi
+    p("advance", 777700n, "paid"),
+    p("item", 888800n, "paid"),
+  ]);
+  assert.deepEqual(kq, { daChi: 960000n, chuaChi: -900000n });
 });

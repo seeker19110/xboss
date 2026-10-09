@@ -80,8 +80,9 @@ export default function PrintPage() {
       const filtered = all.filter(
         (b) => b.responsible === person && (period ? b.period === period : true),
       );
-      // Sắp xếp: bill trước, item sau, advance cuối
-      const order: Record<BillType, number> = { bill: 0, item: 1, advance: 2 };
+      // Sắp xếp: bill trước, item sau, advance; phiếu điều chỉnh IPC (M128) cuối — phiếu in
+      // theo người/kỳ không có mục cho loại này (giữ nguyên các mục A/B/tạm ứng).
+      const order: Record<BillType, number> = { bill: 0, item: 1, advance: 2, adjustment: 3 };
       filtered.sort((a, b) => order[a.type] - order[b.type]);
       setBills(filtered);
       setProject(proj);

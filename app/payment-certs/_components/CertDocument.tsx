@@ -10,6 +10,7 @@ import {
   FileText,
   Save,
   Send,
+  Undo2,
   X,
   XCircle,
 } from "lucide-react";
@@ -41,10 +42,12 @@ import {
   taoIdempotencyKey,
   type CertTotalsView,
   type DongVuot,
+  type TomTatDieuChinhDot,
   type YeuCauXacNhan,
 } from "./chiTietDot";
 import XacNhanCanhBaoDialog from "./XacNhanCanhBaoDialog";
 import DanhDauDaChiDialog from "./DanhDauDaChiDialog";
+import DieuChinhDot from "./DieuChinhDot";
 
 // Khối "chứng từ" của một đợt thanh toán (IPC) — M124. Tách ra từ hộp thoại chi tiết đợt
 // cũ trong `app/payment-certs/page.tsx`: cùng dữ liệu, cùng các hàm gọi API, nhưng hiển thị
@@ -135,6 +138,10 @@ export type CertDocumentCtrl = {
   canEdit: boolean;
   /** Admin/PM, không phải người đã duyệt đợt — được đánh dấu phiếu đã chi (M129). */
   canMarkPaid: boolean;
+  /** Id người đăng nhập (null = chưa rõ) — ẩn nút duyệt chứng từ điều chỉnh do chính mình lập. */
+  meId: number | null;
+  /** M128: tóm tắt chứng từ điều chỉnh của đợt (null = chưa tải/không có). */
+  adjustmentsSummary: TomTatDieuChinhDot | null;
   /** Nạp lại danh sách/đợt sau khi đổi dữ liệu. */
   refresh: () => void | Promise<void>;
   busy: boolean;
@@ -203,6 +210,7 @@ export function useCertDocument({
   // key cũ → server phát lại kết quả cũ thay vì duyệt/sinh phiếu lần hai.
   const keyQuyetDinh = useRef<string | null>(null);
   const [totals, setTotals] = useState<CertTotalsView | null>(null);
+  const [adjustmentsSummary, setAdjustmentsSummary] = useState<TomTatDieuChinhDot | null>(null);
   const [loiChiTiet, setLoiChiTiet] = useState<string | null>(null);
 
   // Đổi đợt (hoặc tải lại danh sách sau khi lưu) → nạp lại ô nhập theo số của server.
@@ -223,6 +231,7 @@ export function useCertDocument({
       setVuotHopDong([]);
       setWarningVersion(null);
       setTotals(null);
+      setAdjustmentsSummary(null);
       setLoiChiTiet(null);
       return;
     }
@@ -233,6 +242,7 @@ export function useCertDocument({
       .then(docChiTietDot)
       .catch(() => ({
         approvalStatus: null,
+        adjustmentsSummary: null,
         vuotHopDong: [],
         warningVersion: null,
         totals: null,
@@ -244,6 +254,7 @@ export function useCertDocument({
         setVuotHopDong(ct.vuotHopDong);
         setWarningVersion(ct.warningVersion);
         setTotals(ct.totals);
+        setAdjustmentsSummary(ct.adjustmentsSummary ?? null);
         setLoiChiTiet(ct.loi);
       })
       .finally(() => {
@@ -393,8 +404,8 @@ export function useCertDocument({
         setXacNhan({ vuotHopDong, warningVersion, doiNguon: false });
         return;
       }
-      // qty_cumulative của mỗi dòng trong đợt này đã là luỹ kế tính tới hết đợt này —
-      // nếu duyệt, đây sẽ là luỹ kế mới của hợp đồng (thay cho luỹ kế đợt duyệt trước đó).
+      // qtyCumulative server trả là luỹ kế HIỆU LỰC tới hết đợt này (gồm chứng từ điều chỉnh đã
+      // duyệt của các kỳ ≤ đợt, M128 §6) — nếu duyệt, đây sẽ là luỹ kế mới của hợp đồng.
       const projectedCumulative = mSumBy(cert.items, (it) =>
         mMul(Number(it.qtyCumulative), it.unitPrice),
       );
@@ -489,6 +500,8 @@ export function useCertDocument({
       cert?.status === "approved" &&
       cert.bill?.payStatus === "committed" &&
       !(meId != null && cert.decidedBy != null && cert.decidedBy === meId),
+    meId,
+    adjustmentsSummary,
     refresh: onSaved,
     busy,
     dirty,
@@ -772,6 +785,11 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
           <h2 className="font-mono text-lg font-semibold text-zinc-100">{cert.code}</h2>
           <Chip tone={STATUS_TONE[cert.status]}>{STATUS_LABEL[cert.status]}</Chip>
           {cert.status === "approved" && <ChipTrangThaiChi bill={cert.bill} />}
+          {cert.status === "approved" && ctrl.adjustmentsSummary?.reversed && (
+            <Chip tone="danger" icon={Undo2}>
+              Đã huỷ hiệu lực
+            </Chip>
+          )}
           {approvalStatus?.status === "pending" && (
             <Chip tone="warning">
               Chờ duyệt (bước {approvalStatus.currentSeq}/{approvalStatus.totalSteps})
@@ -1016,6 +1034,25 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
           )}
         </Card>
       </div>
+
+      {/* M128: đợt đã duyệt chỉ đổi được qua chứng từ điều chỉnh/huỷ hiệu lực. */}
+      {cert.status === "approved" && (
+        <DieuChinhDot
+          certId={cert.id}
+          maDot={cert.code}
+          dongBoq={cert.items.map((it) => ({
+            boqItemId: it.boqItemId,
+            boqCode: it.boqCode,
+            boqName: it.boqName,
+            boqUnit: it.boqUnit,
+          }))}
+          giaTriDuyet={totals?.approvedValue ?? null}
+          tomTat={ctrl.adjustmentsSummary}
+          canManage={ctrl.canManage}
+          meId={ctrl.meId}
+          onXong={ctrl.refresh}
+        />
+      )}
     </div>
   );
 }

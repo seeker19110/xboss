@@ -232,6 +232,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
 
   // S13c (A5-FR10): dòng BOQ còn chứng từ hạ nguồn (đợt IPC, gói thầu) → 409 dependency_conflict
+  // (M128: đợt IPC ĐÃ DUYỆT → 409 adjustment_required, xem dưới)
   // có thông điệp, không DELETE lịch sử. Khoá dòng rồi kiểm + xoá trong cùng transaction; chứng
   // từ chen vào giữa vẫn bị FK chặn (23503) và cũng được trả 409 thay vì 500.
   const xungDot = (dotThanhToan: number, goiThau: number) => {
@@ -264,6 +265,35 @@ export async function DELETE(
     });
     if (kq === "khong_thay")
       return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
+    // M128: dòng đã nằm trong đợt IPC ĐÃ DUYỆT → không còn đường "huỷ chứng từ hạ nguồn" nào
+    // ngoài chứng từ điều chỉnh/huỷ hiệu lực của đợt đó → 409 adjustment_required kèm link.
+    if (kq !== "da_xoa" && kq.dotDaDuyet > 0)
+      return NextResponse.json(
+        {
+          error:
+            `Dòng BOQ đã nằm trong ${kq.dotDaDuyet} đợt thanh toán (IPC) đã duyệt — không xoá được. ` +
+            "Lập chứng từ điều chỉnh (điều chỉnh/huỷ hiệu lực) cho đợt đó trước",
+          code: "adjustment_required",
+          ...(kq.dotDaDuyetDau
+            ? {
+                linkUrl: `/payment-certs?contractId=${kq.dotDaDuyetDau.contractId}&id=${kq.dotDaDuyetDau.certId}`,
+              }
+            : {}),
+        },
+        { status: 409 },
+      );
+    // Mọi đợt chứa dòng đều đã huỷ hiệu lực → không còn chứng từ nào lập được (409
+    // cert_reversed); đợt là hồ sơ lưu trữ nên dòng BOQ được giữ — nói rõ, không chỉ vòng lặp.
+    if (kq !== "da_xoa" && kq.dotDaHuy > 0 && kq.dotDaHuy === kq.dotThanhToan && kq.goiThau === 0)
+      return NextResponse.json(
+        {
+          error:
+            `Dòng BOQ nằm trong ${kq.dotDaHuy} đợt thanh toán (IPC) đã huỷ hiệu lực — đợt huỷ hiệu ` +
+            "lực là hồ sơ lưu trữ (giữ nguyên dòng khối lượng) nên dòng BOQ không xoá được",
+          code: "dependency_conflict",
+        },
+        { status: 409 },
+      );
     if (kq !== "da_xoa") return xungDot(kq.dotThanhToan, kq.goiThau);
   } catch (err) {
     if ((err as { code?: string }).code === "23503") return xungDot(0, 0);
