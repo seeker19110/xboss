@@ -1,5 +1,32 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — Sau S15: đóng các mục "còn mở" (6a–6f, 6i) + đặc tả M128/M129/M130 (ĐANG LÀM)
+
+Đợt làm tiếp ngay sau khi merge PR #614 theo yêu cầu "làm tiếp các việc còn mở". Mỗi việc một
+worktree/nhánh riêng, tích hợp vào nhánh này khi xong (chưa mở PR):
+
+- **Q-AC07 (6f) — xong:** `GET /api/ready` (readiness riêng, chỉ SELECT, 503 `schema_missing |
+schema_behind | db_unavailable`), `login`/`me` trả 503 JSON `schema_not_ready` + `Retry-After` khi
+  schema thiếu (trước đây 500 khung Next; không tính rate-limit, không lộ user). Helper
+  `laLoiSchemaChuaSan`/`phanHoiSchemaChuaSan` (`lib/nen/loi.ts`), `checkSchemaReady` (`lib/db`),
+  `checkReadiness` (`lib/van-hanh/health.ts`). `tests/s16-readiness.test.ts` dựng DB thật thiếu
+  schema (2/6 đỏ trên code cũ). `docs/ops/backup.md` thêm liveness vs readiness.
+- **A1-AC05/Q-AC01 (lỗi thật, đã sửa):** request đã nạp snapshot allow rồi chờ khoá; admin siết
+  override deny trong lúc đó → vẫn ghi nghiệm thu/duyệt IPC bằng snapshot cũ. Nay
+  `kiemQuyenTaiLucGhi` (`lib/bao-mat/permissions.ts`) tái kiểm trong transaction ghi dưới khoá
+  advisory chia sẻ theo org, cho ghi chỉ khi đúng ở cả snapshot cũ lẫn mới; `setPermissionOverride`
+  lấy khoá độc quyền. Áp vào approve task (POST/DELETE), `/api/approvals`, nhánh legacy decide IPC.
+  `tests/s16-stale-snapshot.test.ts` 2/6 đỏ trên code cũ, 7/7 xanh sau. Đang mở rộng ra các route
+  ghi tài chính/quản trị còn lại (worker riêng).
+- **Đặc tả mới (chủ dự án chốt 2026-10-09):** `M128` chứng từ điều chỉnh IPC (sau M129), `M129` tách
+  "đã duyệt" ≠ "đã chi" (`payment_bills.pay_status/paid_at`), `M130` retention cleanup dry-run +
+  chính sách 35/365 ngày — đều "Approved for implementation".
+- **Đang làm (worker):** 6(b) RLS bỏ nhánh GUC rỗng (migration 0165 + scope tường minh ở login/
+  cron), 6(a) cutover membership theo cờ `XBOSS_STRICT_MEMBERSHIP` + script dry-run, A2-AC07/AC08
+  e2e offline sâu (legacy IDB, blocked, quota, SW restart, mất ACK), M130 script retention,
+  mở rộng tái kiểm quyền lúc ghi. 6(i) baseline bench sẽ đo lại khi máy rảnh (lần đo đầu chạy
+  song song 5 agent → không dùng làm baseline).
+
 ## 2026-10-09 — QUALITY-FINAL-1 S15: audit cuối và release candidate
 
 Ánh xạ bằng chứng 54 AC (TEST-MATRIX) trên main `e5ce67b` bằng 4 lượt đọc-chạy độc lập theo trụ A1 /
