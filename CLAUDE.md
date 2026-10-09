@@ -91,6 +91,7 @@ Danh sách **đầy đủ** (kèm biến bắt buộc/tuỳ chọn và luật va
 
 - `DATABASE_URL` — bắt buộc khi chạy app. `MIGRATE_DATABASE_URL` (tuỳ chọn) — chuỗi kết nối role owner chỉ dùng để chạy migration (`lib/db/migrate.ts`, ADR-0005); thiếu thì fallback về `DATABASE_URL`.
 - `XBOSS_PG_POOL_MAX` / `XBOSS_PG_STMT_TIMEOUT_MS` / `XBOSS_SLOW_QUERY_MS` — (tuỳ chọn, M53) chỉnh pool + `statement_timeout` + ngưỡng log query chậm trong `lib/db/index.ts` (mặc định 10 / 30000 / 500; `XBOSS_SLOW_QUERY_MS=0` là tắt log).
+- `XBOSS_STRICT_MEMBERSHIP` — (tuỳ chọn, mặc định tắt; chỉ nhận `0`/`1`/`true`/`false`) cutover membership D01: bật thì non-admin chỉ thấy dự án được gán trong `user_projects` kể cả khi bảng rỗng toàn hệ (admin cùng org vẫn thấy hết). Bật theo runbook `docs/nang-cap/AUDIT-S16-MEMBERSHIP-CUTOVER.md` (dry-run `npm run membership:dry-run` trước).
 - `XBOSS_SECRET` — ký cookie phiên. **Bắt buộc trong production**: thiếu sẽ throw lúc ký/xác minh token (chủ đích fail-fast, build vẫn chạy được).
 - `XBOSS_ADMIN_PASSWORD` — production + DB trống chỉ tạo 1 admin với mật khẩu này (không seed 4 tài khoản demo như dev).
 - `CRON_SECRET` — bảo vệ `/api/cron/daily-report`, chỉ nhận qua header `Authorization: Bearer` (không qua query param).

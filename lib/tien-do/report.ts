@@ -1,6 +1,7 @@
 // Tổng hợp báo cáo trễ hạn hằng ngày (dùng cho email cron + xem trước).
 import { query, queryOne, todayISO, daysFromTodayISO } from "@/lib/db";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/tien-do/status";
+import { strictMembershipEnabled } from "@/lib/nen/env";
 
 export type DelayedRow = {
   code: string;
@@ -322,18 +323,22 @@ export async function listReportProjects(onlyIds?: number[]): Promise<ReportProj
 
 /** Người nhận mặc định của báo cáo một dự án: Admin cùng tổ chức + PM thấy dự án đó (cùng
  *  luật `visibleProjectIds`: chưa cấu hình `user_projects` thì mọi PM cùng tổ chức, đã cấu
- *  hình thì chỉ PM được gán). Trả cả id để gửi Web Push đúng người, không phát mọi thiết bị. */
+ *  hình thì chỉ PM được gán; cờ XBOSS_STRICT_MEMBERSHIP bật → luôn chỉ PM được gán). Trả cả
+ *  id để gửi Web Push đúng người, không phát mọi thiết bị. */
 export async function reportRecipients(
   projectId: number,
 ): Promise<{ id: number; email: string }[]> {
+  const nhanhBangRong = strictMembershipEnabled()
+    ? ""
+    : "NOT EXISTS (SELECT 1 FROM user_projects) OR";
   return query<{ id: number; email: string }>(
     `SELECT u.id, u.email
        FROM users u
        JOIN projects p ON p.id = ? AND p.org_id = u.org_id
       WHERE u.role = 'admin'
-         OR (u.role = 'pm' AND (NOT EXISTS (SELECT 1 FROM user_projects)
-              OR EXISTS (SELECT 1 FROM user_projects up
-                          WHERE up.user_id = u.id AND up.project_id = p.id)))
+         OR (u.role = 'pm' AND (${nhanhBangRong}
+              EXISTS (SELECT 1 FROM user_projects up
+                       WHERE up.user_id = u.id AND up.project_id = p.id)))
       ORDER BY u.id`,
     projectId,
   );

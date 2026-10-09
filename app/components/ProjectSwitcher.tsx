@@ -6,6 +6,7 @@ import type { ProjectListItem } from "@/lib/ha-tang/projects";
 import { phatDoiNguCanh } from "@/app/lib/contextEpoch";
 import { clearServiceWorkerCache } from "@/app/lib/serviceWorkerCache";
 import { showToast } from "@/app/components/Toast";
+import { fetchDuAnKhaKien } from "@/app/lib/duAnKhaKien";
 
 const PINNED_KEY = "xboss_pinned";
 const FILTER_THRESHOLD = 7;
@@ -46,10 +47,7 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
 
   useEffect(() => {
     setPinned(loadPinned());
-    fetch("/api/projects")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setProjects(data?.projects ?? []))
-      .catch(() => setProjects([]));
+    fetchDuAnKhaKien().then((ds) => setProjects(ds ?? []));
   }, []);
 
   useEffect(() => {

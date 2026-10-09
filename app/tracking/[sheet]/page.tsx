@@ -19,6 +19,8 @@ import { Modal, appConfirm } from "@/app/components/dialogs";
 import EmptyState from "@/app/components/EmptyState";
 import { Button, Card } from "@/app/components/ui";
 import { PageSkeleton } from "@/app/components/Skeleton";
+import ChuaGanDuAn from "@/app/components/ChuaGanDuAn";
+import { useChuaGanDuAn } from "@/app/lib/duAnKhaKien";
 import { ErrorState } from "@/app/components/ErrorState";
 import { toSlug } from "@/lib/nen/sheets";
 import { useEditMode } from "@/app/components/useEditMode";
@@ -58,6 +60,7 @@ function useIsMobile() {
 
 export default function TrackingPage({ params }: { params: Promise<{ sheet: string }> }) {
   const { sheet } = use(params);
+  const chuaGanDuAn = useChuaGanDuAn();
   const {
     data,
     loading,
@@ -326,6 +329,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   }
 
   if (loading) return <PageSkeleton />;
+  if (chuaGanDuAn) return <ChuaGanDuAn role={isAdmin ? "admin" : null} />;
   if (loadError && !data)
     return (
       <ErrorState

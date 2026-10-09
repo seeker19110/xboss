@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { readSavedMode, resolveHomeMode, saveMode, type HomeMode } from "@/app/lib/homeMode";
+import { useChuaGanDuAn } from "@/app/lib/duAnKhaKien";
+import ChuaGanDuAn from "@/app/components/ChuaGanDuAn";
 
 // Trang chủ "/" — 2 chế độ theo vai trò (M127, xem docs/nang-cap/M127-trang-chu-theo-vai-tro.md):
 //   - Điều hành  : tổng quan dự án (bố cục M125) — mặc định cho admin/pm/bch/cdt/viewer
@@ -35,6 +37,7 @@ export default function Dashboard() {
 function TrangChu() {
   const [me, setMe] = useState<Me | null>(null);
   const [mode, setMode] = useState<HomeMode | null>(null);
+  const chuaGanDuAn = useChuaGanDuAn();
 
   useEffect(() => {
     // fetchMe tự điều hướng về /login khi 401 (và dọn cache/hàng đợi của phiên cũ).
@@ -59,6 +62,7 @@ function TrangChu() {
   );
 
   if (!me || !mode) return <PageSkeleton />;
+  if (chuaGanDuAn) return <ChuaGanDuAn role={me.role} />;
 
   // Chỉ kỹ sư được chuyển qua lại: thầu phụ không có quyền xem dashboard, các vai trò còn
   // lại không có việc được giao nên chế độ Hiện trường sẽ trống với họ (FR1).
