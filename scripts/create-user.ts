@@ -1,5 +1,5 @@
 import "./env";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withOrgScope } from "@/lib/db";
 import { hashPassword } from "@/lib/bao-mat/auth";
 import { ROLES, type Role } from "@/lib/nen/roles";
 
@@ -41,7 +41,9 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((e) => {
+// S16 (RLS 0165): lệnh vận hành tra/sửa tài khoản theo email (khoá duy nhất TOÀN HỆ) — phạm vi '*'
+// do chính script đặt; user mới vào tổ chức mặc định (users.org_id DEFAULT 1).
+withOrgScope("*", main, { readOnly: false }).catch((e) => {
   console.error(e);
   process.exit(1);
 });

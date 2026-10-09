@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { query, insertId } from "@/lib/db";
+import { query, insertId, withOrgScope } from "@/lib/db";
 import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
 import { sendTelegram } from "@/lib/tien-do/report";
 import { runHealthChecks, type HealthCheckReport } from "@/lib/van-hanh/healthcheck";
@@ -56,7 +56,11 @@ async function handleHealthCheck(): Promise<NextResponse> {
         .map((s) => s.trim())
         .filter(Boolean);
       if (to.length === 0) {
-        const rows = await query<{ email: string }>(`SELECT email FROM users WHERE role = 'admin'`);
+        // Cảnh báo sức khoẻ là của CẢ HỆ THỐNG (không thuộc org nào) nên giữ hành vi gửi mọi
+        // Admin: phạm vi '*' do server đặt, chỉ lấy cột email (S16, RLS 0165).
+        const rows = await withOrgScope("*", () =>
+          query<{ email: string }>(`SELECT email FROM users WHERE role = 'admin'`),
+        );
         to = rows.map((r) => r.email);
       }
       if (to.length > 0) {

@@ -5,6 +5,7 @@ import path from "path";
 import * as XLSX from "xlsx";
 import { queryOne, run } from "@/lib/db";
 import { parseBoqWorkbook, commitBoqImport } from "@/lib/khoi-luong/boq-import";
+import { trongToChuc } from "@/lib/ha-tang/to-chuc";
 
 async function main() {
   const filePath = path.join(process.cwd(), "attachments", "MAU-KHOI-LUONG-BOQ.xlsx");
@@ -59,7 +60,9 @@ async function main() {
   }
 }
 
-main().catch((err) => {
+// S16 (RLS 0165): script dữ liệu đơn tổ chức — chạy trong ngữ cảnh tổ chức mặc định 1 (DEFAULT
+// của projects/users.org_id) để bảng theo tổ chức không trả rỗng khi chạy bằng role ứng dụng.
+trongToChuc(1, main).catch((err) => {
   console.error("❌ Lỗi khi seed BOQ:", err);
   process.exit(1);
 });

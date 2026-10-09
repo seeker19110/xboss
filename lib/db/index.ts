@@ -41,6 +41,8 @@ type TxFrame = {
   actor: { userId?: number; role?: string; orgId?: number; projectId?: number };
   /** Giá trị app.project_id đã đặt: '' = chưa gắn dự án, '*' = liên dự án, 'N' = dự án N. */
   scope: string;
+  /** Giá trị app.org_id đã đặt: '' = chưa gắn tổ chức, '*' = liên tổ chức, 'N' = tổ chức N. */
+  orgScope: string;
 };
 const txStorage = new AsyncLocalStorage<TxFrame>();
 
@@ -181,17 +183,65 @@ const toPg = (sql: string) => {
   return sql.replace(/\?/g, () => `$${++i}`);
 };
 
+// S16 (RLS nghiêm ngặt, migration 0165): các bảng theo tổ chức (users, projects, suppliers…)
+// KHÔNG còn nhánh "GUC rỗng → cho qua" — thiếu app.org_id là thấy 0 dòng. Câu lệnh chạy NGOÀI
+// transaction của một request đã xác thực (getCurrentUser đã gắn orgId vào ngữ cảnh) được bọc
+// trong 1 transaction ngắn có SET LOCAL app.org_id = tổ chức của actor, để đường đọc/ghi cũ
+// không bị trả rỗng âm thầm. CHỈ đặt app.org_id (không đổi app.project_id/actor/vai trò của
+// câu lệnh ngoài transaction như trước). Không có orgId trong ngữ cảnh (cron, đăng nhập, script)
+// → chạy như cũ, GUC rỗng → bảng theo tổ chức trả rỗng: đường đó phải tự gọi withOrgScope.
+// Dùng SET LOCAL (không set cấp phiên) để giữ tương thích PgBouncer transaction pooling (DEPLOY.md)
+// và không để GUC của request này sống tiếp trên connection khi trả về pool.
+function orgCuaNguCanh(): string | null {
+  const orgId = getRequestContext()?.orgId;
+  return orgId != null && Number.isSafeInteger(orgId) && orgId > 0 ? String(orgId) : null;
+}
+
+async function chayNgoaiGiaoDich(
+  pgSql: string,
+  params: unknown[],
+  sql: string,
+): Promise<import("pg").QueryResult> {
+  const orgId = orgCuaNguCanh();
+  if (orgId == null) return timedPgQuery(() => getPool().query(pgSql, params), sql);
+  const client = await getPool().connect();
+  let loiHuyKetNoi: Error | undefined;
+  try {
+    // BEGIN + set_config chung 1 lượt (giao thức simple query) — giá trị đã kiểm là số nguyên
+    // dương ở orgCuaNguCanh và còn qua escapeLiteral, không có đường chèn chuỗi người dùng.
+    await client.query(
+      `BEGIN; SELECT set_config('app.org_id', ${client.escapeLiteral(orgId)}, true)`,
+    );
+    const r = await timedPgQuery(() => client.query(pgSql, params), sql);
+    await client.query("COMMIT");
+    return r;
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rbErr) {
+      loiHuyKetNoi = rbErr instanceof Error ? rbErr : new Error(String(rbErr));
+      log.error("rollback_failed", { error: loiHuyKetNoi.message });
+    }
+    throw err;
+  } finally {
+    client.release(loiHuyKetNoi);
+  }
+}
+
+// Chạy 1 câu lệnh: trong withTransaction thì dùng client của transaction, ngoài thì qua
+// chayNgoaiGiaoDich (tự gắn app.org_id của actor nếu có).
+function thucThi(pgSql: string, params: unknown[], sql: string): Promise<import("pg").QueryResult> {
+  const tx = txStorage.getStore()?.client;
+  if (tx) return timedPgQuery(() => tx.query(pgSql, params), sql);
+  return chayNgoaiGiaoDich(pgSql, params, sql);
+}
+
 export async function query<T = Record<string, unknown>>(
   sql: string,
   ...params: unknown[]
 ): Promise<T[]> {
   await ensureSchemaCompatible();
-  const tx = txStorage.getStore()?.client;
-  const pgSql = toPg(sql);
-  const r = await timedPgQuery(
-    () => (tx ? tx.query(pgSql, params) : getPool().query(pgSql, params)),
-    sql,
-  );
+  const r = await thucThi(toPg(sql), params, sql);
   return r.rows as T[];
 }
 
@@ -205,12 +255,7 @@ export async function queryOne<T = Record<string, unknown>>(
 
 export async function run(sql: string, ...params: unknown[]): Promise<{ changes: number }> {
   await ensureSchemaCompatible();
-  const tx = txStorage.getStore()?.client;
-  const pgSql = toPg(sql);
-  const r = await timedPgQuery(
-    () => (tx ? tx.query(pgSql, params) : getPool().query(pgSql, params)),
-    sql,
-  );
+  const r = await thucThi(toPg(sql), params, sql);
   return { changes: r.rowCount ?? 0 };
 }
 
@@ -221,11 +266,7 @@ export async function insertId(sql: string, ...params: unknown[]): Promise<numbe
   const pgSql = toPg(sql);
   const needsReturning = !/returning\s+id\s*$/i.test(pgSql.trim());
   const finalSql = needsReturning ? pgSql + " RETURNING id" : pgSql;
-  const tx = txStorage.getStore()?.client;
-  const r = await timedPgQuery(
-    () => (tx ? tx.query(finalSql, params) : getPool().query(finalSql, params)),
-    sql,
-  );
+  const r = await thucThi(finalSql, params, sql);
   return Number(r.rows[0].id);
 }
 
@@ -321,6 +362,7 @@ export async function withTransaction<T>(
         projectId: ctx?.projectId ?? undefined,
       },
       scope: ctx?.projectId != null ? String(ctx.projectId) : "",
+      orgScope: ctx?.orgId != null ? String(ctx.orgId) : "",
     };
     const result = await txStorage.run(frame, fn);
     await client.query("COMMIT");
@@ -386,6 +428,47 @@ export async function withProjectScope<T>(
       return fn();
     },
     { isolation: opts?.isolation, readOnly },
+  );
+}
+
+// S16 — cùng khuôn withProjectScope nhưng cho GUC app.org_id (RLS các bảng theo tổ chức,
+// migration 0165 đã bỏ nhánh "GUC rỗng → cho qua"). Dùng cho đường CHƯA có actor trong ngữ cảnh
+// (đăng nhập, cron bằng CRON_SECRET, route công khai, script): orgId = tổ chức cụ thể, hoặc '*'
+// khi THẬT SỰ cần liên tổ chức (vd tra tài khoản theo email lúc đăng nhập — chưa biết org). '*'
+// chỉ do server đặt tường minh, không bao giờ lấy từ đầu vào client. Lồng trong transaction đã
+// gắn tổ chức khác → throw (không nâng từ 1 org lên '*' hay đổi org giữa chừng).
+export async function withOrgScope<T>(
+  orgId: number | "*",
+  fn: () => Promise<T>,
+  opts?: { readOnly?: boolean },
+): Promise<T> {
+  if (orgId !== "*" && !(Number.isSafeInteger(orgId) && orgId > 0))
+    throw new Error(`withOrgScope: tổ chức không hợp lệ (${String(orgId)})`);
+  const readOnly = opts?.readOnly ?? true;
+  const scope = String(orgId);
+  const datPhamVi = async (frame: TxFrame) => {
+    frame.orgScope = scope;
+    await frame.client.query(`SELECT set_config('app.org_id', $1, true)`, [scope]);
+  };
+  const frameNgoai = txStorage.getStore();
+  if (frameNgoai) {
+    kiemTraLoiGoiLong(frameNgoai, { readOnly }, "withOrgScope");
+    if (frameNgoai.orgScope === scope) return fn();
+    if (frameNgoai.orgScope !== "")
+      throw new Error(
+        `withOrgScope: lời gọi lồng đổi phạm vi tổ chức ('${frameNgoai.orgScope}' → '${scope}') bị từ chối`,
+      );
+    await datPhamVi(frameNgoai);
+    return fn();
+  }
+  return withTransaction(
+    async () => {
+      const frame = txStorage.getStore();
+      if (!frame) throw new Error("withOrgScope: thiếu transaction client (không thể xảy ra)");
+      await datPhamVi(frame);
+      return fn();
+    },
+    { readOnly },
   );
 }
 

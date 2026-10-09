@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withOrgScope } from "@/lib/db";
 import { getCurrentUser, isAdminOrPm } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { strictMembershipEnabled } from "@/lib/nen/env";
 
 export const dynamic = "force-dynamic";
+
+/** Tổ chức mặc định (DEFAULT của projects.org_id) — chỉ cho fallback ẩn danh của trang /login. */
+const TO_CHUC_MAC_DINH = 1;
 
 // GET /api/project → tên/mã dự án + tháp đầu tiên + tiêu đề heatmap.
 // Public (chỉ trả tên hiển thị) — dùng cho header, trang login, báo cáo.
@@ -45,8 +48,13 @@ export async function GET() {
             `SELECT name, code, heatmap_title, investor, contractor, logo FROM projects WHERE id = ?`,
             projectId,
           )
-        : await queryOne<DongDuAn>(
-            `SELECT name, code, heatmap_title, investor, contractor, logo FROM projects ORDER BY id LIMIT 1`,
+        : // S16 (RLS 0165): fallback "dự án đầu tiên" chỉ trong 1 tổ chức — của user nếu có
+          // phiên, ẩn danh (trang /login) thì tổ chức mặc định 1 (DEFAULT của projects.org_id).
+          // Không dùng '*' ở route công khai.
+          await withOrgScope(user ? user.orgId : TO_CHUC_MAC_DINH, () =>
+            queryOne<DongDuAn>(
+              `SELECT name, code, heatmap_title, investor, contractor, logo FROM projects ORDER BY id LIMIT 1`,
+            ),
           );
     const tower = await queryOne<{ name: string }>(`SELECT name FROM towers ORDER BY id LIMIT 1`);
     return NextResponse.json(

@@ -1,4 +1,4 @@
-import { queryOne } from "@/lib/db";
+import { queryOne, withProjectScope } from "@/lib/db";
 
 // QUALITY-FINAL-1 A1-FR06: `?baseline=<id>` do client gửi phải thuộc DỰ ÁN ĐANG CHỌN — nếu
 // không, EVM/S-curve đọc được ngày kế hoạch (baseline_tasks) của dự án/tổ chức khác.
@@ -25,10 +25,13 @@ export async function kiemBaselineThuocDuAn(
   if (id === undefined)
     return { ok: false, status: 400, error: "baseline phải là số nguyên dương hợp lệ" };
   if (id === null) return { ok: true, baselineId: null };
-  const row = await queryOne<{ id: number }>(
-    `SELECT id FROM baselines WHERE id = ? AND project_id = ?`,
-    id,
-    projectId,
+  // RLS 0165: baselines không còn nhánh "GUC rỗng cho qua" → đọc trong phạm vi dự án.
+  const row = await withProjectScope(projectId, () =>
+    queryOne<{ id: number }>(
+      `SELECT id FROM baselines WHERE id = ? AND project_id = ?`,
+      id,
+      projectId,
+    ),
   );
   if (!row)
     return { ok: false, status: 404, error: "Không tìm thấy baseline trong dự án đang chọn" };

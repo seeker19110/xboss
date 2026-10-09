@@ -15,6 +15,7 @@ import {
 } from "@/lib/tien-do/report";
 import { verifyAuditChain } from "@/lib/bao-mat/audit-chain";
 import { acquireSyncLock, releaseSyncLock } from "@/lib/ha-tang/sync-locks";
+import { theoTungToChuc } from "@/lib/ha-tang/to-chuc";
 
 export const dynamic = "force-dynamic";
 
@@ -43,10 +44,17 @@ export async function GET(req: NextRequest) {
 
   try {
     const auditChain = await xacMinhAuditChain();
-    // Cron (secret) gửi mọi dự án đang hoạt động; Admin/PM gọi tay chỉ dự án mình thấy.
-    const projects = await listReportProjects(user ? await visibleProjectIds(user) : undefined);
-    const results = [];
-    for (const project of projects) results.push(await handleWeeklyReport(project, auditChain));
+    // Cron (secret) gửi mọi dự án đang hoạt động — lần lượt TỪNG tổ chức (S16, RLS 0165: mỗi
+    // vòng chỉ thấy dữ liệu một org); Admin/PM gọi tay chỉ dự án mình thấy trong org của mình.
+    const chayMotToChuc = async (onlyIds?: number[]) => {
+      const results = [];
+      for (const project of await listReportProjects(onlyIds))
+        results.push(await handleWeeklyReport(project, auditChain));
+      return results;
+    };
+    const results = user
+      ? await chayMotToChuc(await visibleProjectIds(user))
+      : (await theoTungToChuc(() => chayMotToChuc())).flat();
     return NextResponse.json({ projects: results, auditChain });
   } finally {
     await releaseSyncLock(LOCK_NAME);

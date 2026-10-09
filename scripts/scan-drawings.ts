@@ -3,6 +3,7 @@
 // qua lib/ky-thuat/drawings-scan.ts.
 import { queryOne, getPool } from "@/lib/db";
 import { DRAWINGS_DIR, syncDrawingsFromDisk } from "@/lib/ky-thuat/drawings-scan";
+import { trongToChuc } from "@/lib/ha-tang/to-chuc";
 
 async function main() {
   console.log(`🔍 Bắt đầu quét thư mục bản vẽ: ${DRAWINGS_DIR}`);
@@ -36,7 +37,9 @@ async function main() {
   await getPool().end();
 }
 
-main().catch((err) => {
+// S16 (RLS 0165): script dữ liệu đơn tổ chức — chạy trong ngữ cảnh tổ chức mặc định 1 (DEFAULT
+// của projects/users.org_id) để bảng theo tổ chức không trả rỗng khi chạy bằng role ứng dụng.
+trongToChuc(1, main).catch((err) => {
   console.error("Lỗi khi chạy quét bản vẽ:", err);
   process.exit(1);
 });

@@ -3,6 +3,7 @@ import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
 import { query } from "@/lib/db";
 import { runSync, type RunSummary } from "@/lib/ha-tang/integrations/core";
 import { log } from "@/lib/nen/log";
+import { theoTungToChuc } from "@/lib/ha-tang/to-chuc";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +20,17 @@ export async function GET(req: NextRequest) {
       { status: 401 },
     );
 
-  // Cron secret = tác vụ hệ thống, chạy mọi tổ chức. Gọi tay bằng phiên (S02) → chỉ tích
-  // hợp của tổ chức người gọi, không chạy/không trả kết quả đồng bộ của tenant khác.
-  const orgId = bySecret ? null : (user?.orgId ?? null);
+  // Cron secret = tác vụ hệ thống, chạy mọi tổ chức — lần lượt TỪNG tổ chức (S16, RLS 0165:
+  // mỗi vòng chỉ thấy tích hợp của một org). Gọi tay bằng phiên (S02) → chỉ tích hợp của tổ
+  // chức người gọi, không chạy/không trả kết quả đồng bộ của tenant khác.
+  const results = bySecret
+    ? (await theoTungToChuc((orgId) => dongBoToChuc(orgId))).flat()
+    : await dongBoToChuc(user?.orgId ?? null);
+
+  return NextResponse.json({ ok: true, results });
+}
+
+async function dongBoToChuc(orgId: number | null) {
   const integrations = await query<{ id: number; provider: string; projectId: number }>(
     `SELECT id, provider, project_id AS "projectId"
        FROM integrations
@@ -52,6 +61,5 @@ export async function GET(req: NextRequest) {
       });
     }
   }
-
-  return NextResponse.json({ ok: true, results });
+  return results;
 }

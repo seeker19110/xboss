@@ -8,7 +8,7 @@
 // → ssoEnabled()=false, nút SSO tự ẩn, mọi thứ như cũ.
 import { randomBytes } from "node:crypto";
 import * as oidc from "openid-client";
-import { query, queryOne, run } from "@/lib/db";
+import { query, queryOne, run, withOrgScope } from "@/lib/db";
 import { hashPassword } from "@/lib/bao-mat/auth";
 import { log } from "@/lib/nen/log";
 import { ROLES, type Role } from "@/lib/nen/roles";
@@ -96,33 +96,19 @@ export type SsoUser = {
 };
 
 export async function upsertSsoUser(resolved: ResolvedSsoUser): Promise<SsoUser> {
-  const existing = await queryOne<SsoUser>(
-    `SELECT id, name, email, role, password_hash, session_version, org_id FROM users WHERE email = ?`,
-    resolved.email,
+  // S16 (RLS 0165): chưa biết tổ chức khi IdP trả về → tra theo email (khoá duy nhất toàn hệ)
+  // trong phạm vi '*' do server đặt. Đồng bộ role / tạo mới chạy trong phạm vi org của tài khoản.
+  const existing = await withOrgScope("*", () =>
+    queryOne<SsoUser>(
+      `SELECT id, name, email, role, password_hash, session_version, org_id FROM users WHERE email = ?`,
+      resolved.email,
+    ),
   );
 
-  if (existing) {
-    // Đồng bộ role theo claim nếu khác role hiện tại. KHÔNG hạ cấp admin cuối cùng
-    // (chống tự khoá hệ thống — cùng mẫu guard app/api/users/[id]/route.ts / M50 PR1).
-    if (resolved.roleFromClaim && resolved.roleFromClaim !== existing.role) {
-      if (existing.role === "admin" && resolved.roleFromClaim !== "admin") {
-        const admins = await queryOne<{ n: number }>(
-          `SELECT COUNT(*) AS n FROM users WHERE role = 'admin'`,
-        );
-        if (Number(admins?.n) <= 1) {
-          log.warn("Bỏ qua hạ cấp admin cuối cùng theo claim SSO", {
-            route: "oidc.upsertSsoUser",
-            email: resolved.email,
-            requestedRole: resolved.roleFromClaim,
-          });
-          return existing;
-        }
-      }
-      await run(`UPDATE users SET role = ? WHERE id = ?`, resolved.roleFromClaim, existing.id);
-      return { ...existing, role: resolved.roleFromClaim };
-    }
-    return existing;
-  }
+  if (existing)
+    return withOrgScope(existing.org_id, () => dongBoRoleSso(existing, resolved), {
+      readOnly: false,
+    });
 
   // User mới: role = claim nếu có, không thì OIDC_DEFAULT_ROLE ?? 'viewer'. password_hash
   // là hash NGẪU NHIÊN — vừa thoả NOT NULL vừa để makeToken() nhúng pwFrag hoạt động;
@@ -132,17 +118,47 @@ export async function upsertSsoUser(resolved: ResolvedSsoUser): Promise<SsoUser>
   // M54 GĐ1 PR2: SSO Giai đoạn 1 là single-tenant — luồng OIDC hiện KHÔNG có cơ chế
   // chọn tổ chức lúc login (không suy org từ domain email). User SSO mới gán org mặc
   // định 1; org hoá SSO là việc theo sau khi có onboarding đa tổ chức.
-  const created = await queryOne<SsoUser>(
-    `INSERT INTO users (name, email, password_hash, role, org_id) VALUES (?, ?, ?, ?, 1)
+  const created = await withOrgScope(
+    1,
+    () =>
+      queryOne<SsoUser>(
+        `INSERT INTO users (name, email, password_hash, role, org_id) VALUES (?, ?, ?, ?, 1)
      ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
      RETURNING id, name, email, role, password_hash, session_version, org_id`,
-    resolved.name,
-    resolved.email,
-    passwordHash,
-    role,
+        resolved.name,
+        resolved.email,
+        passwordHash,
+        role,
+      ),
+    { readOnly: false },
   );
   if (!created) throw new Error("Không tạo được user SSO");
   return created;
+}
+
+// Đồng bộ role theo claim cho tài khoản SSO đã có — chạy trong phạm vi org của tài khoản, nên
+// đếm "admin cuối cùng" cũng trong tổ chức đó (D01: admin không có quyền liên tổ chức).
+async function dongBoRoleSso(existing: SsoUser, resolved: ResolvedSsoUser): Promise<SsoUser> {
+  // Đồng bộ role theo claim nếu khác role hiện tại. KHÔNG hạ cấp admin cuối cùng
+  // (chống tự khoá hệ thống — cùng mẫu guard app/api/users/[id]/route.ts / M50 PR1).
+  if (resolved.roleFromClaim && resolved.roleFromClaim !== existing.role) {
+    if (existing.role === "admin" && resolved.roleFromClaim !== "admin") {
+      const admins = await queryOne<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM users WHERE role = 'admin'`,
+      );
+      if (Number(admins?.n) <= 1) {
+        log.warn("Bỏ qua hạ cấp admin cuối cùng theo claim SSO", {
+          route: "oidc.upsertSsoUser",
+          email: resolved.email,
+          requestedRole: resolved.roleFromClaim,
+        });
+        return existing;
+      }
+    }
+    await run(`UPDATE users SET role = ? WHERE id = ?`, resolved.roleFromClaim, existing.id);
+    return { ...existing, role: resolved.roleFromClaim };
+  }
+  return existing;
 }
 
 // ===== Rate limit callback lỗi (riêng, tái dùng bảng login_rate_limits) =====
