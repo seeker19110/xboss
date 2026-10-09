@@ -16,7 +16,12 @@ import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 
 type AlertMetric =
-  "due_soon_days" | "due_soon_progress" | "material_over_pct" | "spi_below" | "cpi_below";
+  | "due_soon_days"
+  | "due_soon_progress"
+  | "material_over_pct"
+  | "spi_below"
+  | "cpi_below"
+  | "bill_unpaid_days";
 
 const ALERT_METRICS: Record<
   AlertMetric,
@@ -51,6 +56,13 @@ const ALERT_METRICS: Record<
     operator: "lt",
     defaultThreshold: 1,
     unit: "",
+  },
+  // M129: phiếu IPC đã duyệt nhưng chưa đánh dấu chi quá N ngày.
+  bill_unpaid_days: {
+    label: "Phiếu đã duyệt chưa chi quá số ngày thì cảnh báo",
+    operator: "gt",
+    defaultThreshold: 30,
+    unit: "ngày",
   },
 };
 const METRIC_KEYS = Object.keys(ALERT_METRICS) as AlertMetric[];

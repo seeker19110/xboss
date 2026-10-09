@@ -35,6 +35,7 @@ const ENTITY_LABEL: Record<string, string> = {
   contracts: "Hợp đồng",
   variation_orders: "Phát sinh (VO)",
   payment_certs: "Chứng nhận thanh toán (IPC)",
+  payment_bills: "Phiếu thanh toán",
   invoices: "Hoá đơn",
   cash_transactions: "Giao dịch quỹ tiền mặt",
   advances: "Tạm ứng",
