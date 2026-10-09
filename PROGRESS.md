@@ -1,31 +1,71 @@
 # PROGRESS — XBoss
 
-## 2026-10-09 — Sau S15: đóng các mục "còn mở" (6a–6f, 6i) + đặc tả M128/M129/M130 (ĐANG LÀM)
+## 2026-10-09 — Sau S15 (PR-A): đóng 6(a)/6(d)/6(f), A1-AC05 toàn diện, A1-AC03 null-scope, A2-AC07/08 lớp B + đặc tả M128/M129/M130
 
-Đợt làm tiếp ngay sau khi merge PR #614 theo yêu cầu "làm tiếp các việc còn mở". Mỗi việc một
-worktree/nhánh riêng, tích hợp vào nhánh này khi xong (chưa mở PR):
+Đợt làm tiếp ngay sau khi merge PR #614 ("làm tiếp các việc còn mở"). Mỗi việc một worktree/nhánh riêng,
+tích hợp vào một PR (PR-A); 6(b) RLS strict tách PR-B riêng vì có migration đụng policy (qua staging).
 
 - **Q-AC07 (6f) — xong:** `GET /api/ready` (readiness riêng, chỉ SELECT, 503 `schema_missing |
 schema_behind | db_unavailable`), `login`/`me` trả 503 JSON `schema_not_ready` + `Retry-After` khi
-  schema thiếu (trước đây 500 khung Next; không tính rate-limit, không lộ user). Helper
-  `laLoiSchemaChuaSan`/`phanHoiSchemaChuaSan` (`lib/nen/loi.ts`), `checkSchemaReady` (`lib/db`),
-  `checkReadiness` (`lib/van-hanh/health.ts`). `tests/s16-readiness.test.ts` dựng DB thật thiếu
-  schema (2/6 đỏ trên code cũ). `docs/ops/backup.md` thêm liveness vs readiness.
-- **A1-AC05/Q-AC01 (lỗi thật, đã sửa):** request đã nạp snapshot allow rồi chờ khoá; admin siết
-  override deny trong lúc đó → vẫn ghi nghiệm thu/duyệt IPC bằng snapshot cũ. Nay
-  `kiemQuyenTaiLucGhi` (`lib/bao-mat/permissions.ts`) tái kiểm trong transaction ghi dưới khoá
-  advisory chia sẻ theo org, cho ghi chỉ khi đúng ở cả snapshot cũ lẫn mới; `setPermissionOverride`
-  lấy khoá độc quyền. Áp vào approve task (POST/DELETE), `/api/approvals`, nhánh legacy decide IPC.
-  `tests/s16-stale-snapshot.test.ts` 2/6 đỏ trên code cũ, 7/7 xanh sau. Đang mở rộng ra các route
-  ghi tài chính/quản trị còn lại (worker riêng).
+  schema thiếu (trước đây 500 khung Next). Helper `laLoiSchemaChuaSan`/`phanHoiSchemaChuaSan`
+  (`lib/nen/loi.ts`), `checkSchemaReady` (`lib/db`), `checkReadiness` (`lib/van-hanh/health.ts`).
+  `tests/s16-readiness.test.ts` dựng DB thật thiếu schema (2/6 đỏ trên code cũ). `docs/ops/backup.md`
+  thêm liveness vs readiness. `/api/ready` vào WHITELIST `project-scope-invariant` (công khai, không
+  dữ liệu dự án).
+- **A1-AC05/Q-AC01 (lỗi thật, đã sửa toàn diện):** request đã nạp snapshot allow rồi chờ khoá; admin
+  siết override deny trong lúc đó → vẫn ghi bằng snapshot cũ. `kiemQuyenTaiLucGhi`
+  (`lib/bao-mat/permissions.ts`) tái kiểm trong transaction ghi dưới khoá advisory chia sẻ theo org,
+  cho ghi chỉ khi đúng ở cả snapshot cũ lẫn mới; `ghiNeuConQuyen(kiem, ghi)` bọc route chưa có
+  transaction. Phủ **72 handler**: nghiệm thu (approve task POST/DELETE, `/api/approvals`, huỷ nghiệm
+  thu tầng), decide IPC nhánh legacy, toàn bộ ghi tài chính (contracts/addenda/documents, insurance-
+  bonds, payment-certs, variations, claims, advances, cash-transactions, invoices, payroll, payments/
+  bills, costs/settings, tenders, purchase-requests) và quản trị (alert-rules, api-keys, approval-flows,
+  assignments, custom-fields, feature-flags, integrations, webhooks, user-projects, nav-settings,
+  projects, sheets). Route dùng vai trò cứng/`manageUsers` không áp (không có snapshot stale) — bảng
+  kiểm kê + lý do ở `docs/nang-cap/AUDIT-S16-QUYEN-LUC-GHI.md`. `setPermissionOverride` lấy khoá độc
+  quyền với `lock_timeout` 5s → 409 `permission_lock_busy` (admin không treo). Giới hạn ghi rõ: chỉ
+  đọc lại `role_permissions`, không đọc lại `users.role`. Test: `s16-stale-snapshot` (9 ca, 2 đỏ trên
+  code cũ), `s16-quyen-ghi-mo-rong` (8 ca, 4 đỏ trên code cũ). **Hoãn:** `insurance-bonds/[id]` PATCH
+  và `tenders/.../bids/[bidId]/file` POST (xoá file cũ trước khi ghi DB — cần sắp lại thứ tự); boq*
+  (miền khối lượng, việc riêng).
+- **A1-AC03 (lỗi thật, đã sửa — 23 route coi `projectId == null` là "không lọc"):** danh sách
+  (design-changes, gantt, schedule-control, resources, documents-hub, admin/approval-flows, admin/
+  audit-log, claims/eot-suggestion, norms/over, prefill diary) → 200 rỗng; chi tiết/ghi/export/upload
+  (design-changes/[id]+decide, systems/[code]/upload(-template), audit-log/export, system-uploads/[id]/
+  file, drawings/revisions/[id]*, meetings/[id]/actions/[aid], approvals POST) → 404; design-changes
+  POST → 422. Lỗ phụ cùng lớp: cạnh gantt 2 đầu cùng dự án, `equipmentUsageByWeek`/`listApprovalFlows`
+  lọc dự án/org, 3 khối `thong-bao.ts` truyền dự án, export/work-fronts đọc tên dự án hiện hành thay
+  "dự án đầu bảng". Chữ ký lib đổi sang `projectId: number` bắt buộc. `tests/s16-null-scope.test.ts`
+  18/18 đỏ trên code cũ. Bảng + nợ còn lại (~100 hàm lib còn nhánh null nhưng mọi route gọi đã chặn)
+  ở `docs/nang-cap/AUDIT-S16-NULL-SCOPE.md`. **Phát hiện thêm, đã sửa:** `POST /api/dimensions/rename`
+  nhận `packageId` không kiểm dự án → đổi tên cột của sheet bất kỳ (xuyên org); nay JOIN theo dự án
+  hiện hành, test hồi quy trong `route-tien-do-3`. **Phát hiện chưa sửa (nợ):** `PATCH /api/nav-
+settings` thông báo mọi PM toàn hệ; `audit_log`/`custom_field_defs` không có `org_id`; unique
+  `ux_flow_active` toàn hệ; `allocationOverNorm` tính toàn hệ; `stageMissingList` JOIN WP không ràng
+  dự án; `system-uploads` hàng `project_id NULL` legacy.
+- **6(a) cutover membership (A1-AC02) — xong theo cờ:** `XBOSS_STRICT_MEMBERSHIP=1` tắt nhánh legacy
+  "user_projects rỗng = thấy mọi dự án org" (`visibleProjectIds`, `/api/project` trả null,
+  `reportRecipients`); script dry-run chỉ-đọc liệt kê người sẽ mất quyền; runbook
+  `docs/nang-cap/AUDIT-S16-MEMBERSHIP-CUTOVER.md`. Mặc định TẮT; bật sau khi chủ dự án duyệt danh
+  sách gán. Điều kiện tiên quyết §3 (route null-scope) nay đã đóng ở mục A1-AC03 trên.
+- **A2-AC07/AC08 lớp B — xong:** `e2e/authed/offline-deep.spec.ts` (Chromium thật): legacy IDB,
+  IDB bị chặn, quota, SW restart, mất ACK — hàng đợi không mất/không nhân đôi.
+- **6(d) M130 — xong:** `scripts/retention-cleanup.ts` + `scripts/lib/retention.ts`, dry-run mặc định,
+  `--apply`, chính sách evidence PASS 35 ngày / FAIL 365 ngày, `run-*` 7/35 ngày, `--force-run`;
+  **chỉ xoá evidence nhận diện được** (có cờ `completeDrVerified`/`completePitrVerified` — JSON lạ
+  như `package.json` không đụng), từ chối `/`, `$HOME`, `BACKUP_DIR`/WAL và cả thư mục CHA của chúng,
+  `--now` không đi cùng `--apply`. `tests/retention-cleanup.test.ts` 7 ca. `docs/ops/backup.md` thay
+  `rm -rf` thủ công bằng quy trình dry-run → đọc → `--apply`.
+- **Sửa nhỏ theo review:** cache danh sách dự án khả kiến (`app/lib/duAnKhaKien.ts`) xoá khi đổi ngữ
+  cảnh org/dự án (`contextEpoch`); `tenders` POST bắt lỗi có `status`.
 - **Đặc tả mới (chủ dự án chốt 2026-10-09):** `M128` chứng từ điều chỉnh IPC (sau M129), `M129` tách
-  "đã duyệt" ≠ "đã chi" (`payment_bills.pay_status/paid_at`), `M130` retention cleanup dry-run +
-  chính sách 35/365 ngày — đều "Approved for implementation".
-- **Đang làm (worker):** 6(b) RLS bỏ nhánh GUC rỗng (migration 0165 + scope tường minh ở login/
-  cron), 6(a) cutover membership theo cờ `XBOSS_STRICT_MEMBERSHIP` + script dry-run, A2-AC07/AC08
-  e2e offline sâu (legacy IDB, blocked, quota, SW restart, mất ACK), M130 script retention,
-  mở rộng tái kiểm quyền lúc ghi. 6(i) baseline bench sẽ đo lại khi máy rảnh (lần đo đầu chạy
-  song song 5 agent → không dùng làm baseline).
+  "đã duyệt" ≠ "đã chi" (`payment_bills.pay_status/paid_at`), `M130` (đã làm ở trên) — đều "Approved
+  for implementation".
+- **Tiếp theo:** PR-B 6(b) RLS strict (migration 0165 bỏ nhánh GUC rỗng, scope `'*'` tường minh ở
+  login/cron/script; nhánh `s16-rls-strict` đã code, rebase lên main sau PR-A; Metabase view cần GUC);
+  6(i) đo lại bench baseline khi máy rảnh (`BENCH_APP_DATABASE_URL`, role app); M129 rồi M128; nợ
+  null-scope ở trên; `.env.example` (người có quyền) thêm `XBOSS_STRICT_MEMBERSHIP=0`,
+  `XBOSS_OFFLINE_KEK`, `GOOGLE_SHEET_PROJECT_ID`.
 
 ## 2026-10-09 — QUALITY-FINAL-1 S15: audit cuối và release candidate
 

@@ -498,6 +498,21 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > variations 946→267, contracts 1200→404. **Không đổi** API/schema/`lib/`/`CustomFieldsSection`.
 > Quy ước chốt trong ADR-0009 mục "DocShell cho `/claims`, `/variations`, `/contracts` — M126".
 
+## Đặc tả ĐÃ DUYỆT — sau S15 (viết + duyệt 2026-10-09)
+
+> **`M130-retention-cleanup-evidence.md`** — ✅ **Approved 2026-10-09 và ĐÃ TRIỂN KHAI XONG** (PR-A sau
+> S15). `scripts/retention-cleanup.ts` dry-run mặc định, chính sách evidence PASS 35 / FAIL 365 ngày,
+> `run-*` 7/35 ngày; chỉ xoá evidence nhận diện được, từ chối thư mục backup/WAL và thư mục cha.
+
+> **`M129-ipc-da-chi-tach-cam-ket-thuc-chi.md`** — ✅ **Approved 2026-10-09, CHƯA triển khai.**
+> `payment_bills.pay_status (committed|paid|void)` + `paid_at/paid_by/paid_ref`, `POST /api/payments/:id/pay`
+> (SoD người chi ≠ người duyệt), cost report tách `actual` (đã chi) / `approvedUnpaid`. Migration 0166
+> có UPDATE backfill → **qua staging**. Làm TRƯỚC M128.
+
+> **`M128-chung-tu-dieu-chinh-ipc.md`** — ✅ **Approved 2026-10-09, CHƯA triển khai** (sau M129).
+> Bảng `payment_cert_adjustments(+_items)`, `kind adjustment|reversal`, luồng nháp→trình→duyệt (SoD),
+> phiếu `type='adjustment'`, luỹ kế/vượt HĐ cộng adjustment approved. Migration 0167 tạo mới thuần.
+
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 
 > **M62 (`M62-rls-khoa-cua.md`)** — đóng nốt RLS: `withProjectScope` đọc-ghi + bọc 3 route còn lại (`notifications`, `payments/bills`, `payments/floors`) rồi migration "khoá cửa" bỏ nhánh thiếu-ngữ-cảnh (2 PR, `route: spec`; PR2 có điều kiện tiên quyết vận hành). **Đã xong hoàn toàn 2026-07-20** — PR1 (nhánh `claude/plan-m62-m63-7osrkh`, 2026-07-19) và PR2 (`migrations/0077_rls_lock.sql`, PR #300) đều đã merge `main`; người dùng xác nhận cả 2 điều kiện tiên quyết vận hành đủ trước khi merge PR2. Xem `PROGRESS.md`. **M63 (`M63-webhook-ssrf-dns-pinning.md`)** — chống SSRF DNS rebinding cho webhook: resolve + pin IP qua undici `connect.lookup`, mở rộng `isPrivateIp` (1 PR, `route: spec`). **Đã xong 2026-07-19** (nhánh `claude/plan-m62-m63-7osrkh`). Cả 2 sinh từ đợt đánh giá chi tiết lần 8 (`PROGRESS.md`).
