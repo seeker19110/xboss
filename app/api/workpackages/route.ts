@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   const code = String(body.code ?? "").trim();
   const name = String(body.name ?? "").trim();
   if (isNaN(sheetTypeId) || !code || !name)
-    return NextResponse.json({ error: "Thiáº¿u sheetTypeId / code / name" }, { status: 400 });
+    return NextResponse.json({ error: "Thiếu sheetTypeId / code / name" }, { status: 400 });
 
   // Chống tạo xuyên dự án: sheetTypeId phải thuộc dự án user thấy được (vá W0).
   const visible = await visibleProjectIds(user);
