@@ -5,7 +5,7 @@ import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { formatDateDMY, todayISO } from "@/lib/nen/date";
 import { showToast } from "@/app/components/Toast";
 import { HEADER_TIEN_V1, fmtDongDayDuMinor } from "@/lib/nen/money-dto";
-import { docBills, tongTien, type Bill, type BillType } from "../_components/tienThanhToan";
+import { docBills, tongBanIn, type Bill, type BillType } from "../_components/tienThanhToan";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -21,10 +21,11 @@ type ProjectInfo = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-// Chứng từ in: đồng đầy đủ (giữ xu khi khác 0), định dạng bằng bigint — không qua float.
+// Chứng từ in: đồng đầy đủ (giữ xu khi khác 0), định dạng bằng bigint — không qua float. Số âm
+// (phiếu điều chỉnh IPC giảm, M128) in dấu "−" chữ trước trị tuyệt đối.
 function fmtVND(minor: bigint) {
   if (minor === 0n) return "—";
-  return fmtDongDayDuMinor(minor);
+  return minor < 0n ? `−${fmtDongDayDuMinor(-minor)}` : fmtDongDayDuMinor(minor);
 }
 
 // ── Print Page ─────────────────────────────────────────────────────────────────
@@ -80,8 +81,8 @@ export default function PrintPage() {
       const filtered = all.filter(
         (b) => b.responsible === person && (period ? b.period === period : true),
       );
-      // Sắp xếp: bill trước, item sau, advance; phiếu điều chỉnh IPC (M128) cuối — phiếu in
-      // theo người/kỳ không có mục cho loại này (giữ nguyên các mục A/B/tạm ứng).
+      // Sắp xếp: bill trước, item sau, advance; phiếu điều chỉnh IPC (M128) cuối — mục A của
+      // bản in gồm cả phiếu điều chỉnh (tongBanIn), bỏ phiếu đã huỷ (void).
       const order: Record<BillType, number> = { bill: 0, item: 1, advance: 2, adjustment: 3 };
       filtered.sort((a, b) => order[a.type] - order[b.type]);
       setBills(filtered);
@@ -105,20 +106,19 @@ export default function PrintPage() {
       </div>
     );
 
-  const billRows = bills.filter((b) => b.type === "bill");
-  const itemRows = bills.filter((b) => b.type === "item");
-  const advances = bills.filter((b) => b.type === "advance");
+  // S10c/M128: mục + tổng bằng bigint đồng×100 (exact) — cùng quy tắc KPI /payments: phiếu void
+  // (đợt đã huỷ hiệu lực) không in/không cộng, phiếu điều chỉnh IPC ± vào mục A.
+  const {
+    mucA: billRows,
+    mucB: itemRows,
+    tamUng: advances,
+    gtthtc,
+    tuAmount,
+    gtttk,
+  } = tongBanIn(bills);
 
   // Lấy ngày bill đầu tiên (hoặc hôm nay)
   const billDate = bills[0]?.paidDate ?? todayISO();
-
-  // Tính toán
-  // S10c: cộng/trừ bằng bigint đồng×100 (exact), không float.
-  const sumA = tongTien(billRows, (b) => b.amount); // Section A
-  const sumB = tongTien(itemRows, (b) => b.amount); // Section B (khấu trừ)
-  const gtthtc = sumA; // Tổng GT công việc hoàn thành
-  const tuAmount = tongTien(advances, (b) => b.amount); // Tạm ứng
-  const gtttk = gtthtc - sumB - tuAmount; // Được TT kỳ này
 
   async function uploadLogo(file: File) {
     if (!file.type.startsWith("image/")) {
@@ -285,6 +285,9 @@ export default function PrintPage() {
                 <tr key={b.id} className="hover:bg-yellow-50">
                   <td className="border border-black px-1 py-1.5 text-center">{stt}</td>
                   <td className="border border-black px-2 py-1.5">
+                    {b.type === "adjustment" && (
+                      <span className="font-semibold">[Điều chỉnh IPC] </span>
+                    )}
                     {b.description ??
                       b.workPackageName ??
                       ([b.sheetCode, b.floorLabel ? `tầng ${b.floorLabel}` : ""]
@@ -299,7 +302,9 @@ export default function PrintPage() {
                   <td className="border border-black px-2 py-1.5 text-right">
                     {b.labor != null && b.labor > 0n ? fmtVND(b.labor) : "—"}
                   </td>
-                  <td className="border border-black px-2 py-1.5 text-right font-medium">
+                  <td
+                    className={`border border-black px-2 py-1.5 text-right font-medium ${b.amount < 0n ? "text-red-700" : ""}`}
+                  >
                     {fmtVND(b.amount)}
                   </td>
                   <td className="border border-black px-2 py-1.5 text-[11px]">{b.note ?? ""}</td>

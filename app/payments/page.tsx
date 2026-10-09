@@ -33,6 +33,7 @@ import {
   docFloors,
   fmtFull,
   fmtVND,
+  fmtVNDCoDau,
   phanTram,
   thanhTienTheoPct,
   tienNhapGuiServer,
@@ -1029,14 +1030,32 @@ function BillsSection({
                     (f) => f.sheetTypeId === b.sheetTypeId && f.floorLabel === b.floorLabel,
                   );
                   const isExp = expandHist === b.id;
+                  // M128: phiếu sinh từ chứng từ điều chỉnh IPC — chỉ đọc (API cũng chặn 409).
+                  const laDieuChinh = b.type === "adjustment";
+                  const daHuy = b.payStatus === "void";
+                  const suaDuoc = canEdit && !laDieuChinh;
                   return (
                     <>
-                      <tr key={b.id} className="border-b border-zinc-800/40 hover:bg-zinc-800/20">
+                      <tr
+                        key={b.id}
+                        data-loai-phieu={b.type}
+                        className="border-b border-zinc-800/40 hover:bg-zinc-800/20"
+                      >
                         <td className="px-1 py-1.5 text-center text-zinc-500">{i + 1}</td>
-                        <td className="px-2 py-1.5 font-medium text-zinc-200">
+                        <td
+                          className={`px-2 py-1.5 font-medium ${daHuy ? "line-through text-zinc-500" : "text-zinc-200"}`}
+                        >
                           {b.floorLabel ?? b.description ?? "Thanh toán tiến độ"}
                           {b.period && (
                             <span className="ml-1.5 text-[10px] text-zinc-500">[{b.period}]</span>
+                          )}
+                          {laDieuChinh && (
+                            <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <Chip tone={b.amount < 0n ? "danger" : "info"}>Điều chỉnh IPC</Chip>
+                              <span className="text-[10px] font-normal text-zinc-400">
+                                Sinh từ chứng từ điều chỉnh
+                              </span>
+                            </span>
                           )}
                         </td>
                         <td className="px-1 py-1.5 text-center text-zinc-400">
@@ -1048,7 +1067,7 @@ function BillsSection({
                         <td className="px-1 py-1.5 text-center text-zinc-300 tabular-nums">
                           {b.pctThisPeriod > 0 ? `${Math.round(b.pctThisPeriod * 100)}%` : "—"}
                         </td>
-                        {canEdit ? (
+                        {suaDuoc ? (
                           <>
                             <td className="px-1 py-1">
                               <input
@@ -1109,8 +1128,16 @@ function BillsSection({
                             </td>
                           </>
                         )}
-                        <td className="px-2 py-1.5 text-right text-sky-300 font-semibold tabular-nums">
-                          {fmtVND(b.amount)}
+                        <td
+                          className={`px-2 py-1.5 text-right font-semibold tabular-nums ${
+                            daHuy
+                              ? "line-through text-zinc-500"
+                              : b.amount < 0n
+                                ? "text-rose-300"
+                                : "text-sky-300"
+                          }`}
+                        >
+                          {fmtVNDCoDau(b.amount)}
                         </td>
                         <td className="px-2 py-1.5">
                           {fl && (
@@ -1151,13 +1178,15 @@ function BillsSection({
                         </td>
                         {canEdit && (
                           <td className="px-1 py-1.5 text-center">
-                            <button
-                              aria-label="Xoá"
-                              onClick={() => onDelete(b.id)}
-                              className="text-zinc-700 hover:text-red-400"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {suaDuoc && (
+                              <button
+                                aria-label="Xoá"
+                                onClick={() => onDelete(b.id)}
+                                className="text-zinc-700 hover:text-red-400"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </td>
                         )}
                       </tr>

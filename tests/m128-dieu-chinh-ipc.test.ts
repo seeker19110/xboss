@@ -17,8 +17,9 @@ import { todayISO } from "@/lib/nen/date";
 // M128 — chứng từ điều chỉnh / huỷ hiệu lực IPC đã duyệt (docs/nang-cap/M128-chung-tu-dieu-chinh-
 // ipc.md §4). Mọi bước người dùng đi qua ROUTE HANDLER THẬT (lập/sửa/trình/duyệt IPC + chứng từ
 // điều chỉnh, đánh dấu chi, báo cáo chi phí, hộp thư duyệt); luỹ kế hợp đồng đối chiếu ORACLE SQL
-// độc lập (Σ KL kỳ của mọi đợt đã duyệt + Σ KL điều chỉnh đã duyệt — khác cách tính "snapshot đợt
-// mới nhất" của lib). Tiền so bằng CHUỖI exact.
+// độc lập (theo từng dòng BOQ: (Σ KL kỳ của mọi đợt đã duyệt + Σ KL điều chỉnh đã duyệt) × đơn giá
+// đợt đã duyệt mới nhất của dòng — khác cách đọc "luỹ kế lưu của đợt mới nhất" của lib). Tiền so
+// bằng CHUỖI exact.
 //
 // Ca (2) và (3) đã được thấy ĐỎ trên code cũ: trước M128 các route /adjustments không tồn tại
 // (import lỗi), và khi bỏ phần cộng điều chỉnh khỏi SQL luỹ kế (paymentcerts.ts) thì (2)(3) đỏ ở
@@ -168,17 +169,35 @@ async function luyKeLib(contractId: number): Promise<string> {
   return moneyToDecimal(await contractCumulativeValue(contractId));
 }
 
-/** ORACLE độc lập: Σ KL kỳ × giá của MỌI đợt đã duyệt + Σ KL điều chỉnh × giá đã duyệt. */
+/**
+ * ORACLE độc lập luỹ kế HĐ (định giá theo đợt mới nhất — cùng ngữ nghĩa luỹ kế hiệu lực của đợt):
+ * mỗi dòng BOQ có trong đợt đã duyệt = (Σ KL kỳ của MỌI đợt đã duyệt + Σ KL điều chỉnh đã duyệt)
+ * × đơn giá của đợt đã duyệt MỚI NHẤT chứa dòng; cộng NUMERIC rồi làm tròn 2 số lẻ một lần. Không
+ * dùng `qty_cumulative` lưu (lib dùng), nên lệch cách cộng là lộ.
+ */
 async function luyKeOracle(contractId: number): Promise<string> {
   const { queryOne } = await import("@/lib/db");
   const r = await queryOne<{ v: string }>(
-    `SELECT ROUND(COALESCE((SELECT SUM(i.qty_period * i.unit_price)
-                              FROM payment_cert_items i JOIN payment_certs c ON c.id = i.cert_id
-                             WHERE c.contract_id = ? AND c.status = 'approved'), 0)
-                + COALESCE((SELECT SUM(ai.qty_delta * ai.unit_price)
-                              FROM payment_cert_adjustment_items ai
-                              JOIN payment_cert_adjustments a ON a.id = ai.adjustment_id
-                             WHERE a.contract_id = ? AND a.status = 'approved'), 0), 2)::text AS v`,
+    `SELECT ROUND(COALESCE(SUM(
+              ((SELECT SUM(i.qty_period) FROM payment_cert_items i
+                  JOIN payment_certs c ON c.id = i.cert_id
+                 WHERE c.contract_id = ? AND c.status = 'approved'
+                   AND i.boq_item_id = d.boq_item_id)
+               + COALESCE((SELECT SUM(ai.qty_delta) FROM payment_cert_adjustment_items ai
+                             JOIN payment_cert_adjustments a ON a.id = ai.adjustment_id
+                            WHERE a.contract_id = ? AND a.status = 'approved'
+                              AND ai.boq_item_id = d.boq_item_id), 0))
+              * (SELECT i.unit_price FROM payment_cert_items i
+                   JOIN payment_certs c ON c.id = i.cert_id
+                  WHERE c.contract_id = ? AND c.status = 'approved'
+                    AND i.boq_item_id = d.boq_item_id
+                  ORDER BY c.period_no DESC LIMIT 1)
+            ), 0), 2)::text AS v
+       FROM (SELECT DISTINCT i.boq_item_id FROM payment_cert_items i
+               JOIN payment_certs c ON c.id = i.cert_id
+              WHERE c.contract_id = ? AND c.status = 'approved') d`,
+    contractId,
+    contractId,
     contractId,
     contractId,
   );
@@ -222,13 +241,14 @@ let fHienTai: SoFixture | null = null;
 /**
  * Số chốt cho ca "tạm ứng 10% / giữ lại 5%": đợt 10 × 1000. Quyết định 2026-10-09 (M128 §6, mục
  * 11): phiếu sinh từ chứng từ điều chỉnh tính RÒNG cùng ipc-sum-v1 — +2 × 1000 = 2000 gộp → phiếu
- * 2000 − 200 − 100 = 1700; giá trị chứng từ `adjustment` vẫn là KL × giá (gộp). Reversal = −Σ phiếu
- * còn hiệu lực (8500 + 1700). Trước quyết định: phiếu điều chỉnh 2000 (gộp), reversal −10500.
+ * 2000 − 200 − 100 = 1700. Giá trị CHỨNG TỪ luôn GỘP (KL × giá, khuôn IPC: periodValue gộp cho
+ * ngưỡng duyệt, approvedValue ròng cho phiếu): điều chỉnh +2000; reversal = −(giá trị gộp của đợt
+ * + Σ điều chỉnh gộp đã duyệt) = −(10000 + 2000). Bản trước lấy reversal = −Σ phiếu ròng −10200.
  */
 const KY_VONG_TAM_UNG_GIU_LAI = {
   goc: [["bill", "8500.00", "committed"]],
   dieuChinh: "2000.00",
-  reversal: "-10200.00",
+  reversal: "-12000.00",
   truocHuy: [
     ["bill", "8500.00", "committed"],
     ["adjustment", "1700.00", "committed"],
@@ -338,11 +358,14 @@ test(
         ["approved", null, c.admin.id, todayISO(), "-12345.60"],
       );
       const xem = await xemDot(cert);
+      // Gộp: chênh lệch giá trị chứng từ; ròng: tiền phiếu điều chỉnh (phiếu gốc void, không
+      // phiếu âm → 0).
       assert.deepEqual(xem.body!.adjustmentsSummary, {
         open: 0,
         approvedCount: 1,
         reversed: true,
-        netAmount: "-12345.60",
+        grossAmount: "-12345.60",
+        netBillAmount: "0.00",
       });
       // Không chỉnh sửa lịch sử: dòng KL + trạng thái đợt gốc giữ nguyên; audit có vết.
       const cert0 = (xem.body!.cert as Record<string, unknown>).status;
@@ -388,6 +411,12 @@ test(
       );
       const ds = await dsDC(cert);
       assert.equal((ds.body!.adjustments as Record<string, unknown>[])[0].billId, ps[1].id);
+      const tomTat = (await xemDot(cert)).body!.adjustmentsSummary as Record<string, unknown>;
+      assert.deepEqual(
+        [tomTat.grossAmount, tomTat.netBillAmount],
+        ["-12345.60", "-12345.60"],
+        "gộp = −giá trị đợt; ròng = phiếu âm bù phần đã chi",
+      );
       assert.equal(await luyKeLib(c.contractId), await luyKeOracle(c.contractId));
       assert.equal(await luyKeLib(c.contractId), "0.00");
       assert.deepEqual(await tongChiPhi(), { actual: "12345.60", approvedUnpaid: "-12345.60" });
@@ -711,6 +740,15 @@ test(
         ),
         1,
       );
+      // Snapshot quyết định chốt quy tắc tiền v2: amount chứng từ GỘP, phiếu RÒNG (ghi cả hai).
+      const { queryOne } = await import("@/lib/db");
+      const snap = await queryOne<{ s: Record<string, unknown> }>(
+        `SELECT snapshot AS s FROM payment_cert_adjustment_decisions WHERE adjustment_id = ?`,
+        id,
+      );
+      assert.equal(snap!.s.moneyRule, "adj-sum-v2");
+      assert.equal(snap!.s.amount, "2000.00");
+      assert.equal(snap!.s.billAmount, "2000.00");
       assert.equal((await quyetDC(id, {}, "khong-phai-uuid")).status, 422);
     } finally {
       await f.don();
@@ -989,6 +1027,11 @@ test(
       assert.equal(r.status, 409, JSON.stringify(r.body));
       assert.equal(r.body?.code, "adjustment_required");
       assert.match(r.body?.error as string, /chứng từ điều chỉnh/);
+      // L1: không hứa "điều chỉnh xong thì xoá được" — huỷ hiệu lực chỉ biến dòng thành hồ sơ
+      // lưu trữ, dòng vẫn không xoá được.
+      assert.match(r.body?.error as string, /huỷ hiệu lực/);
+      assert.match(r.body?.error as string, /hồ sơ lưu trữ/);
+      assert.doesNotMatch(r.body?.error as string, /cho đợt đó trước/);
       assert.equal(r.body?.linkUrl, `/payment-certs?contractId=${c.contractId}&id=${cert}`);
     } finally {
       await f.don();
@@ -1307,9 +1350,16 @@ test(
         (ds.body!.adjustments as Record<string, unknown>[]).map((x) => [x.id, x.amount]),
       );
       const truocHuy = (await phieu(cert)).map((p) => [p.type, p.amount, p.payStatus]);
+      const tomTat = async () => {
+        const t = (await xemDot(cert)).body!.adjustmentsSummary as Record<string, unknown>;
+        return [t.grossAmount, t.netBillAmount];
+      };
+      assert.deepEqual(await tomTat(), ["2000.00", "1700.00"], "gộp ≠ ròng khi có tạm ứng");
       assert.equal((await trinhDC(rev.body!.id as number)).status, 200);
       await f.vao(c.admin, c.projectId);
       assert.equal((await quyetDC(rev.body!.id as number, { decision: "approved" })).status, 200);
+      // Sau huỷ: chênh lệch gộp = −giá trị gộp của đợt (đợt hết hiệu lực); mọi phiếu void → 0.
+      assert.deepEqual(await tomTat(), ["-10000.00", "0.00"]);
       const thucTe = {
         goc,
         dieuChinh: amounts[dc],
@@ -1564,6 +1614,311 @@ test(
         "chứng từ vẫn chờ duyệt",
       );
       assert.equal((await phieu(dot)).length, 0, "không sinh phiếu");
+    } finally {
+      await f.don();
+    }
+  },
+);
+
+// ── Hậu audit vòng 2 (2026-10-09): gộp/ròng, đơn giá theo đợt mới nhất, trigger, SoD đa tổ chức ──
+
+/** Luỹ kế (gộp) của đợt qua route chi tiết — chuỗi exact. */
+async function luyKeDotRoute(certId: number): Promise<string> {
+  const xem = await xemDot(certId);
+  assert.equal(xem.status, 200, JSON.stringify(xem.body));
+  return (xem.body!.totals as Record<string, string>).cumulativeValue;
+}
+
+async function doiDonGiaBoq(boqId: number, unitPrice: string) {
+  const { PATCH } = await import("@/app/api/boq/[id]/route");
+  const r = await goi(requestRieng(() => PATCH(jreq(`/x`, { unitPrice }, "PATCH"), P(boqId))));
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+}
+
+test(
+  "M128 H1: đổi đơn giá BOQ giữa đợt 1 và 2 — điều chỉnh/huỷ hiệu lực đợt 1 → luỹ kế HĐ = luỹ kế đợt mới nhất = oracle (định giá theo đợt mới nhất)",
+  S,
+  async () => {
+    const f = (fHienTai = new SoFixture());
+    try {
+      const c = await dungDuAn(f, 1000000);
+      const a = await taoBoq(c.contractId, "1000");
+      const dot1 = await dotDaDuyet(c.contractId, [{ boqItemId: a, qtyPeriod: 10 }]);
+      await doiDonGiaBoq(a, "1500");
+      const dot2 = await dotDaDuyet(c.contractId, [{ boqItemId: a, qtyPeriod: 5 }]);
+      // Trước điều chỉnh: 15 × 1500 (đơn giá đợt mới nhất) — cả ba cách đọc khớp nhau.
+      assert.equal(await luyKeLib(c.contractId), "22500.00");
+      assert.equal(await luyKeDotRoute(dot2), "22500.00");
+      assert.equal(await luyKeOracle(c.contractId), "22500.00");
+
+      // Điều chỉnh −2 trên đợt 1 (đơn giá đợt 1 = 1000): chứng từ gộp −2000 theo giá đợt gốc,
+      // nhưng luỹ kế HĐ định giá theo đợt mới nhất: (15 − 2) × 1500 = 19500 (không phải 20500).
+      const id = await dcDaDuyet(c, dot1, {
+        kind: "adjustment",
+        reason: LY_DO,
+        items: [{ boqItemId: a, qtyDelta: "-2" }],
+      });
+      const ds = await dsDC(dot1);
+      const adj = (ds.body!.adjustments as Record<string, unknown>[]).find((x) => x.id === id)!;
+      assert.equal(adj.amount, "-2000.00");
+      assert.equal(await luyKeDotRoute(dot2), "19500.00");
+      assert.equal(await luyKeLib(c.contractId), "19500.00", "luỹ kế HĐ = luỹ kế đợt mới nhất");
+      assert.equal(await luyKeOracle(c.contractId), "19500.00", "oracle SQL");
+
+      // Huỷ hiệu lực đợt 1 sau đổi giá: amount = −(10000 + (−2000)) gộp theo giá đợt 1; luỹ kế HĐ
+      // còn KL của đợt 2: 5 × 1500.
+      await f.vao(c.pm, c.projectId);
+      const rev = await lapDC(dot1, { kind: "reversal", reason: LY_DO });
+      assert.equal(rev.status, 201, JSON.stringify(rev.body));
+      assert.equal(rev.body!.amount, "-8000.00");
+      const revId = rev.body!.id as number;
+      assert.equal((await trinhDC(revId)).status, 200);
+      await f.vao(c.admin, c.projectId);
+      assert.equal((await quyetDC(revId, { decision: "approved" })).status, 200);
+      assert.equal(await luyKeDotRoute(dot2), "7500.00");
+      assert.equal(await luyKeLib(c.contractId), "7500.00");
+      assert.equal(await luyKeOracle(c.contractId), "7500.00", "oracle SQL");
+      assert.deepEqual(
+        (await phieu(dot1)).map((p) => [p.type, p.amount, p.payStatus]),
+        [
+          ["bill", "10000.00", "void"],
+          ["adjustment", "-2000.00", "void"],
+        ],
+      );
+    } finally {
+      await f.don();
+    }
+  },
+);
+
+test(
+  "M128 L2: phiếu điều chỉnh RÒNG lấy tỷ lệ tạm ứng/giữ lại từ snapshot quyết định IPC gốc, không theo tỷ lệ HĐ đã sửa sau",
+  S,
+  async () => {
+    const f = (fHienTai = new SoFixture());
+    try {
+      const c = await dungDuAn(f, 1000000, { advancePct: 10, retentionPct: 5 });
+      const a = await taoBoq(c.contractId, "1000");
+      const cert = await dotDaDuyet(c.contractId, [{ boqItemId: a, qtyPeriod: 10 }]);
+      // PM sửa tỷ lệ HĐ SAU khi đợt đã duyệt (route thật).
+      const { PATCH } = await import("@/app/api/contracts/[id]/route");
+      const sua = await goi(
+        requestRieng(() =>
+          PATCH(jreq(`/x`, { advancePct: 20, retentionPct: 0 }, "PATCH"), P(c.contractId)),
+        ),
+      );
+      assert.equal(sua.status, 200, JSON.stringify(sua.body));
+      await dcDaDuyet(c, cert, {
+        kind: "adjustment",
+        reason: LY_DO,
+        items: [{ boqItemId: a, qtyDelta: "2" }],
+      });
+      // Tỷ lệ của đợt gốc (10%/5%): 2000 − 200 − 100 = 1700 (tỷ lệ HĐ mới 20%/0% sẽ ra 1600).
+      assert.deepEqual(
+        (await phieu(cert)).map((p) => [p.type, p.amount]),
+        [
+          ["bill", "8500.00"],
+          ["adjustment", "1700.00"],
+        ],
+      );
+    } finally {
+      await f.don();
+    }
+  },
+);
+
+test(
+  "M128 fix DB vòng 2: trigger — INSERT chứng từ phải là nháp sạch; đã trình chỉ đổi giá trị; nháp không mang quyết định (role xboss_app)",
+  S,
+  async () => {
+    const f = (fHienTai = new SoFixture());
+    try {
+      const c = await dungDuAn(f, 1000000);
+      const a = await taoBoq(c.contractId, "1000");
+      const cert = await dotDaDuyet(c.contractId, [{ boqItemId: a, qtyPeriod: 10 }]);
+      const { withTransaction, run, queryOne } = await import("@/lib/db");
+      // Chạy như ứng dụng thật: role xboss_app (không sở hữu bảng) + GUC đúng dự án.
+      const nhuApp = <T>(fn: () => Promise<T>) =>
+        withTransaction(async () => {
+          await run(`SET LOCAL ROLE xboss_app`);
+          await run(
+            `SELECT set_config('app.org_id', '1', true), set_config('app.project_id', ?, true),
+                    set_config('xboss.bao_tri_chung_tu', 'on', true)`,
+            String(c.projectId),
+          );
+          return fn();
+        });
+      const chen = (cot: string, giaTri: string, ...thamSo: unknown[]) =>
+        nhuApp(() =>
+          run(
+            `INSERT INTO payment_cert_adjustments
+               (code, cert_id, contract_id, project_id, kind, reason, amount, created_by${cot})
+             VALUES (?, ?, ?, ?, 'adjustment', ?, 0, ?${giaTri})`,
+            uniq("ADJ-TRG-"),
+            cert,
+            c.contractId,
+            c.projectId,
+            LY_DO,
+            c.pm.id,
+            ...thamSo,
+          ),
+        );
+      // Bỏ qua luồng nháp → trình → duyệt: chèn thẳng chứng từ đã duyệt / mang người quyết định /
+      // gắn phiếu → bị chặn (cờ bảo trì vô hiệu với xboss_app).
+      const NHAP = /phải là nháp/;
+      await assert.rejects(chen(", status", ", 'approved'"), NHAP);
+      await assert.rejects(chen(", status", ", 'submitted'"), NHAP);
+      await assert.rejects(
+        chen(", decided_by, decided_at", ", ?, ?", c.admin.id, todayISO()),
+        NHAP,
+      );
+      const [goc] = await phieu(cert);
+      await assert.rejects(chen(", bill_id", ", ?", goc.id), NHAP);
+      // Nháp sạch → được (đúng đường taoDieuChinh).
+      await chen("", "");
+      const nhap = await queryOne<{ id: number }>(
+        `SELECT id FROM payment_cert_adjustments WHERE cert_id = ? AND status = 'draft'`,
+        cert,
+      );
+      assert.ok(nhap);
+      // Nháp không được mang người quyết định / phiếu.
+      await assert.rejects(
+        nhuApp(() =>
+          run(
+            `UPDATE payment_cert_adjustments SET decided_by = ? WHERE id = ?`,
+            c.admin.id,
+            nhap!.id,
+          ),
+        ),
+        /quyết định/,
+      );
+      await assert.rejects(
+        nhuApp(() =>
+          run(`UPDATE payment_cert_adjustments SET bill_id = ? WHERE id = ?`, goc.id, nhap!.id),
+        ),
+        /quyết định/,
+      );
+      await nhuApp(() => run(`DELETE FROM payment_cert_adjustments WHERE id = ?`, nhap!.id));
+
+      // Đã trình: chỉ đổi được giá trị (chốt lại trong SQL lúc duyệt) — đổi lý do bị chặn.
+      await f.vao(c.pm, c.projectId);
+      const lap = await lapDC(cert, {
+        kind: "adjustment",
+        reason: LY_DO,
+        items: [{ boqItemId: a, qtyDelta: "1" }],
+      });
+      assert.equal(lap.status, 201, JSON.stringify(lap.body));
+      const id = lap.body!.id as number;
+      assert.equal((await trinhDC(id)).status, 200);
+      await assert.rejects(
+        nhuApp(() =>
+          run(`UPDATE payment_cert_adjustments SET reason = ? WHERE id = ?`, LY_DO + " sửa", id),
+        ),
+        /đã trình/,
+      );
+      await nhuApp(() =>
+        run(`UPDATE payment_cert_adjustments SET amount = amount WHERE id = ?`, id),
+      );
+      // Luồng thật vẫn chạy: duyệt (chotGiaTri trên chứng từ đã trình + chuyển trạng thái).
+      await f.vao(c.admin, c.projectId);
+      assert.equal((await quyetDC(id, { decision: "approved" })).status, 200);
+    } finally {
+      await f.don();
+    }
+  },
+);
+
+test(
+  "M128 LOW-3: báo cáo SoD chỉ trả vi phạm chứng từ điều chỉnh của đúng tổ chức",
+  S,
+  async () => {
+    const f = (fHienTai = new SoFixture());
+    const { insertId, run, queryOne } = await import("@/lib/db");
+    const orgA = await insertId(`INSERT INTO organizations (name) VALUES (?)`, uniq("M128 SoD A "));
+    const orgB = await insertId(`INSERT INTO organizations (name) VALUES (?)`, uniq("M128 SoD B "));
+    const duAn: number[] = [];
+    try {
+      // Mỗi tổ chức 1 vi phạm "cùng người lập + quyết định" (dữ liệu lọt ngoài route).
+      const viPham: number[] = [];
+      for (let i = 0; i < 2; i++) {
+        const c = await dungDuAn(f, 1000000);
+        duAn.push(c.projectId);
+        const a = await taoBoq(c.contractId, "1000");
+        const cert = await dotDaDuyet(c.contractId, [{ boqItemId: a, qtyPeriod: 10 }]);
+        const lap = await lapDC(cert, {
+          kind: "adjustment",
+          reason: LY_DO,
+          items: [{ boqItemId: a, qtyDelta: "1" }],
+        });
+        const id = lap.body!.id as number;
+        assert.equal((await trinhDC(id)).status, 200);
+        await run(
+          `UPDATE payment_cert_adjustments
+              SET status = 'approved', decided_by = created_by, decided_at = ?
+            WHERE id = ?`,
+          todayISO(),
+          id,
+        );
+        viPham.push(id);
+      }
+      await run(`UPDATE projects SET org_id = ? WHERE id = ?`, orgA, duAn[0]);
+      await run(`UPDATE projects SET org_id = ? WHERE id = ?`, orgB, duAn[1]);
+      const { buildSodReport } = await import("@/lib/bao-mat/sod");
+      const cuaOrg = async (org: number) =>
+        (await buildSodReport(90, org))
+          .find((r) => r.rule === "create_and_approve")!
+          .violations.filter((v) => v.source === "payment_cert_adjustment")
+          .map((v) => v.entityId);
+      assert.deepEqual(await cuaOrg(orgA), [viPham[0]]);
+      assert.deepEqual(await cuaOrg(orgB), [viPham[1]]);
+      const org1 = await cuaOrg(1);
+      assert.ok(!org1.includes(viPham[0]) && !org1.includes(viPham[1]), "org 1 không thấy");
+      assert.ok(await queryOne(`SELECT 1 FROM organizations WHERE id = ?`, orgA));
+    } finally {
+      for (const p of duAn) await run(`UPDATE projects SET org_id = 1 WHERE id = ?`, p);
+      await f.don();
+      await run(`DELETE FROM organizations WHERE id IN (?, ?)`, orgA, orgB);
+    }
+  },
+);
+
+test(
+  "M128 M2: phiếu sinh từ chứng từ điều chỉnh CHỈ ĐỌC — PATCH KL/tiền/ĐVT/nhân công → 409 bill_adjustment_locked, DELETE → 409 bill_ipc_locked",
+  S,
+  async () => {
+    const f = (fHienTai = new SoFixture());
+    try {
+      const c = await dungDuAn(f, 1000000);
+      const a = await taoBoq(c.contractId, "1000");
+      const cert = await dotDaDuyet(c.contractId, [{ boqItemId: a, qtyPeriod: 10 }]);
+      await dcDaDuyet(c, cert, {
+        kind: "adjustment",
+        reason: LY_DO,
+        items: [{ boqItemId: a, qtyDelta: "-1" }],
+      });
+      const dc = (await phieu(cert)).find((p) => p.type === "adjustment")!;
+      const { PATCH, DELETE } = await import("@/app/api/payments/bills/[id]/route");
+      for (const body of [
+        { quantity: 5 },
+        { amount: "1.00" },
+        { labor: "100.00" },
+        { unit: "m" },
+      ]) {
+        const r = await goi(requestRieng(() => PATCH(jreq(`/x`, body, "PATCH"), P(dc.id))));
+        assert.equal(r.status, 409, `${JSON.stringify(body)} → ${JSON.stringify(r.body)}`);
+        assert.equal(r.body?.code, "bill_adjustment_locked");
+      }
+      const xoa = await goi(requestRieng(() => DELETE(jreq(`/x`, undefined, "DELETE"), P(dc.id))));
+      assert.equal(xoa.status, 409);
+      assert.equal(xoa.body?.code, "bill_ipc_locked");
+      const sau = (await phieu(cert)).find((p) => p.id === dc.id)!;
+      assert.deepEqual([sau.amount, sau.payStatus], ["-1000.00", "committed"]);
+      const { queryOne } = await import("@/lib/db");
+      const kl = await queryOne<{ q: string | null; u: string | null }>(
+        `SELECT quantity::text AS q, unit AS u FROM payment_bills WHERE id = ?`,
+        dc.id,
+      );
+      assert.deepEqual(kl, { q: null, u: "LS" }, "không ghi gì (ĐVT mặc định giữ nguyên)");
     } finally {
       await f.don();
     }

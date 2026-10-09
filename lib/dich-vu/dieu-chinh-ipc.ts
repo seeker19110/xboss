@@ -5,7 +5,8 @@
 //   * Đợt IPC gốc đã đi qua engine (có approval_request 'payment_cert') VÀ dự án còn flow
 //     'payment_cert' active → chứng từ mở request 'payment_cert_adjustment' theo đúng flow đó lúc
 //     TRÌNH; quyết định đi `advanceApproval` (quyền theo bước + SoD người tạo request). Ngưỡng
-//     min_amount so theo |amount| (reversal âm vẫn phải qua bước cấp cao như giá trị dương).
+//     min_amount so theo |amount| GỘP (khuôn IPC so periodValue gộp; reversal âm vẫn phải qua bước
+//     cấp cao như giá trị dương) — tiền phiếu ròng không dùng cho ngưỡng.
 //   * Ngược lại → quyết định trực tiếp: CAN.approve (Admin/PM), tái kiểm lúc ghi.
 //   * Mọi trường hợp: người quyết định ≠ người lập (= người trình) → 403 sod_same_actor.
 import { query, queryOne } from "@/lib/db";
@@ -34,7 +35,7 @@ export const ENTITY_DIEU_CHINH = "payment_cert_adjustment";
 
 type Actor = { id: number; role: Role };
 
-/** |amount| dạng number cho engine so ngưỡng (approval_requests.amount NUMERIC(15,2)). */
+/** |amount| GỘP dạng number cho engine so ngưỡng (approval_requests.amount NUMERIC(15,2)). */
 function amountChoEngine(amountText: string): number {
   const minor = parseMoneyExact(amountText);
   try {

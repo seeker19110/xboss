@@ -2,7 +2,7 @@
 // test được không cần render. QUALITY-FINAL-1 S10a: client CHỌN decimal-string-v1 nên tổng tiền
 // về dạng chuỗi canonical exact (không bao giờ dính 422 money_precision_unsupported của định
 // dạng number cũ) và hiển thị bằng bigint, không qua float.
-import { mulRatio, parseMoneyExact } from "@/lib/nen/money";
+import { isCanonicalDecimal, moneyToDecimal, mulRatio, parseMoneyExact } from "@/lib/nen/money";
 import type { EntityApprovalStatus } from "@/lib/tien-do/approvals";
 
 /** Header + giá trị opt-in (A3-FR06) — trùng hằng trong lib/nen/money, ghi rõ ở nơi gọi fetch. */
@@ -26,13 +26,33 @@ export type DongVuot = {
   qtyCumulative: number;
 };
 
-/** M128: tóm tắt chứng từ điều chỉnh của đợt (GET /api/payment-certs/:id). */
+/**
+ * M128: tóm tắt chứng từ điều chỉnh của đợt (GET /api/payment-certs/:id). Tiền null = bị che.
+ * grossAmount = chênh lệch giá trị GỘP (Σ chứng từ đã duyệt, KL × giá); netBillAmount = tiền
+ * phiếu điều chỉnh RÒNG (sau tạm ứng/giữ lại) chưa huỷ.
+ */
 export type TomTatDieuChinhDot = {
   open: number;
   approvedCount: number;
   reversed: boolean;
-  netAmount?: string | number | null;
+  grossAmount?: string | number | null;
+  netBillAmount?: string | number | null;
 };
+
+/**
+ * Giá trị HIỆU LỰC (gộp) hiện tại của đợt = giá trị kỳ (periodValue) + Σ điều chỉnh gộp đã duyệt
+ * — đúng số chứng từ huỷ hiệu lực sẽ chốt (âm). Cộng bigint exact; thiếu/che/số legacy → null (UI
+ * không đoán, không cộng float).
+ */
+export function giaTriHieuLucDot(
+  periodValue: string | number | null | undefined,
+  grossAmount: string | number | null | undefined,
+): string | null {
+  if (!isCanonicalDecimal(periodValue, 2)) return null;
+  if (grossAmount == null) return periodValue;
+  if (!isCanonicalDecimal(grossAmount, 2)) return null;
+  return moneyToDecimal(parseMoneyExact(periodValue) + parseMoneyExact(grossAmount));
+}
 
 export type ChiTietDot = {
   adjustmentsSummary?: TomTatDieuChinhDot | null;

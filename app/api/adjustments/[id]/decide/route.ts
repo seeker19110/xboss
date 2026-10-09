@@ -23,7 +23,8 @@ const MAX_LY_DO_TU_CHOI = 2000;
 // snapshot quyết định + audit — một transaction, dưới khoá HĐ → đợt → chứng từ.
 // 200 { decided, decision, operationId, replayed? } | { decided, pending, currentSeq, nextRole }
 // 403 | 404 khác dự án | 409 adjustment_not_submitted / ipc_no_bill (duyệt khi đợt mất phiếu gốc)
-// | 422. Phiếu điều chỉnh tính RÒNG ipc-sum-v1 (trừ tạm ứng/giữ lại theo tỷ lệ HĐ).
+// | 422. amount chứng từ GỘP (ngưỡng engine so |amount| như periodValue IPC); phiếu điều chỉnh
+// RÒNG ipc-sum-v1 (trừ tạm ứng/giữ lại theo tỷ lệ snapshot quyết định đợt gốc — adj-sum-v2).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });

@@ -54,8 +54,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 // POST /api/payment-certs/:id/adjustments — lập chứng từ NHÁP cho đợt đã duyệt (Admin/PM).
 // body: { kind: 'adjustment'|'reversal', reason (≥10 ký tự), items?: [{ boqItemId, qtyDelta, note? }] }
-// reversal: dòng = −KL kỳ từng dòng, amount = −giá trị phiếu gốc (server sinh, bỏ qua items).
-// adjustment: amount = ROUND(Σ qtyDelta × đơn giá gốc, 2) tính trong SQL.
+// amount luôn GỘP (KL × đơn giá gốc, adj-sum-v2), tính trong SQL — tiền phiếu RÒNG sinh lúc duyệt.
+// reversal: dòng = −(KL kỳ + Σ KL điều chỉnh đã duyệt) từng dòng (server sinh, bỏ qua items);
+//   amount = −(giá trị kỳ gộp của đợt + Σ amount gộp điều chỉnh đã duyệt).
+// adjustment: amount = ROUND(Σ qtyDelta × đơn giá gốc, 2).
 // 201 chứng từ | 403 | 404 khác dự án | 409 cert_not_approved / ipc_no_bill (đợt legacy không có
 // phiếu gốc) / cert_reversed / adjustment_open_exists | 422 reason_too_short / items_required / item_not_in_cert /
 // qty_delta_invalid / qty_below_zero. Logic: lib/tai-chinh/ipc-dieu-chinh.ts.

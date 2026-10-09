@@ -17,7 +17,12 @@ import { showToast } from "@/app/components/Toast";
 import { Skeleton } from "@/app/components/Skeleton";
 import { Button, Card, Chip, Section } from "@/app/components/ui";
 import type { ChipTone } from "@/app/components/ui/Chip";
-import { HEADER_DINH_DANG_TIEN, fmtVNDExact, taoIdempotencyKey } from "./chiTietDot";
+import {
+  HEADER_DINH_DANG_TIEN,
+  fmtVNDExact,
+  taoIdempotencyKey,
+  type TomTatDieuChinhDot,
+} from "./chiTietDot";
 
 // M128 PR-UI: khối "Chứng từ điều chỉnh" của đợt IPC đã duyệt. Đợt đã duyệt không sửa/xoá được —
 // chỉ điều chỉnh một phần (adjustment) hoặc huỷ hiệu lực toàn đợt (reversal) qua chứng từ riêng,
@@ -45,7 +50,7 @@ export type Adjustment = {
   kind: AdjustmentKind;
   status: AdjustmentStatus;
   reason: string;
-  /** Tiền ± (chuỗi decimal-string-v1; số cũ vẫn được chấp nhận). */
+  /** Giá trị ± GỘP (KL × giá) — chuỗi decimal-string-v1; số cũ vẫn được chấp nhận. */
   amount: string | number | null;
   createdBy: number | null;
   createdByName: string | null;
@@ -54,13 +59,6 @@ export type Adjustment = {
   decidedByName: string | null;
   rejectReason: string | null;
   items: AdjustmentItem[];
-};
-
-export type TomTatDieuChinh = {
-  open: number;
-  approvedCount: number;
-  reversed: boolean;
-  netAmount?: string | number | null;
 };
 
 export type DongBoqDot = { boqItemId: number; boqCode: string; boqName: string; boqUnit: string };
@@ -111,7 +109,7 @@ function FormDieuChinh({
   maDot,
   kind,
   dongBoq,
-  giaTriDuyet,
+  giaTriHieuLuc,
   suaAdj,
   onDong,
   onXong,
@@ -120,7 +118,7 @@ function FormDieuChinh({
   maDot: string;
   kind: AdjustmentKind;
   dongBoq: DongBoqDot[];
-  giaTriDuyet: string | null;
+  giaTriHieuLuc: string | null;
   /** Có → sửa nháp (PATCH); không → tạo mới (POST). */
   suaAdj?: Adjustment;
   onDong: () => void;
@@ -224,9 +222,12 @@ function FormDieuChinh({
           >
             <TriangleAlert className="w-4 h-4 shrink-0 mt-px" aria-hidden="true" />
             <span>
-              Cảnh báo: huỷ toàn bộ hiệu lực đợt, giá trị −
-              {giaTriDuyet ? fmtVNDExact(giaTriDuyet) : "toàn bộ giá trị đã duyệt"}. Chứng từ phải
-              được người khác duyệt mới có hiệu lực.
+              Cảnh báo: huỷ toàn bộ hiệu lực đợt, giá trị{" "}
+              {giaTriHieuLuc
+                ? `−${fmtVNDExact(giaTriHieuLuc)} (giá trị hiệu lực hiện tại của đợt, gộp)`
+                : "−toàn bộ giá trị hiệu lực hiện tại của đợt"}
+              . Phiếu chưa chi bị huỷ, phần đã chi sinh phiếu âm. Chứng từ phải được người khác
+              duyệt mới có hiệu lực.
             </span>
           </p>
         )}
@@ -337,7 +338,7 @@ export default function DieuChinhDot({
   certId,
   maDot,
   dongBoq,
-  giaTriDuyet,
+  giaTriHieuLuc,
   tomTat,
   canManage,
   meId,
@@ -346,9 +347,12 @@ export default function DieuChinhDot({
   certId: number;
   maDot: string;
   dongBoq: DongBoqDot[];
-  /** approvedValue của đợt (chuỗi exact) — hiện trong cảnh báo reversal. */
-  giaTriDuyet: string | null;
-  tomTat: TomTatDieuChinh | null;
+  /**
+   * Giá trị HIỆU LỰC (gộp) hiện tại của đợt = giá trị kỳ + Σ điều chỉnh gộp đã duyệt (chuỗi exact,
+   * `giaTriHieuLucDot`) — cảnh báo reversal hiện đúng −số này (= amount chứng từ sẽ chốt).
+   */
+  giaTriHieuLuc: string | null;
+  tomTat: TomTatDieuChinhDot | null;
   canManage: boolean;
   meId: number | null;
   /** Nạp lại đợt (và qua đó tóm tắt) sau khi đổi dữ liệu. */
@@ -474,7 +478,7 @@ export default function DieuChinhDot({
               variant="danger"
               onClick={() => setForm({ kind: "reversal" })}
             >
-              Huỷ hiệu lực (reversal)
+              Huỷ hiệu lực đợt
             </Button>
           </div>
         ) : undefined
@@ -487,7 +491,7 @@ export default function DieuChinhDot({
           maDot={maDot}
           kind={form.kind}
           dongBoq={dongBoq}
-          giaTriDuyet={giaTriDuyet}
+          giaTriHieuLuc={giaTriHieuLuc}
           suaAdj={form.sua}
           onDong={() => setForm(null)}
           onXong={lamMoi}
@@ -528,13 +532,21 @@ export default function DieuChinhDot({
         {!loiTai && !dangTai && ds.length === 0 && (
           <p className="text-xs text-zinc-400">Chưa có chứng từ điều chỉnh nào cho đợt này.</p>
         )}
-        {tomTat && tomTat.netAmount != null && tomTat.approvedCount > 0 && (
-          <p className="text-xs text-zinc-300">
-            Giá trị ròng sau điều chỉnh:{" "}
-            <span className="font-mono font-semibold text-zinc-100">
-              {fmtVNDExact(String(tomTat.netAmount))}
-            </span>
-          </p>
+        {tomTat && tomTat.approvedCount > 0 && tomTat.grossAmount != null && (
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+            <dt className="text-zinc-300">Chênh lệch giá trị (gộp)</dt>
+            <dd className="font-mono font-semibold text-zinc-100 tabular-nums text-right">
+              {fmtTienDau(tomTat.grossAmount)}
+            </dd>
+            {tomTat.netBillAmount != null && (
+              <>
+                <dt className="text-zinc-300">Tiền phiếu điều chỉnh (ròng)</dt>
+                <dd className="font-mono font-semibold text-zinc-100 tabular-nums text-right">
+                  {fmtTienDau(tomTat.netBillAmount)}
+                </dd>
+              </>
+            )}
+          </dl>
         )}
         <ul className="divide-y divide-zinc-800/60">
           {ds.map((a) => {

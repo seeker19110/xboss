@@ -141,24 +141,43 @@ export type TomTatDieuChinh = {
   open: number;
   approvedCount: number;
   reversed: boolean;
-  /** Σ amount chứng từ đã duyệt (MoneyMinor, cộng trong SQL). */
-  netAmount: bigint;
+  /**
+   * Chênh lệch giá trị GỘP: Σ amount chứng từ đã duyệt (KL × giá — adj-sum-v2), MoneyMinor cộng
+   * trong SQL. Giá trị hiệu lực của đợt = giá trị kỳ (periodValue) + grossAmount.
+   */
+  grossAmount: bigint;
+  /**
+   * Tiền phiếu điều chỉnh RÒNG: Σ amount phiếu `type='adjustment'` chưa huỷ (void) gắn đợt — gồm
+   * phiếu âm bù phần đã chi của reversal. MoneyMinor cộng trong SQL.
+   */
+  netBillAmount: bigint;
 };
 
 /** Tóm tắt chứng từ điều chỉnh của một đợt cho GET /api/payment-certs/:id. */
 export async function tomTatDieuChinh(certId: number): Promise<TomTatDieuChinh> {
-  const r = await queryOne<{ open: number; approvedCount: number; reversed: boolean; net: string }>(
+  const r = await queryOne<{
+    open: number;
+    approvedCount: number;
+    reversed: boolean;
+    gross: string;
+    netBill: string;
+  }>(
     `SELECT COUNT(*) FILTER (WHERE status IN ('draft', 'submitted'))::int AS open,
             COUNT(*) FILTER (WHERE status = 'approved')::int AS "approvedCount",
             COALESCE(bool_or(kind = 'reversal' AND status = 'approved'), false) AS reversed,
-            COALESCE(SUM(amount) FILTER (WHERE status = 'approved'), 0)::text AS net
+            COALESCE(SUM(amount) FILTER (WHERE status = 'approved'), 0)::text AS gross,
+            (SELECT COALESCE(SUM(b.amount), 0) FROM payment_bills b
+              WHERE b.payment_cert_id = ? AND b.type = 'adjustment'
+                AND b.pay_status <> 'void')::text AS "netBill"
        FROM payment_cert_adjustments WHERE cert_id = ?`,
+    certId,
     certId,
   );
   return {
     open: r?.open ?? 0,
     approvedCount: r?.approvedCount ?? 0,
     reversed: r?.reversed ?? false,
-    netAmount: parseMoneyExact(r?.net ?? "0"),
+    grossAmount: parseMoneyExact(r?.gross ?? "0"),
+    netBillAmount: parseMoneyExact(r?.netBill ?? "0"),
   };
 }

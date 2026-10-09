@@ -265,14 +265,17 @@ export async function DELETE(
     });
     if (kq === "khong_thay")
       return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
-    // M128: dòng đã nằm trong đợt IPC ĐÃ DUYỆT → không còn đường "huỷ chứng từ hạ nguồn" nào
-    // ngoài chứng từ điều chỉnh/huỷ hiệu lực của đợt đó → 409 adjustment_required kèm link.
+    // M128: dòng đã nằm trong đợt IPC ĐÃ DUYỆT còn hiệu lực → KHÔNG BAO GIỜ xoá được (đợt đã
+    // duyệt là hồ sơ chốt, kể cả sau điều chỉnh/huỷ hiệu lực). Muốn bỏ KL của dòng thì chỉ có thể
+    // huỷ hiệu lực đợt — khi đó dòng thành hồ sơ lưu trữ của đợt. 409 adjustment_required kèm link.
     if (kq !== "da_xoa" && kq.dotDaDuyet > 0)
       return NextResponse.json(
         {
           error:
-            `Dòng BOQ đã nằm trong ${kq.dotDaDuyet} đợt thanh toán (IPC) đã duyệt — không xoá được. ` +
-            "Lập chứng từ điều chỉnh (điều chỉnh/huỷ hiệu lực) cho đợt đó trước",
+            `Dòng BOQ đã nằm trong ${kq.dotDaDuyet} đợt thanh toán (IPC) đã duyệt còn hiệu lực — ` +
+            "không xoá được (đợt đã duyệt là hồ sơ chốt). Muốn bỏ khối lượng của dòng: chỉ có thể " +
+            "lập chứng từ điều chỉnh (huỷ hiệu lực đợt); sau đó dòng thành hồ sơ lưu trữ của đợt, " +
+            "vẫn không xoá được",
           code: "adjustment_required",
           ...(kq.dotDaDuyetDau
             ? {

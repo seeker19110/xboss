@@ -46,7 +46,8 @@
 //
 // [paymentCertAdjustment] — perm: viewPayments — route: GET /api/payment-certs/[id]/adjustments,
 //   POST/PATCH trả chứng từ (M128)
-//   amount             giá trị ± của chứng từ điều chỉnh/huỷ hiệu lực (SQL tính)
+//   amount             giá trị ± GỘP (KL × đơn giá gốc, adj-sum-v2) của chứng từ điều chỉnh/huỷ
+//                      hiệu lực (SQL tính) — tiền phiếu RÒNG nằm ở payment_bills (paymentBill)
 //   items.unitPrice    đơn giá gốc từng dòng điều chỉnh (payment_cert_adjustment_items.unit_price)
 //   → Gate route ĐÃ là viewPayments (đọc) / manageContracts (ghi) — phòng thủ/nhất quán.
 //

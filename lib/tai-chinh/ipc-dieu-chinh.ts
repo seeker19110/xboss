@@ -3,7 +3,16 @@
 //
 // IPC đã duyệt là hồ sơ chốt: không sửa dòng KL, không sửa snapshot kỳ sau. Sửa sai đi qua chứng
 // từ RIÊNG (sổ điều chỉnh) — luỹ kế hợp đồng cộng `qty_delta` của chứng từ đã duyệt
-// (`lib/tai-chinh/paymentcerts.ts`). Module này giữ phần thuần tài chính: đọc/validate đầu vào,
+// (`lib/tai-chinh/paymentcerts.ts`).
+//
+// Quy tắc tiền `adj-sum-v2` (khuôn IPC: `periodValue` GỘP cho ngưỡng duyệt, `approvedValue` RÒNG
+// cho phiếu — spec M128 §6):
+//   * `payment_cert_adjustments.amount` = GỘP (KL × đơn giá gốc) cho CẢ adjustment lẫn reversal —
+//     là số engine duyệt so ngưỡng (|amount|) và số "chênh lệch giá trị" hiển thị;
+//   * phiếu `payment_bills.type='adjustment'` = RÒNG (ipc-sum-v1: trừ tạm ứng/giữ lại theo tỷ lệ
+//     của đợt gốc) — reversal: phiếu committed → void, phần đã chi bù bằng phiếu âm = −Σ phiếu paid.
+//
+// Module này giữ phần thuần tài chính: đọc/validate đầu vào,
 // lập/sửa/xoá nháp, chốt giá trị trong SQL, áp hệ quả khi duyệt (phiếu thanh toán / huỷ phiếu
 // gốc), snapshot quyết định + Idempotency-Key, DTO wire. Phần phối hợp với engine phê duyệt
 // (miền tiến độ) nằm ở `lib/dich-vu/dieu-chinh-ipc.ts` (ADR-0008).
@@ -331,9 +340,11 @@ async function chotGiaTri(adjId: number): Promise<void> {
 /**
  * Reversal = huỷ TOÀN BỘ hiệu lực của đợt, kể cả các điều chỉnh đã duyệt trước đó của chính đợt
  * (không thì luỹ kế/tiền còn sót phần điều chỉnh cũ): dòng = −(KL kỳ + Σ KL điều chỉnh đã duyệt)
- * từng dòng khác 0 (đơn giá gốc); amount = −(Σ phiếu còn hiệu lực của đợt — phiếu gốc + phiếu điều
- * chỉnh, trừ phiếu void; mọi phiếu đều RÒNG ipc-sum-v1) = −giá trị đề nghị của đợt khi đợt chưa có
- * điều chỉnh. Đợt luôn có phiếu gốc (`kiemCoPhieuGoc` chặn đợt legacy trước khi lập).
+ * từng dòng khác 0 (đơn giá gốc); amount GỘP = −(giá trị kỳ của đợt ROUND(Σ KL kỳ × giá, 2) + Σ
+ * amount gộp các điều chỉnh đã duyệt của đợt) — tính trong SQL. Cộng các amount ĐÃ làm tròn (không
+ * làm tròn lại Σ KL hiệu lực × giá) để tổng giá trị chứng từ của đợt sau huỷ đúng bằng 0, và khớp
+ * số cảnh báo UI (`giaTriHieuLucDot`). Phiếu (ròng) xử lý riêng lúc duyệt (`apDungDuyet`). Đợt luôn
+ * có phiếu gốc (`kiemCoPhieuGoc` chặn đợt legacy trước khi lập).
  */
 async function ghiReversal(adj: { id: number; certId: number; projectId: number }): Promise<void> {
   await run(
@@ -354,10 +365,12 @@ async function ghiReversal(adj: { id: number; certId: number; projectId: number 
   );
   await run(
     `UPDATE payment_cert_adjustments
-        SET amount = -(SELECT COALESCE(SUM(amount), 0) FROM payment_bills
-                        WHERE payment_cert_id = ? AND type IN ('bill', 'adjustment')
-                          AND pay_status <> 'void')
+        SET amount = -((SELECT ROUND(COALESCE(SUM(qty_period * unit_price), 0), 2)
+                          FROM payment_cert_items WHERE cert_id = ?)
+                       + (SELECT COALESCE(SUM(amount), 0) FROM payment_cert_adjustments
+                           WHERE cert_id = ? AND status = 'approved'))
       WHERE id = ?`,
+    adj.certId,
     adj.certId,
     adj.id,
   );
@@ -381,12 +394,42 @@ export async function kiemCoPhieuGoc(certId: number): Promise<void> {
     );
 }
 
+const TY_LE = /^\d+(\.\d+)?$/;
+
 /**
- * Số tiền RÒNG của phiếu sinh từ chứng từ `adjustment` (quyết định 2026-10-09, mục 11): cùng
- * công thức ipc-sum-v1 với phiếu gốc — round(Σ qty_delta × giá gốc) − round(tạm ứng) − round(giữ
- * lại) theo tỷ lệ HĐ — để −toàn bộ KL của đợt = −đúng giá trị phiếu gốc. Bigint exact (đọc `::text`).
+ * Tỷ lệ tạm ứng/giữ lại áp cho phiếu RÒNG của chứng từ (L2): lấy từ snapshot quyết định DUYỆT
+ * của đợt gốc (`payment_cert_decision_snapshots.snapshot.contract`, S13c) — tỷ lệ đã dùng để
+ * tính phiếu gốc, nên HĐ sửa tỷ lệ sau khi duyệt không làm −toàn bộ KL ≠ −phiếu gốc. Đợt duyệt
+ * trước S13c (không có snapshot) → tỷ lệ HĐ hiện tại (spec M128 §6, có log để truy vết).
+ * Snapshot có mà tỷ lệ sai dạng = dữ liệu hỏng → fail-fast (tiền thật), không đoán.
  */
-async function giaTriRongDieuChinh(adj: DongKhoa): Promise<string> {
+async function tyLeChoPhieuRong(
+  adj: DongKhoa,
+): Promise<{ advancePct: string; retentionPct: string }> {
+  const snap = await queryOne<{ advancePct: unknown; retentionPct: unknown }>(
+    `SELECT snapshot->'contract'->'advancePct' AS "advancePct",
+            snapshot->'contract'->'retentionPct' AS "retentionPct"
+       FROM payment_cert_decision_snapshots
+      WHERE cert_id = ? AND result_status = 'approved' AND snapshot->'contract' <> 'null'::jsonb
+      ORDER BY created_at DESC, id DESC LIMIT 1`,
+    adj.certId,
+  );
+  if (snap) {
+    const { advancePct, retentionPct } = snap;
+    if (
+      typeof advancePct !== "string" ||
+      typeof retentionPct !== "string" ||
+      !TY_LE.test(advancePct) ||
+      !TY_LE.test(retentionPct)
+    ) {
+      log.error("tyLeChoPhieuRong: tỷ lệ trong snapshot quyết định IPC sai dạng", {
+        adjustmentId: adj.id,
+        certId: adj.certId,
+      });
+      throw new Error("tyLeChoPhieuRong: snapshot quyết định IPC gốc có tỷ lệ sai dạng");
+    }
+    return { advancePct, retentionPct };
+  }
   const hd = await queryOne<{ advancePct: string | null; retentionPct: string | null }>(
     `SELECT advance_pct::text AS "advancePct", retention_pct::text AS "retentionPct"
        FROM contracts WHERE id = ?`,
@@ -394,17 +437,30 @@ async function giaTriRongDieuChinh(adj: DongKhoa): Promise<string> {
   );
   // Tỷ lệ NOT NULL — null chỉ khi không đọc được HĐ (RLS/dữ liệu hỏng): tiền thật → fail-fast.
   if (hd?.advancePct == null || hd.retentionPct == null) {
-    log.error("giaTriRongDieuChinh: không đọc được tỷ lệ hợp đồng", { adjustmentId: adj.id });
-    throw new Error("giaTriRongDieuChinh: thiếu dòng hợp đồng của chứng từ điều chỉnh");
+    log.error("tyLeChoPhieuRong: không đọc được tỷ lệ hợp đồng", { adjustmentId: adj.id });
+    throw new Error("tyLeChoPhieuRong: thiếu dòng hợp đồng của chứng từ điều chỉnh");
   }
+  log.warn("tyLeChoPhieuRong: đợt không có snapshot quyết định — dùng tỷ lệ HĐ hiện tại", {
+    adjustmentId: adj.id,
+    certId: adj.certId,
+  });
+  return { advancePct: hd.advancePct, retentionPct: hd.retentionPct };
+}
+
+/**
+ * Số tiền RÒNG của phiếu sinh từ chứng từ `adjustment` (quyết định 2026-10-09, mục 11): cùng
+ * công thức ipc-sum-v1 với phiếu gốc — round(Σ qty_delta × giá gốc) − round(tạm ứng) − round(giữ
+ * lại) theo tỷ lệ của đợt gốc (`tyLeChoPhieuRong`) — để −toàn bộ KL của đợt = −đúng giá trị phiếu
+ * gốc. Bigint exact (đọc `::text`).
+ */
+async function giaTriRongDieuChinh(adj: DongKhoa): Promise<string> {
+  const tyLe = await tyLeChoPhieuRong(adj);
   const lines = await query<{ qtyPeriod: string; unitPrice: string }>(
     `SELECT qty_delta::text AS "qtyPeriod", unit_price::text AS "unitPrice"
        FROM payment_cert_adjustment_items WHERE adjustment_id = ? ORDER BY id`,
     adj.id,
   );
-  return moneyToDecimal(
-    ipcSumV1(lines, { advancePct: hd.advancePct, retentionPct: hd.retentionPct }).approvedValue,
-  );
+  return moneyToDecimal(ipcSumV1(lines, tyLe).approvedValue);
 }
 
 // ── Lập / sửa / xoá nháp ────────────────────────────────────────────────────────────────
@@ -548,7 +604,8 @@ export async function trinhDieuChinhCore(
 }
 
 /**
- * Bước cuối DUYỆT: (1) chốt giá trị trong SQL; (2) phiếu thanh toán:
+ * Bước cuối DUYỆT: (1) chốt giá trị GỘP trong SQL (adjustment; reversal chốt lúc lập — dòng/đợt
+ * không đổi được khi chứng từ mở); (2) phiếu thanh toán (RÒNG):
  *   - adjustment → phiếu type 'adjustment' (pay_status 'committed', payment_cert_id = đợt gốc),
  *     số tiền RÒNG ipc-sum-v1 (`giaTriRongDieuChinh`, quyết định 2026-10-09) — giá trị chứng từ
  *     vẫn là KL × giá (gộp, luỹ kế KL gộp);
@@ -702,6 +759,14 @@ export async function ghiSnapshotDieuChinh(opts: {
     `SELECT amount::text AS amount, reason FROM payment_cert_adjustments WHERE id = ?`,
     adj.id,
   );
+  // adj-sum-v2: chốt CẢ giá trị gộp của chứng từ (`amount`) lẫn tiền ròng của phiếu sinh ra.
+  const bill =
+    opts.billId == null
+      ? undefined
+      : await queryOne<{ amount: string }>(
+          `SELECT amount::text AS amount FROM payment_bills WHERE id = ?`,
+          opts.billId,
+        );
   const lines = await query<{ boqItemId: number; qtyDelta: string; unitPrice: string }>(
     `SELECT boq_item_id AS "boqItemId", qty_delta::text AS "qtyDelta",
             unit_price::text AS "unitPrice"
@@ -710,7 +775,7 @@ export async function ghiSnapshotDieuChinh(opts: {
   );
   const snapshot = {
     schema: "ipc-adjustment-decision-snapshot-v1",
-    moneyRule: "adj-sum-v1",
+    moneyRule: "adj-sum-v2",
     buoc: opts.buoc,
     ketQua: opts.ketQua,
     actorRole: opts.actor.role,
@@ -720,6 +785,7 @@ export async function ghiSnapshotDieuChinh(opts: {
     periodNo: goc.periodNo,
     statusTruoc: adj.status,
     amount: head?.amount ?? null,
+    billAmount: bill?.amount ?? null,
     reason: head?.reason ?? null,
     lines,
     rejectReason: opts.rejectReason,

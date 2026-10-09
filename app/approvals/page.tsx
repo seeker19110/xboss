@@ -201,7 +201,7 @@ function ApprovalsPageInner() {
       const laHuyHieuLuc = laDieuChinh && item.adjustmentKind === "reversal";
       const giaTri =
         laDieuChinh && item.amount != null
-          ? ` Giá trị ${item.amount > 0 ? "+" : ""}${formatVnd(item.amount)}.`
+          ? ` Giá trị (gộp) ${item.amount < 0 ? `−${formatVnd(-item.amount)}` : `+${formatVnd(item.amount)}`}.`
           : "";
       const msg = laHuyHieuLuc
         ? `Duyệt "${item.label}" — HUỶ HIỆU LỰC cả đợt thanh toán: luỹ kế hợp đồng của đợt về 0, phiếu chưa chi bị huỷ, phần đã chi sinh phiếu âm.${giaTri} Bước ${item.currentSeq} (${item.stepRole}).`
@@ -751,8 +751,11 @@ function ApprovalsPageInner() {
                           Bước {it.currentSeq} · Vai trò {it.stepRole}
                         </span>
                         {it.amount != null && (
-                          <span className="font-mono font-semibold text-emerald-400">
-                            · {formatVnd(it.amount)}
+                          // Chứng từ điều chỉnh âm (giảm/huỷ hiệu lực, M128): dấu "−" + màu rose.
+                          <span
+                            className={`font-mono font-semibold ${it.amount < 0 ? "text-rose-300" : "text-emerald-400"}`}
+                          >
+                            · {it.amount < 0 ? `−${formatVnd(-it.amount)}` : formatVnd(it.amount)}
                           </span>
                         )}
                         {deadline && (

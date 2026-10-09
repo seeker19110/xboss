@@ -1,25 +1,51 @@
 # PROGRESS — XBoss
 
-## 2026-10-09 — M128 hậu audit (nhánh m128-fix, chưa PR)
+## 2026-10-09 — M128: chứng từ điều chỉnh/huỷ hiệu lực IPC đã duyệt (migration 0168)
 
-Sửa các phát hiện audit M128 không cần quyết định nghiệp vụ (`docs/nang-cap/M128-chung-tu-dieu-chinh-ipc.md`):
+Đóng mục 6(c) của `AUDIT-S15-RELEASE-CANDIDATE.md` (A5-AC07, D07 "huỷ upstream phải qua adjustment") theo
+`docs/nang-cap/M128-chung-tu-dieu-chinh-ipc.md` (§6 = quyết định bổ sung thay §2.2 khi mâu thuẫn).
 
-- **SoD nháp:** PATCH `/api/adjustments/:id` chỉ người lập (Admin sửa nháp PM rồi tự duyệt = lách SoD);
-  Admin chỉ còn xoá nháp người khác. Báo cáo SoD `create_and_approve` thêm nguồn `payment_cert_adjustment`.
-- **0168 (chưa merge, sửa tại chỗ):** trigger hồ sơ chốt — chứng từ `approved/rejected` + dòng của nó không
-  UPDATE/DELETE được; chỉ cho đúng luồng (nháp→trình→duyệt/từ chối, dòng chỉ ghi khi nháp, chỉ xoá nháp);
-  cờ bảo trì `xboss.bao_tri_chung_tu` chỉ có tác dụng với role chủ bảng. `_decisions` FK kép
-  `(adjustment_id, project_id)`.
-- **Reversal đợt lẫn trạng thái:** void MỌI phiếu committed của đợt, phiếu âm = −Σ phiếu `paid` (SQL exact);
-  không phiếu paid → không phiếu âm.
-- **Quyết định chủ dự án 2026-10-09 (spec M128 §6):** (a) luỹ kế HIỆU LỰC đợt kỳ N = luỹ kế IPC + Σ điều
-  chỉnh đã duyệt kỳ ≤ N ở mọi đường đọc (tổng/dòng/danh sách/Excel/PDF/cảnh báo, `LUY_KE_HIEU_LUC_SQL`);
-  (b) phiếu sinh từ chứng từ điều chỉnh tính RÒNG `ipcSumV1` (giá trị chứng từ + luỹ kế KL vẫn gộp);
-  (c) đợt legacy không có phiếu gốc → 409 `ipc_no_bill` khi lập và khi duyệt.
-- `/payments` KPI/tổng tính cả phiếu `adjustment` (bỏ void); hộp thư `/approvals` thêm `adjustmentKind`
-  (chỉ reversal cảnh báo đỏ); xoá BOQ thuộc đợt đã huỷ hiệu lực → 409 nêu hồ sơ lưu trữ (hết vòng lặp);
-  hộp thư không còn nuốt lỗi độ chính xác thành `amount: null` (422 có mã + log); DR snapshot thêm 3 bảng;
-  +3 mutation M128.
+- **Schema `0168_payment_cert_adjustments.sql`:** `payment_cert_adjustments` (`kind adjustment|reversal`, mã
+  `ADJ-YYYY-NNNN`, `amount` GỘP) + `_items` (`qty_delta` theo dòng BOQ) + `_decisions` (snapshot quyết định,
+  FK kép `(adjustment_id, project_id)`), RLS FORCE theo dự án, nới CHECK `payment_bills.type` thêm
+  `adjustment`. Trigger hồ sơ chốt: INSERT chỉ nhận nháp sạch; nháp/đã trình không mang `decided_*`/phiếu;
+  đã trình chỉ đổi `amount`; chứng từ `approved/rejected` + dòng không UPDATE/DELETE; hàm trigger
+  `SET search_path` cố định, gọi có schema; cờ bảo trì `xboss.bao_tri_chung_tu` chỉ có tác dụng với role chủ
+  bảng. **Chỉ CREATE/trigger/nới CHECK, không đụng dòng dữ liệu → đi thẳng production.**
+- **Luồng/API** (logic `lib/tai-chinh/ipc-dieu-chinh{,-doc}.ts`, phối hợp `lib/dich-vu/dieu-chinh-ipc.ts`):
+  `GET/POST /api/payment-certs/:id/adjustments`, `PATCH/DELETE /api/adjustments/:id` (nháp, chỉ người lập
+  sửa; Admin xoá được nháp người khác), `POST …/submit`, `POST …/decide` (+ `Idempotency-Key`, SoD người
+  duyệt ≠ người lập, engine `approval_flows` ngưỡng theo |amount| gộp, khoá HĐ → đợt). 1 chứng từ mở/đợt
+  (409), sau reversal đã duyệt không lập thêm (409 `cert_reversed`), đợt legacy không phiếu gốc → 409
+  `ipc_no_bill` khi lập và khi duyệt. Hộp thư `/approvals` gom chứng từ đã trình (`kind 'adjustment'`).
+- **Tiền (quy tắc `adj-sum-v2`):** `amount` chứng từ GỘP (KL × giá, SQL); reversal = −(giá trị đợt gộp +
+  Σ điều chỉnh đã duyệt) = −giá trị hiệu lực hiện tại. Phiếu `payment_bills.type='adjustment'` RÒNG theo
+  `ipcSumV1` với tỷ lệ tạm ứng/giữ lại lấy từ snapshot quyết định IPC gốc (thiếu → tỷ lệ HĐ hiện tại + log
+  cảnh báo). Reversal: phiếu `committed` của đợt → `void`, phần đã chi bù bằng phiếu âm = −Σ phiếu `paid`.
+  Tóm tắt ở `GET /api/payment-certs/:id` tách `grossAmount`/`netBillAmount` (bỏ `netAmount`).
+- **Luỹ kế:** luỹ kế hiệu lực đợt kỳ N = luỹ kế IPC + Σ điều chỉnh đã duyệt kỳ ≤ N ở mọi đường đọc
+  (`LUY_KE_HIEU_LUC_SQL`: tổng/dòng/danh sách/Excel/PDF/cảnh báo). Luỹ kế HĐ (`contractCumulativeValue`)
+  tính theo từng dòng BOQ, định giá theo đơn giá đợt đã duyệt mới nhất (hết lẫn giá cũ/mới khi đổi giá).
+- **UI:** `DieuChinhDot.tsx` trong `CertDocument` (form ±KL, nút "Huỷ hiệu lực đợt" cảnh báo −giá trị hiệu
+  lực hiện tại, tóm tắt "Chênh lệch giá trị (gộp)"/"Tiền phiếu điều chỉnh (ròng)"); `/approvals` số âm rose
+  có dấu −, hộp xác nhận nguy hiểm cho reversal; `/payments` chip "Điều chỉnh IPC", dòng điều chỉnh chỉ đọc,
+  dòng void gạch ngang, KPI/tổng tính phiếu `adjustment` (bỏ void); trang in liệt kê phiếu điều chỉnh ở
+  mục A. PATCH phiếu điều chỉnh đổi tiền/KL/đơn vị → 409 `bill_adjustment_locked` (sửa ghi chú vẫn được).
+  Xoá dòng BOQ thuộc đợt đã duyệt → 409 nêu chỉ còn đường huỷ hiệu lực + hồ sơ lưu trữ.
+- **Hậu audit vòng 1:** SoD nháp, trigger hồ sơ chốt, reversal đợt lẫn trạng thái, hộp thư không nuốt lỗi
+  độ chính xác, DR snapshot thêm 3 bảng, báo cáo SoD thêm nguồn `payment_cert_adjustment`. **Vòng 2:** amount
+  gộp cho reversal, luỹ kế HĐ theo đơn giá mới nhất (H1), tỷ lệ phiếu ròng từ snapshot (L2), trigger chặn
+  INSERT bẩn + search_path (M1), khoá PATCH phiếu điều chỉnh (M2), thông điệp BOQ (L1), trang in.
+- **Test:** `tests/m128-dieu-chinh-ipc.test.ts` (route thật, oracle SQL độc lập; ca vòng 2 đỏ trên code cũ:
+  tóm tắt gộp/ròng, snapshot v2, đổi giá giữa đợt, tỷ lệ snapshot, trigger dưới `xboss_app`, khoá phiếu;
+  SoD hai tổ chức xanh sẵn — chỉ thêm độ phủ); `s10c`/`payment-certs-money-ui` thêm hàm thuần; e2e
+  `payment-certs-canh-bao` ca huỷ hiệu lực đã chi → người khác duyệt ở `/approvals` → `/payments` (axe,
+  desktop + mobile). Mutation `--only=M128`: 6/6 bị bắt.
+- **Nợ:** `/payments` chế độ "Người phụ trách" còn nợ a11y có sẵn từ trước (chữ `zinc-600` dòng GL/HU/GTTTKT,
+  input LS/ngày thiếu nhãn, nút icon thiếu tên) — e2e axe khoanh vào dòng điều chỉnh; `cost-report` A4-AC04
+  flaky có sẵn trên main khi chạy song song (poll `pg_stat_activity` trong transaction bị cache snapshot —
+  cần `pg_stat_clear_snapshot()` trước mỗi lần poll), chạy riêng xanh; A5-AC07 còn lớp M (UAT HĐ thật).
+
 ## 2026-10-09 — S16: test đường phụ bằng pool `xboss_app` (đóng nợ RLS strict)
 
 Đóng phần đầu dòng "Nợ ghi nhận" của mục S16 (PR-B 6(b), migration 0165): 4 đường chưa có ca chạy

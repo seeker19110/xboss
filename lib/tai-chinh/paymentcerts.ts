@@ -606,32 +606,37 @@ export function certItemsToWire(
 }
 
 // Giá trị luỹ kế đã nghiệm thu của 1 hợp đồng (biểu thức SQL theo `contractIdExpr` — hằng `?`
-// hoặc cột `c.id`, không bao giờ là giá trị người dùng) = Σ qty_cumulative × unit_price của đợt
-// 'approved' mới nhất mỗi dòng BOQ + Σ qty_delta × unit_price gốc của MỌI chứng từ điều chỉnh đã
-// duyệt của HĐ (M128 — snapshot đợt là chuỗi IPC thuần nên không đếm lặp), cộng NUMERIC trong SQL
-// rồi làm tròn 2 số lẻ SAU khi cộng (như ipc-sum-v1) — không qua float JS (S13d, M45).
+// hoặc cột `c.id`, không bao giờ là giá trị người dùng). Định giá THEO ĐỢT MỚI NHẤT, cùng ngữ nghĩa
+// `LUY_KE_HIEU_LUC_SQL` (M128 H1): mỗi dòng BOQ lấy đợt 'approved' mới nhất có dòng đó →
+// (qty_cumulative lưu + Σ qty_delta chứng từ điều chỉnh ĐÃ DUYỆT gắn đợt kỳ ≤ kỳ đó, cùng dòng)
+// × đơn giá của ĐỢT MỚI NHẤT ấy. Nên luỹ kế HĐ = `certTotals(đợt mới nhất).cumulativeValue` kể cả
+// khi đơn giá BOQ đổi giữa các đợt (điều chỉnh đợt cũ không bị định giá theo giá cũ ở cấp HĐ).
+// Snapshot đợt là chuỗi IPC thuần nên sổ điều chỉnh cộng đúng một lần. Cộng NUMERIC trong SQL rồi
+// làm tròn 2 số lẻ SAU khi cộng (như ipc-sum-v1) — không qua float JS (S13d, M45).
 function luyKeHopDongSql(contractIdExpr: string): string {
   return `ROUND(COALESCE((
-       SELECT SUM(v) FROM (
-         (SELECT DISTINCT ON (i.boq_item_id) i.qty_cumulative * i.unit_price AS v
-           FROM payment_cert_items i
-           JOIN payment_certs pc ON pc.id = i.cert_id
-          WHERE pc.contract_id = ${contractIdExpr} AND pc.status = 'approved'
-          ORDER BY i.boq_item_id, pc.period_no DESC)
-         UNION ALL
-         SELECT ai.qty_delta * ai.unit_price AS v
-           FROM payment_cert_adjustment_items ai
-           JOIN payment_cert_adjustments a ON a.id = ai.adjustment_id
-          WHERE a.contract_id = ${contractIdExpr} AND a.status = 'approved'
-       ) t), 0), 2)`;
+       SELECT SUM((t.cum + COALESCE((
+                SELECT SUM(ai.qty_delta)
+                  FROM payment_cert_adjustment_items ai
+                  JOIN payment_cert_adjustments a ON a.id = ai.adjustment_id
+                  JOIN payment_certs pa ON pa.id = a.cert_id
+                 WHERE a.contract_id = ${contractIdExpr} AND a.status = 'approved'
+                   AND pa.period_no <= t.period_no AND ai.boq_item_id = t.boq_item_id), 0))
+                  * t.unit_price)
+         FROM (SELECT DISTINCT ON (i.boq_item_id) i.boq_item_id, i.qty_cumulative AS cum,
+                      i.unit_price, pc.period_no
+                 FROM payment_cert_items i
+                 JOIN payment_certs pc ON pc.id = i.cert_id
+                WHERE pc.contract_id = ${contractIdExpr} AND pc.status = 'approved'
+                ORDER BY i.boq_item_id, pc.period_no DESC) t), 0), 2)`;
 }
 
 /** Luỹ kế nghiệm thu của 1 hợp đồng — MoneyMinor (bigint đồng×100), đọc `::text`. */
 export async function contractCumulativeValue(contractId: number): Promise<bigint> {
   const row = await queryOne<{ total: string }>(
     `SELECT ${luyKeHopDongSql("?")}::text AS total`,
+    contractId, // phần sổ điều chỉnh (M128) — subquery đứng trước trong biểu thức
     contractId, // phần snapshot đợt
-    contractId, // phần sổ điều chỉnh (M128)
   );
   return parseMoneyExact(row?.total ?? "0");
 }

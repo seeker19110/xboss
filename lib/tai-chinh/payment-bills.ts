@@ -53,7 +53,7 @@ export function billScopeParams(id: number, projectId: number, orgId: number): u
   return [id, projectId, projectId, orgId, projectId, orgId, projectId, orgId];
 }
 
-type BillLock = { payStatus: PayStatus; paymentCertId: number | null };
+type BillLock = { payStatus: PayStatus; paymentCertId: number | null; type: string };
 
 /** Khoá dòng phiếu trong phạm vi dự án (FOR UPDATE) — undefined khi không thấy. Gọi trong tx. */
 export async function khoaPhieu(
@@ -62,7 +62,7 @@ export async function khoaPhieu(
   orgId: number,
 ): Promise<BillLock | undefined> {
   return queryOne<BillLock>(
-    `SELECT pay_status AS "payStatus", payment_cert_id AS "paymentCertId"
+    `SELECT pay_status AS "payStatus", payment_cert_id AS "paymentCertId", type
        FROM payment_bills WHERE ${BILL_SCOPE} FOR UPDATE`,
     ...billScopeParams(id, projectId, orgId),
   );
@@ -83,6 +83,17 @@ export function phieuDaChot(b: BillLock): boolean {
 export function phieuGanIpc(b: BillLock): boolean {
   return b.paymentCertId != null;
 }
+
+/**
+ * Phiếu sinh từ chứng từ điều chỉnh/huỷ hiệu lực IPC (M128, type 'adjustment') là hệ quả của một
+ * chứng từ đã duyệt: số tiền/KL/ĐVT/nhân công CHỈ ĐỌC — sửa sai bằng chứng từ điều chỉnh mới.
+ */
+export function phieuDieuChinhIpc(b: Pick<BillLock, "type">): boolean {
+  return b.type === "adjustment";
+}
+
+export const LOI_PHIEU_DIEU_CHINH =
+  "Phiếu sinh từ chứng từ điều chỉnh IPC — chỉ đọc, sửa sai bằng chứng từ điều chỉnh mới (M128)";
 
 export const LOI_PHIEU_GAN_IPC =
   "Phiếu gắn đợt IPC — không xoá được, huỷ/sửa phải qua chứng từ điều chỉnh (M128)";

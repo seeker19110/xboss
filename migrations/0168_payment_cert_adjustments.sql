@@ -17,6 +17,10 @@
 --   * chứng từ đã duyệt/từ chối là HỒ SƠ CHỐT: trigger chặn mọi UPDATE/DELETE chứng từ + dòng;
 --     chỉ cho đúng luồng code: nháp→nháp/đã trình, đã trình→đã trình/đã duyệt/từ chối; dòng chỉ
 --     ghi khi chứng từ còn nháp; chỉ xoá nháp; không đổi mã/đợt/HĐ/dự án/loại/người lập
+--   * INSERT chỉ tạo NHÁP sạch (không trạng thái khác, không ngày trình/người-ngày quyết định/phiếu/
+--     lý do từ chối) — không chèn thẳng chứng từ "đã duyệt" bỏ qua trình + SoD; chứng từ chưa quyết
+--     định không mang người/ngày quyết định/phiếu; đã trình chỉ còn đổi được `amount` (chốt lại giá
+--     trị trong SQL lúc duyệt) — lý do/ngày trình cố định từ lúc trình
 -- items có cột project_id (ngoài DDL đặc tả) để áp RLS theo dự án trực tiếp như bảng cha.
 --
 -- Mã chứng từ: SEQUENCE riêng (không MAX+1) — bảng FORCE RLS theo dự án nên MAX chỉ thấy dự án
@@ -117,17 +121,33 @@ CREATE TRIGGER audit_payment_cert_adjustment_items
 -- Cờ bảo trì `xboss.bao_tri_chung_tu = 'on'` (SET LOCAL) chỉ có tác dụng với role CHỦ BẢNG (role
 -- migration/bảo trì, superuser) — role ứng dụng xboss_app không sở hữu bảng (ADR-0005) nên đặt cờ
 -- cũng vô hiệu. Dùng để dọn dữ liệu test / sửa dữ liệu có biên bản; app không bao giờ đặt cờ này.
+-- search_path cố định (khuôn 0163) + gọi hàm/bảng có schema: trigger chạy với search_path của
+-- phiên gọi — không để schema/bảng tạm cùng tên che hàm bảo trì hay bảng chứng từ.
 CREATE OR REPLACE FUNCTION pca_bao_tri_chung_tu(bang oid) RETURNS boolean
-  LANGUAGE sql STABLE AS $$
+  LANGUAGE sql STABLE
+  SET search_path = pg_catalog, public, pg_temp
+AS $$
   SELECT COALESCE(current_setting('xboss.bao_tri_chung_tu', true), '') = 'on'
-     AND pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = bang), 'MEMBER')
+     AND pg_has_role(current_user, (SELECT relowner FROM pg_catalog.pg_class WHERE oid = bang), 'MEMBER')
 $$;
 
 CREATE OR REPLACE FUNCTION pca_khoa_chung_tu_chot() RETURNS trigger
-  LANGUAGE plpgsql AS $$
+  LANGUAGE plpgsql
+  SET search_path = pg_catalog, public, pg_temp
+AS $$
 BEGIN
-  IF pca_bao_tri_chung_tu(TG_RELID) THEN
+  IF public.pca_bao_tri_chung_tu(TG_RELID) THEN
     IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+  END IF;
+  -- INSERT: chỉ lập NHÁP sạch (taoDieuChinh). Trạng thái/ngày trình/quyết định/phiếu chỉ đến từ
+  -- luồng trình → quyết định (UPDATE bên dưới), không chèn thẳng.
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.status <> 'draft' OR NEW.submitted_at IS NOT NULL OR NEW.decided_at IS NOT NULL
+       OR NEW.decided_by IS NOT NULL OR NEW.bill_id IS NOT NULL OR NEW.reject_reason IS NOT NULL THEN
+      RAISE EXCEPTION 'Chứng từ điều chỉnh mới phải là nháp chưa trình/quyết định (%: %)',
+        NEW.code, NEW.status;
+    END IF;
     RETURN NEW;
   END IF;
   IF OLD.status IN ('approved', 'rejected') THEN
@@ -152,22 +172,46 @@ BEGIN
     RAISE EXCEPTION 'Chuyển trạng thái chứng từ điều chỉnh % không hợp lệ: % → %',
       OLD.code, OLD.status, NEW.status;
   END IF;
+  -- Chưa quyết định (nháp/đã trình) → không mang người/ngày quyết định, phiếu, lý do từ chối.
+  IF NEW.status IN ('draft', 'submitted')
+     AND (NEW.decided_at IS NOT NULL OR NEW.decided_by IS NOT NULL OR NEW.bill_id IS NOT NULL
+          OR NEW.reject_reason IS NOT NULL) THEN
+    RAISE EXCEPTION 'Chứng từ điều chỉnh % chưa quyết định — không được mang người/ngày quyết định, phiếu hay lý do từ chối',
+      OLD.code;
+  END IF;
+  IF NEW.status = 'draft' AND NEW.submitted_at IS NOT NULL THEN
+    RAISE EXCEPTION 'Chứng từ điều chỉnh % còn nháp — không có ngày trình', OLD.code;
+  END IF;
+  -- Đã trình: nội dung đã gửi người duyệt cố định — chỉ `amount` được chốt lại (chotGiaTri, cùng
+  -- dòng đã khoá nên cùng giá trị); lý do/ngày trình không đổi, kể cả lúc quyết định.
+  IF OLD.status = 'submitted'
+     AND (NEW.reason, NEW.submitted_at) IS DISTINCT FROM (OLD.reason, OLD.submitted_at) THEN
+    RAISE EXCEPTION 'Chứng từ điều chỉnh % đã trình — không đổi lý do/ngày trình', OLD.code;
+  END IF;
+  IF OLD.status = 'submitted' AND NEW.status <> 'submitted' AND NEW.amount IS DISTINCT FROM OLD.amount THEN
+    RAISE EXCEPTION 'Chứng từ điều chỉnh % — không đổi giá trị cùng lúc quyết định', OLD.code;
+  END IF;
+  IF NEW.status = 'rejected' AND NEW.bill_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Chứng từ điều chỉnh % bị từ chối — không gắn phiếu thanh toán', OLD.code;
+  END IF;
   RETURN NEW;
 END $$;
 
 -- Dòng chỉ ghi được khi chứng từ cha còn NHÁP (ghiDong/ghiReversal). DELETE không thấy cha = xoá
 -- theo cascade khi chính chứng từ nháp bị xoá (trigger của cha đã kiểm) → cho qua.
 CREATE OR REPLACE FUNCTION pcai_khoa_dong_chung_tu() RETURNS trigger
-  LANGUAGE plpgsql AS $$
+  LANGUAGE plpgsql
+  SET search_path = pg_catalog, public, pg_temp
+AS $$
 DECLARE
   cha RECORD;
 BEGIN
-  IF pca_bao_tri_chung_tu(TG_RELID) THEN
+  IF public.pca_bao_tri_chung_tu(TG_RELID) THEN
     IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
     RETURN NEW;
   END IF;
   IF TG_OP <> 'INSERT' THEN
-    SELECT code, status INTO cha FROM payment_cert_adjustments WHERE id = OLD.adjustment_id;
+    SELECT code, status INTO cha FROM public.payment_cert_adjustments WHERE id = OLD.adjustment_id;
     IF FOUND AND cha.status IN ('approved', 'rejected') THEN
       RAISE EXCEPTION 'Dòng của chứng từ điều chỉnh % đã chốt (%) — không sửa/xoá được',
         cha.code, cha.status;
@@ -180,7 +224,7 @@ BEGIN
     END IF;
   END IF;
   IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
-  SELECT code, status INTO cha FROM payment_cert_adjustments WHERE id = NEW.adjustment_id;
+  SELECT code, status INTO cha FROM public.payment_cert_adjustments WHERE id = NEW.adjustment_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Không thấy chứng từ điều chỉnh #% của dòng', NEW.adjustment_id;
   END IF;
@@ -196,7 +240,7 @@ END $$;
 
 DROP TRIGGER IF EXISTS khoa_payment_cert_adjustments ON payment_cert_adjustments;
 CREATE TRIGGER khoa_payment_cert_adjustments
-  BEFORE UPDATE OR DELETE ON payment_cert_adjustments
+  BEFORE INSERT OR UPDATE OR DELETE ON payment_cert_adjustments
   FOR EACH ROW EXECUTE FUNCTION pca_khoa_chung_tu_chot();
 DROP TRIGGER IF EXISTS khoa_payment_cert_adjustment_items ON payment_cert_adjustment_items;
 CREATE TRIGGER khoa_payment_cert_adjustment_items

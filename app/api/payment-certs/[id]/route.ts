@@ -59,8 +59,9 @@ const json = (body: unknown, status = 200) =>
 // (đọc `::text` trong SQL, không qua float) + `moneyFormat`; không gửi → JSON number legacy (422
 // `money_precision_unsupported` nếu một giá trị không round-trip được qua number). Che đơn giá
 // (stripSensitive) TRƯỚC khi đổi wire — đơn giá bị che là null ở cả hai định dạng.
-// M128: kèm `adjustmentsSummary: { open, approvedCount, reversed, netAmount }` (netAmount = Σ
-// amount chứng từ điều chỉnh đã duyệt, cùng kiểu wire với totals.approvedValue).
+// M128: kèm `adjustmentsSummary: { open, approvedCount, reversed, grossAmount, netBillAmount }`
+// — grossAmount = Σ amount (GỘP, KL × giá) chứng từ điều chỉnh đã duyệt; netBillAmount = Σ tiền
+// phiếu điều chỉnh RÒNG chưa huỷ của đợt (adj-sum-v2). Cùng kiểu wire + luật che với totals.
 export async function GET(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -115,15 +116,14 @@ export async function GET(
   try {
     wireTotals = certTotalsToWire(maskedTotals, format);
     wireItems = certItemsToWire(maskedCert.items, itemsExact, format);
-    // netAmount = Σ amount chứng từ đã duyệt — cùng kiểu wire + cùng luật che với approvedValue.
+    // Tiền gộp/ròng cùng kiểu wire + cùng luật che (viewPayments) với totals.
+    const xemTien = CAN.viewPayments(user.role);
     adjustmentsSummary = {
       open: dieuChinh.open,
       approvedCount: dieuChinh.approvedCount,
       reversed: dieuChinh.reversed,
-      netAmount: moneyOrNullToWire(
-        CAN.viewPayments(user.role) ? dieuChinh.netAmount : null,
-        format,
-      ),
+      grossAmount: moneyOrNullToWire(xemTien ? dieuChinh.grossAmount : null, format),
+      netBillAmount: moneyOrNullToWire(xemTien ? dieuChinh.netBillAmount : null, format),
     };
   } catch (err) {
     if (!isMoneyPrecisionError(err)) throw err;

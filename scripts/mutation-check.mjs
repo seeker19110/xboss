@@ -461,6 +461,22 @@ const MUTATIONS = [
     tests: ["tests/m128-dieu-chinh-ipc.test.ts"],
     why: "Reversal không huỷ phiếu committed → đợt đã huỷ hiệu lực vẫn còn phiếu chờ chi, có thể chi tiền thật.",
   },
+  {
+    key: "M128: duyệt chứng từ kiểm lại phiếu gốc dưới khoá (ipc_no_bill)",
+    file: "lib/dich-vu/dieu-chinh-ipc.ts",
+    find: 'if (decision === "approved") await kiemCoPhieuGoc(k.adj.certId);',
+    replace: "if (false) await kiemCoPhieuGoc(k.adj.certId);",
+    tests: ["tests/m128-dieu-chinh-ipc.test.ts"],
+    why: "Đợt mất phiếu gốc sau khi lập chứng từ vẫn duyệt được → sinh/huỷ tiền trên đợt không có hồ sơ tiền gốc.",
+  },
+  {
+    key: "M128: phiếu điều chỉnh tính RÒNG (trừ tạm ứng/giữ lại), chứng từ mới gộp",
+    file: "lib/tai-chinh/ipc-dieu-chinh.ts",
+    find: "return moneyToDecimal(ipcSumV1(lines, tyLe).approvedValue);",
+    replace: "return moneyToDecimal(ipcSumV1(lines, tyLe).periodValue);",
+    tests: ["tests/m128-dieu-chinh-ipc.test.ts"],
+    why: "Phiếu điều chỉnh lấy giá trị gộp → −toàn bộ KL đợt ≠ −phiếu gốc ròng, chi/thu hồi lệch đúng phần tạm ứng/giữ lại.",
+  },
 ];
 
 const only = process.argv.find((a) => a.startsWith("--only="))?.slice("--only=".length);

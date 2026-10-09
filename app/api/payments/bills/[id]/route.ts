@@ -13,10 +13,12 @@ import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import {
   BILL_SCOPE,
   LOI_PHIEU_DA_CHOT,
+  LOI_PHIEU_DIEU_CHINH,
   LOI_PHIEU_GAN_IPC,
   billScopeParams,
   khoaPhieu,
   phieuDaChot,
+  phieuDieuChinhIpc,
   phieuGanIpc,
 } from "@/lib/tai-chinh/payment-bills";
 
@@ -32,7 +34,9 @@ const notFound = () =>
 
 // PATCH /api/payments/bills/:id — sửa ĐVT / khối lượng / nhân công / ghi chú. Số tiền không sửa
 // qua route này; M129: body có `amount` trên phiếu đã chi gắn IPC → 409 `bill_paid_locked` (điều
-// chỉnh phải qua chứng từ M128), phiếu khác giữ hành vi cũ (bỏ qua `amount`).
+// chỉnh phải qua chứng từ M128), phiếu khác giữ hành vi cũ (bỏ qua `amount`). M128: phiếu sinh từ
+// chứng từ điều chỉnh (type 'adjustment') chỉ đọc — body có amount/quantity/labor/unit → 409
+// `bill_adjustment_locked` (chỉ còn sửa ghi chú).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = await params;
   const user = await getCurrentUser();
@@ -89,6 +93,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     args.push(String(b.note).trim() || null);
   }
   const doiSoTien = b.amount !== undefined;
+  const doiKlTien = doiSoTien || ["quantity", "labor", "unit"].some((k) => b[k] !== undefined);
   if (!sets.length && !doiSoTien)
     return NextResponse.json({ error: "Không có gì để sửa" }, { status: 400 });
 
@@ -98,11 +103,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     () =>
       ghiNeuConQuyen(
         () => CAN.editStructure(user.role),
-        async (): Promise<"not_found" | "locked" | "empty" | "ok"> => {
-          if (doiSoTien) {
+        async (): Promise<"not_found" | "locked" | "adjustment_locked" | "empty" | "ok"> => {
+          if (doiKlTien) {
             const phieu = await khoaPhieu(id, projectId, user.orgId);
             if (!phieu) return "not_found";
-            if (phieuDaChot(phieu)) return "locked";
+            if (phieuDieuChinhIpc(phieu)) return "adjustment_locked";
+            if (doiSoTien && phieuDaChot(phieu)) return "locked";
           }
           if (!sets.length) return "empty";
           const rows = await query<{ id: number }>(
@@ -121,6 +127,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (kq.value === "locked")
     return NextResponse.json(
       { error: LOI_PHIEU_DA_CHOT, code: "bill_paid_locked" },
+      { status: 409, headers: PRIVATE_NO_STORE },
+    );
+  if (kq.value === "adjustment_locked")
+    return NextResponse.json(
+      { error: LOI_PHIEU_DIEU_CHINH, code: "bill_adjustment_locked" },
       { status: 409, headers: PRIVATE_NO_STORE },
     );
   if (kq.value === "empty")

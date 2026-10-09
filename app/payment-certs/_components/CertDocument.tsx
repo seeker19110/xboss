@@ -39,6 +39,7 @@ import {
   docChiTietDot,
   docYeuCauXacNhan,
   fmtVNDExact,
+  giaTriHieuLucDot,
   taoIdempotencyKey,
   type CertTotalsView,
   type DongVuot,
@@ -1046,7 +1047,10 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
             boqName: it.boqName,
             boqUnit: it.boqUnit,
           }))}
-          giaTriDuyet={totals?.approvedValue ?? null}
+          giaTriHieuLuc={giaTriHieuLucDot(
+            totals?.periodValue,
+            ctrl.adjustmentsSummary?.grossAmount,
+          )}
           tomTat={ctrl.adjustmentsSummary}
           canManage={ctrl.canManage}
           meId={ctrl.meId}
