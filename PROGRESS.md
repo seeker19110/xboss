@@ -1,5 +1,24 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — S16: test đường phụ bằng pool `xboss_app` (đóng nợ RLS strict)
+
+Đóng phần đầu dòng "Nợ ghi nhận" của mục S16 (PR-B 6(b), migration 0165): 4 đường chưa có ca chạy
+bằng role `xboss_app` (NOBYPASSRLS, FORCE RLS) nay đã có test tích hợp `tests/s16-app-role-duong-phu.test.ts`
+(gọi route/hàm THẬT, không mock DB/`withOrgScope`; fixture 2 tổ chức A/B):
+
+- **2FA bước 2** (`POST /api/auth/login/2fa`): login bước 1 → `need2fa`+pending (không cookie); mã sai 401;
+  mã đúng (sinh bằng `otplib`) 200 + cookie + đúng user org A; dùng lại mã 401 (`totp_last_step` ghi được);
+  phạm vi org A không thấy user org B; pending rác 401.
+- **OIDC `upsertSsoUser`**: tạo mới (org 1) + đăng nhập lại không trùng; đồng bộ role user org A ghi thật;
+  admin cuối của org A không bị hạ cấp dù org B còn admin (đếm trong phạm vi org); org A/B không thấy nhau.
+- **`/api/v1/{materials,tasks}`**: key org A chỉ thấy dữ liệu dự án A; key sai/thiếu header 401; key toàn cục
+  org B với `?project=` của org A → 404; `last_used_at` ghi được.
+- **Cron `GET /api/cron/sync-sheets`** (chỉ CRON_SECRET, mock lớp mạng Google như `route-vat-tu-sync-pham-vi`):
+  thiếu `GOOGLE_SHEET_PROJECT_ID` → 503; có → DB→Sheet chỉ vật tư dự án đã cấu hình, Sheet→DB ghi được,
+  dòng mang ID vật tư dự án khác không bị chạm.
+- **Kết quả:** không phát hiện lỗi thật (4 đường đã bọc `withOrgScope` đúng). Kiểm chứng test phân biệt
+  được: tạm bỏ `withOrgScope("*")` ở 4 chỗ tra theo email/uid/key_hash/dự án → cả 4 ca ĐỎ.
+
 ## 2026-10-09 — M129: IPC "đã duyệt" ≠ "đã chi" (migration 0166 có backfill → QUA STAGING)
 
 Đóng mục 6(e) của `AUDIT-S15-RELEASE-CANDIDATE.md` (A5-AC08, D07) theo `docs/nang-cap/M129-ipc-da-chi-tach-cam-ket-thuc-chi.md`.
@@ -72,8 +91,9 @@ bất biến và checklist staging ở `docs/nang-cap/AUDIT-S16-RLS-STRICT.md`; 
   cron); `tests/migrations-rls-scope.test.ts` quét migration sau 0165 ghi lên 18 bảng phải tự
   `set_config('app.org_id','*')` (Cạm bẫy #3: role migration production không superuser → thiếu GUC
   thì UPDATE lặng lẽ 0 dòng; CI không bắt vì role ci là superuser).
-- **Nợ ghi nhận:** 2FA bước 2, OIDC `upsertSsoUser`, `/api/v1/*`, cron sync-sheets chưa có ca chạy
-  bằng `xboss_app` (mock `withOrgScope` ở unit test chạy thẳng, không kiểm đối số) — kiểm trên
+- **Nợ ghi nhận:** ~~2FA bước 2, OIDC `upsertSsoUser`, `/api/v1/*`, cron sync-sheets chưa có ca chạy
+  bằng `xboss_app`~~ (đã đóng 2026-10-09 bởi `tests/s16-app-role-duong-phu.test.ts`; unit test cũ vẫn mock
+  `withOrgScope`, nhưng đã có ca tích hợp thật) — còn lại: kiểm trên
   staging theo checklist; mỗi query ngoài transaction nay 3 lượt khứ hồi (BEGIN/câu/COMMIT) → đo
   `poolStats`/dashboard trên staging; `code-lists.getList` cache kết quả rỗng theo org (fail-open 2FA
   nếu sau này gọi sai phạm vi); `stageMissingList(undefined)` dùng `'*'` đếm tầng chờ mọi org (lỗi
