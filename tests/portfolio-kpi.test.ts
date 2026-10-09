@@ -83,7 +83,11 @@ async function goiList(qs = "") {
   const { NextRequest } = await import("next/server");
   const res = await GET(new NextRequest(`http://localhost/api/projects${qs}`));
   assert.equal(res.status, 200);
-  return (await res.json()).projects as { id: number; progressPercent: number }[];
+  return (await res.json()).projects as {
+    id: number;
+    progressPercent: number;
+    progressAvailable: boolean;
+  }[];
 }
 
 test(
@@ -127,6 +131,10 @@ test(
     assert.equal(kpi.avgProgress, null);
     assert.equal(kpi.progressAvailable, false);
     assert.equal(kpi.taskCount, 0);
+    // Thẻ dự án dùng cùng quy tắc: dự án rỗng không được hiện "0%".
+    const [dong] = await goiList();
+    assert.equal(dong.id, p);
+    assert.equal(dong.progressAvailable, false);
   },
 );
 
@@ -152,6 +160,9 @@ test(
     assert.equal(kpi.taskCount, 2);
     assert.ok(Math.abs(kpi.avgProgress - 0.5) < 1e-9);
     assert.deepEqual(kpi.coverage, { validTasks: 2, excludedTasks: 1 });
+    const [dong] = await goiList();
+    assert.equal(dong.progressAvailable, true);
+    assert.ok(Math.abs(dong.progressPercent - 0.5) < 1e-9);
     const row = await queryOne<{ p: number | null }>(
       `SELECT progress_percent AS p FROM tasks WHERE id = ?`,
       tNull,

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Star, LayoutGrid, Search } from "lucide-react";
 import { systemColorClasses } from "@/lib/nen/systemColors";
 import type { ProjectListItem } from "@/lib/ha-tang/projects";
+import { phanTramTienDo } from "@/lib/nen/phan-tram";
 import { phatDoiNguCanh } from "@/app/lib/contextEpoch";
 import { clearServiceWorkerCache } from "@/app/lib/serviceWorkerCache";
 import { showToast } from "@/app/components/Toast";
@@ -182,6 +183,7 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
   }
 
   function row(p: ProjectListItem, idx: number) {
+    const pct = phanTramTienDo(p.progressPercent, p.progressAvailable);
     const cc = systemColorClasses(p.color);
     const isCurrent = p.id === effectiveCurrentId;
     const isPinned = pinned.includes(p.id);
@@ -206,7 +208,13 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
           </span>
         )}
         <span className="tabular-nums text-xs text-zinc-400 shrink-0 w-9 text-right">
-          {Math.round(p.progressPercent * 100)}%
+          {pct == null ? (
+            <span title="Chưa có dữ liệu tiến độ" aria-label="Chưa có dữ liệu tiến độ">
+              —
+            </span>
+          ) : (
+            `${pct}%`
+          )}
         </span>
         {isCurrent && (
           <span className="text-emerald-400 shrink-0" aria-hidden="true">

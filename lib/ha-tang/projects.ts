@@ -123,6 +123,8 @@ export type ProjectListItem = {
   color: string | null;
   orgId: number | null;
   progressPercent: number;
+  /** false = dự án chưa có việc hợp lệ nào — progressPercent 0 khi đó KHÔNG có nghĩa "0%". */
+  progressAvailable: boolean;
   delayedCount: number;
 };
 
@@ -160,6 +162,7 @@ export async function listProjects(
   return query<ProjectListItem>(
     `SELECT p.id, p.name, p.code, p.status, p.color, p.org_id AS "orgId",
             COALESCE(AVG(t.progress_percent) FILTER (WHERE ${TASK_HOP_LE}), 0) AS "progressPercent",
+            COUNT(t.id) FILTER (WHERE ${TASK_HOP_LE}) > 0 AS "progressAvailable",
             COUNT(DISTINCT t.id) FILTER (WHERE ${TASK_TRE}) AS "delayedCount"
        ${NGUON_DU_AN_TASK}
       WHERE p.id IN (${placeholders}) AND p.org_id = ?

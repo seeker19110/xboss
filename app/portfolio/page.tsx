@@ -8,6 +8,7 @@ import { clearServiceWorkerCache } from "@/app/lib/serviceWorkerCache";
 import { PageSkeleton, MetricsRowSkeleton } from "@/app/components/Skeleton";
 import { systemColorClasses } from "@/lib/nen/systemColors";
 import type { ProjectListItem, PortfolioKpi, OrganizationItem } from "@/lib/ha-tang/projects";
+import { phanTramTienDo } from "@/lib/nen/phan-tram";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "Đang thi công",
@@ -30,10 +31,10 @@ function KpiTile({ label, value, hint }: { label: string; value: string; hint?: 
   );
 }
 
-/** % tiến độ theo công việc — làm tròn XUỐNG để 99,6% không hiện thành 100% (chưa xong thật). */
-function phanTramTienDo(kpi: PortfolioKpi): string {
-  if (!kpi.progressAvailable || kpi.avgProgress == null) return "Chưa có dữ liệu";
-  return `${Math.floor(kpi.avgProgress * 100 + 1e-9)}%`;
+/** % tiến độ theo công việc của KPI tổng. */
+function nhanTienDoKpi(kpi: PortfolioKpi): string {
+  const pct = phanTramTienDo(kpi.avgProgress, kpi.progressAvailable);
+  return pct == null ? "Chưa có dữ liệu" : `${pct}%`;
 }
 
 function ghiChuTienDo(kpi: PortfolioKpi): string | undefined {
@@ -73,7 +74,7 @@ async function selectProject(id: number) {
 
 function ProjectCard({ project }: { project: ProjectListItem }) {
   const c = systemColorClasses(project.color);
-  const pct = Math.round(project.progressPercent * 100);
+  const pct = phanTramTienDo(project.progressPercent, project.progressAvailable);
   return (
     <button
       type="button"
@@ -91,10 +92,14 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
       </div>
       {project.code && <p className="mt-1 text-xs text-zinc-400">{project.code}</p>}
       <div className="mt-3 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-        <div className={`h-full ${c.dot}`} style={{ width: `${pct}%` }} />
+        <div className={`h-full ${c.dot}`} style={{ width: `${pct ?? 0}%` }} />
       </div>
       <div className="mt-2 flex items-center justify-between text-xs">
-        <span className="tabular-nums text-zinc-300 font-medium">{pct}% tiến độ</span>
+        {pct == null ? (
+          <span className="text-zinc-400">Chưa có dữ liệu tiến độ</span>
+        ) : (
+          <span className="tabular-nums text-zinc-300 font-medium">{pct}% tiến độ</span>
+        )}
         {project.delayedCount > 0 && (
           <span className="px-1.5 py-0.5 rounded bg-rose-950 text-rose-200 border border-rose-800">
             {project.delayedCount} việc trễ
@@ -150,7 +155,7 @@ export default function PortfolioPage() {
             <KpiTile label="Đang thi công" value={String(kpi.activeCount)} />
             <KpiTile
               label="Tiến độ theo công việc"
-              value={phanTramTienDo(kpi)}
+              value={nhanTienDoKpi(kpi)}
               hint={ghiChuTienDo(kpi)}
             />
             <KpiTile label="Tổng việc trễ" value={String(kpi.totalDelayed)} />

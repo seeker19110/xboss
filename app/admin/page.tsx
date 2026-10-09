@@ -24,6 +24,7 @@ import { fetchMe } from "@/app/lib/me";
 import { ROLE_LABELS } from "@/lib/nen/roles";
 import { DASHBOARD_TREE, dashboardStatus } from "@/app/lib/dashboardTree";
 import { systemColorClasses } from "@/lib/nen/systemColors";
+import { phanTramTienDo } from "@/lib/nen/phan-tram";
 import { dangKyKetNoiSong } from "@/app/lib/contextEpoch";
 
 type User = { id: number; name: string; role: string };
@@ -62,8 +63,14 @@ type ProjectRow = {
   status: "active" | "handover" | "closed";
   color: string | null;
   progressPercent: number;
+  progressAvailable: boolean;
   delayedCount: number;
 };
+/** "Chưa có tiến độ" thay vì "0%" cho dự án chưa có việc hợp lệ (cùng quy tắc trang Portfolio). */
+function nhanTienDo(p: ProjectRow): string {
+  const pct = phanTramTienDo(p.progressPercent, p.progressAvailable);
+  return pct == null ? "Chưa có tiến độ" : `${pct}%`;
+}
 const PROJECT_COLORS = ["zinc", "amber", "sky", "violet", "emerald", "rose"] as const;
 type AuditRow = {
   id: number;
@@ -850,7 +857,7 @@ export default function AdminPage() {
                         {p.code && <p className="text-xs text-zinc-500">{p.code}</p>}
                       </div>
                       <span className="text-xs tabular-nums text-zinc-400">
-                        {Math.round(p.progressPercent * 100)}% · {p.delayedCount} trễ
+                        {nhanTienDo(p)} · {p.delayedCount} trễ
                       </span>
                       <select
                         value={p.status}
