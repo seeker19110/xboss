@@ -4,6 +4,7 @@ import {
   HEADER_DINH_DANG_TIEN,
   docChiTietDot,
   fmtVNDExact,
+  giaTriHieuLucDot,
 } from "@/app/payment-certs/_components/chiTietDot";
 import { MONEY_FORMAT_DECIMAL_V1, MONEY_FORMAT_HEADER } from "@/lib/nen/money";
 
@@ -49,6 +50,8 @@ test("docChiTietDot: 200 → totals chuỗi + cảnh báo vượt KL, không l�
   );
   assert.deepEqual(ct, {
     approvalStatus: null,
+    // M128: server chưa trả tóm tắt chứng từ điều chỉnh → null (không bịa).
+    adjustmentsSummary: null,
     vuotHopDong: vuot,
     warningVersion,
     totals,
@@ -75,4 +78,16 @@ test("docChiTietDot: lỗi vẫn giữ vuotHopDong nếu server có trả; body 
   const hong = await docChiTietDot(new Response("<html>", { status: 502 }));
   assert.equal(hong.loi, "Không tải được tổng hợp giá trị đợt (mã 502)");
   assert.deepEqual(hong.vuotHopDong, []);
+});
+
+test("M128 giaTriHieuLucDot: giá trị hiệu lực (gộp) = giá trị kỳ + Σ điều chỉnh gộp đã duyệt, bigint exact", () => {
+  // Cảnh báo huỷ hiệu lực phải hiện đúng số chứng từ reversal sẽ chốt (−giá trị hiệu lực), không
+  // phải −approvedValue (ròng sau tạm ứng/giữ lại).
+  assert.equal(giaTriHieuLucDot("12358.10", "-3086.40"), "9271.70");
+  assert.equal(giaTriHieuLucDot("0.10", "0.20"), "0.30");
+  assert.equal(giaTriHieuLucDot("90071992547409.93", "0.01"), "90071992547409.94");
+  assert.equal(giaTriHieuLucDot("10000.00", null), "10000.00", "chưa có điều chỉnh");
+  assert.equal(giaTriHieuLucDot("10000.00", undefined), "10000.00");
+  assert.equal(giaTriHieuLucDot(null, "1.00"), null, "giá trị kỳ bị che → không đoán");
+  assert.equal(giaTriHieuLucDot(10000, "1.00"), null, "số legacy → không cộng float");
 });

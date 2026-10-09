@@ -110,6 +110,8 @@ function PaymentCertsInner() {
   // — dùng mSum/mMul để giá trị dẫn xuất cũng "bị che" (null), không ngầm thành 0.
   const contractValue = contract ? mSum(contract.value, contract.addendaTotal) : null;
 
+  // Luỹ kế HĐ = luỹ kế HIỆU LỰC của đợt đã duyệt mới nhất — qtyCumulative server trả đã gồm chứng
+  // từ điều chỉnh đã duyệt kỳ ≤ đợt (M128 §6), không tự cộng lại ở client.
   const approvedCumulative = useMemo((): number | null => {
     const approved = certs.filter((c) => c.status === "approved");
     if (approved.length === 0) return 0;

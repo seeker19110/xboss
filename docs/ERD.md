@@ -6431,6 +6431,96 @@
 - `organizations_pkey`: UNIQUE INDEX organizations_pkey ON public.organizations USING btree (id)
 - `organizations_slug_key`: UNIQUE INDEX organizations_slug_key ON public.organizations USING btree (slug)
 
+### payment_cert_adjustment_decisions
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  |  |
+| adjustment_id | integer |  |  |
+| cert_id | integer |  |  |
+| contract_id | integer |  |  |
+| project_id | integer |  |  |
+| org_id | integer |  |  |
+| actor_id | integer |  |  |
+| operation_id | uuid |  |  |
+| request_hash | text |  |  |
+| result_status | text |  |  |
+| snapshot | jsonb |  |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `actor_id` → `users(id)`
+- `adjustment_id` → `payment_cert_adjustments(id)`
+- `cert_id` → `payment_certs(id)`
+- `contract_id` → `contracts(id)`
+- `org_id` → `organizations(id)`
+- `project_id` → `payment_cert_adjustments(project_id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `payment_cert_adjustment_decision_adjustment_id_operation_id_key`: UNIQUE INDEX payment_cert_adjustment_decision_adjustment_id_operation_id_key ON public.payment_cert_adjustment_decisions USING btree (adjustment_id, operation_id)
+- `payment_cert_adjustment_decisions_pkey`: UNIQUE INDEX payment_cert_adjustment_decisions_pkey ON public.payment_cert_adjustment_decisions USING btree (id)
+
+### payment_cert_adjustment_items
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('payment_cert_adjustment_items_id_seq'::regclass)` |
+| adjustment_id | integer |  |  |
+| project_id | integer |  |  |
+| boq_item_id | integer |  |  |
+| qty_delta | numeric(15,3) |  |  |
+| unit_price | numeric(15,2) |  |  |
+| note | text | ✓ |  |
+
+**Khóa ngoại:**
+- `adjustment_id` → `payment_cert_adjustments(id)`
+- `boq_item_id` → `boq_items(id)`
+- `project_id` → `payment_cert_adjustments(project_id)`
+
+**Index:**
+- `idx_pcai_boq`: INDEX idx_pcai_boq ON public.payment_cert_adjustment_items USING btree (boq_item_id)
+- `payment_cert_adjustment_items_adjustment_id_boq_item_id_key`: UNIQUE INDEX payment_cert_adjustment_items_adjustment_id_boq_item_id_key ON public.payment_cert_adjustment_items USING btree (adjustment_id, boq_item_id)
+- `payment_cert_adjustment_items_pkey`: UNIQUE INDEX payment_cert_adjustment_items_pkey ON public.payment_cert_adjustment_items USING btree (id)
+
+### payment_cert_adjustments
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('payment_cert_adjustments_id_seq'::regclass)` |
+| code | text |  |  |
+| cert_id | integer |  |  |
+| contract_id | integer |  |  |
+| project_id | integer |  |  |
+| kind | text |  |  |
+| status | text |  | `'draft'::text` |
+| reason | text |  |  |
+| amount | numeric(15,2) |  |  |
+| bill_id | integer | ✓ |  |
+| created_by | integer |  |  |
+| submitted_at | date | ✓ |  |
+| decided_at | date | ✓ |  |
+| decided_by | integer | ✓ |  |
+| reject_reason | text | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `bill_id` → `payment_bills(id)`
+- `cert_id` → `payment_certs(id)`
+- `contract_id` → `contracts(id)`
+- `created_by` → `users(id)`
+- `decided_by` → `users(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `idx_pca_cert`: INDEX idx_pca_cert ON public.payment_cert_adjustments USING btree (cert_id, status)
+- `idx_pca_contract`: INDEX idx_pca_contract ON public.payment_cert_adjustments USING btree (contract_id, status)
+- `payment_cert_adjustments_code_key`: UNIQUE INDEX payment_cert_adjustments_code_key ON public.payment_cert_adjustments USING btree (code)
+- `payment_cert_adjustments_id_project_id_key`: UNIQUE INDEX payment_cert_adjustments_id_project_id_key ON public.payment_cert_adjustments USING btree (id, project_id)
+- `payment_cert_adjustments_pkey`: UNIQUE INDEX payment_cert_adjustments_pkey ON public.payment_cert_adjustments USING btree (id)
+- `uq_pca_open`: UNIQUE INDEX uq_pca_open ON public.payment_cert_adjustments USING btree (cert_id) WHERE (status = ANY (ARRAY['draft'::text, 'submitted'::text]))
+- `uq_pca_reversal`: UNIQUE INDEX uq_pca_reversal ON public.payment_cert_adjustments USING btree (cert_id) WHERE ((kind = 'reversal'::text) AND (status = 'approved'::text))
+
 ### payment_cert_decision_snapshots
 
 | Cột | Kiểu | Null | Default |

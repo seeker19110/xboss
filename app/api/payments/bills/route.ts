@@ -26,7 +26,8 @@ import type { PayStatus } from "@/lib/tai-chinh/payment-bills";
 
 export const dynamic = "force-dynamic";
 
-export type BillType = "bill" | "advance" | "item";
+// "adjustment" (M128): phiếu sinh khi duyệt chứng từ điều chỉnh IPC — chỉ đọc, không lập tay.
+export type BillType = "bill" | "advance" | "item" | "adjustment";
 
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" };
 

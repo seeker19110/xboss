@@ -33,10 +33,12 @@ import {
   docFloors,
   fmtFull,
   fmtVND,
+  fmtVNDCoDau,
   phanTram,
   thanhTienTheoPct,
   tienNhapGuiServer,
   tienNhapSangMinor,
+  tongPhieu,
   tongTien,
   type Bill,
   type BillType,
@@ -44,11 +46,6 @@ import {
   type FloorData,
   type FloorRow,
 } from "./_components/tienThanhToan";
-
-// Phiếu đã chi thật: paid, hoặc thiếu payStatus (API/phiếu cũ). committed/void bị loại.
-function daChi(b: Bill): boolean {
-  return b.payStatus === "paid" || b.payStatus == null;
-}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 // S10c: kiểu tiền là bigint đồng×100 — xem ./_components/tienThanhToan.ts.
@@ -411,16 +408,9 @@ export default function PaymentsPage() {
     list.push(b);
     billsByPerson.set(b.responsible, list);
   }
-  // KPI toàn dự án: chỉ tính type='bill' (tạm ứng & phát sinh là nội bộ từng đợt).
-  // Chỉ phiếu ĐÃ CHI (paid hoặc payStatus thiếu = phiếu/API cũ); committed/void không tính.
-  const totalPaid = tongTien(
-    bills.filter((b) => b.type === "bill" && daChi(b)),
-    (b) => b.amount,
-  );
-  const totalCommitted = tongTien(
-    bills.filter((b) => b.type === "bill" && b.payStatus === "committed"),
-    (b) => b.amount,
-  );
+  // KPI toàn dự án: phiếu thường/IPC + phiếu điều chỉnh IPC ± (M128), bỏ void — tạm ứng &
+  // phát sinh là nội bộ từng đợt. Đã chi = paid hoặc thiếu payStatus (phiếu/API cũ).
+  const { daChi: totalPaid, chuaChi: totalCommitted } = tongPhieu(bills);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -604,10 +594,7 @@ export default function PaymentsPage() {
               const isNone = person === NONE;
               const personBills = isNone ? [] : (billsByPerson.get(person) ?? []);
               // Chỉ tính bills thực để hiển thị đã TT trên header.
-              const paid = tongTien(
-                personBills.filter((b) => b.type === "bill" && daChi(b)),
-                (b) => b.amount,
-              );
+              const paid = tongPhieu(personBills).daChi;
               return (
                 <div
                   key={person}
@@ -757,9 +744,11 @@ function BillsSection({
   }, [person, bills]); // reload khi bills thay đổi
 
   const [locChi, setLocChi] = useState<"all" | "committed" | "paid">("all");
+  // Mục A gồm cả phiếu điều chỉnh IPC (M128) để dòng hiển thị khớp tổng; phiếu void vẫn hiện
+  // (chip "Đã huỷ") nhưng không vào tổng.
   const billRows = bills.filter(
     (b) =>
-      b.type === "bill" &&
+      (b.type === "bill" || b.type === "adjustment") &&
       (locChi === "all" ||
         (locChi === "committed"
           ? b.payStatus === "committed"
@@ -768,10 +757,7 @@ function BillsSection({
   const itemRows = bills.filter((b) => b.type === "item");
   const advRows = bills.filter((b) => b.type === "advance");
   // Tổng trên TOÀN BỘ bills (không theo bộ lọc hiển thị), chỉ phiếu đã chi.
-  const sumBills = tongTien(
-    bills.filter((b) => b.type === "bill" && daChi(b)),
-    (b) => b.amount,
-  );
+  const sumBills = tongPhieu(bills).daChi;
   const sumItems = tongTien(itemRows, (b) => b.amount);
   const sumAdvs = tongTien(advRows, (b) => b.amount);
 
@@ -1044,14 +1030,32 @@ function BillsSection({
                     (f) => f.sheetTypeId === b.sheetTypeId && f.floorLabel === b.floorLabel,
                   );
                   const isExp = expandHist === b.id;
+                  // M128: phiếu sinh từ chứng từ điều chỉnh IPC — chỉ đọc (API cũng chặn 409).
+                  const laDieuChinh = b.type === "adjustment";
+                  const daHuy = b.payStatus === "void";
+                  const suaDuoc = canEdit && !laDieuChinh;
                   return (
                     <>
-                      <tr key={b.id} className="border-b border-zinc-800/40 hover:bg-zinc-800/20">
+                      <tr
+                        key={b.id}
+                        data-loai-phieu={b.type}
+                        className="border-b border-zinc-800/40 hover:bg-zinc-800/20"
+                      >
                         <td className="px-1 py-1.5 text-center text-zinc-500">{i + 1}</td>
-                        <td className="px-2 py-1.5 font-medium text-zinc-200">
+                        <td
+                          className={`px-2 py-1.5 font-medium ${daHuy ? "line-through text-zinc-500" : "text-zinc-200"}`}
+                        >
                           {b.floorLabel ?? b.description ?? "Thanh toán tiến độ"}
                           {b.period && (
                             <span className="ml-1.5 text-[10px] text-zinc-500">[{b.period}]</span>
+                          )}
+                          {laDieuChinh && (
+                            <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <Chip tone={b.amount < 0n ? "danger" : "info"}>Điều chỉnh IPC</Chip>
+                              <span className="text-[10px] font-normal text-zinc-400">
+                                Sinh từ chứng từ điều chỉnh
+                              </span>
+                            </span>
                           )}
                         </td>
                         <td className="px-1 py-1.5 text-center text-zinc-400">
@@ -1063,7 +1067,7 @@ function BillsSection({
                         <td className="px-1 py-1.5 text-center text-zinc-300 tabular-nums">
                           {b.pctThisPeriod > 0 ? `${Math.round(b.pctThisPeriod * 100)}%` : "—"}
                         </td>
-                        {canEdit ? (
+                        {suaDuoc ? (
                           <>
                             <td className="px-1 py-1">
                               <input
@@ -1124,8 +1128,16 @@ function BillsSection({
                             </td>
                           </>
                         )}
-                        <td className="px-2 py-1.5 text-right text-sky-300 font-semibold tabular-nums">
-                          {fmtVND(b.amount)}
+                        <td
+                          className={`px-2 py-1.5 text-right font-semibold tabular-nums ${
+                            daHuy
+                              ? "line-through text-zinc-500"
+                              : b.amount < 0n
+                                ? "text-rose-300"
+                                : "text-sky-300"
+                          }`}
+                        >
+                          {fmtVNDCoDau(b.amount)}
                         </td>
                         <td className="px-2 py-1.5">
                           {fl && (
@@ -1166,13 +1178,15 @@ function BillsSection({
                         </td>
                         {canEdit && (
                           <td className="px-1 py-1.5 text-center">
-                            <button
-                              aria-label="Xoá"
-                              onClick={() => onDelete(b.id)}
-                              className="text-zinc-700 hover:text-red-400"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {suaDuoc && (
+                              <button
+                                aria-label="Xoá"
+                                onClick={() => onDelete(b.id)}
+                                className="text-zinc-700 hover:text-red-400"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </td>
                         )}
                       </tr>

@@ -40,6 +40,10 @@ export const DIGEST_TABLES = [
   "payment_certs",
   "payment_cert_items",
   "payment_bills",
+  // M128 (0168): sổ điều chỉnh IPC đã duyệt cộng vào luỹ kế HĐ + sinh phiếu tiền.
+  "payment_cert_adjustments",
+  "payment_cert_adjustment_items",
+  "payment_cert_adjustment_decisions",
   "invoices",
   "advances",
   "claims",
@@ -68,6 +72,16 @@ export const FINANCE_TOTALS = [
     expr: "qty_period * unit_price",
   },
   { key: "payment_bills.amount", table: "payment_bills", expr: "amount" },
+  {
+    key: "payment_cert_adjustments.amount",
+    table: "payment_cert_adjustments",
+    expr: "amount",
+  },
+  {
+    key: "payment_cert_adjustment_items.amount",
+    table: "payment_cert_adjustment_items",
+    expr: "qty_delta * unit_price",
+  },
   { key: "invoices.net_amount", table: "invoices", expr: "net_amount" },
   { key: "invoices.vat_amount", table: "invoices", expr: "vat_amount" },
   { key: "advances.amount", table: "advances", expr: "amount" },
@@ -101,6 +115,12 @@ export const INTEGRITY_RULES: readonly IntegrityRule[] = [
   orphan("users-org", "users", "org_id", "organizations"),
   orphan("contracts-project", "contracts", "project_id", "projects"),
   orphan("payment_certs-contract", "payment_certs", "contract_id", "contracts"),
+  orphan(
+    "payment_cert_adjustment_items-adjustment",
+    "payment_cert_adjustment_items",
+    "adjustment_id",
+    "payment_cert_adjustments",
+  ),
   orphan("task_documents-task", "task_documents", "task_id", "tasks"),
   orphan("contract_documents-contract", "contract_documents", "contract_id", "contracts"),
   orphan("vo_documents-vo", "vo_documents", "vo_id", "variation_orders"),
@@ -163,6 +183,36 @@ export const INTEGRITY_RULES: readonly IntegrityRule[] = [
                  AND pb.project_id <> cc.project_id)
              OR (pb.project_id IS NOT NULL AND tw.project_id IS NOT NULL
                  AND pb.project_id <> tw.project_id)`,
+  },
+  {
+    // M128: chứng từ điều chỉnh khớp HĐ/dự án của đợt gốc; dòng + snapshot quyết định cùng dự án
+    // với chứng từ, dòng BOQ thuộc đúng HĐ (cùng bất biến payment_cert_items-scope).
+    name: "payment_cert_adjustments-scope",
+    tables: [
+      "payment_cert_adjustments",
+      "payment_cert_adjustment_items",
+      "payment_cert_adjustment_decisions",
+      "payment_certs",
+      "contracts",
+      "boq_items",
+    ],
+    sql: `SELECT ((SELECT COUNT(*) FROM payment_cert_adjustments a
+                     LEFT JOIN payment_certs pc ON pc.id = a.cert_id
+                     LEFT JOIN contracts c ON c.id = a.contract_id
+                    WHERE pc.id IS NULL OR c.id IS NULL
+                       OR pc.contract_id IS DISTINCT FROM a.contract_id
+                       OR c.project_id IS DISTINCT FROM a.project_id)
+                 + (SELECT COUNT(*) FROM payment_cert_adjustment_items ai
+                     LEFT JOIN payment_cert_adjustments a ON a.id = ai.adjustment_id
+                     LEFT JOIN boq_items b ON b.id = ai.boq_item_id
+                    WHERE a.id IS NULL OR b.id IS NULL
+                       OR ai.project_id IS DISTINCT FROM a.project_id
+                       OR b.contract_id IS DISTINCT FROM a.contract_id)
+                 + (SELECT COUNT(*) FROM payment_cert_adjustment_decisions d
+                     LEFT JOIN payment_cert_adjustments a ON a.id = d.adjustment_id
+                    WHERE a.id IS NULL OR d.project_id IS DISTINCT FROM a.project_id
+                       OR d.cert_id IS DISTINCT FROM a.cert_id
+                       OR d.contract_id IS DISTINCT FROM a.contract_id))::text AS violations`,
   },
   {
     name: "invoices-scope",

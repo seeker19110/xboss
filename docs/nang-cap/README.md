@@ -509,9 +509,11 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > `POST /api/payments/bills/:id/pay` (SoD người chi ≠ người duyệt), cost report tách `actual` (đã chi) /
 > `approvedUnpaid`. Migration 0166 có UPDATE backfill → **qua staging**. Lệch spec/nợ ghi ở `PROGRESS.md`.
 
-> **`M128-chung-tu-dieu-chinh-ipc.md`** — ✅ **Approved 2026-10-09, CHƯA triển khai** (sau M129).
-> Bảng `payment_cert_adjustments(+_items)`, `kind adjustment|reversal`, luồng nháp→trình→duyệt (SoD),
-> phiếu `type='adjustment'`, luỹ kế/vượt HĐ cộng adjustment approved. Migration 0167 tạo mới thuần.
+> **`M128-chung-tu-dieu-chinh-ipc.md`** — ✅ **Approved 2026-10-09 và ĐÃ TRIỂN KHAI XONG** (PR
+> M128, sau M129). Bảng `payment_cert_adjustments(+_items,_decisions)`, `kind adjustment|reversal`, luồng
+> nháp→trình→duyệt (SoD, hộp thư `/approvals`), phiếu ròng `type='adjustment'`, luỹ kế/vượt HĐ cộng
+> điều chỉnh đã duyệt (định giá theo đợt mới nhất). Migration 0168 tạo mới + trigger hồ sơ chốt + nới
+> CHECK `payment_bills.type` (không đụng dòng dữ liệu). Quyết định bổ sung ở §6 spec, nợ ở `PROGRESS.md`.
 
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 

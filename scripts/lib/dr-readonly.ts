@@ -73,6 +73,9 @@ const FINANCE_RLS_TABLES = [
   "advances",
   "claims",
   "cash_transactions",
+  // M128 (0168): chứng từ điều chỉnh IPC + dòng — FORCE RLS theo dự án.
+  "payment_cert_adjustments",
+  "payment_cert_adjustment_items",
 ] as const;
 const ROLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
 

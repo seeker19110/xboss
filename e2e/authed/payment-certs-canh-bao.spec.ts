@@ -2,6 +2,7 @@ import { test, expect, type Locator, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import {
   dangNhapCoLap,
+  dungSheetNguoiPhuTrach,
   dungToChucCoLap,
   ganBoqVaoHopDong,
   goiApi,
@@ -525,6 +526,163 @@ test.describe("IPC đã duyệt — đánh dấu đã chi (M129, lớp B)", () =
     await expect(tieuDeDot(page)).not.toContainText("chưa chi");
 
     const axe = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+    const nang = axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(nang, JSON.stringify(nang, null, 2)).toEqual([]);
+  });
+});
+
+// M128 — đợt đã duyệt chỉ đổi được qua chứng từ điều chỉnh/huỷ hiệu lực.
+test.describe("IPC đã duyệt — chứng từ điều chỉnh (M128, lớp B)", () => {
+  test("M128: đợt đã duyệt → mở form 'Điều chỉnh' có bảng KL ±; axe sạch", async ({ page }) => {
+    await theme(page, "darkblue");
+    const co = await dungToChucCoLap(["pm"]);
+    await dangNhapCoLap(page, co.nguoi.pm.email);
+    const hd = await dungHopDong(page, { value: 100000, qtyContract: 100, unitPrice: 1000 });
+    const d = await lapDot(page, hd.contractId, hd.boqId, 90);
+    await trinh(page, d.id);
+    await ok(
+      goiApi(page, "POST", `/api/payment-certs/${d.id}/decide`, { decision: "approved" }),
+      200,
+      "duyệt đợt",
+    );
+    await moDot(page, d);
+    await daDuocDuyet(page);
+
+    await bam(page.getByRole("button", { name: "Điều chỉnh", exact: true }));
+    const dlg = hop(page);
+    await expect(dlg.getByRole("heading", { name: /Điều chỉnh đợt/ })).toBeVisible();
+    await expect(dlg.getByLabel(/Lý do/)).toBeVisible();
+    await expect(dlg.getByRole("columnheader", { name: "KL điều chỉnh ±" })).toBeVisible();
+    const axe = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+    const nang = axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    expect(nang, JSON.stringify(nang, null, 2)).toEqual([]);
+  });
+
+  test("M128: khối 'Chứng từ điều chỉnh' không tràn ngang trên mobile", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(!isMobile, "chỉ áp dụng cho viewport mobile");
+    await theme(page, "darkblue");
+    const co = await dungToChucCoLap(["pm"]);
+    await dangNhapCoLap(page, co.nguoi.pm.email);
+    const hd = await dungHopDong(page, { value: 100000, qtyContract: 100, unitPrice: 1000 });
+    const d = await lapDot(page, hd.contractId, hd.boqId, 90);
+    await trinh(page, d.id);
+    await ok(
+      goiApi(page, "POST", `/api/payment-certs/${d.id}/decide`, { decision: "approved" }),
+      200,
+      "duyệt đợt",
+    );
+    await moDot(page, d);
+    await daDuocDuyet(page);
+    await bam(page.getByRole("button", { name: "Điều chỉnh", exact: true }));
+    await expect(hop(page).getByRole("columnheader", { name: "KL điều chỉnh ±" })).toBeVisible();
+    const rong = await page.evaluate(() => ({
+      cuon: document.documentElement.scrollWidth,
+      hienThi: document.documentElement.clientWidth,
+    }));
+    expect(rong.cuon).toBeLessThanOrEqual(rong.hienThi + 1);
+  });
+
+  test("M128: huỷ hiệu lực đợt đã chi — người khác duyệt ở /approvals (xác nhận nguy hiểm) → /payments có dòng 'Điều chỉnh IPC' âm chỉ đọc; axe sạch", async ({
+    page,
+  }) => {
+    await theme(page, "darkblue");
+    const co = await dungToChucCoLap(["pm", "admin"]);
+    // Người phụ trách = bên hợp đồng (phiếu IPC mang tên này) để /payments hiện khối phiếu.
+    await dungSheetNguoiPhuTrach(co.projectId, "CĐT S15");
+    await dangNhapCoLap(page, co.nguoi.pm.email);
+    const hd = await dungHopDong(page, { value: 100000, qtyContract: 100, unitPrice: 1000 });
+    const d = await lapDot(page, hd.contractId, hd.boqId, 90);
+    await trinh(page, d.id);
+    await ok(
+      goiApi(page, "POST", `/api/payment-certs/${d.id}/decide`, { decision: "approved" }),
+      200,
+      "duyệt đợt",
+    );
+
+    // Admin (≠ người duyệt đợt) đánh dấu chi phiếu gốc → reversal sẽ sinh phiếu âm bù phần đã chi.
+    await page.context().clearCookies();
+    await dangNhapCoLap(page, co.nguoi.admin.email);
+    const dot = await ok(goiApi(page, "GET", `/api/payment-certs/${d.id}`), 200, "xem đợt");
+    const billId = (dot.cert as { bill: { id: number } }).bill.id;
+    const homNay = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
+    await ok(
+      goiApi(page, "POST", `/api/payments/bills/${billId}/pay`, { paidAt: homNay }),
+      200,
+      "đánh dấu chi phiếu gốc",
+    );
+
+    // PM lập + trình chứng từ huỷ hiệu lực qua UI: cảnh báo nêu đúng −giá trị hiệu lực của đợt.
+    await page.context().clearCookies();
+    await dangNhapCoLap(page, co.nguoi.pm.email);
+    await moDot(page, d);
+    await daDuocDuyet(page);
+    await bam(page.getByRole("button", { name: "Huỷ hiệu lực đợt", exact: true }).first());
+    const form = hop(page);
+    await expect(form.getByRole("heading", { name: /Huỷ hiệu lực đợt/ })).toBeVisible();
+    await expect(form.getByRole("note")).toContainText("−90.000 đ");
+    const axeForm = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+    const nangForm = axeForm.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    );
+    expect(nangForm, JSON.stringify(nangForm, null, 2)).toEqual([]);
+    await form.getByLabel(/Lý do/).fill("Đợt lập nhầm hợp đồng — huỷ toàn bộ");
+    await bam(form.getByRole("button", { name: "Lưu nháp" }));
+    await expect(form).toHaveCount(0, { timeout: 20_000 });
+    await bam(page.getByRole("button", { name: /^Trình ADJ-/ }).first());
+    await bam(hop(page).getByRole("button", { name: "Trình", exact: true }));
+    await expect(page.getByText("Đã trình", { exact: true }).first()).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // Admin duyệt ở hộp thư /approvals: hộp xác nhận NGUY HIỂM (huỷ hiệu lực cả đợt), axe sạch.
+    await page.context().clearCookies();
+    await dangNhapCoLap(page, co.nguoi.admin.email);
+    await page.goto("/approvals");
+    // Dòng hộp thư = khối nhỏ nhất chứa cả nhãn loại chứng từ lẫn nút Duyệt.
+    const dong = page
+      .locator("div")
+      .filter({ hasText: "Huỷ hiệu lực IPC" })
+      .filter({ has: page.getByRole("button", { name: /Duyệt/ }) })
+      .last();
+    await expect(dong).toBeVisible({ timeout: 20_000 });
+    await expect(dong).toContainText("−90.000");
+    await bam(dong.getByRole("button", { name: /Duyệt/ }).first());
+    const xacNhan = hop(page);
+    await expect(xacNhan).toContainText("HUỶ HIỆU LỰC cả đợt");
+    const axeHop = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+    const nangHop = axeHop.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    );
+    expect(nangHop, JSON.stringify(nangHop, null, 2)).toEqual([]);
+    await bam(xacNhan.getByRole("button", { name: "Duyệt", exact: true }));
+    await expect(page.getByText("Huỷ hiệu lực IPC")).toHaveCount(0, { timeout: 20_000 });
+    const sau = await ok(goiApi(page, "GET", `/api/payment-certs/${d.id}/adjustments`), 200, "ds");
+    expect((sau.adjustments as { status: string }[])[0].status).toBe("approved");
+
+    // /payments: dòng phiếu điều chỉnh âm — chip, dấu "−", chỉ đọc (không ô nhập, không nút Xoá).
+    await page.goto("/payments");
+    await expect(page.getByText("Tổng giá trị HĐ").first()).toBeVisible({ timeout: 20_000 });
+    await bam(page.getByRole("button", { name: /Người phụ trách/ }));
+    // Mở khoá chỉnh sửa: phiếu thường có ô nhập + nút Xoá, phiếu điều chỉnh vẫn chỉ đọc.
+    await bam(page.getByRole("button", { name: /Chỉ xem — bấm để mở khoá/ }));
+    const dongDc = page.locator("tr").filter({ hasText: "Điều chỉnh IPC" });
+    await expect(dongDc).toHaveCount(1, { timeout: 20_000 });
+    await expect(dongDc).toContainText("Sinh từ chứng từ điều chỉnh");
+    await expect(dongDc).toContainText("−90.000 đ");
+    await expect(dongDc.locator("input")).toHaveCount(0);
+    await expect(dongDc.getByRole("button", { name: "Xoá" })).toHaveCount(0);
+    const dongGoc = page.locator("tr").filter({ hasText: /Đã chi \d/ });
+    await expect(dongGoc.locator("input").first()).toBeVisible();
+    // axe khoanh vào dòng phiếu điều chỉnh (phần M128 thêm): khối phiếu chế độ "Người phụ trách"
+    // của /payments còn nợ a11y có từ trước (nhãn text-zinc-600, ô nhập/nút icon thiếu nhãn —
+    // ghi nợ trong PROGRESS.md), quét cả trang sẽ đỏ vì phần không thuộc thay đổi này.
+    const axe = await new AxeBuilder({ page })
+      .include('tr[data-loai-phieu="adjustment"]')
+      .withTags(AXE_TAGS)
+      .analyze();
     const nang = axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(nang, JSON.stringify(nang, null, 2)).toEqual([]);
   });

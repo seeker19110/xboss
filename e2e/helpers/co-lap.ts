@@ -101,6 +101,34 @@ export async function dungTaskTienDo(projectId: number, tienDo: number[]): Promi
   });
 }
 
+/**
+ * 1 tháp → 1 sheet có NGƯỜI PHỤ TRÁCH `responsible` → 1 nhóm có nhãn tầng: trang /payments (chế độ
+ * "Người phụ trách") chỉ hiện khối phiếu của người có ô tầng × hệ — dữ liệu đầu vào, không phải
+ * trạng thái nghiệp vụ.
+ */
+export async function dungSheetNguoiPhuTrach(
+  projectId: number,
+  responsible: string,
+): Promise<void> {
+  const h = hauTo();
+  await voiPool(async (p) => {
+    const tw = await p.query(
+      `INSERT INTO towers (project_id, name) VALUES ($1, 'Tháp E2E') RETURNING id`,
+      [projectId],
+    );
+    const st = await p.query(
+      `INSERT INTO sheet_types (tower_id, code, name, slug, responsible)
+       VALUES ($1, $2, 'Sheet E2E', $3, $4) RETURNING id`,
+      [tw.rows[0].id, `S${h}`, `s-${h}`, responsible],
+    );
+    await p.query(
+      `INSERT INTO work_packages (sheet_type_id, code, name, sort_order, floor_label)
+       VALUES ($1, $2, 'Nhóm E2E', 1, 'T1')`,
+      [st.rows[0].id, `P${h}`],
+    );
+  });
+}
+
 /** Gắn dòng BOQ vào hợp đồng (không có route nào ghi `boq_items.contract_id`). */
 export async function ganBoqVaoHopDong(boqId: number, contractId: number): Promise<void> {
   await voiPool((p) =>

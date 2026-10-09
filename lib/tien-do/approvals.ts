@@ -119,12 +119,15 @@ export async function getActiveFlow(
 // Mở yêu cầu duyệt khi tạo thực thể. Không có flow → null (caller giữ hành vi cũ).
 // Đã có request đang chờ cho thực thể này → trả lại request đó (idempotent). Không còn
 // bước hiệu lực nào (vd flow rỗng hoặc mọi bước bị ngưỡng loại) → tạo request đã duyệt sẵn.
+// `flowEntityType` (tuỳ chọn): loại dùng để TRA flow khi khác loại của request — chứng từ điều
+// chỉnh IPC (M128, entity 'payment_cert_adjustment') đi theo flow cấu hình cho 'payment_cert'.
 export async function openApproval(opts: {
   entityType: string;
   entityId: number;
   projectId: number;
   amount?: number | null;
   user: ActorUser;
+  flowEntityType?: string;
 }): Promise<ApprovalRequest | null> {
   const amount = opts.amount ?? null;
   return withTransaction(async () => {
@@ -139,7 +142,7 @@ export async function openApproval(opts: {
     );
     if (existing) return existing;
 
-    const flow = await getActiveFlow(opts.entityType, opts.projectId);
+    const flow = await getActiveFlow(opts.flowEntityType ?? opts.entityType, opts.projectId);
     if (!flow) return null;
 
     // approval_requests.amount là NUMERIC(15,2): tràn cột → 422 rõ ràng thay vì lỗi pg 22003

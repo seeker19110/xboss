@@ -122,7 +122,7 @@ thay đổi; lần đo dùng role owner (không RLS).
 | A5-AC04 | P/H/B | s13a-chuoi-ipc-thanh-toan; e2e payment-certs-canh-bao (409 thiếu ack, hộp xác nhận) | PARTIAL  | PASS     | —                           |
 | A5-AC05 | P/H   | s13a-chuoi-ipc-thanh-toan                                                           | PASS     | PASS     | —                           |
 | A5-AC06 | P/H/M | s13a-chuoi-ipc-thanh-toan; s13e                                                     | PARTIAL  | PARTIAL  | M UAT hợp đồng thật         |
-| A5-AC07 | P/H/M | s13a-chuoi-ipc-thanh-toan; s13c                                                     | PARTIAL  | PARTIAL  | adjustment, M               |
+| A5-AC07 | P/H/M | s13a-chuoi-ipc-thanh-toan; m128-dieu-chinh-ipc (+B e2e payment-certs-canh-bao)      | PARTIAL  | PARTIAL  | M UAT điều chỉnh HĐ thật    |
 | A5-AC08 | P/H/B | s13a-chuoi-ipc-thanh-toan (+2 ca S15); m129-ipc-da-chi (9 ca)                       | GAP      | PASS     | M129 (pay_status), B        |
 | A5-AC09 | B/M   | s13c; s13a; e2e payment-certs-canh-bao (retry không tự ack, bàn phím, axe)          | GAP      | PARTIAL  | M (7 vai trò thiết bị thật) |
 
@@ -201,7 +201,10 @@ Không mục nào dưới đây được tự quyết hoặc code trong S15.
   `org-scope-invariant`) nên xếp **P2 defense-in-depth**. Sửa cần migration + đổi login/`getCurrentUser` sang
   scope `'*'` tường minh → đề xuất slice riêng, chạy qua staging (migration đụng policy).
 - **(c) Tính năng adjustment (A5-AC07):** hiện chỉ chặn huỷ upstream/trả conflict, chưa có chứng từ điều chỉnh
-  để kiểm quyền/audit. Cần chủ nghiệp vụ chốt luồng.
+  để kiểm quyền/audit. Cần chủ nghiệp vụ chốt luồng. → **xong (M128):** chứng từ điều chỉnh/huỷ hiệu lực
+  IPC (`payment_cert_adjustments`, nháp→trình→duyệt SoD, phiếu `adjustment` ròng, luỹ kế hiệu lực, trigger
+  hồ sơ chốt; xem `M128-*.md`, PROGRESS 2026-10-09). Lớp P/H (+B e2e) đủ; A5-AC07 giữ PARTIAL chỉ vì lớp M
+  (UAT điều chỉnh trên hợp đồng thật) chưa chạy — theo luật "không PASS khi còn lớp M".
 - **(d) Retention/cleanup diễn tập (A6-AC06):** chưa có chính sách retention evidence và quyền cleanup;
   `docs/ops/backup.md` đang giao `rm -rf` thủ công cho người vận hành.
 - **(e) "approved ≠ paid" (A5-AC08):** duyệt IPC sinh phiếu thanh toán ngay nên không biểu diễn được trạng
@@ -227,7 +230,7 @@ Không mục nào dưới đây được tự quyết hoặc code trong S15.
   "cookie sai → dự án đầu"/`projectId == null` đóng ở `AUDIT-S16-NULL-SCOPE.md` (23 route + rename).
 - **(b)** → **xong (PR-B)**: migration 0165 + `withOrgScope`/cron theo từng org (`AUDIT-S16-RLS-STRICT.md`);
   **bắt buộc staging trước production**, Metabase view cần GUC/BYPASSRLS (chủ dự án quyết).
-- **(c)** → đặc tả `M128-chung-tu-dieu-chinh-ipc.md` (Approved, thi hành sau M129).
+- **(c)** → **xong (M128)**: đặc tả `M128-chung-tu-dieu-chinh-ipc.md`, migration 0168.
 - **(d)** → **xong** (M130, `scripts/retention-cleanup.ts`, `docs/ops/backup.md`).
 - **(e)** → đặc tả `M129-ipc-da-chi-tach-cam-ket-thuc-chi.md` (Approved).
 - **(f)** → **xong** (`/api/ready`, login/me 503 `schema_not_ready`).

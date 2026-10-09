@@ -27,6 +27,7 @@ const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const TOP_A = new Set([
   "payments",
   "payment-certs",
+  "adjustments", // M128: chứng từ điều chỉnh IPC
   "claims",
   "claim-documents",
   "variations",

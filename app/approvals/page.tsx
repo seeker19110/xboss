@@ -48,6 +48,10 @@ type FloorGroup = {
 type PendingApproval = {
   id: number;
   entityType: "variation" | "payment_cert" | "proposal" | "task_acceptance";
+  /** M128: phần tử chứng từ điều chỉnh IPC (`entityId` = id chứng từ; `label` "Điều chỉnh IPC <code> — đợt <maDot>"). */
+  kind?: "adjustment";
+  /** M128: loại chứng từ khi `kind === 'adjustment'` — chỉ 'reversal' (huỷ hiệu lực cả đợt) cảnh báo nguy hiểm. */
+  adjustmentKind?: "adjustment" | "reversal";
   entityId: number;
   amount: number | null;
   currentSeq: number;
@@ -74,6 +78,7 @@ function decideBody(entityType: PendingApproval["entityType"], approve: boolean,
   return { decision: approve ? "approved" : "rejected", rejectReason: note };
 }
 function decideUrl(item: PendingApproval): string {
+  if (item.kind === "adjustment") return `/api/adjustments/${item.entityId}/decide`;
   switch (item.entityType) {
     case "variation":
       return `/api/variations/${item.entityId}/decide`;
@@ -189,12 +194,22 @@ function ApprovalsPageInner() {
       const n = await appPrompt("Lý do từ chối (bắt buộc)");
       if (!n?.trim()) return;
       note = n.trim();
-    } else if (
-      !(await appConfirm(`Duyệt "${item.label}" — bước ${item.currentSeq} (${item.stepRole})?`, {
-        confirmLabel: "Duyệt",
-      }))
-    )
-      return;
+    } else {
+      // Chứng từ điều chỉnh IPC: nêu hệ quả + giá trị; chỉ huỷ hiệu lực (reversal) là thao tác
+      // nguy hiểm (xoá hiệu lực cả đợt, huỷ phiếu chưa chi) → nút đỏ.
+      const laDieuChinh = item.kind === "adjustment";
+      const laHuyHieuLuc = laDieuChinh && item.adjustmentKind === "reversal";
+      const giaTri =
+        laDieuChinh && item.amount != null
+          ? ` Giá trị (gộp) ${item.amount < 0 ? `−${formatVnd(-item.amount)}` : `+${formatVnd(item.amount)}`}.`
+          : "";
+      const msg = laHuyHieuLuc
+        ? `Duyệt "${item.label}" — HUỶ HIỆU LỰC cả đợt thanh toán: luỹ kế hợp đồng của đợt về 0, phiếu chưa chi bị huỷ, phần đã chi sinh phiếu âm.${giaTri} Bước ${item.currentSeq} (${item.stepRole}).`
+        : laDieuChinh
+          ? `Duyệt "${item.label}" — chứng từ điều chỉnh IPC thay đổi luỹ kế hợp đồng và sinh phiếu thanh toán.${giaTri} Bước ${item.currentSeq} (${item.stepRole}).`
+          : `Duyệt "${item.label}" — bước ${item.currentSeq} (${item.stepRole})?`;
+      if (!(await appConfirm(msg, { confirmLabel: "Duyệt", danger: laHuyHieuLuc }))) return;
+    }
     await guiQuyetDinhInbox(item, decideBody(item.entityType, approve, note));
   }
 
@@ -718,7 +733,11 @@ function ApprovalsPageInner() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300 shrink-0">
-                          {ENTITY_TYPE_LABEL[it.entityType]}
+                          {it.kind === "adjustment"
+                            ? it.adjustmentKind === "reversal"
+                              ? "Huỷ hiệu lực IPC"
+                              : "Điều chỉnh IPC"
+                            : ENTITY_TYPE_LABEL[it.entityType]}
                         </span>
                         <a
                           href={it.linkUrl}
@@ -732,8 +751,11 @@ function ApprovalsPageInner() {
                           Bước {it.currentSeq} · Vai trò {it.stepRole}
                         </span>
                         {it.amount != null && (
-                          <span className="font-mono font-semibold text-emerald-400">
-                            · {formatVnd(it.amount)}
+                          // Chứng từ điều chỉnh âm (giảm/huỷ hiệu lực, M128): dấu "−" + màu rose.
+                          <span
+                            className={`font-mono font-semibold ${it.amount < 0 ? "text-rose-300" : "text-emerald-400"}`}
+                          >
+                            · {it.amount < 0 ? `−${formatVnd(-it.amount)}` : formatVnd(it.amount)}
                           </span>
                         )}
                         {deadline && (

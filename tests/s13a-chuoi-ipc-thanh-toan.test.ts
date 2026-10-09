@@ -792,7 +792,7 @@ test(
 );
 
 test(
-  "A5-FR10: xoá dòng BOQ có dòng IPC đã chốt trả 409 dependency_conflict có kiểm soát",
+  "A5-FR10: xoá dòng BOQ có dòng IPC đã chốt trả 409 adjustment_required (M128) có kiểm soát",
   S,
   async () => {
     const f = new SoFixture();
@@ -806,7 +806,7 @@ test(
       const { DELETE: XOA_BOQ } = await import("@/app/api/boq/[id]/route");
       const r = await goi(XOA_BOQ(jreq(`/x`, undefined, "DELETE"), P(c.boqId)));
       assert.equal(r.status, 409);
-      assert.equal(r.body?.code, "dependency_conflict");
+      assert.equal(r.body?.code, "adjustment_required");
     } finally {
       await f.don();
     }

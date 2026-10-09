@@ -10,7 +10,10 @@ import {
   phanTram,
   thanhTienTheoPct,
   tienNhapSangMinor,
+  tongBanIn,
+  tongPhieu,
   tongTien,
+  type Bill,
 } from "@/app/payments/_components/tienThanhToan";
 import { soTienNhapThuan, tienTextToWire } from "@/lib/nen/money-dto";
 import { isMoneyPrecisionError } from "@/lib/nen/money";
@@ -317,4 +320,41 @@ test("tienTextToWire: chuỗi ::text → wire; dạng mũ float8 bị từ chố
     (e) => isMoneyPrecisionError(e),
   );
   assert.throws(() => tienTextToWire("1.999999999999998e+16", "decimal-string-v1"), TypeError);
+});
+
+test("M128 tongPhieu: KPI /payments gồm phiếu điều chỉnh IPC ± (bỏ void), không gồm tạm ứng/phát sinh", () => {
+  const p = (type: Bill["type"], amount: bigint, payStatus?: Bill["payStatus"]) =>
+    ({ type, amount, payStatus }) as Bill;
+  const kq = tongPhieu([
+    p("bill", 900000n, "paid"), // 9.000,00 đ đã chi
+    p("adjustment", 200000n, "void"), // điều chỉnh đã huỷ — không tính
+    p("adjustment", -900000n, "committed"), // phiếu âm của reversal — chưa chi
+    p("adjustment", 50000n, "paid"), // điều chỉnh đã chi
+    p("bill", 10000n), // phiếu cũ thiếu payStatus = đã chi
+    p("advance", 777700n, "paid"),
+    p("item", 888800n, "paid"),
+  ]);
+  assert.deepEqual(kq, { daChi: 960000n, chuaChi: -900000n });
+});
+
+test("M128 tongBanIn: bản in /payments/print bỏ phiếu void, gồm phiếu điều chỉnh IPC ± ở mục A", () => {
+  const p = (id: number, type: Bill["type"], amount: bigint, payStatus?: Bill["payStatus"]) =>
+    ({ id, type, amount, payStatus }) as Bill;
+  const kq = tongBanIn([
+    p(1, "adjustment", -300000n, "committed"), // phiếu âm điều chỉnh IPC (−3.000,00 đ)
+    p(2, "bill", 1000000n, "void"), // phiếu gốc đã huỷ hiệu lực — không in, không tính
+    p(3, "bill", 500000n, "paid"),
+    p(4, "item", 20000n),
+    p(5, "advance", 100000n),
+  ]);
+  assert.deepEqual(
+    kq.mucA.map((b) => b.id),
+    [3, 1],
+    "phiếu thường trước, điều chỉnh sau; phiếu void bị loại",
+  );
+  assert.deepEqual([kq.mucB.map((b) => b.id), kq.tamUng.map((b) => b.id)], [[4], [5]]);
+  assert.equal(kq.gtthtc, 200000n, "5.000 − 3.000 (không cộng 10.000 của phiếu void)");
+  assert.equal(kq.sumB, 20000n);
+  assert.equal(kq.tuAmount, 100000n);
+  assert.equal(kq.gtttk, 200000n - 20000n - 100000n);
 });

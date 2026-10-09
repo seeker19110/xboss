@@ -25,7 +25,8 @@ export type FloorRow = {
 };
 export type DuLieuThanhToan = { rows: FloorRow[]; totalContract: bigint; totalEarned: bigint };
 
-export type BillType = "bill" | "advance" | "item";
+/** M128: 'adjustment' = phiếu sinh từ chứng từ điều chỉnh/huỷ hiệu lực IPC (amount ±). */
+export type BillType = "bill" | "advance" | "item" | "adjustment";
 export type Bill = {
   id: number;
   responsible: string;
@@ -118,6 +119,63 @@ export function docFloors(body: unknown): FloorData[] | null {
   }
 }
 
+/**
+ * Phiếu tính vào KPI/tổng "công việc hoàn thành": phiếu thường/IPC ('bill') + phiếu điều chỉnh
+ * IPC ('adjustment', ±, M128). Bỏ phiếu đã huỷ (void). Tạm ứng/phát sinh là nội bộ từng đợt.
+ */
+export function laPhieuThanhToan(b: Pick<Bill, "type" | "payStatus">): boolean {
+  return (b.type === "bill" || b.type === "adjustment") && b.payStatus !== "void";
+}
+
+/** Phiếu đã chi thật: paid, hoặc thiếu payStatus (API/phiếu cũ). committed/void bị loại. */
+export function daChi(b: Pick<Bill, "payStatus">): boolean {
+  return b.payStatus === "paid" || b.payStatus == null;
+}
+
+/** KPI phiếu: Σ đã chi + Σ đã duyệt chưa chi (committed) — bigint exact, gồm phiếu điều chỉnh ±. */
+export function tongPhieu(bills: readonly Bill[]): { daChi: bigint; chuaChi: bigint } {
+  const phieu = bills.filter(laPhieuThanhToan);
+  return {
+    daChi: tongTien(phieu.filter(daChi), (b) => b.amount),
+    chuaChi: tongTien(
+      phieu.filter((b) => b.payStatus === "committed"),
+      (b) => b.amount,
+    ),
+  };
+}
+
+/** Các mục + tổng của bản in "Bảng khối lượng thanh toán" (/payments/print) — bigint exact. */
+export type TongBanIn = {
+  /** Mục A: phiếu thường/IPC rồi phiếu điều chỉnh IPC (±), bỏ phiếu void (`laPhieuThanhToan`). */
+  mucA: Bill[];
+  mucB: Bill[];
+  tamUng: Bill[];
+  /** Tổng GT công việc hoàn thành = Σ mục A (đã chi + đã duyệt chưa chi, `tongPhieu`). */
+  gtthtc: bigint;
+  sumB: bigint;
+  tuAmount: bigint;
+  /** Được thanh toán kỳ này = GTTHTC − khấu trừ − tạm ứng. */
+  gtttk: bigint;
+};
+
+/**
+ * M128: bản in cùng quy tắc KPI /payments — phiếu void (huỷ hiệu lực) không in/không cộng, phiếu
+ * điều chỉnh IPC (kể cả phiếu âm) vào mục A để tổng khớp số tiền thật.
+ */
+export function tongBanIn(bills: readonly Bill[]): TongBanIn {
+  const mucA = [
+    ...bills.filter((b) => b.type === "bill" && laPhieuThanhToan(b)),
+    ...bills.filter((b) => b.type === "adjustment" && laPhieuThanhToan(b)),
+  ];
+  const mucB = bills.filter((b) => b.type === "item");
+  const tamUng = bills.filter((b) => b.type === "advance");
+  const { daChi: chi, chuaChi } = tongPhieu(mucA);
+  const gtthtc = chi + chuaChi;
+  const sumB = tongTien(mucB, (b) => b.amount);
+  const tuAmount = tongTien(tamUng, (b) => b.amount);
+  return { mucA, mucB, tamUng, gtthtc, sumB, tuAmount, gtttk: gtthtc - sumB - tuAmount };
+}
+
 /** Σ tiền bigint theo hàm lấy giá trị. */
 export function tongTien<T>(items: readonly T[], lay: (it: T) => bigint): bigint {
   let s = 0n;
@@ -167,6 +225,11 @@ export function fmtVND(minor: bigint): string {
   if (minor === 0n) return "—";
   const gon = fmtDongGonMinor(minor);
   return /(tỷ|tr)$/.test(gon) ? gon : `${gon} đ`;
+}
+
+/** Tiền gọn có dấu: âm → "−" + trị tuyệt đối (dấu trừ chữ, không gạch nối), dương như `fmtVND`. */
+export function fmtVNDCoDau(minor: bigint): string {
+  return minor < 0n ? `−${fmtVND(-minor)}` : fmtVND(minor);
 }
 
 /** Tiền đầy đủ (giữ xu khi khác 0): "1.234.567,5 đ". */

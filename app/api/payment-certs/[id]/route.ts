@@ -25,6 +25,8 @@ import {
 } from "@/lib/nen/money";
 import { getEntityApprovalStatus } from "@/lib/tien-do/approvals";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
+import { tomTatDieuChinh } from "@/lib/tai-chinh/ipc-dieu-chinh-doc";
+import { moneyOrNullToWire } from "@/lib/nen/money-dto";
 import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +59,9 @@ const json = (body: unknown, status = 200) =>
 // (đọc `::text` trong SQL, không qua float) + `moneyFormat`; không gửi → JSON number legacy (422
 // `money_precision_unsupported` nếu một giá trị không round-trip được qua number). Che đơn giá
 // (stripSensitive) TRƯỚC khi đổi wire — đơn giá bị che là null ở cả hai định dạng.
+// M128: kèm `adjustmentsSummary: { open, approvedCount, reversed, grossAmount, netBillAmount }`
+// — grossAmount = Σ amount (GỘP, KL × giá) chứng từ điều chỉnh đã duyệt; netBillAmount = Σ tiền
+// phiếu điều chỉnh RÒNG chưa huỷ của đợt (adj-sum-v2). Cùng kiểu wire + luật che với totals.
 export async function GET(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -92,21 +97,34 @@ export async function GET(
       // luỹ kế HIỆU LỰC (đúng số quyết định sẽ chốt) + warningVersion để người duyệt xác nhận
       // đúng bản đang xem (S13c, A5-FR07).
       const { vuotHopDong, warningVersion } = await canhBaoDot(id);
-      return { cert, totals, itemsExact, approvalStatus, vuotHopDong, warningVersion };
+      // M128: tóm tắt chứng từ điều chỉnh/huỷ hiệu lực của đợt (cùng snapshot).
+      const dieuChinh = await tomTatDieuChinh(id);
+      return { cert, totals, itemsExact, approvalStatus, vuotHopDong, warningVersion, dieuChinh };
     },
     { isolation: "repeatable_read" },
   );
   if (!detail) return json({ error: "Không tìm thấy đợt thanh toán" }, 404);
-  const { cert, totals, itemsExact, approvalStatus, vuotHopDong, warningVersion } = detail;
+  const { cert, totals, itemsExact, approvalStatus, vuotHopDong, warningVersion, dieuChinh } =
+    detail;
   // M50 PR2: che đơn giá dòng KL + tổng tiền đợt cho user thiếu viewPayments (phòng thủ
   // — gate route hiện cũng là viewPayments). Che TRƯỚC khi đổi sang wire.
   const [maskedCert] = stripSensitive("paymentCert", [cert], user);
   const [maskedTotals] = stripSensitive<CertTotalsMasked>("certTotals", [totals], user);
   let wireTotals;
   let wireItems;
+  let adjustmentsSummary;
   try {
     wireTotals = certTotalsToWire(maskedTotals, format);
     wireItems = certItemsToWire(maskedCert.items, itemsExact, format);
+    // Tiền gộp/ròng cùng kiểu wire + cùng luật che (viewPayments) với totals.
+    const xemTien = CAN.viewPayments(user.role);
+    adjustmentsSummary = {
+      open: dieuChinh.open,
+      approvedCount: dieuChinh.approvedCount,
+      reversed: dieuChinh.reversed,
+      grossAmount: moneyOrNullToWire(xemTien ? dieuChinh.grossAmount : null, format),
+      netBillAmount: moneyOrNullToWire(xemTien ? dieuChinh.netBillAmount : null, format),
+    };
   } catch (err) {
     if (!isMoneyPrecisionError(err)) throw err;
     return json(
@@ -128,6 +146,7 @@ export async function GET(
     approvalStatus,
     vuotHopDong,
     warningVersion,
+    adjustmentsSummary,
     ...(format === MONEY_FORMAT_DECIMAL_V1 ? { moneyFormat: MONEY_FORMAT_DECIMAL_V1 } : {}),
   });
 }
@@ -219,7 +238,9 @@ export async function PATCH(
 
   // Lưu xong mới soát: người lập vẫn ghi được (quyết định "cảnh báo, không chặn"), nhưng
   // phải nhìn thấy ngay dòng nào đang vượt khối lượng hợp đồng trước khi trình duyệt.
-  const vuotHopDong = await dongVuotHopDong(id);
+  // M128: luỹ kế hiệu lực cộng sổ điều chỉnh (bảng FORCE RLS theo dự án) → đọc trong phạm vi
+  // dự án, không thì role ứng dụng thấy 0 chứng từ và cảnh báo thiếu phần điều chỉnh.
+  const vuotHopDong = await withProjectScope(projectId as number, () => dongVuotHopDong(id));
   return NextResponse.json(
     { updated: id, vuotHopDong },
     { headers: { "Cache-Control": "private, no-store" } },

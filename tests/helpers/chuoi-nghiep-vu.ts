@@ -143,7 +143,7 @@ export class SoFixture {
   }
 
   async don(): Promise<void> {
-    const { query, run } = await import("@/lib/db");
+    const { query, run, withTransaction } = await import("@/lib/db");
     for (const pid of this.projects) {
       const contracts = (
         await query<{ id: number }>(`SELECT id FROM contracts WHERE project_id = ?`, pid)
@@ -158,6 +158,22 @@ export class SoFixture {
           pid,
         )
       ).map((r) => r.id);
+      // M128: chứng từ điều chỉnh (dòng cascade) + snapshot quyết định — trước payment_bills
+      // (bill_id) và payment_certs (cert_id). Chứng từ đã duyệt/từ chối bị trigger 0168 khoá →
+      // fixture (role chủ bảng) bật cờ bảo trì trong đúng transaction dọn này (SET LOCAL).
+      await withTransaction(async () => {
+        await run(`SELECT set_config('xboss.bao_tri_chung_tu', 'on', true)`);
+        await run(
+          `DELETE FROM payment_cert_adjustment_decisions WHERE project_id = ? OR contract_id = ANY(?::int[])`,
+          pid,
+          contracts,
+        );
+        await run(
+          `DELETE FROM payment_cert_adjustments WHERE project_id = ? OR contract_id = ANY(?::int[])`,
+          pid,
+          contracts,
+        );
+      });
       await run(
         `DELETE FROM payment_bills
           WHERE project_id = ? OR contract_id = ANY(?::int[])
