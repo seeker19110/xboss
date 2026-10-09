@@ -44,6 +44,13 @@ function routeTrao(awardTender: () => Promise<unknown>) {
         getCurrentUser: async () => ({ id: 1, role: "pm", orgId: 1 }),
         CAN: { approve: () => true },
       },
+      // D01: route tái kiểm quyền lúc ghi qua ghiNeuConQuyen — stub biên: luôn còn quyền, chạy thẳng `ghi`.
+      "@/lib/bao-mat/permissions": {
+        ghiNeuConQuyen: async (_kiem: () => boolean, ghi: () => Promise<unknown>) => ({
+          ok: true,
+          value: await ghi(),
+        }),
+      },
       "@/lib/ha-tang/projects": { getCurrentProjectId: async () => 1 },
       "@/lib/tai-chinh/tender": { awardTender },
     },
