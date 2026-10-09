@@ -28,3 +28,6 @@ Không import app/env runtime, không auto-migrate, không chạm production, kh
 - A6-AC06: kho archive/base backup không đổi một byte; giữ evidence khi FAIL.
 - Thiếu binary server PostgreSQL → NOT_RUN, không skip test (`--release-gate`).
 - Cửa sổ 35 ngày FAIL cho tới khi người vận hành có đủ archive thật.
+- A6-AC04 (verifier `scripts/verify-dr-restore.ts`): hạng mục `app-role-rls` — role app trên đích (mặc định
+  `xboss_app`, đổi qua `DR_VERIFY_APP_ROLE`) phải NOBYPASSRLS, không superuser, không sở hữu bảng RLS, bảng
+  tài chính bật+FORCE RLS; vi phạm hoặc thiếu role → FAIL (không NOT_RUN).

@@ -3,11 +3,15 @@
 // REPEATABLE READ READ ONLY rồi ROLLBACK, trên connection riêng (không qua lib/db).
 //
 // Secret chỉ qua biến môi trường (không qua tham số CLI):
-//   DR_VERIFY_DATABASE_URL       — role audit trên đích (BYPASSRLS + pg_read_all_data, không superuser)
+//   DR_VERIFY_DATABASE_URL       — role audit trên đích (BYPASSRLS + pg_read_all_data; nên không
+//                                  superuser — superuser vẫn được coi là bypass RLS khi đo quyền đọc)
 //   DR_VERIFY_EXPECTED_DATABASE  — tên DB đích kỳ vọng
 //   DR_VERIFY_EXPECTED_USER      — role kỳ vọng
 //   DR_VERIFY_EXPECTED_MARKER    — COMMENT ON DATABASE 'xboss-disposable:<token>' của đích
 //   DR_VERIFY_MARKER_DATABASE    — (tuỳ chọn) DB mang marker, mặc định chính DB đích
+//   DR_VERIFY_APP_ROLE           — (tuỳ chọn) role ứng dụng trên đích, mặc định xboss_app; hạng mục
+//                                  app-role-rls FAIL nếu thiếu role / BYPASSRLS / superuser / sở hữu
+//                                  bảng RLS / bảng tài chính không bật + FORCE RLS
 // Cờ:
 //   --manifest <tệp>        recovery manifest v1 (hoặc manifest cũ của backup.sh)
 //   --attachments-dir <dir> thư mục tệp đính kèm đã khôi phục (băm từng tệp critical)

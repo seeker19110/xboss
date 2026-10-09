@@ -303,21 +303,22 @@ JSON có `recoverySetId`, `appSha`, `startedAt/completedAt`, `counts`, `fixtureC
 `infrastructure`, `reason`, `expected`/`actual`). **Exit ≠ 0 khi có bất kỳ FAIL hoặc NOT_RUN.**
 `--evidence-out` không ghi đè tệp cũ — giữ bằng chứng cả lần thất bại (A6-AC06).
 
-| Hạng mục                                    | PASS khi                                                                           |
-| ------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `source-distinct`, `target`                 | Đích khác nguồn; DB/role/marker/chỉ-đọc khớp                                       |
-| `manifest`, `app-sha`                       | Manifest v1 hợp lệ; app SHA đang dùng khớp snapshot                                |
-| `audit-role-access`                         | Role đọc toàn phần mọi bảng trọng yếu (không bị RLS/quyền chặn)                    |
-| `migration-names`, `migration-checksums`    | Tên migration khớp mã nguồn; tên + SHA-256 khớp manifest                           |
-| `table-digests`, `finance-totals`           | Số dòng + digest từng bảng; tổng tiền so **chuỗi exact**                           |
-| `schema-objects`                            | Ràng buộc, policy RLS, trigger, hàm, extension khớp snapshot                       |
-| `integrity:<luật>`                          | 0 dòng mồ côi/lệch org-project (danh sách luật trong `scripts/lib/dr-snapshot.ts`) |
-| `audit-chain`, `audit-watermark`            | Hash-chain hợp lệ, phủ 100%; số dòng/id/hash cuối khớp (bắt mất đuôi)              |
-| `attachments-manifest`, `attachments-files` | Mọi tệp critical DB tham chiếu có trong manifest; tệp khôi phục đủ + hash khớp     |
-| `backup-artifacts`                          | Artifact backup (dump) còn đủ, size/SHA-256 khớp                                   |
-| `encryption-key-reference`                  | Manifest có tham chiếu key (không chứa key)                                        |
-| `encryption-key-availability`               | Luôn `NOT_RUN` — verifier không truy cập kho key                                   |
-| `wal-coverage`, `rpo`, `rto`                | Chỉ khi manifest có số đo, so với D08 (≤300s, ≤3600s, ≥35 ngày, 0 đoạn thiếu)      |
+| Hạng mục                                    | PASS khi                                                                                                                                                                 |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `source-distinct`, `target`                 | Đích khác nguồn; DB/role/marker/chỉ-đọc khớp                                                                                                                             |
+| `manifest`, `app-sha`                       | Manifest v1 hợp lệ; app SHA đang dùng khớp snapshot                                                                                                                      |
+| `audit-role-access`                         | Role đọc toàn phần mọi bảng trọng yếu (không bị RLS/quyền chặn)                                                                                                          |
+| `app-role-rls`                              | Role app đích (mặc định `xboss_app`, đổi qua `DR_VERIFY_APP_ROLE`): NOBYPASSRLS, không superuser, không sở hữu bảng RLS, bảng tài chính bật+FORCE RLS; thiếu role = FAIL |
+| `migration-names`, `migration-checksums`    | Tên migration khớp mã nguồn; tên + SHA-256 khớp manifest                                                                                                                 |
+| `table-digests`, `finance-totals`           | Số dòng + digest từng bảng; tổng tiền so **chuỗi exact**                                                                                                                 |
+| `schema-objects`                            | Ràng buộc, policy RLS, trigger, hàm, extension khớp snapshot                                                                                                             |
+| `integrity:<luật>`                          | 0 dòng mồ côi/lệch org-project (danh sách luật trong `scripts/lib/dr-snapshot.ts`)                                                                                       |
+| `audit-chain`, `audit-watermark`            | Hash-chain hợp lệ, phủ 100%; số dòng/id/hash cuối khớp (bắt mất đuôi)                                                                                                    |
+| `attachments-manifest`, `attachments-files` | Mọi tệp critical DB tham chiếu có trong manifest; tệp khôi phục đủ + hash khớp                                                                                           |
+| `backup-artifacts`                          | Artifact backup (dump) còn đủ, size/SHA-256 khớp                                                                                                                         |
+| `encryption-key-reference`                  | Manifest có tham chiếu key (không chứa key)                                                                                                                              |
+| `encryption-key-availability`               | Luôn `NOT_RUN` — verifier không truy cập kho key                                                                                                                         |
+| `wal-coverage`, `rpo`, `rto`                | Chỉ khi manifest có số đo, so với D08 (≤300s, ≤3600s, ≥35 ngày, 0 đoạn thiếu)                                                                                            |
 
 Manifest cũ của `backup.sh` (`schemaVersion: 1`) vẫn đọc được: chỉ `backup-artifacts` chạy được,
 các hạng mục cần dữ liệu v1 là `NOT_RUN` (không FAIL cả bộ, không PASS giả).
