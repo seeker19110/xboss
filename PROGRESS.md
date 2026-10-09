@@ -1,11 +1,11 @@
 # PROGRESS — XBoss
 
-## 2026-10-09 — QUALITY-FINAL-1 S15: audit cuối và release candidate (đang làm)
+## 2026-10-09 — QUALITY-FINAL-1 S15: audit cuối và release candidate
 
 Ánh xạ bằng chứng 54 AC (TEST-MATRIX) trên main `e5ce67b` bằng 4 lượt đọc-chạy độc lập theo trụ A1 /
 A2 / A3+A4 / A5+A6 (+ Q-AC01..08): 13 PASS · 28 PARTIAL (tự động xanh, còn thiếu lớp M/O hoặc B thật) ·
-13 GAP · 0 FAIL. Bảng bằng chứng + verdict từng AC sẽ chốt trong `docs/nang-cap/AUDIT-S15-RELEASE-CANDIDATE.md`
-(cùng PR này). Đợt vá GAP đang tích hợp dần trên nhánh:
+13 GAP · 0 FAIL. Bảng bằng chứng + verdict từng AC trong `docs/nang-cap/AUDIT-S15-RELEASE-CANDIDATE.md`
+(cùng PR này). Đợt vá GAP trong S15:
 
 - **Q-AC04 (lỗi thật, đã sửa):** `GET /api/variations` + `/[id]` trả tiền float (kể cả trong `json_agg`).
   Nay tổng `ROUND(SUM(qty×giá),2)::text` trong SQL, dòng KL `::text`, adapter `variationsToWire`
@@ -23,14 +23,41 @@ A2 / A3+A4 / A5+A6 (+ Q-AC01..08): 13 PASS · 28 PARTIAL (tự động xanh, cò
   song → 1 thành công/1 409, không `nghiem_thu` khi <100%), A5-AC01 (`tests/s15-import-route-rerun.test.ts`:
   import 3 lần không nhân dòng), A2-AC03/AC06-H (nhật ký cùng ngày khác chủ/dự án độc lập; 403/404/422 từ
   route thật → `rejected` bền vững).
-- **Đang chạy:** vá A1 (nested scope từ chối, pool đồng thời, quyền fail-closed khi DB lỗi, revoke
-  session/2FA proxy → 401, safe-integer projectId, app role khi thiếu schema), e2e lớp B (portfolio 10%,
-  cảnh báo vượt HĐ + xác nhận/bàn phím/axe, tiền exact trên màn, IDB abort), parser KL `"0.125"` + commercial
-  contracts v1.
+- **A1 (scope/auth), lỗi thật đã sửa — `lib/db/index.ts` (A1-AC04):** transaction lồng trước đây đổi GUC
+  `app.project_id` âm thầm (write tx dự án A → lồng `withProjectScope(B)` chạy tiếp với B). Nay
+  `txStorage` giữ khung `{client, readOnly, actor, scope}` chụp lúc BEGIN: lồng khác actor/dự án, đòi
+  REPEATABLE READ, nâng chỉ-đọc → ghi, hay đổi scope đã gắn ('*'↔N) đều throw; tx chưa gắn dự án được gắn
+  đúng 1 lần (gán trước await nên Promise.all 2 scope bị chặn); ROLLBACK lỗi → `client.release(err)` huỷ
+  connection (không mang GUC cũ sang request sau). `tests/db-scope-nested.test.ts` 8/9 đỏ trên code cũ;
+  244 file test chạm DB không vỡ. Test mới: `permissions-fail-closed` (DB lỗi khi nạp snapshot → CAN false,
+  route approve 500 không ghi; 20 request 2 org không lẫn snapshot; override deny → 403),
+  `rls-app-role-route` (xboss_app NOBYPASSRLS/không owner; `/api/contracts` bằng app role đúng scope),
+  `auth-session-revoke-http` (revoke/đổi mật khẩu → 401; `proxy` chặn flag2fa), `s02-import-project-id`
+  (11 cookie sai → 404, không tạo batch), `runtime-app-role-schema` (DB chưa migrate: health 503
+  `schema_not_ready`, login/me ném `XBOSS_SCHEMA_NOT_READY`, chỉ SELECT, không DDL).
+- **Lỗi nhỏ:** `parseQuantityInput` từ chối `"0.125"` (regex nhóm nghìn khớp cả `0.ddd`) — sửa + test đỏ
+  trên code cũ; `/commercial` gửi header tiền v1 cho mọi fetch (HĐ vượt biên không còn làm KPI "—").
+- **Lớp B (e2e Chromium, desktop+mobile, 35 pass, `--repeat-each=6` spec IPC):** `portfolio-kpi.spec.ts`
+  (A4-AC05: 10% không 50%, rỗng → "Chưa có dữ liệu"), `payment-certs-canh-bao.spec.ts` (A5-AC04: 409
+  `acknowledgement_required`, hộp xác nhận khoá tới khi tick + lý do; A5-AC09: 409 `warning_changed` không
+  tự ack/không retry ngầm, bàn phím Tab/Enter/Esc, axe; A3-AC05: "100.50"/"9999999999999.99" exact trên
+  màn, kỹ sư 403 không lộ số), `offline-idb-abort.spec.ts` (A2-AC05: IDB thật abort → toast
+  OFFLINE_SAVE_ERROR, không "đã lưu", form giữ, ops2 = 0). Helper `e2e/helpers/co-lap.ts` (org/dự án/user
+  riêng cho spec cần số tuyệt đối). **3 lỗi UI thật lộ ra** (fixme → sửa cùng PR): cảnh báo vượt HĐ ở theme
+  sáng tương phản 1,32:1 (`text-rose-200` thiếu token override — sửa `globals.css` ADR-0010); Esc trên hộp
+  xác nhận đóng luôn chứng từ + mất focus; chứng từ IPC tràn ngang mobile 393px.
+- **Kết quả sau vá (@5a36ff2, chờ CI xác nhận):** 19 PASS · 32 PARTIAL · 3 GAP (A1-AC02 chờ cutover,
+  A2-AC07/AC08 offline sâu B/M) · 0 FAIL. State S15 = **CODE_COMPLETE có điều kiện / WAITING_RELEASE**
+  (`docs/nang-cap/AUDIT-S15-RELEASE-CANDIDATE.md`). Bộ test đầy đủ `--release-gate`: 4662 pass, chỉ 2 file
+  hỏng do môi trường cục bộ (`restore-check-postgres`, `db-runtime-migration-boundary` — CI xanh).
 - **WAITING_RELEASE / cần chủ dự án quyết (không code trong S15):** cutover membership rỗng (A1-AC02) + "cookie
-  sai → dự án đầu" (A1-AC03) chờ dry-run membership production; tính năng adjustment (A5-AC07); retention
-  cleanup diễn tập (A6-AC06); PITR VPS chưa bật (RPO thực ~24h), RPO 5m/RTO 60m chưa đo; Safari/iOS thật;
-  "approved ≠ paid" không biểu diễn được vì duyệt IPC sinh phiếu ngay (đổi thiết kế nếu cần).
+  sai → dự án đầu" (A1-AC03) chờ dry-run membership production; **RLS nhánh "GUC rỗng cho qua" còn trên
+  ~18 bảng org/dự án** (users, projects, suppliers, role_permissions, api_keys, webhooks, baselines…): app
+  role không GUC đọc được 2 org — lớp app vẫn lọc org nên xếp P2 defense-in-depth, sửa cần migration + đổi
+  login/`getCurrentUser` sang scope '*' tường minh → slice riêng qua staging; tính năng adjustment
+  (A5-AC07); retention cleanup diễn tập (A6-AC06); PITR VPS chưa bật (RPO thực ~24h), RPO 5m/RTO 60m chưa
+  đo; Safari/iOS thật; "approved ≠ paid" không biểu diễn được vì duyệt IPC sinh phiếu ngay (đổi thiết kế
+  nếu cần); login/me khi thiếu schema ném lỗi → 500 thay vì 503 JSON (đổi contract auth nếu muốn).
 
 ## 2026-10-08 — QUALITY-FINAL-1 S08: UI phục hồi hàng đợi ngoại tuyến và browser acceptance
 

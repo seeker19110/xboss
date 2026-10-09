@@ -64,20 +64,20 @@ Ghi chú A1:
 
 ### A2 — Ngoại tuyến
 
-| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                              | @e5ce67b | @98520f6 | Còn thiếu                           |
-| ------- | ------- | --------------------------------------------------------- | -------- | -------- | ----------------------------------- |
-| A2-AC01 | B/M     | e2e offline-recovery (b); audit-s08-offline-recovery      | PARTIAL  | PARTIAL  | M Safari/iOS                        |
-| A2-AC02 | B/H/P   | offline-queue-route; audit-s08-sw-allowlist               | PARTIAL  | PARTIAL  | SSE sau switch, B 2 tab             |
-| A2-AC03 | U/B/P   | offline-queue; offline-queue-route (+3 ca S15)            | PARTIAL  | PARTIAL  | B dedup/batch thật                  |
-| A2-AC04 | P/H/B   | offline-queue-route (20 request đồng thời)                | PARTIAL  | PARTIAL  | B 2 tab/lease/crash                 |
-| A2-AC05 | B       | audit-offline-store-commit (IDB giả)                      | GAP      | GAP      | đang bổ sung e2e (xem mục cập nhật) |
-| A2-AC06 | U/H/B   | offline-queue; offline-queue-vault; offline-queue-route   | PARTIAL  | PARTIAL  | B hàng đợi qua mạng thật            |
-| A2-AC07 | B/M     | offline-queue-vault; audit-offline-store-commit (IDB giả) | GAP      | GAP      | B + M Safari/iOS                    |
-| A2-AC08 | B/M     | offline-queue-vault (lease); audit-s08-sw-allowlist       | GAP      | GAP      | SW restart, Background Sync, M      |
-| A2-AC09 | H/B/M   | audit-s08-sw-allowlist; offline-vault-route               | PARTIAL  | PARTIAL  | M Safari/iOS, B hết lease           |
-| A2-AC10 | P/H/B   | offline-queue-route (If-Match/If-None-Match)              | PARTIAL  | PARTIAL  | B diary conflict thật               |
-| Q-AC02  | P/H/B/M | offline-vault-route                                       | PARTIAL  | PARTIAL  | B KEK rotation, M                   |
-| Q-AC03  | H/B/M   | offline-vault-route                                       | PARTIAL  | PARTIAL  | B clock rollback, M                 |
+| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                                           | @e5ce67b | @98520f6 | Còn thiếu                      |
+| ------- | ------- | ---------------------------------------------------------------------- | -------- | -------- | ------------------------------ |
+| A2-AC01 | B/M     | e2e offline-recovery (b); audit-s08-offline-recovery                   | PARTIAL  | PARTIAL  | M Safari/iOS                   |
+| A2-AC02 | B/H/P   | offline-queue-route; audit-s08-sw-allowlist                            | PARTIAL  | PARTIAL  | SSE sau switch, B 2 tab        |
+| A2-AC03 | U/B/P   | offline-queue; offline-queue-route (+3 ca S15)                         | PARTIAL  | PARTIAL  | B dedup/batch thật             |
+| A2-AC04 | P/H/B   | offline-queue-route (20 request đồng thời)                             | PARTIAL  | PARTIAL  | B 2 tab/lease/crash            |
+| A2-AC05 | B       | audit-offline-store-commit (IDB giả); e2e offline-idb-abort (IDB thật) | GAP      | PASS     | —                              |
+| A2-AC06 | U/H/B   | offline-queue; offline-queue-vault; offline-queue-route                | PARTIAL  | PARTIAL  | B hàng đợi qua mạng thật       |
+| A2-AC07 | B/M     | offline-queue-vault; audit-offline-store-commit (IDB giả)              | GAP      | GAP      | B + M Safari/iOS               |
+| A2-AC08 | B/M     | offline-queue-vault (lease); audit-s08-sw-allowlist                    | GAP      | GAP      | SW restart, Background Sync, M |
+| A2-AC09 | H/B/M   | audit-s08-sw-allowlist; offline-vault-route                            | PARTIAL  | PARTIAL  | M Safari/iOS, B hết lease      |
+| A2-AC10 | P/H/B   | offline-queue-route (If-Match/If-None-Match)                           | PARTIAL  | PARTIAL  | B diary conflict thật          |
+| Q-AC02  | P/H/B/M | offline-vault-route                                                    | PARTIAL  | PARTIAL  | B KEK rotation, M              |
+| Q-AC03  | H/B/M   | offline-vault-route                                                    | PARTIAL  | PARTIAL  | B clock rollback, M            |
 
 Ghi chú A2: sau vá chỉ A2-AC03 (nhật ký cùng ngày khác chủ/dự án độc lập, chủ thứ hai bị conflict không đè)
 và A2-AC06 (403/404/422 từ route thật → `rejected` bền vững) được bổ sung lớp P/H; không đổi verdict vì
@@ -86,27 +86,27 @@ lớp B/M vẫn thiếu. Lớp B thật hiện chỉ có `e2e/authed/offline-rec
 
 ### A3 — Tiền exact
 
-| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                        | @e5ce67b | @98520f6 | Còn thiếu                           |
-| ------- | ------- | --------------------------------------------------- | -------- | -------- | ----------------------------------- |
-| A3-AC01 | U/P/H/M | MEG; CR; s15-vo-exact (v1 tổng 2^53 xu)             | PARTIAL  | PARTIAL  | M số lớn trên thiết bị              |
-| A3-AC02 | U/P     | MEG                                                 | PASS     | PASS     | —                                   |
-| A3-AC03 | U/P     | MEG                                                 | PASS     | PASS     | —                                   |
-| A3-AC04 | U/P     | MEG (3000 mẫu, oracle bigint)                       | PASS     | PASS     | —                                   |
-| A3-AC05 | H/B/M   | PCD; s10c-*; s15-vo-exact (legacy ngoài biên → 422) | GAP      | GAP      | đang bổ sung e2e (xem mục cập nhật) |
-| A3-AC06 | P/H/M   | MEG (ipc-sum-v1); s15-vo-exact                      | PARTIAL  | PARTIAL  | M chứng từ IPC/PDF thật             |
+| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                                                         | @e5ce67b | @98520f6 | Còn thiếu               |
+| ------- | ------- | ------------------------------------------------------------------------------------ | -------- | -------- | ----------------------- |
+| A3-AC01 | U/P/H/M | MEG; CR; s15-vo-exact (v1 tổng 2^53 xu)                                              | PARTIAL  | PARTIAL  | M số lớn trên thiết bị  |
+| A3-AC02 | U/P     | MEG                                                                                  | PASS     | PASS     | —                       |
+| A3-AC03 | U/P     | MEG                                                                                  | PASS     | PASS     | —                       |
+| A3-AC04 | U/P     | MEG (3000 mẫu, oracle bigint)                                                        | PASS     | PASS     | —                       |
+| A3-AC05 | H/B/M   | PCD; s10c-*; s15-vo-exact; e2e payment-certs-canh-bao (exact trên màn, 403 không lộ) | GAP      | PARTIAL  | M (UAT thiết bị)        |
+| A3-AC06 | P/H/M   | MEG (ipc-sum-v1); s15-vo-exact                                                       | PARTIAL  | PARTIAL  | M chứng từ IPC/PDF thật |
 
 ### A4 — Báo cáo
 
-| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                           | @e5ce67b | @98520f6 | Còn thiếu                           |
-| ------- | ------- | ------------------------------------------------------ | -------- | -------- | ----------------------------------- |
-| A4-AC01 | P/H     | CR                                                     | PASS     | PASS     | —                                   |
-| A4-AC02 | P/H     | CR                                                     | PASS     | PASS     | —                                   |
-| A4-AC03 | P/H     | CR (+ ca NaN/±Inf)                                     | PASS     | PASS     | —                                   |
-| A4-AC04 | P/H     | CR (snapshot REPEATABLE READ)                          | PASS     | PASS     | —                                   |
-| A4-AC05 | U/P/H/B | PKPI (10% không phải 50%)                              | GAP      | GAP      | đang bổ sung e2e (xem mục cập nhật) |
-| A4-AC06 | P/H/B   | PKPI (khớp status/visibility); CR (nhãn T1 trùng, 403) | GAP      | PARTIAL  | B                                   |
-| A4-AC07 | P/H     | PKPI (ngày VN, kế thừa ngày KT nhóm)                   | PASS     | PASS     | —                                   |
-| A4-AC08 | P/H/M   | bao-cao-a4-ac08; `npm run bench:reports`               | PARTIAL  | PARTIAL  | baseline ±10%, dữ liệu thật         |
+| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                                    | @e5ce67b | @98520f6 | Còn thiếu                   |
+| ------- | ------- | --------------------------------------------------------------- | -------- | -------- | --------------------------- |
+| A4-AC01 | P/H     | CR                                                              | PASS     | PASS     | —                           |
+| A4-AC02 | P/H     | CR                                                              | PASS     | PASS     | —                           |
+| A4-AC03 | P/H     | CR (+ ca NaN/±Inf)                                              | PASS     | PASS     | —                           |
+| A4-AC04 | P/H     | CR (snapshot REPEATABLE READ)                                   | PASS     | PASS     | —                           |
+| A4-AC05 | U/P/H/B | PKPI; e2e portfolio-kpi (10%/"Chưa có dữ liệu", không NaN/100%) | GAP      | PASS     | —                           |
+| A4-AC06 | P/H/B   | PKPI (khớp status/visibility); CR (nhãn T1 trùng, 403)          | GAP      | PARTIAL  | B                           |
+| A4-AC07 | P/H     | PKPI (ngày VN, kế thừa ngày KT nhóm)                            | PASS     | PASS     | —                           |
+| A4-AC08 | P/H/M   | bao-cao-a4-ac08; `npm run bench:reports`                        | PARTIAL  | PARTIAL  | baseline ±10%, dữ liệu thật |
 
 Ghi chú A4-AC08: p95 đạt ngưỡng D09 trên fixture tổng hợp (xem
 [AUDIT-A4-AC08-BENCHMARK](AUDIT-A4-AC08-BENCHMARK.md)); so baseline ±10% là NOT_RUN vì chưa có baseline trước
@@ -114,17 +114,17 @@ thay đổi; lần đo dùng role owner (không RLS).
 
 ### A5 — Chuỗi nghiệp vụ
 
-| AC      | Lớp   | Bằng chứng (tests/*.test.ts)                      | @e5ce67b | @98520f6 | Còn thiếu                              |
-| ------- | ----- | ------------------------------------------------- | -------- | -------- | -------------------------------------- |
-| A5-AC01 | P/H   | s13a-chuoi-dong-bo-vat-tu; s15-import-route-rerun | PASS     | PASS     | —                                      |
-| A5-AC02 | P/H   | s13a-chuoi-tien-do-nghiem-thu                     | PASS     | PASS     | —                                      |
-| A5-AC03 | P/H/B | s13a-chuoi-tien-do-nghiem-thu; s15-dong-thoi-lo   | PARTIAL  | PARTIAL  | B batch/approve đồng thời              |
-| A5-AC04 | P/H/B | s13a-chuoi-ipc-thanh-toan                         | PARTIAL  | PARTIAL  | đang bổ sung e2e (xem mục cập nhật)    |
-| A5-AC05 | P/H   | s13a-chuoi-ipc-thanh-toan                         | PASS     | PASS     | —                                      |
-| A5-AC06 | P/H/M | s13a-chuoi-ipc-thanh-toan; s13e                   | PARTIAL  | PARTIAL  | M UAT hợp đồng thật                    |
-| A5-AC07 | P/H/M | s13a-chuoi-ipc-thanh-toan; s13c                   | PARTIAL  | PARTIAL  | adjustment, M                          |
-| A5-AC08 | P/H/B | s13a-chuoi-ipc-thanh-toan (+2 ca S15)             | GAP      | PARTIAL  | approved≠paid, B                       |
-| A5-AC09 | B/M   | s13c (unit docYeuCauXacNhan); s13a (7 vai trò)    | GAP      | GAP      | đang bổ sung e2e (xem mục cập nhật), M |
+| AC      | Lớp   | Bằng chứng (tests/*.test.ts)                                                        | @e5ce67b | @98520f6 | Còn thiếu                   |
+| ------- | ----- | ----------------------------------------------------------------------------------- | -------- | -------- | --------------------------- |
+| A5-AC01 | P/H   | s13a-chuoi-dong-bo-vat-tu; s15-import-route-rerun                                   | PASS     | PASS     | —                           |
+| A5-AC02 | P/H   | s13a-chuoi-tien-do-nghiem-thu                                                       | PASS     | PASS     | —                           |
+| A5-AC03 | P/H/B | s13a-chuoi-tien-do-nghiem-thu; s15-dong-thoi-lo                                     | PARTIAL  | PARTIAL  | B batch/approve đồng thời   |
+| A5-AC04 | P/H/B | s13a-chuoi-ipc-thanh-toan; e2e payment-certs-canh-bao (409 thiếu ack, hộp xác nhận) | PARTIAL  | PASS     | —                           |
+| A5-AC05 | P/H   | s13a-chuoi-ipc-thanh-toan                                                           | PASS     | PASS     | —                           |
+| A5-AC06 | P/H/M | s13a-chuoi-ipc-thanh-toan; s13e                                                     | PARTIAL  | PARTIAL  | M UAT hợp đồng thật         |
+| A5-AC07 | P/H/M | s13a-chuoi-ipc-thanh-toan; s13c                                                     | PARTIAL  | PARTIAL  | adjustment, M               |
+| A5-AC08 | P/H/B | s13a-chuoi-ipc-thanh-toan (+2 ca S15)                                               | GAP      | PARTIAL  | approved≠paid, B            |
+| A5-AC09 | B/M   | s13c; s13a; e2e payment-certs-canh-bao (retry không tự ack, bàn phím, axe)          | GAP      | PARTIAL  | M (7 vai trò thiết bị thật) |
 
 ### A6 — Vận hành, PITR, DR
 
@@ -152,16 +152,16 @@ bảng RLS, mất FORCE RLS, thiếu role đều FAIL) nhưng lớp O trên bả
 
 ## 3. Tổng hợp
 
-| Thời điểm                 | PASS | PARTIAL | GAP | FAIL | Tổng |
-| ------------------------- | ---- | ------- | --- | ---- | ---- |
-| @e5ce67b (đo)             | 13   | 28      | 13  | 0    | 54   |
-| @98520f6 (sau vá, chờ CI) | 16   | 31      | 7   | 0    | 54   |
+| Thời điểm               | PASS | PARTIAL | GAP | FAIL | Tổng |
+| ----------------------- | ---- | ------- | --- | ---- | ---- |
+| @e5ce67b (đo)           | 13   | 28      | 13  | 0    | 54   |
+| @98520f6 (sau vá P/H)   | 16   | 31      | 7   | 0    | 54   |
+| @5a36ff2 (sau vá lớp B) | 19   | 32      | 3   | 0    | 54   |
 
 - Chuyển GAP → PASS (2): A1-AC04, Q-AC06. Chuyển PARTIAL → PASS (1): A1-AC07 (A1-AC05/Q-AC01 giữ PARTIAL: thiếu ca stale snapshot).
 - Chuyển GAP → PARTIAL (4): Q-AC07, A4-AC06, Q-AC04, A5-AC08.
-- GAP còn lại (7): A1-AC02, A2-AC05, A2-AC07, A2-AC08, A3-AC05, A4-AC05, A5-AC09.
-- Ô "đang bổ sung e2e" (A2-AC05, A3-AC05, A4-AC05, A5-AC04, A5-AC09): phiên chính điền kết quả vào
-  mục cập nhật cuối tài liệu sau khi worker lớp B xong và CI xanh; verdict hiện giữ nguyên cột @e5ce67b.
+- Sau lớp B: A2-AC05, A4-AC05 → PASS; A5-AC04 PARTIAL → PASS; A3-AC05, A5-AC09 → PARTIAL (còn M).
+- GAP còn lại (3): A1-AC02 (cutover membership — chờ quyết định), A2-AC07, A2-AC08 (B/M offline sâu).
 - Không AC nào PASS khi còn lớp M/O yêu cầu. 0 FAIL ở cả hai thời điểm.
 
 ## 4. Lỗi thật phát hiện trong S15 và cách xử lý
@@ -287,12 +287,21 @@ npm run test:e2e                                # lớp B (Playwright, Chromium)
 npm run gate -- --test --build                  # cổng cục bộ = job static của CI
 ```
 
-## Cập nhật sau lớp B (phiên chính điền)
+## Cập nhật sau lớp B
 
-| AC      | Spec e2e         | CI run/SHA | Verdict cuối | Ghi chú |
-| ------- | ---------------- | ---------- | ------------ | ------- |
-| A4-AC05 | đang bổ sung e2e |            |              |         |
-| A5-AC04 | đang bổ sung e2e |            |              |         |
-| A5-AC09 | đang bổ sung e2e |            |              |         |
-| A3-AC05 | đang bổ sung e2e |            |              |         |
-| A2-AC05 | đang bổ sung e2e |            |              |         |
+Worker e2e (Chromium, authed-desktop + authed-mobile, 2 lượt liên tiếp + `--repeat-each=6` cho spec IPC):
+35 passed / 0 failed. Helper `e2e/helpers/co-lap.ts` tạo tổ chức/dự án/người dùng riêng cho spec cần số
+tuyệt đối (spec authed chạy song song trên cùng DB). CI xác nhận lại trên SHA cuối của PR.
+
+| AC      | Spec e2e                                    | Verdict cuối | Ghi chú                                          |
+| ------- | ------------------------------------------- | ------------ | ------------------------------------------------ |
+| A4-AC05 | `e2e/authed/portfolio-kpi.spec.ts`          | PASS         | 10% (không 50%), rỗng → "Chưa có dữ liệu"        |
+| A5-AC04 | `e2e/authed/payment-certs-canh-bao.spec.ts` | PASS         | 409 `acknowledgement_required`, hộp xác nhận     |
+| A5-AC09 | `e2e/authed/payment-certs-canh-bao.spec.ts` | PARTIAL      | retry 409 không tự ack; bàn phím; axe; M NOT_RUN |
+| A3-AC05 | `e2e/authed/payment-certs-canh-bao.spec.ts` | PARTIAL      | "100.50"/"9999999999999.99" exact; M NOT_RUN     |
+| A2-AC05 | `e2e/authed/offline-idb-abort.spec.ts`      | PASS         | IDB thật abort → không báo "đã lưu", giữ form    |
+
+Lỗi UI thật lộ ra khi viết e2e (có `test.fixme` tương ứng trong spec IPC, đang sửa trong cùng PR):
+tương phản khối cảnh báo vượt HĐ ở theme sáng (`text-rose-200` không có token override — sửa ở
+`globals.css` theo ADR-0010); Esc trên hộp xác nhận đóng luôn chứng từ và mất focus; chứng từ IPC tràn
+ngang trên mobile 393px. Ngoài ra `ProjectCard` dự án rỗng hiện "0% tiến độ" (COALESCE 0) — chỉ ghi nhận.
