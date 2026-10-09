@@ -47,11 +47,11 @@ npx tsx scripts/retention-cleanup.ts --evidence-dir <dir> [--drill-dir <dir>] [-
 
 - Mặc định in bảng (tiếng Việt): từng tệp/thư mục, loại, tuổi, lý do giữ/xoá, tổng dung lượng sẽ giải
   phóng; exit 0. `--json` in JSON `{ dryRun, items:[{path,kind,ageDays,verdict,reason,bytes}], summary }`.
-- Phân loại evidence: đọc JSON, trường `status`/`overall`/`result` theo format của `verify-dr-restore.ts`
-  và `verify-pitr.ts` (đọc 2 file này để lấy đúng tên trường; nếu không parse được hoặc không có trường →
-  coi là FAIL → giữ dài). Tuổi tính theo trường thời gian trong JSON nếu có, không thì mtime.
-- Thư mục `run-*`: PASS/FAIL đọc từ tệp kết quả trong thư mục nếu có (xem `scripts/lib/pitr-drill.ts`
-  ghi gì), không có → FAIL. `--force-run <id>` cho phép xoá sớm một run cụ thể (có log lý do).
+- Phân loại evidence: đọc JSON, PASS khi `completeDrVerified === true` (verify-dr-restore) hoặc
+  `completePitrVerified === true` (verify-pitr); không parse được/thiếu trường → FAIL → giữ dài. Tuổi
+  theo `completedAt`, không có thì mtime.
+- Thư mục `run-*`: `pitr-drill.ts` không ghi tệp kết quả trong thư mục → PASS suy từ evidence JSON trong
+  `--evidence-dir` có `drillRunDir` trùng tên và `completePitrVerified === true`; không có → FAIL. `--force-run <id>` cho phép xoá sớm một run cụ thể (có log lý do).
 - An toàn: refuse (exit 2) nếu `--evidence-dir`/`--drill-dir` trùng hoặc nằm trong `BACKUP_DIR`,
   thư mục WAL archive (`/srv/xboss-wal`), hoặc là `/`, `$HOME`; chỉ xoá **tệp `.json`** trong evidence-dir
   và **thư mục khớp `^run-[0-9A-Za-z_-]+$`** trong drill-dir; symlink → bỏ qua và cảnh báo; không đệ quy
@@ -63,7 +63,7 @@ npx tsx scripts/retention-cleanup.ts --evidence-dir <dir> [--drill-dir <dir>] [-
 
 - Logic thuần: bảng quyết định PASS/FAIL × tuổi × ngưỡng; JSON hỏng → giữ; `--force-run` chỉ áp đúng id.
 - Đĩa thật (tmpdir của test): dựng evidence PASS 40 ngày, FAIL 40 ngày, PASS 10 ngày, `run-a` FAIL 40
-  ngày, `run-b` PASS 10 ngày, 1 tệp lạ `.txt`, 1 symlink → dry-run không xoá gì; `--apply` xoá đúng
+  ngày, `run-b` PASS 5 ngày, 1 tệp lạ `.txt`, 1 symlink → dry-run không xoá gì; `--apply` xoá đúng
   {PASS 40 ngày, `run-a`}; tệp lạ/symlink còn nguyên; chạy lại `--apply` lần 2 không lỗi (idempotent).
 - Từ chối thư mục nguy hiểm (exit 2, không xoá).
 
