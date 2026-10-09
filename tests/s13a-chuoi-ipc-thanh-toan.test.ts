@@ -674,27 +674,46 @@ test(
 );
 
 test(
-  "A5-FR06: kỳ SAU đã duyệt thì duyệt kỳ TRƯỚC phải trả conflict (cần đối soát/điều chỉnh), không chốt im lặng",
+  "IPC tuần tự (quyết định 2026-10-09): duyệt kỳ SAU khi kỳ TRƯỚC còn chờ duyệt → 409 previous_period_open, không chốt/không phiếu",
   S,
   async () => {
     const f = new SoFixture();
     try {
       const c = await haiDotCungMo(f);
+      assert.equal((await trinh(c.dot2)).status, 200);
       assert.equal((await trinh(c.dot3)).status, 200);
       const r3 = await duyetNhuNguoiDung(c.dot3);
-      const luyKe3 = await luyKe(c.dot3);
+      assert.equal(r3.status, 409, JSON.stringify(r3.body));
+      assert.equal(r3.body?.code, "previous_period_open");
+      assert.equal(await trangThaiDot(c.dot3), "submitted");
+      assert.deepEqual(await phieuCuaDot(c.dot3), []);
+      // Kỳ trước chốt xong thì kỳ sau duyệt được, luỹ kế tính lại dưới khoá.
+      assert.equal((await duyetNhuNguoiDung(c.dot2)).status, 200);
+      assert.equal((await duyetNhuNguoiDung(c.dot3)).status, 200);
+      assert.equal(await luyKe(c.dot3), "120.000");
+    } finally {
+      await f.don();
+    }
+  },
+);
+
+test(
+  "A5-FR06: kỳ SAU đã duyệt (dữ liệu legacy) thì duyệt kỳ TRƯỚC phải trả conflict (cần đối soát/điều chỉnh), không chốt im lặng",
+  S,
+  async () => {
+    const f = new SoFixture();
+    try {
+      const c = await haiDotCungMo(f);
       assert.equal((await trinh(c.dot2)).status, 200);
+      // Kỳ sau đã duyệt từ trước luật tuần tự — dựng thẳng trạng thái, route không còn cho làm vậy.
+      const { run } = await import("@/lib/db");
+      await run(`UPDATE payment_certs SET status = 'approved' WHERE id = ?`, c.dot3);
+      const luyKe3 = await luyKe(c.dot3);
       const r2 = await duyetNhuNguoiDung(c.dot2);
-      assert.ok(
-        !(r3.status === 200 && r2.status === 200),
-        "kỳ sau đã approved mà kỳ trước vẫn được duyệt 200 — phải 409 cần đối soát",
-      );
-      if (r3.status === 200) {
-        assert.equal(r2.status, 409);
-        assert.equal(r2.body?.code, "reconciliation_required");
-        assert.equal(await trangThaiDot(c.dot2), "submitted");
-        assert.deepEqual(await phieuCuaDot(c.dot2), []);
-      }
+      assert.equal(r2.status, 409, JSON.stringify(r2.body));
+      assert.equal(r2.body?.code, "reconciliation_required");
+      assert.equal(await trangThaiDot(c.dot2), "submitted");
+      assert.deepEqual(await phieuCuaDot(c.dot2), []);
       assert.equal(await luyKe(c.dot3), luyKe3, "không âm thầm sửa snapshot kỳ sau");
     } finally {
       await f.don();

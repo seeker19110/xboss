@@ -1,5 +1,15 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — IPC duyệt tuần tự: chặn duyệt kỳ sau khi kỳ trước còn mở
+
+- Quyết định chủ dự án 2026-10-09 (đóng "Cần quyết (2)" của S13c): `POST /api/payment-certs/:id/decide`
+  duyệt đợt kỳ N khi cùng hợp đồng còn đợt kỳ < N ở trạng thái nháp/chờ duyệt → **409
+  `previous_period_open`** (thông điệp nêu mã + kỳ đợt đang mở). Kiểm dưới khoá HĐ → đợt nên hai quyết
+  định đồng thời không cùng lọt; từ chối vẫn được. Lập đợt mới vốn đã bị chặn khi còn đợt mở — lỗ còn lại
+  là dữ liệu legacy/đợt cùng mở. `reconciliation_required` (kỳ sau đã duyệt) giữ cho dữ liệu legacy.
+- Test: ca mới trong `s13a-chuoi-ipc-thanh-toan` (**đỏ trên code cũ**); ca FR06 legacy dựng kỳ sau
+  approved bằng SQL; ca đồng thời `s13c` cập nhật nhánh "đợt 3 lấy khoá trước" → 409.
+
 ## 2026-10-09 — Đóng nốt nợ S16: phạm vi tổ chức cho thông báo menu, audit log, flow duyệt, upload
 
 Đóng các mục còn mở trong `docs/nang-cap/AUDIT-S16-NULL-SCOPE.md` §"Phát hiện ngoài phạm vi":
@@ -919,7 +929,7 @@ warningVersion` — có cảnh báo mà thiếu → **409 `acknowledgement_requi
   money-ipc-golden-route, route-tai-chinh-_, s10c-_, boq_, rls, thong-bao, approvals-vo-ipc…) xanh.
 - **Cần quyết (phiên chính — không tự quyết):** (1) decide vẫn ghi `payment_bills` với `paid_date`
   = ngày duyệt nên "approved" ≡ "đã chi" trong báo cáo (A5 §2 nói khác, A4-FR02 chốt actual = mọi
-  payment_bills) — giữ nguyên hành vi; (2) hiện **cho phép duyệt kỳ sau khi kỳ trước còn mở**
+  payment_bills) — giữ nguyên hành vi; (2) ~~hiện **cho phép duyệt kỳ sau khi kỳ trước còn mở**~~ (đã chốt 2026-10-09: chặn 409)
   (đặc tả chỉ cấm chiều ngược) → kỳ trước sau đó bị 409, phải từ chối + lập đợt điều chỉnh; có nên
   chặn luôn "duyệt kỳ sau khi kỳ trước chưa chốt"? (3) chưa có loại "chứng từ điều chỉnh" IPC riêng —
   thông điệp 409 hướng dẫn từ chối + lập đợt mới.
