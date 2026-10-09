@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/nen/storage";
+import { storageDelete, storagePut } from "@/lib/nen/storage";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { newAlbumPhotoFileName, MAX_PHOTO_BYTES, parseUploadedFile } from "@/lib/nen/photos";
 import { listAlbumPhotos } from "@/lib/ky-thuat/tech";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -75,17 +76,30 @@ export async function POST(
   const fileName = newAlbumPhotoFileName(albumId, file.type);
   await storagePut(user.orgId, fileName, fileBuf);
 
-  const id = await insertId(
-    `INSERT INTO task_photos (task_id, album_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by)
-     VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)`,
-    albumId,
-    fileName,
-    file.name || null,
-    file.type,
-    file.size,
-    caption,
-    user.id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageTech(user.role),
+    () =>
+      insertId(
+        `INSERT INTO task_photos (task_id, album_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by)
+         VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)`,
+        albumId,
+        fileName,
+        file.name || null,
+        file.type,
+        file.size,
+        caption,
+        user.id,
+      ),
   );
+  if (!kq.ok) {
+    await storageDelete(user.orgId, fileName).catch(() => {});
+    return NextResponse.json(
+      { error: "Bạn không có quyền thêm ảnh album (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  }
+  const id = kq.value;
 
   return NextResponse.json({ id, albumId, caption, sizeBytes: file.size }, { status: 201 });
 }

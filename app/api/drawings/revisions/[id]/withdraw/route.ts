@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getRevisionDrawingProject, withdrawRevision } from "@/lib/ky-thuat/drawings";
@@ -43,7 +44,17 @@ export async function POST(
   if (!revProject || revProject.projectId !== projectId)
     return NextResponse.json({ error: "Không tìm thấy revision" }, { status: 404 });
 
-  const result = await withdrawRevision(id, user.id);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageDrawings(user.role),
+    () => withdrawRevision(id, user.id),
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền thu hồi bản vẽ (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const result = kq.value;
   if (result.status === "not-found")
     return NextResponse.json({ error: "Không tìm thấy revision" }, { status: 404 });
   if (result.status === "forbidden")

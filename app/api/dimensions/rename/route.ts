@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run, withTransaction } from "@/lib/db";
+import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 
 // Mã lỗi Postgres cho vi phạm UNIQUE (uq_progress_dimensions_task_label, migrations/0004).
 const PG_UNIQUE_VIOLATION = "23505";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -44,31 +45,41 @@ export async function POST(req: NextRequest) {
 
   let updated: number;
   try {
-    updated = await withTransaction(async () => {
-      const r = await run(
-        `UPDATE progress_dimensions SET dimension_label = ?
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay đầu transaction ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.editStructure(user.role),
+      async () => {
+        const r = await run(
+          `UPDATE progress_dimensions SET dimension_label = ?
            WHERE dimension_label = ?
              AND task_id IN (
                SELECT t.id FROM tasks t
                JOIN work_packages wp ON t.package_id = wp.id
               WHERE wp.sheet_type_id = ?)`,
-        trimmedNewLabel,
-        oldLabel,
-        sheet.sheet_type_id,
-      );
-      // Không có trigger DB nào theo dõi progress_dimensions (chỉ tasks/work_packages,
-      // migrations/0067) — đổi tên cột không đổi % nên không gọi recomputeTask, phải tự
-      // bump watermark ở đây, nếu không client khác không biết tên cột vừa đổi.
-      if (r.changes > 0) {
-        await run(
-          `INSERT INTO sheet_versions (sheet_type_id) VALUES (?)
-             ON CONFLICT (sheet_type_id) DO UPDATE
-               SET version = sheet_versions.version + 1, updated_at = NOW()`,
+          trimmedNewLabel,
+          oldLabel,
           sheet.sheet_type_id,
         );
-      }
-      return Number(r.changes);
-    });
+        // Không có trigger DB nào theo dõi progress_dimensions (chỉ tasks/work_packages,
+        // migrations/0067) — đổi tên cột không đổi % nên không gọi recomputeTask, phải tự
+        // bump watermark ở đây, nếu không client khác không biết tên cột vừa đổi.
+        if (r.changes > 0) {
+          await run(
+            `INSERT INTO sheet_versions (sheet_type_id) VALUES (?)
+             ON CONFLICT (sheet_type_id) DO UPDATE
+               SET version = sheet_versions.version + 1, updated_at = NOW()`,
+            sheet.sheet_type_id,
+          );
+        }
+        return Number(r.changes);
+      },
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" },
+        { status: 403 },
+      );
+    updated = kq.value;
   } catch (err: unknown) {
     // Đổi tên trùng nhãn đã có ở 1 task khác trong sheet → vi phạm UNIQUE(task_id, label).
     if ((err as { code?: string }).code === PG_UNIQUE_VIOLATION)

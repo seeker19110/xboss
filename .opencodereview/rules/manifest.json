@@ -71,6 +71,11 @@
       "fragments": ["tai-chinh", "chung-ts"]
     },
     {
+      "id": "xuat-file-tai-chinh",
+      "path": "app/api/export/excel/**",
+      "fragments": ["xuat-file", "tai-chinh", "route-api"]
+    },
+    {
       "id": "tai-chinh-route",
       "path": "app/api/{v1/payment-certs,adjustments,advances,cash-transactions,claim-documents,claims,contract-documents,contracts,costs,finance,insurance-bonds,invoices,payment-certs,payments,payroll,proposals,purchase-orders,purchase-requests,saved-reports,suppliers,tenders,variations,vo-documents}/**",
       "fragments": ["tai-chinh", "route-api"]

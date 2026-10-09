@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { reviewEngineeringObject } from "@/lib/ky-thuat/engineering-kernel";
 import { phanHoiLoi } from "@/lib/nen/loi";
@@ -34,7 +35,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const { id } = await params;
   try {
-    await reviewEngineeringObject(projectId, id, decision, user.id, note);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.reviewEngineeringObjects(user.role),
+      () => reviewEngineeringObject(projectId, id, decision, user.id, note),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Chỉ Admin/PM được duyệt đối tượng kỹ thuật" },
+        { status: 403 },
+      );
   } catch (err) {
     // Trước đây MỌI lỗi ở đây đều ra 404 — kể cả sự cố DB thật. Nay `reviewEngineeringObject`
     // ném LoiNghiepVu mang sẵn mã (404 không tồn tại/khác dự án, 409 đối tượng đã xoá mềm),

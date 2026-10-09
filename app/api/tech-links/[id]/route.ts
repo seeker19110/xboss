@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { parseTechLinkBody, validateTechLink, type TechLinkInput } from "@/lib/ky-thuat/tech";
 
@@ -77,15 +78,25 @@ export async function PATCH(
   const invalid = validateTechLink(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  await run(
-    `UPDATE tech_links SET category = ?, title = ?, url = ?, embed = ?, note = ? WHERE id = ?`,
-    input.category,
-    input.title,
-    input.url,
-    input.embed,
-    input.note,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageTech(user.role),
+    () =>
+      run(
+        `UPDATE tech_links SET category = ?, title = ?, url = ?, embed = ?, note = ? WHERE id = ?`,
+        input.category,
+        input.title,
+        input.url,
+        input.embed,
+        input.note,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa link công nghệ (chỉ Admin/PM)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -112,7 +123,16 @@ export async function DELETE(
     const existing = await loadExisting(id, projectId);
     if (!existing) return NextResponse.json({ error: "Không tìm thấy link" }, { status: 404 });
 
-    await run(`DELETE FROM tech_links WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageTech(user.role),
+      () => run(`DELETE FROM tech_links WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá link công nghệ (chỉ Admin/PM)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   scanReceiveQrTag,
@@ -36,12 +37,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Thiếu mã QR" }, { status: 422 });
     }
 
-    const tagRecord = await scanReceiveQrTag({
-      projectId,
-      qrCode,
-      userId: user.id,
-      locationNote,
-    });
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageEngineeringGraph(user.role),
+      () =>
+        scanReceiveQrTag({
+          projectId,
+          qrCode,
+          userId: user.id,
+          locationNote,
+        }),
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Không có quyền quét nhận vật tư" }, { status: 403 });
+    const tagRecord = kq.value;
 
     let reconciliation = null;
     if (manifest.length > 0) {

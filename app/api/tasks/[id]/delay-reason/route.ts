@@ -5,6 +5,7 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { isDelayReason } from "@/lib/tien-do/delay";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -50,12 +51,18 @@ export async function POST(
       .trim()
       .slice(0, 500) || null;
 
-  await run(
-    `UPDATE tasks SET delay_reason = ?, delay_note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    reason,
-    reason ? note : null,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editProgress(user.role),
+    () =>
+      run(
+        `UPDATE tasks SET delay_reason = ?, delay_note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        reason,
+        reason ? note : null,
+        id,
+      ),
   );
+  if (!kq.ok) return NextResponse.json({ error: "Không có quyền" }, { status: 403 });
 
   return NextResponse.json({ id, reason, note: reason ? note : null });
 }

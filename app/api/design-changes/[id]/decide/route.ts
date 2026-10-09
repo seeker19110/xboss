@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { canDecideDesignChange, decideDesignChange } from "@/lib/ky-thuat/designchanges";
 
@@ -37,13 +38,24 @@ export async function POST(
   const projectId = await getCurrentProjectId(user);
   if (projectId == null)
     return NextResponse.json({ error: "Không tìm thấy thay đổi thiết kế" }, { status: 404 });
-  const result = await decideDesignChange({
-    designChangeId: id,
-    decision,
-    decisionNote: typeof body.decisionNote === "string" ? body.decisionNote : null,
-    decidedBy: user.id,
-    projectId,
-  });
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => canDecideDesignChange(user),
+    () =>
+      decideDesignChange({
+        designChangeId: id,
+        decision,
+        decisionNote: typeof body.decisionNote === "string" ? body.decisionNote : null,
+        decidedBy: user.id,
+        projectId,
+      }),
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Chỉ Admin/PM được quyết thay đổi thiết kế" },
+      { status: 403 },
+    );
+  const result = kq.value;
   if (typeof result === "string")
     return NextResponse.json(
       { error: result },

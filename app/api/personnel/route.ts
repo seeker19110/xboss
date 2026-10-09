@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   listPersonnel,
@@ -71,20 +72,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nhà thầu phụ không tồn tại" }, { status: 422 });
   }
 
-  const id = await insertId(
-    `INSERT INTO personnel (project_id, code, full_name, role_title, supplier_id, phone,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageHr(user.role),
+    () =>
+      insertId(
+        `INSERT INTO personnel (project_id, code, full_name, role_title, supplier_id, phone,
                              id_number, status, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.code,
-    input.fullName,
-    input.roleTitle,
-    input.supplierId,
-    input.phone,
-    input.idNumber,
-    input.status,
-    user.id,
+        projectId,
+        input.code,
+        input.fullName,
+        input.roleTitle,
+        input.supplierId,
+        input.phone,
+        input.idNumber,
+        input.status,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo nhân sự (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

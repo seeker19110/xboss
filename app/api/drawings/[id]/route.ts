@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   checkDrawingRefs,
@@ -84,18 +85,28 @@ export async function PATCH(
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
 
   try {
-    await run(
-      `UPDATE drawings SET code = ?, name = ?, kind = ?, system_group = ?, floor_label = ?,
-              work_package_id = ?
-        WHERE id = ?`,
-      input.code,
-      input.name,
-      input.kind,
-      input.systemGroup,
-      input.floorLabel,
-      input.workPackageId,
-      id,
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageDrawings(user.role),
+      () =>
+        run(
+          `UPDATE drawings SET code = ?, name = ?, kind = ?, system_group = ?, floor_label = ?,
+                  work_package_id = ?
+            WHERE id = ?`,
+          input.code,
+          input.name,
+          input.kind,
+          input.systemGroup,
+          input.floorLabel,
+          input.workPackageId,
+          id,
+        ),
     );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền sửa bản vẽ (chỉ Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
   } catch (err) {
     if ((err as { code?: string }).code === "23505")
       return NextResponse.json({ error: `Số bản vẽ "${input.code}" đã tồn tại` }, { status: 409 });

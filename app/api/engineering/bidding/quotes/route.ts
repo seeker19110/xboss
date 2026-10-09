@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { createVendorQuote, listVendorQuotes } from "@/lib/ky-thuat/engineering-bidding-matrix";
 import { moneyInputErrorBody, parseMoneyInput } from "@/lib/nen/money";
@@ -84,19 +85,26 @@ export async function POST(req: NextRequest) {
     if (totalAmountVnd.startsWith("-"))
       return NextResponse.json({ error: "Tổng giá chào phải là số không âm" }, { status: 422 });
 
-    const quote = await createVendorQuote({
-      projectId,
-      packageId: body.packageId,
-      vendorName: body.vendorName,
-      vendorType: body.vendorType,
-      totalAmountVnd,
-      lineItems: body.lineItems,
-      capacityScore: body.capacityScore != null ? Number(body.capacityScore) : 80,
-      safetyScore: body.safetyScore != null ? Number(body.safetyScore) : 85,
-      technicalComplianceScore:
-        body.technicalComplianceScore != null ? Number(body.technicalComplianceScore) : 80,
-      createdBy: user.id,
-    });
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageEngineeringGraph(user.role),
+      () =>
+        createVendorQuote({
+          projectId,
+          packageId: body.packageId,
+          vendorName: body.vendorName,
+          vendorType: body.vendorType,
+          totalAmountVnd,
+          lineItems: body.lineItems,
+          capacityScore: body.capacityScore != null ? Number(body.capacityScore) : 80,
+          safetyScore: body.safetyScore != null ? Number(body.safetyScore) : 85,
+          technicalComplianceScore:
+            body.technicalComplianceScore != null ? Number(body.technicalComplianceScore) : 80,
+          createdBy: user.id,
+        }),
+    );
+    if (!kq.ok) return NextResponse.json({ error: "Không có quyền nhập báo giá" }, { status: 403 });
+    const quote = kq.value;
 
     return NextResponse.json({ success: true, data: quote });
   } catch (err: unknown) {

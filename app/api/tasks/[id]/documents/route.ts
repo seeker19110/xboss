@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/nen/storage";
+import { storageDelete, storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -8,6 +8,7 @@ import { newDocFileName, MAX_DOC_BYTES, sha256Hex, parseUploadedFile } from "@/l
 import { DOC_CATEGORIES, type DocCategory } from "@/lib/ky-thuat/qaqc";
 import { extractPdfText } from "@/lib/nen/pdf-extract";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -97,20 +98,30 @@ export async function POST(
   // được (scan ảnh, hỏng, quá giới hạn trang/thời gian), không chặn upload.
   const extractedText = ext === ".pdf" ? await extractPdfText(fileBuf) : null;
 
-  const id = await insertId(
-    `INSERT INTO task_documents (task_id, file_name, original_name, mime_type, size_bytes, caption, doc_category, uploaded_by, sha256, extracted_text)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi DB; bị thu hồi ⇒ dọn file vừa lưu.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editProgress(user.role),
+    () =>
+      insertId(
+        `INSERT INTO task_documents (task_id, file_name, original_name, mime_type, size_bytes, caption, doc_category, uploaded_by, sha256, extracted_text)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    taskId,
-    fileName,
-    file.name || null,
-    file.type,
-    file.size,
-    caption,
-    docCategory,
-    user.id,
-    sha256,
-    extractedText,
+        taskId,
+        fileName,
+        file.name || null,
+        file.type,
+        file.size,
+        caption,
+        docCategory,
+        user.id,
+        sha256,
+        extractedText,
+      ),
   );
+  if (!kq.ok) {
+    await storageDelete(user.orgId, fileName).catch(() => {});
+    return NextResponse.json({ error: "Không có quyền upload tài liệu" }, { status: 403 });
+  }
+  const id = kq.value;
 
   return NextResponse.json(
     { id, taskId, caption, docCategory, sizeBytes: file.size },

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   resolveConflict,
@@ -38,9 +39,16 @@ export async function POST(
 
   const { id, conflictId } = await params;
   try {
-    await resolveConflict(projectId, id, conflictId, user.id, resolution, method, {
-      lowRiskPreference: body?.lowRiskPreference === true,
-    });
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.resolveEngineeringConflicts(user.role),
+      () =>
+        resolveConflict(projectId, id, conflictId, user.id, resolution, method, {
+          lowRiskPreference: body?.lowRiskPreference === true,
+        }),
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin/PM được chốt xung đột" }, { status: 403 });
   } catch (err) {
     if (err instanceof VoteNotAllowedError)
       return NextResponse.json({ error: err.message }, { status: 403 });

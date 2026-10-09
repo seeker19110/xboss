@@ -3,6 +3,7 @@ import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchFloor } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { sheetTypeProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -34,12 +35,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Không có quyền với tầng này" }, { status: 403 });
 
   // INSERT ... ON CONFLICT để tránh race condition khi 2 request đồng thời tạo cùng 1 tầng
-  await run(
-    `INSERT INTO floor_approvals (sheet_type_id, floor_label, is_approved) VALUES (?, ?, FALSE)
-     ON CONFLICT (sheet_type_id, floor_label) DO NOTHING`,
-    sheetTypeId,
-    floorLabel,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editProgress(user.role),
+    () =>
+      run(
+        `INSERT INTO floor_approvals (sheet_type_id, floor_label, is_approved) VALUES (?, ?, FALSE)
+         ON CONFLICT (sheet_type_id, floor_label) DO NOTHING`,
+        sheetTypeId,
+        floorLabel,
+      ),
   );
+  if (!kq.ok) return NextResponse.json({ error: "Không có quyền" }, { status: 403 });
   const record = await queryOne<{ id: number; isApproved: boolean }>(
     `SELECT id, is_approved AS "isApproved" FROM floor_approvals WHERE sheet_type_id = ? AND floor_label = ?`,
     sheetTypeId,

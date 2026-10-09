@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { executeSignEnvelope } from "@/lib/ky-thuat/engineering-esignature";
 import { phanHoiLoi } from "@/lib/nen/loi";
@@ -32,16 +33,24 @@ export async function POST(req: NextRequest) {
 
     const ipAddress = req.headers.get("x-forwarded-for") || "127.0.0.1";
 
-    const result = await executeSignEnvelope({
-      projectId,
-      userId: user.id,
-      envelopeId: body.envelopeId,
-      signatoryId: body.signatoryId,
-      signatureData: body.signatureData,
-      otpCode: body.otpCode,
-      ipAddress,
-      geoLocation: body.geoLocation,
-    });
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.signEngineeringEsign(user.role),
+      () =>
+        executeSignEnvelope({
+          projectId,
+          userId: user.id,
+          envelopeId: body.envelopeId,
+          signatoryId: body.signatoryId,
+          signatureData: body.signatureData,
+          otpCode: body.otpCode,
+          ipAddress,
+          geoLocation: body.geoLocation,
+        }),
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Không có quyền ký số tài liệu" }, { status: 403 });
+    const result = kq.value;
 
     return NextResponse.json({ success: true, data: result });
   } catch (err: unknown) {

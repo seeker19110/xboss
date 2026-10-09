@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   checkCorrespondenceRefs,
@@ -41,7 +42,17 @@ export async function POST(
   const refErr = await checkCorrespondenceRefs(input);
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
 
-  const result = await createReply(originalId, input, user.id, projectId);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageCorrespondence(user.role),
+    () => createReply(originalId, input, user.id, projectId),
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền trả lời công văn (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const result = kq.value;
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: 404 });
 
   return NextResponse.json({ id: result.id }, { status: 201 });

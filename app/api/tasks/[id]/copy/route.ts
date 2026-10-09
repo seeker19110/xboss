@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, insertId, run, withTransaction } from "@/lib/db";
+import { query, queryOne, insertId, run } from "@/lib/db";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
@@ -79,38 +80,45 @@ export async function POST(
   );
 
   // Bọc sort_order bump + INSERT task + INSERT dims trong 1 transaction.
-  const newId = await withTransaction(async () => {
-    await run(
-      `UPDATE tasks SET sort_order = sort_order + 1 WHERE package_id = ? AND sort_order >= ?`,
-      src.package_id,
-      sortOrder,
-    );
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay đầu transaction ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    async () => {
+      await run(
+        `UPDATE tasks SET sort_order = sort_order + 1 WHERE package_id = ? AND sort_order >= ?`,
+        src.package_id,
+        sortOrder,
+      );
 
-    const taskId = await insertId(
-      `INSERT INTO tasks (package_id, code, name, start_date, end_date, assigned_to, assigned_manual,
+      const taskId = await insertId(
+        `INSERT INTO tasks (package_id, code, name, start_date, end_date, assigned_to, assigned_manual,
                           drawing_url, sort_order, status, progress_percent)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'chuan_bi', 0)`,
-      src.package_id,
-      newCode,
-      newName,
-      src.start_date,
-      src.end_date,
-      src.assigned_to,
-      src.assigned_manual,
-      src.drawing_url,
-      sortOrder,
-    );
-
-    for (const d of dims) {
-      await insertId(
-        `INSERT INTO progress_dimensions (task_id, dimension_label, installed, sort_order) VALUES (?, ?, 0, ?)`,
-        taskId,
-        d.dimension_label,
-        d.sort_order,
+        src.package_id,
+        newCode,
+        newName,
+        src.start_date,
+        src.end_date,
+        src.assigned_to,
+        src.assigned_manual,
+        src.drawing_url,
+        sortOrder,
       );
-    }
-    return taskId;
-  });
+
+      for (const d of dims) {
+        await insertId(
+          `INSERT INTO progress_dimensions (task_id, dimension_label, installed, sort_order) VALUES (?, ?, 0, ?)`,
+          taskId,
+          d.dimension_label,
+          d.sort_order,
+        );
+      }
+      return taskId;
+    },
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin/PM mới copy được task" }, { status: 403 });
+  const newId = kq.value;
 
   // Task copy 0% làm tăng mẫu số của nhóm — tính lại % nhóm (như route DELETE task).
   await recomputePackage(src.package_id);

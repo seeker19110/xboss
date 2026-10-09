@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   WASTE_TYPES,
@@ -52,20 +53,31 @@ export async function POST(req: NextRequest) {
   const invalid = validateWasteInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  const id = await insertId(
-    `INSERT INTO waste_logs (project_id, log_date, waste_type, quantity, unit,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageEnv(user.role),
+    () =>
+      insertId(
+        `INSERT INTO waste_logs (project_id, log_date, waste_type, quantity, unit,
                               disposal_method, handler, note, recorded_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.logDate,
-    input.wasteType,
-    input.quantity,
-    input.unit,
-    input.disposalMethod,
-    input.handler,
-    input.note,
-    user.id,
+        projectId,
+        input.logDate,
+        input.wasteType,
+        input.quantity,
+        input.unit,
+        input.disposalMethod,
+        input.handler,
+        input.note,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền ghi nhận chất thải (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getEquipment, parseEquipmentBody, validateEquipmentInput } from "@/lib/vat-tu/equipment";
 
@@ -74,22 +75,32 @@ export async function PATCH(
     if (dup) return NextResponse.json({ error: "Mã thiết bị đã tồn tại" }, { status: 409 });
   }
 
-  await run(
-    `UPDATE equipment
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageEquipment(user.role),
+    () =>
+      run(
+        `UPDATE equipment
         SET code = ?, name = ?, kind = ?, serial = ?, condition = ?, calibration_due = ?,
             current_location = ?, current_crew = ?, note = ?
       WHERE id = ?`,
-    input.code,
-    input.name,
-    input.kind,
-    input.serial,
-    input.condition,
-    input.calibrationDue,
-    input.currentLocation,
-    input.currentCrew,
-    input.note,
-    id,
+        input.code,
+        input.name,
+        input.kind,
+        input.serial,
+        input.condition,
+        input.calibrationDue,
+        input.currentLocation,
+        input.currentCrew,
+        input.note,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa thiết bị (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }

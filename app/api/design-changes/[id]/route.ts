@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   checkDesignChangeRefs,
@@ -68,7 +69,17 @@ export async function PATCH(
     return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
   if (body.markDrawingUpdated === true) {
-    const err = await markDrawingUpdated(id, projectId);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageDesignChanges(user.role),
+      () => markDrawingUpdated(id, projectId),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền sửa thay đổi thiết kế (Admin/PM/Kỹ sư)" },
+        { status: 403 },
+      );
+    const err = kq.value;
     if (err) return NextResponse.json({ error: err }, { status: 409 });
     return NextResponse.json({ ok: true, status: "drawing_updated" });
   }
@@ -100,22 +111,32 @@ export async function PATCH(
   // status='assessing' là chuyển tiếp hợp lệ trước khi quyết (đang đánh giá tác động).
   const nextStatus = body.status === "assessing" ? "assessing" : existing.status;
 
-  await run(
-    `UPDATE design_changes SET title = ?, system_id = ?, drawing_id = ?, requested_by_note = ?,
-            reason = ?, impact_technical = ?, impact_cost = ?, impact_schedule = ?, status = ?
-      WHERE id = ? AND project_id = ?`,
-    input.title,
-    input.systemId,
-    input.drawingId,
-    input.requestedByNote,
-    input.reason,
-    input.impactTechnical,
-    input.impactCost,
-    input.impactSchedule,
-    nextStatus,
-    id,
-    projectId,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageDesignChanges(user.role),
+    () =>
+      run(
+        `UPDATE design_changes SET title = ?, system_id = ?, drawing_id = ?, requested_by_note = ?,
+                reason = ?, impact_technical = ?, impact_cost = ?, impact_schedule = ?, status = ?
+          WHERE id = ? AND project_id = ?`,
+        input.title,
+        input.systemId,
+        input.drawingId,
+        input.requestedByNote,
+        input.reason,
+        input.impactTechnical,
+        input.impactCost,
+        input.impactSchedule,
+        nextStatus,
+        id,
+        projectId,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa thay đổi thiết kế (Admin/PM/Kỹ sư)" },
+      { status: 403 },
+    );
   return NextResponse.json({ updated: id });
 }
 
@@ -149,7 +170,16 @@ export async function DELETE(
     if (!isPending && user.role !== "admin")
       return NextResponse.json({ error: "Đã có quyết định — chỉ Admin xoá được" }, { status: 403 });
 
-    await run(`DELETE FROM design_changes WHERE id = ? AND project_id = ?`, id, projectId);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageDesignChanges(user.role),
+      () => run(`DELETE FROM design_changes WHERE id = ? AND project_id = ?`, id, projectId),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá thay đổi thiết kế (Admin/PM/Kỹ sư)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

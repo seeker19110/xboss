@@ -8,6 +8,7 @@ import {
   validateWorkFrontUpdate,
   workFrontProjectId,
 } from "@/lib/tien-do/workfronts";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,17 @@ export async function PATCH(
   const invalid = validateWorkFrontUpdate(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  const result = await updateWorkFrontStatus(id, input, user.id, user.role === "admin", visible);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageWorkFronts(user.role),
+    () => updateWorkFrontStatus(id, input, user.id, user.role === "admin", visible),
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền đổi trạng thái mặt bằng (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const result = kq.value;
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: 409 });
 
   return NextResponse.json({ updated: id });

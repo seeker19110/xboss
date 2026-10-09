@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/nen/storage";
+import { storageDelete, storagePut } from "@/lib/nen/storage";
 import { query, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId, visibleProjectIds } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { newWorkFrontFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
 import { workFrontProjectId } from "@/lib/tien-do/workfronts";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -75,15 +76,28 @@ export async function POST(
   const fileName = newWorkFrontFileName(workFrontId, file.type);
   await storagePut(user.orgId, fileName, fileBuf);
 
-  const id = await insertId(
-    `INSERT INTO work_front_documents (work_front_id, file_path, file_name, mime, uploaded_by)
-     VALUES (?, ?, ?, ?, ?)`,
-    workFrontId,
-    fileName,
-    fileName,
-    file.type,
-    user.id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageWorkFronts(user.role),
+    () =>
+      insertId(
+        `INSERT INTO work_front_documents (work_front_id, file_path, file_name, mime, uploaded_by)
+         VALUES (?, ?, ?, ?, ?)`,
+        workFrontId,
+        fileName,
+        fileName,
+        file.type,
+        user.id,
+      ),
   );
+  if (!kq.ok) {
+    await storageDelete(user.orgId, fileName).catch(() => {});
+    return NextResponse.json(
+      { error: "Bạn không có quyền upload biên bản mặt bằng (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  }
+  const id = kq.value;
 
   return NextResponse.json({ id, workFrontId }, { status: 201 });
 }

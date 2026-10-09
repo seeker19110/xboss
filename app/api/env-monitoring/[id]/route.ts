@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   parseEnvMonitoringBody,
@@ -89,21 +90,31 @@ export async function PATCH(
   const { error, passed } = validateMonitoringInput(input);
   if (error) return NextResponse.json({ error }, { status: 422 });
 
-  await run(
-    `UPDATE env_monitoring SET measured_at = ?, category = ?, indicator = ?, value = ?,
-            unit = ?, threshold = ?, passed = ?, location = ?, note = ?
-      WHERE id = ?`,
-    input.measuredAt,
-    input.category,
-    input.indicator,
-    input.value,
-    input.unit,
-    input.threshold,
-    passed,
-    input.location,
-    input.note,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageEnv(user.role),
+    () =>
+      run(
+        `UPDATE env_monitoring SET measured_at = ?, category = ?, indicator = ?, value = ?,
+                unit = ?, threshold = ?, passed = ?, location = ?, note = ?
+          WHERE id = ?`,
+        input.measuredAt,
+        input.category,
+        input.indicator,
+        input.value,
+        input.unit,
+        input.threshold,
+        passed,
+        input.location,
+        input.note,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa kỳ quan trắc (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -131,7 +142,16 @@ export async function DELETE(
     if (!existing)
       return NextResponse.json({ error: "Không tìm thấy kỳ quan trắc" }, { status: 404 });
 
-    await run(`DELETE FROM env_monitoring WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageEnv(user.role),
+      () => run(`DELETE FROM env_monitoring WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá kỳ quan trắc (chỉ Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

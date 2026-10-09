@@ -20,6 +20,7 @@ import {
 } from "@/lib/bao-mat/offline-receipt";
 import { chotNguCanhHangDoi, traLoiOfflineHoacNem } from "@/lib/bao-mat/offline-http";
 import { log } from "@/lib/nen/log";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -154,6 +155,9 @@ export async function POST(
         hash,
       );
       if (!existing) return null;
+      // D01: ghi receipt cho ảnh trùng cũng là ghi — tái kiểm quyền với dữ liệu có hiệu lực.
+      if (bn && !(await kiemQuyenTaiLucGhi(() => CAN.editProgress(user.role))))
+        return { khongQuyen: true } as const;
       const receipt = bn
         ? await ghiBienNhan(bn, {
             resourceType: "task_photo",
@@ -167,6 +171,8 @@ export async function POST(
     return traLoiOfflineHoacNem(e);
   }
   if (truoc && "replay" in truoc) return NextResponse.json({ receipt: truoc.replay });
+  if (truoc && "khongQuyen" in truoc)
+    return NextResponse.json({ error: "Không có quyền upload ảnh" }, { status: 403 });
   if (truoc)
     return NextResponse.json(
       {
@@ -193,6 +199,9 @@ export async function POST(
         const replay = await khoaVaTraBienNhan(bn);
         if (replay) return { replay } as const;
       }
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi metadata (file đã ở staging).
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.editProgress(user.role))))
+        return { khongQuyen: true } as const;
       const id = await insertId(
         `INSERT INTO task_photos (task_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by, sha256)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -222,6 +231,10 @@ export async function POST(
   if ("replay" in kq) {
     await donFileStaging(user, fileName);
     return NextResponse.json({ receipt: kq.replay });
+  }
+  if ("khongQuyen" in kq) {
+    await donFileStaging(user, fileName);
+    return NextResponse.json({ error: "Không có quyền upload ảnh" }, { status: 403 });
   }
 
   return NextResponse.json(

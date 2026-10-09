@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   EQUIPMENT_CONDITIONS,
@@ -62,21 +63,32 @@ export async function POST(req: NextRequest) {
   const dup = await queryOne(`SELECT id FROM equipment WHERE code = ?`, input.code);
   if (dup) return NextResponse.json({ error: "Mã thiết bị đã tồn tại" }, { status: 409 });
 
-  const id = await insertId(
-    `INSERT INTO equipment (code, name, kind, serial, condition, calibration_due,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageEquipment(user.role),
+    () =>
+      insertId(
+        `INSERT INTO equipment (code, name, kind, serial, condition, calibration_due,
        current_location, current_crew, note, project_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    input.code,
-    input.name,
-    input.kind,
-    input.serial,
-    input.condition,
-    input.calibrationDue,
-    input.currentLocation,
-    input.currentCrew,
-    input.note,
-    projectId,
+        input.code,
+        input.name,
+        input.kind,
+        input.serial,
+        input.condition,
+        input.calibrationDue,
+        input.currentLocation,
+        input.currentCrew,
+        input.note,
+        projectId,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo thiết bị (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

@@ -4,6 +4,7 @@ import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,16 @@ export async function DELETE(
         { status: 403 },
       );
 
-    await run(`DELETE FROM task_comments WHERE id = ?`, id);
+    // D01: tái kiểm quyền (cùng điều kiện ở trên) với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => comment.user_id === user.id || CAN.editStructure(user.role),
+      () => run(`DELETE FROM task_comments WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Chỉ tác giả hoặc Admin/PM được xoá bình luận" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

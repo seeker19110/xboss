@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { storagePut, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   newCertificationFileName,
@@ -148,8 +149,6 @@ export async function PATCH(
     if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: checked.status });
     const fileBuf = checked.buf;
 
-    if (existing.fileName) await storageDelete(user.orgId, existing.fileName);
-
     const fileName = newCertificationFileName(id, file.type);
     await storagePut(user.orgId, fileName, fileBuf);
     fileCols = {
@@ -160,34 +159,49 @@ export async function PATCH(
     };
   }
 
-  if (fileCols) {
-    await run(
-      `UPDATE certifications SET personnel_id = ?, kind = ?, code = ?, issued_date = ?,
-              expiry_date = ?, file_name = ?, original_name = ?, mime_type = ?, size_bytes = ?
-        WHERE id = ?`,
-      input.personnelId,
-      input.kind,
-      input.code,
-      input.issuedDate,
-      input.expiryDate,
-      fileCols.fileName,
-      fileCols.originalName,
-      fileCols.mimeType,
-      fileCols.sizeBytes,
-      id,
-    );
-  } else {
-    await run(
-      `UPDATE certifications SET personnel_id = ?, kind = ?, code = ?, issued_date = ?, expiry_date = ?
-        WHERE id = ?`,
-      input.personnelId,
-      input.kind,
-      input.code,
-      input.issuedDate,
-      input.expiryDate,
-      id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi DB; bị thu hồi ⇒ dọn file vừa lưu.
+  // File cũ chỉ xoá SAU khi ghi DB đã commit (trước đây xoá trước khi UPDATE).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageHr(user.role),
+    async () => {
+      if (fileCols) {
+        await run(
+          `UPDATE certifications SET personnel_id = ?, kind = ?, code = ?, issued_date = ?,
+                  expiry_date = ?, file_name = ?, original_name = ?, mime_type = ?, size_bytes = ?
+            WHERE id = ?`,
+          input.personnelId,
+          input.kind,
+          input.code,
+          input.issuedDate,
+          input.expiryDate,
+          fileCols.fileName,
+          fileCols.originalName,
+          fileCols.mimeType,
+          fileCols.sizeBytes,
+          id,
+        );
+      } else {
+        await run(
+          `UPDATE certifications SET personnel_id = ?, kind = ?, code = ?, issued_date = ?, expiry_date = ?
+            WHERE id = ?`,
+          input.personnelId,
+          input.kind,
+          input.code,
+          input.issuedDate,
+          input.expiryDate,
+          id,
+        );
+      }
+    },
+  );
+  if (!kq.ok) {
+    if (fileCols?.fileName) await storageDelete(user.orgId, fileCols.fileName).catch(() => {});
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa chứng chỉ (chỉ Admin/PM)" },
+      { status: 403 },
     );
   }
+  if (fileCols && existing.fileName) await storageDelete(user.orgId, existing.fileName);
 
   return NextResponse.json({ updated: id });
 }
@@ -214,7 +228,16 @@ export async function DELETE(
     const existing = await loadExisting(id, projectId);
     if (!existing) return NextResponse.json({ error: "Không tìm thấy chứng chỉ" }, { status: 404 });
 
-    await run(`DELETE FROM certifications WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi; file chỉ xoá sau khi commit.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageHr(user.role),
+      () => run(`DELETE FROM certifications WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá chứng chỉ (chỉ Admin/PM)" },
+        { status: 403 },
+      );
     if (existing.fileName) await storageDelete(user.orgId, existing.fileName);
 
     return NextResponse.json({ deleted: id });

@@ -3,6 +3,7 @@ import { queryOne, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { updateStage } from "@/lib/tien-do/constructionStages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,15 @@ export async function PATCH(
     patch.durationDays = durationDays;
   }
 
-  await updateStage(projectId, id, patch);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    () => updateStage(projectId, id, patch),
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa công tác (chỉ Admin/PM)" },
+      { status: 403 },
+    );
   return NextResponse.json({ updated: id });
 }

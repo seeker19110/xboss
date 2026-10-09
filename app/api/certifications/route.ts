@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, query, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { parseCertificationBody, validateCertificationInput } from "@/lib/hien-truong/hr";
 
@@ -89,17 +90,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Không tìm thấy nhân sự" }, { status: 422 });
   }
 
-  const id = await insertId(
-    `INSERT INTO certifications (project_id, personnel_id, kind, code, issued_date, expiry_date, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.personnelId,
-    input.kind,
-    input.code,
-    input.issuedDate,
-    input.expiryDate,
-    user.id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageHr(user.role),
+    () =>
+      insertId(
+        `INSERT INTO certifications (project_id, personnel_id, kind, code, issued_date, expiry_date, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        projectId,
+        input.personnelId,
+        input.kind,
+        input.code,
+        input.issuedDate,
+        input.expiryDate,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo chứng chỉ (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

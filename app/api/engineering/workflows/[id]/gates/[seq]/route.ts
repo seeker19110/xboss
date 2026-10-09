@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { approveGate, WorkflowError } from "@/lib/ky-thuat/engineering-workflow";
 
@@ -36,7 +37,13 @@ export async function POST(
     return NextResponse.json({ error: "seq không hợp lệ" }, { status: 422 });
 
   try {
-    await approveGate(projectId, id, seqNum, user.id, user.role, decision, comments);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.approveEngineeringGate(user.role),
+      () => approveGate(projectId, id, seqNum, user.id, user.role, decision, comments),
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Không có quyền ký duyệt gate" }, { status: 403 });
   } catch (err) {
     if (err instanceof WorkflowError)
       return NextResponse.json({ error: err.message }, { status: 422 });

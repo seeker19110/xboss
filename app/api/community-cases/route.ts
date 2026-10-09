@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
 import {
@@ -55,20 +56,31 @@ export async function POST(req: NextRequest) {
   const invalid = validateCommunityCaseInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  const id = await insertId(
-    `INSERT INTO community_cases (project_id, code, title, source, received_date, status,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageMonitoring(user.role),
+    () =>
+      insertId(
+        `INSERT INTO community_cases (project_id, code, title, source, received_date, status,
        resolution, closed_date, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.code,
-    input.title,
-    input.source,
-    input.receivedDate,
-    input.status,
-    input.resolution,
-    input.status === "closed" ? (input.closedDate ?? todayISO()) : input.closedDate,
-    user.id,
+        projectId,
+        input.code,
+        input.title,
+        input.source,
+        input.receivedDate,
+        input.status,
+        input.resolution,
+        input.status === "closed" ? (input.closedDate ?? todayISO()) : input.closedDate,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo khiếu nại (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

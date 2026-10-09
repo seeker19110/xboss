@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   COMMISSIONING_RESULTS,
@@ -52,7 +53,8 @@ export async function POST(req: NextRequest) {
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
   const input = parseCommissioningBody(body);
-  if (input.result === "passed" || input.result === "failed") {
+  const datKetQua = input.result === "passed" || input.result === "failed";
+  if (datKetQua) {
     if (!CAN.approve(user.role))
       return NextResponse.json(
         { error: "Chỉ Admin/PM được đặt kết quả Đạt/Không đạt" },
@@ -67,20 +69,35 @@ export async function POST(req: NextRequest) {
     if (!disc) return NextResponse.json({ error: "Hệ không tồn tại" }, { status: 422 });
   }
 
-  const id = await insertId(
-    `INSERT INTO commissioning (project_id, code, system_name, system_id, checklist,
-                                 result, tested_at, note, created_by)
-     VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?)`,
-    projectId,
-    input.code,
-    input.systemName,
-    input.tradeId,
-    JSON.stringify(input.checklist),
-    input.result,
-    input.testedAt,
-    input.note,
-    user.id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageHandover(user.role) && (!datKetQua || CAN.approve(user.role)),
+    () =>
+      insertId(
+        `INSERT INTO commissioning (project_id, code, system_name, system_id, checklist,
+                                     result, tested_at, note, created_by)
+         VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?)`,
+        projectId,
+        input.code,
+        input.systemName,
+        input.tradeId,
+        JSON.stringify(input.checklist),
+        input.result,
+        input.testedAt,
+        input.note,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      {
+        error: CAN.manageHandover(user.role)
+          ? "Chỉ Admin/PM được đặt kết quả Đạt/Không đạt"
+          : "Bạn không có quyền tạo hệ thống T&C (Admin/PM/kỹ sư)",
+      },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

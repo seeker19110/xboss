@@ -10,10 +10,12 @@ import { handoverBlocked, methodStatementBlocked } from "@/lib/ky-thuat/qaqc";
 import { log } from "@/lib/nen/log";
 import type { StatusSlug } from "@/lib/tien-do/status";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
 const MAX_UPDATES = 500;
+const KHONG_CON_QUYEN = "D01: không còn quyền lúc ghi";
 
 // PATCH /api/tasks/batch  body: { updates: { id, patch }[] }  (Admin/PM)
 // Sửa metadata nhiều task cùng lúc (tên/mã/ngày/status/người phụ trách) cho lưới
@@ -50,6 +52,9 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const updated = await withTransaction(async () => {
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay đầu transaction ghi (giữ tới COMMIT).
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.editStructure(me.role))))
+        throw new Error(KHONG_CON_QUYEN);
       let count = 0;
       for (const u of updates) {
         const id = parseInt(String(u.id));
@@ -171,6 +176,11 @@ export async function PATCH(req: NextRequest) {
     });
     return NextResponse.json({ ok: true, updated });
   } catch (e: unknown) {
+    if (e instanceof Error && e.message === KHONG_CON_QUYEN)
+      return NextResponse.json(
+        { error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" },
+        { status: 403 },
+      );
     const msg = e instanceof Error ? e.message : "Lỗi máy chủ khi cập nhật task";
     const status = /BOQ|hợp lệ|tìm thấy|nghiệm thu|100%|Chờ/i.test(msg) ? 422 : 500;
     if (status === 500)

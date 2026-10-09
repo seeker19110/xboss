@@ -12,6 +12,7 @@ import {
   type FloorStageFrontRow,
   type StageRow,
 } from "@/lib/tien-do/constructionStages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -182,22 +183,33 @@ export async function PUT(req: NextRequest) {
   const incomingRepName =
     typeof body.incomingRepName === "string" ? body.incomingRepName.trim() || null : null;
 
-  const id = await upsertFloorStageFront(
-    projectId,
-    floorLabel,
-    stageId,
-    {
-      receivedAt: receivedAt ?? null,
-      handedOverAt: handedOverAt ?? null,
-      plannedReceivedAt: plannedReceivedAt ?? null,
-      note,
-      outgoingSupplierId,
-      incomingSupplierId,
-      transitionStageId,
-      outgoingRepName,
-      incomingRepName,
-    },
-    user.id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageWorkFronts(user.role),
+    () =>
+      upsertFloorStageFront(
+        projectId,
+        floorLabel,
+        stageId,
+        {
+          receivedAt: receivedAt ?? null,
+          handedOverAt: handedOverAt ?? null,
+          plannedReceivedAt: plannedReceivedAt ?? null,
+          note,
+          outgoingSupplierId,
+          incomingSupplierId,
+          transitionStageId,
+          outgoingRepName,
+          incomingRepName,
+        },
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền cập nhật mặt bằng (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const id = kq.value;
   return NextResponse.json({ id });
 }

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { storageGet, storageDelete } from "@/lib/nen/storage";
 import { run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getOmDoc } from "@/lib/hien-truong/warranty";
 
@@ -61,7 +62,16 @@ export async function DELETE(
     const existing = projectId != null ? await getOmDoc(id, projectId) : null;
     if (!existing) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
-    await run(`DELETE FROM om_documents WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageWarranty(user.role),
+      () => run(`DELETE FROM om_documents WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá tài liệu O&M (Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
     if (existing.fileName) {
       await storageDelete(user.orgId, existing.fileName);
     }

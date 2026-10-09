@@ -5,6 +5,7 @@ import { newDrawingFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/
 import { storagePut, storageGet, storageDelete } from "@/lib/nen/storage";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
 import { packageProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -112,17 +113,26 @@ export async function POST(
   const fileName = newDrawingFileName(id, mime);
   await storagePut(user.orgId, fileName, fileBuf);
 
-  // Xoá file cũ sau khi ghi file mới thành công
-  if (wp.drawingFileName) await storageDelete(user.orgId, wp.drawingFileName);
-
   const drawingUrl = `/api/workpackages/${id}/drawing`;
-  await run(
-    `UPDATE work_packages SET drawing_url = ?, drawing_file_name = ?, drawing_original_name = ? WHERE id = ?`,
-    drawingUrl,
-    fileName,
-    file.name || null,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi DB; bị thu hồi ⇒ dọn file vừa lưu.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editProgress(user.role),
+    () =>
+      run(
+        `UPDATE work_packages SET drawing_url = ?, drawing_file_name = ?, drawing_original_name = ? WHERE id = ?`,
+        drawingUrl,
+        fileName,
+        file.name || null,
+        id,
+      ),
   );
+  if (!kq.ok) {
+    await storageDelete(user.orgId, fileName).catch(() => {});
+    return NextResponse.json({ error: "Không có quyền" }, { status: 403 });
+  }
+
+  // Xoá file cũ chỉ sau khi DB đã COMMIT trỏ sang file mới.
+  if (wp.drawingFileName) await storageDelete(user.orgId, wp.drawingFileName);
 
   return NextResponse.json({ drawingUrl, fileName }, { status: 201 });
 }
@@ -159,10 +169,16 @@ export async function DELETE(
       { status: 403 },
     );
 
-  await run(
-    `UPDATE work_packages SET drawing_url = NULL, drawing_file_name = NULL, drawing_original_name = NULL WHERE id = ?`,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi; file chỉ xoá sau COMMIT.
+  const kqXoa = await ghiNeuConQuyen(
+    () => CAN.editProgress(user.role),
+    () =>
+      run(
+        `UPDATE work_packages SET drawing_url = NULL, drawing_file_name = NULL, drawing_original_name = NULL WHERE id = ?`,
+        id,
+      ),
   );
+  if (!kqXoa.ok) return NextResponse.json({ error: "Không có quyền" }, { status: 403 });
 
   if (wp?.drawingFileName) await storageDelete(user.orgId, wp.drawingFileName);
 

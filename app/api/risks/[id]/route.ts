@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   RISK_STATUSES,
@@ -46,12 +47,18 @@ export async function PATCH(
     const status = body.status as RiskStatus;
     if (!RISK_STATUSES.includes(status))
       return NextResponse.json({ error: "Trạng thái không hợp lệ" }, { status: 422 });
-    await run(
-      `UPDATE risks SET status = ?, closed_at = CASE WHEN ? = 'closed' THEN NOW() ELSE NULL END WHERE id = ?`,
-      status,
-      status,
-      id,
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageRisks(user.role),
+      () =>
+        run(
+          `UPDATE risks SET status = ?, closed_at = CASE WHEN ? = 'closed' THEN NOW() ELSE NULL END WHERE id = ?`,
+          status,
+          status,
+          id,
+        ),
     );
+    if (!kq.ok) return NextResponse.json({ error: "Không có quyền sửa rủi ro" }, { status: 403 });
     return NextResponse.json({ ok: true, status });
   }
 
@@ -69,17 +76,23 @@ export async function PATCH(
     if (!u) return NextResponse.json({ error: "Người phụ trách không tồn tại" }, { status: 422 });
   }
 
-  await run(
-    `UPDATE risks SET title = ?, description = ?, category = ?, probability = ?, impact = ?, mitigation = ?, owner = ? WHERE id = ?`,
-    input.title,
-    input.description,
-    input.category,
-    input.probability,
-    input.impact,
-    input.mitigation,
-    input.owner,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageRisks(user.role),
+    () =>
+      run(
+        `UPDATE risks SET title = ?, description = ?, category = ?, probability = ?, impact = ?, mitigation = ?, owner = ? WHERE id = ?`,
+        input.title,
+        input.description,
+        input.category,
+        input.probability,
+        input.impact,
+        input.mitigation,
+        input.owner,
+        id,
+      ),
   );
+  if (!kq.ok) return NextResponse.json({ error: "Không có quyền sửa rủi ro" }, { status: 403 });
   return NextResponse.json({ ok: true });
 }
 

@@ -4,6 +4,7 @@ import { storageGet, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +81,17 @@ export async function DELETE(
         { status: 403 },
       );
 
-    await run(`DELETE FROM work_front_documents WHERE id = ?`, id);
+    // D01: tái kiểm quyền (cùng điều kiện ở trên) với dữ liệu có hiệu lực ngay trước ghi;
+    // file chỉ xoá sau COMMIT.
+    const kq = await ghiNeuConQuyen(
+      () => doc.uploaded_by === user.id || CAN.manageWorkFronts(user.role),
+      () => run(`DELETE FROM work_front_documents WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Chỉ người upload hoặc Admin/PM/kỹ sư được xoá tài liệu" },
+        { status: 403 },
+      );
     await storageDelete(user.orgId, doc.file_name);
 
     return NextResponse.json({ deleted: id });

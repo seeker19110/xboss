@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { parseMeetingActionBody, validateMeetingActionInput } from "@/lib/hien-truong/meetings";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
@@ -56,14 +57,22 @@ export async function POST(
       return NextResponse.json({ error: "Task liên kết không tồn tại" }, { status: 422 });
   }
 
-  const id = await insertId(
-    `INSERT INTO meeting_actions (meeting_id, content, assignee, due_date, task_id)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageMeetings(user.role),
+    () =>
+      insertId(
+        `INSERT INTO meeting_actions (meeting_id, content, assignee, due_date, task_id)
      VALUES (?, ?, ?, ?, ?)`,
-    meetingId,
-    input.content,
-    input.assignee,
-    input.dueDate,
-    input.taskId,
+        meetingId,
+        input.content,
+        input.assignee,
+        input.dueDate,
+        input.taskId,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Không có quyền thêm việc sau họp" }, { status: 403 });
+  const id = kq.value;
   return NextResponse.json({ id }, { status: 201 });
 }

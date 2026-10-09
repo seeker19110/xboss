@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId, visibleProjectIds } from "@/lib/ha-tang/projects";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -33,10 +34,12 @@ export async function POST(req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
   if (projectId == null) return NextResponse.json({ error: "Chưa có dự án nào" }, { status: 400 });
 
-  const id = await insertId(
-    `INSERT INTO towers (project_id, name) VALUES (?, ?)`,
-    projectId,
-    name.trim(),
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    () => insertId(`INSERT INTO towers (project_id, name) VALUES (?, ?)`, projectId, name.trim()),
   );
+  if (!kq.ok) return NextResponse.json({ error: "Chỉ Admin/PM" }, { status: 403 });
+  const id = kq.value;
   return NextResponse.json({ tower: { id, name: name.trim(), projectId } }, { status: 201 });
 }

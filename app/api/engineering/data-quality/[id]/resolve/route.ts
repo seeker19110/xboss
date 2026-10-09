@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { resolveDataQualityIssue } from "@/lib/ky-thuat/engineering-graph";
 import { phanHoiLoi } from "@/lib/nen/loi";
@@ -28,7 +29,17 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
   }
 
   try {
-    const ok = await resolveDataQualityIssue(projectId, id, user.id, note);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageEngineeringDataQuality(user.role),
+      () => resolveDataQualityIssue(projectId, id, user.id, note),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Không có quyền xử lý chất lượng dữ liệu" },
+        { status: 403 },
+      );
+    const ok = kq.value;
     if (!ok) {
       return NextResponse.json(
         { error: "Không tìm thấy vấn đề chất lượng dữ liệu để xử lý" },

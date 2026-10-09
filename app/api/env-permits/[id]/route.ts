@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { storagePut, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   newEnvPermitFileName,
@@ -137,8 +138,6 @@ export async function PATCH(
     if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: checked.status });
     const fileBuf = checked.buf;
 
-    if (existing.fileName) await storageDelete(user.orgId, existing.fileName);
-
     const fileName = newEnvPermitFileName(id, file.type);
     await storagePut(user.orgId, fileName, fileBuf);
     fileCols = {
@@ -149,40 +148,55 @@ export async function PATCH(
     };
   }
 
-  if (fileCols) {
-    await run(
-      `UPDATE env_permits SET kind = ?, code = ?, title = ?, issued_by = ?, issued_date = ?,
-              expiry_date = ?, status = ?,
-              file_name = ?, original_name = ?, mime_type = ?, size_bytes = ?
-        WHERE id = ?`,
-      input.kind,
-      input.code,
-      input.title,
-      input.issuedBy,
-      input.issuedDate,
-      input.expiryDate,
-      input.status,
-      fileCols.fileName,
-      fileCols.originalName,
-      fileCols.mimeType,
-      fileCols.sizeBytes,
-      id,
-    );
-  } else {
-    await run(
-      `UPDATE env_permits SET kind = ?, code = ?, title = ?, issued_by = ?, issued_date = ?,
-              expiry_date = ?, status = ?
-        WHERE id = ?`,
-      input.kind,
-      input.code,
-      input.title,
-      input.issuedBy,
-      input.issuedDate,
-      input.expiryDate,
-      input.status,
-      id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi DB; bị thu hồi ⇒ dọn file vừa lưu.
+  // File cũ chỉ xoá SAU khi ghi DB đã commit (trước đây xoá trước khi UPDATE).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageEnv(user.role),
+    async () => {
+      if (fileCols) {
+        await run(
+          `UPDATE env_permits SET kind = ?, code = ?, title = ?, issued_by = ?, issued_date = ?,
+                  expiry_date = ?, status = ?,
+                  file_name = ?, original_name = ?, mime_type = ?, size_bytes = ?
+            WHERE id = ?`,
+          input.kind,
+          input.code,
+          input.title,
+          input.issuedBy,
+          input.issuedDate,
+          input.expiryDate,
+          input.status,
+          fileCols.fileName,
+          fileCols.originalName,
+          fileCols.mimeType,
+          fileCols.sizeBytes,
+          id,
+        );
+      } else {
+        await run(
+          `UPDATE env_permits SET kind = ?, code = ?, title = ?, issued_by = ?, issued_date = ?,
+                  expiry_date = ?, status = ?
+            WHERE id = ?`,
+          input.kind,
+          input.code,
+          input.title,
+          input.issuedBy,
+          input.issuedDate,
+          input.expiryDate,
+          input.status,
+          id,
+        );
+      }
+    },
+  );
+  if (!kq.ok) {
+    if (fileCols?.fileName) await storageDelete(user.orgId, fileCols.fileName).catch(() => {});
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa hồ sơ môi trường (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
     );
   }
+  if (fileCols && existing.fileName) await storageDelete(user.orgId, existing.fileName);
 
   return NextResponse.json({ updated: id });
 }
@@ -209,7 +223,16 @@ export async function DELETE(
     const existing = await loadExisting(id, projectId);
     if (!existing) return NextResponse.json({ error: "Không tìm thấy hồ sơ" }, { status: 404 });
 
-    await run(`DELETE FROM env_permits WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi; file chỉ xoá sau khi commit.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageEnv(user.role),
+      () => run(`DELETE FROM env_permits WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá hồ sơ môi trường (chỉ Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
     if (existing.fileName) await storageDelete(user.orgId, existing.fileName);
 
     return NextResponse.json({ deleted: id });

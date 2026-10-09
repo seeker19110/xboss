@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { storagePut, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen, kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { packageProjectId } from "@/lib/tien-do/workpackages";
 import {
@@ -153,7 +154,6 @@ export async function PATCH(
     if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: checked.status });
     const fileBuf = checked.buf;
 
-    if (existing.minutesFile) await storageDelete(user.orgId, existing.minutesFile);
     minutesFile = newHandoverMinutesFileName(id, file.type);
     await storagePut(user.orgId, minutesFile, fileBuf);
   }
@@ -166,6 +166,20 @@ export async function PATCH(
         id,
       );
       if (!locked) throw Object.assign(new Error("Không tìm thấy hạng mục"), { status: 404 });
+      // D01: tái kiểm quyền (cùng điều kiện ở trên) với dữ liệu có hiệu lực, sau khi khoá dòng.
+      if (
+        !(await kiemQuyenTaiLucGhi(
+          () => CAN.manageHandover(user.role) && (!changingToAccepted || CAN.approve(user.role)),
+        ))
+      )
+        throw Object.assign(
+          new Error(
+            CAN.manageHandover(user.role)
+              ? "Chỉ Admin/PM được đặt trạng thái Đã nghiệm thu"
+              : "Bạn không có quyền sửa hạng mục bàn giao (Admin/PM/kỹ sư)",
+          ),
+          { status: 403 },
+        );
 
       await run(
         `UPDATE handover_items SET title = ?, system_id = ?, work_package_id = ?, status = ?,
@@ -181,8 +195,14 @@ export async function PATCH(
       );
     });
   } catch (err: unknown) {
+    // Bị thu hồi quyền lúc ghi ⇒ DB không trỏ tới file mới — dọn file vừa lưu.
+    const status = (err as { status?: unknown } | null)?.status;
+    if (status === 403 && file && minutesFile)
+      await storageDelete(user.orgId, minutesFile).catch(() => {});
     return phanHoiLoiCoStatus(err);
   }
+  // File biên bản cũ chỉ xoá sau khi DB đã commit tên file mới.
+  if (file && existing.minutesFile) await storageDelete(user.orgId, existing.minutesFile);
 
   return NextResponse.json({ updated: id });
 }
@@ -210,7 +230,16 @@ export async function DELETE(
     const existing = await loadExisting(id, projectId);
     if (!existing) return NextResponse.json({ error: "Không tìm thấy hạng mục" }, { status: 404 });
 
-    await run(`DELETE FROM handover_items WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageHandover(user.role),
+      () => run(`DELETE FROM handover_items WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá hạng mục bàn giao (Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
     if (existing.minutesFile) await storageDelete(user.orgId, existing.minutesFile);
 
     return NextResponse.json({ deleted: id });

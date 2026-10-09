@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   PUNCH_SEVERITIES,
@@ -79,19 +80,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Người được gán không tồn tại" }, { status: 422 });
   }
 
-  const id = await insertId(
-    `INSERT INTO punch_list (project_id, handover_item_id, description, severity, status,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageHandover(user.role),
+    () =>
+      insertId(
+        `INSERT INTO punch_list (project_id, handover_item_id, description, severity, status,
                               due_date, assignee, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.handoverItemId,
-    input.description,
-    input.severity,
-    input.status,
-    input.dueDate,
-    input.assignee,
-    user.id,
+        projectId,
+        input.handoverItemId,
+        input.description,
+        input.severity,
+        input.status,
+        input.dueDate,
+        input.assignee,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo tồn tại (Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

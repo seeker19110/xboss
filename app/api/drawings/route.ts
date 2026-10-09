@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   DRAWING_KINDS,
@@ -70,18 +71,29 @@ export async function POST(req: NextRequest) {
 
   let id: number;
   try {
-    id = await insertId(
-      `INSERT INTO drawings (code, name, kind, system_group, floor_label, work_package_id, created_by, project_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      input.code,
-      input.name,
-      input.kind,
-      input.systemGroup,
-      input.floorLabel,
-      input.workPackageId,
-      user.id,
-      projectId,
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageDrawings(user.role),
+      () =>
+        insertId(
+          `INSERT INTO drawings (code, name, kind, system_group, floor_label, work_package_id, created_by, project_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          input.code,
+          input.name,
+          input.kind,
+          input.systemGroup,
+          input.floorLabel,
+          input.workPackageId,
+          user.id,
+          projectId,
+        ),
     );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền tạo bản vẽ (chỉ Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
+    id = kq.value;
   } catch (err) {
     if ((err as { code?: string }).code === "23505")
       return NextResponse.json({ error: `Số bản vẽ "${input.code}" đã tồn tại` }, { status: 409 });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { validateChecklistItems } from "@/lib/ky-thuat/qaqc";
 
@@ -76,7 +77,13 @@ export async function PATCH(
 
   if (sets.length === 0) return NextResponse.json({ ok: true });
 
-  await run(`UPDATE qc_checklists SET ${sets.join(", ")} WHERE id = ?`, ...values, id);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    () => run(`UPDATE qc_checklists SET ${sets.join(", ")} WHERE id = ?`, ...values, id),
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin/PM được sửa checklist" }, { status: 403 });
   return NextResponse.json({ ok: true });
 }
 
@@ -96,11 +103,16 @@ export async function DELETE(
 
   const projectId = await getCurrentProjectId(user);
   try {
-    const result =
-      projectId != null
-        ? await run(`DELETE FROM qc_checklists WHERE id = ? AND project_id = ?`, id, projectId)
-        : { changes: 0 };
-    if (result.changes === 0)
+    if (projectId == null)
+      return NextResponse.json({ error: "Không tìm thấy checklist" }, { status: 404 });
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.editStructure(user.role),
+      () => run(`DELETE FROM qc_checklists WHERE id = ? AND project_id = ?`, id, projectId),
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin/PM được xoá checklist" }, { status: 403 });
+    if (kq.value.changes === 0)
       return NextResponse.json({ error: "Không tìm thấy checklist" }, { status: 404 });
   } catch (err) {
     if ((err as { code?: string }).code === "23503")

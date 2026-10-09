@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   LEGAL_KINDS,
@@ -52,21 +53,32 @@ export async function POST(req: NextRequest) {
   const invalid = validateLegalInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  const id = await insertId(
-    `INSERT INTO legal_documents (project_id, kind, code, title, issued_by, issued_date,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageKickoff(user.role),
+    () =>
+      insertId(
+        `INSERT INTO legal_documents (project_id, kind, code, title, issued_by, issued_date,
                                    expiry_date, status, note, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.kind,
-    input.code,
-    input.title,
-    input.issuedBy,
-    input.issuedDate,
-    input.expiryDate,
-    input.status,
-    input.note,
-    user.id,
+        projectId,
+        input.kind,
+        input.code,
+        input.title,
+        input.issuedBy,
+        input.issuedDate,
+        input.expiryDate,
+        input.status,
+        input.note,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo hồ sơ pháp lý (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

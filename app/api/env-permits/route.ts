@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   ENV_PERMIT_KINDS,
@@ -55,20 +56,31 @@ export async function POST(req: NextRequest) {
   const invalid = validateEnvPermitInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  const id = await insertId(
-    `INSERT INTO env_permits (project_id, kind, code, title, issued_by, issued_date,
-                               expiry_date, status, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.kind,
-    input.code,
-    input.title,
-    input.issuedBy,
-    input.issuedDate,
-    input.expiryDate,
-    input.status,
-    user.id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageEnv(user.role),
+    () =>
+      insertId(
+        `INSERT INTO env_permits (project_id, kind, code, title, issued_by, issued_date,
+                                   expiry_date, status, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        projectId,
+        input.kind,
+        input.code,
+        input.title,
+        input.issuedBy,
+        input.issuedDate,
+        input.expiryDate,
+        input.status,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo hồ sơ môi trường (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

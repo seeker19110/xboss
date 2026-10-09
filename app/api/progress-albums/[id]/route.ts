@@ -1,6 +1,6 @@
 import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { query, queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@/lib/ky-thuat/tech";
 import { storageDelete } from "@/lib/nen/storage";
 import { khoaNhatKyCuaAnh } from "@/lib/hien-truong/diary";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -78,13 +79,23 @@ export async function PATCH(
   const invalid = validateAlbumInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  await run(
-    `UPDATE progress_albums SET milestone_label = ?, captured_date = ?, note = ? WHERE id = ?`,
-    input.milestoneLabel,
-    input.capturedDate,
-    input.note,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageTech(user.role),
+    () =>
+      run(
+        `UPDATE progress_albums SET milestone_label = ?, captured_date = ?, note = ? WHERE id = ?`,
+        input.milestoneLabel,
+        input.capturedDate,
+        input.note,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa album (chỉ Admin/PM)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -116,12 +127,21 @@ export async function DELETE(
       `SELECT id, file_name AS "fileName" FROM task_photos WHERE album_id = ?`,
       id,
     );
-    await withTransaction(async () => {
-      // Khoá nhật ký gắn ảnh album TRƯỚC khi xoá (thứ tự "nhật ký → ảnh" như PUT nhật ký, S06).
-      await khoaNhatKyCuaAnh(fileRows.map((f) => f.id));
-      await run(`DELETE FROM task_photos WHERE album_id = ?`, id);
-      await run(`DELETE FROM progress_albums WHERE id = ?`, id);
-    });
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay đầu transaction ghi.
+    const kqXoa = await ghiNeuConQuyen(
+      () => CAN.manageTech(user.role),
+      async () => {
+        // Khoá nhật ký gắn ảnh album TRƯỚC khi xoá (thứ tự "nhật ký → ảnh" như PUT nhật ký, S06).
+        await khoaNhatKyCuaAnh(fileRows.map((f) => f.id));
+        await run(`DELETE FROM task_photos WHERE album_id = ?`, id);
+        await run(`DELETE FROM progress_albums WHERE id = ?`, id);
+      },
+    );
+    if (!kqXoa.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá album (chỉ Admin/PM)" },
+        { status: 403 },
+      );
 
     for (const f of fileRows) {
       await storageDelete(user.orgId, f.fileName);

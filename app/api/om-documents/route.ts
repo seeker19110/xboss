@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/nen/storage";
+import { storageDelete, storagePut } from "@/lib/nen/storage";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { listOmDocs } from "@/lib/hien-truong/warranty";
 import { newOmDocFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
@@ -52,19 +53,32 @@ export async function POST(req: NextRequest) {
   const fileName = newOmDocFileName(projectId, file.type);
   await storagePut(user.orgId, fileName, fileBuf);
 
-  const id = await insertId(
-    `INSERT INTO om_documents (project_id, title, system_id, file_name, original_name,
-       mime_type, size_bytes, uploaded_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    title,
-    tradeId,
-    fileName,
-    file.name || null,
-    file.type,
-    file.size,
-    user.id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageWarranty(user.role),
+    () =>
+      insertId(
+        `INSERT INTO om_documents (project_id, title, system_id, file_name, original_name,
+           mime_type, size_bytes, uploaded_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        projectId,
+        title,
+        tradeId,
+        fileName,
+        file.name || null,
+        file.type,
+        file.size,
+        user.id,
+      ),
   );
+  if (!kq.ok) {
+    await storageDelete(user.orgId, fileName).catch(() => {});
+    return NextResponse.json(
+      { error: "Bạn không có quyền upload tài liệu O&M (Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  }
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

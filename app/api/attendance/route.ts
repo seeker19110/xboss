@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   attendanceByDate,
@@ -86,20 +87,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Không tìm thấy nhân sự" }, { status: 422 });
   }
 
-  const id = await insertId(
-    `INSERT INTO attendance (project_id, work_date, crew_id, personnel_id, headcount, present,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.recordAttendance(user.role),
+    () =>
+      insertId(
+        `INSERT INTO attendance (project_id, work_date, crew_id, personnel_id, headcount, present,
                               hours, note, recorded_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.workDate,
-    input.crewId,
-    input.personnelId,
-    input.headcount,
-    input.present,
-    input.hours,
-    input.note,
-    user.id,
+        projectId,
+        input.workDate,
+        input.crewId,
+        input.personnelId,
+        input.headcount,
+        input.present,
+        input.hours,
+        input.note,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền chấm công (Admin/PM/Kỹ sư)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

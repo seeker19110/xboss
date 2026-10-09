@@ -1,12 +1,13 @@
 import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { storageGet, storageDelete } from "@/lib/nen/storage";
-import { queryOne, run, withTransaction } from "@/lib/db";
+import { queryOne, run } from "@/lib/db";
 import { khoaNhatKyCuaAnh } from "@/lib/hien-truong/diary";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -124,10 +125,19 @@ export async function DELETE(
 
     // Khoá nhật ký đang gắn ảnh TRƯỚC khi xoá (cùng thứ tự "nhật ký → ảnh" với PUT nhật ký) —
     // cascade diary_photos tăng version nhật ký, khoá ngược chiều sẽ deadlock (S06).
-    await withTransaction(async () => {
-      await khoaNhatKyCuaAnh([id]);
-      await run(`DELETE FROM task_photos WHERE id = ?`, id);
-    });
+    // D01: tái kiểm quyền (cùng điều kiện ở trên) với dữ liệu có hiệu lực ngay đầu transaction ghi.
+    const kq = await ghiNeuConQuyen(
+      () => photo.uploaded_by === user.id || CAN.editStructure(user.role),
+      async () => {
+        await khoaNhatKyCuaAnh([id]);
+        await run(`DELETE FROM task_photos WHERE id = ?`, id);
+      },
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Chỉ người upload hoặc Admin/PM được xoá ảnh" },
+        { status: 403 },
+      );
     await storageDelete(user.orgId, photo.file_name);
 
     return NextResponse.json({ deleted: id });

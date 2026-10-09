@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   workflowInputSchema,
@@ -45,7 +46,14 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await createWorkflow(projectId, user.id, parsed.data);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.createEngineeringWorkflow(user.role),
+      () => createWorkflow(projectId, user.id, parsed.data),
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Không có quyền tạo workflow kỹ thuật" }, { status: 403 });
+    const result = kq.value;
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     if (err instanceof Gate0FailedError)

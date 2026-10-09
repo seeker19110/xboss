@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getEquipment } from "@/lib/vat-tu/equipment";
 import { newEquipmentCertFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
@@ -82,13 +83,25 @@ export async function POST(
   await storagePut(user.orgId, fileName, fileBuf);
 
   const oldFileName = eq.certFileName;
-  await run(
-    `UPDATE equipment SET cert_file_path = ?, cert_file_name = ?, cert_mime = ? WHERE id = ?`,
-    fileName,
-    fileName,
-    file.type,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi DB; bị thu hồi ⇒ dọn file vừa lưu.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageEquipment(user.role),
+    () =>
+      run(
+        `UPDATE equipment SET cert_file_path = ?, cert_file_name = ?, cert_mime = ? WHERE id = ?`,
+        fileName,
+        fileName,
+        file.type,
+        id,
+      ),
   );
+  if (!kq.ok) {
+    await storageDelete(user.orgId, fileName).catch(() => {});
+    return NextResponse.json(
+      { error: "Bạn không có quyền upload giấy kiểm định (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  }
   if (oldFileName) await storageDelete(user.orgId, oldFileName);
 
   return NextResponse.json({ ok: true }, { status: 201 });

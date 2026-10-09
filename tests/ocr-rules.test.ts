@@ -118,7 +118,7 @@ const BANG_ANH_XA: [string, string][] = [
   ["lib/dich-vu/thong-bao.ts", "thong-bao-lib"],
   ["lib/van-hanh/push.ts", "thong-bao-lib"],
   ["app/api/notifications/route.ts", "thong-bao-route"],
-  ["app/api/export/excel/route.ts", "xuat-file"],
+  ["app/api/export/excel/route.ts", "xuat-file-tai-chinh"],
   ["app/api/admin/audit-log/export/route.ts", "xuat-file"],
   ["app/api/dashboard/route.ts", "route-api"],
   ["app/api/v1/tasks/route.ts", "route-api"],
@@ -178,7 +178,7 @@ const KHONG_PHAI_ROUTE_TAI_CHINH: Record<string, string> = {
     "logistics xe — chỉ dùng helper danh sách/trạng thái xe trong lib/tai-chinh/procurement, không tính tiền",
 };
 
-test("mọi route import @/lib/tai-chinh/ đều nhận luật tai-chinh-route", () => {
+test("mọi route import @/lib/tai-chinh/ đều nhận luật tài chính", () => {
   const thieu: string[] = [];
   const duyet = (thuMuc: string) => {
     for (const muc of fs.readdirSync(path.join(ROOT, thuMuc), { withFileTypes: true })) {
@@ -188,7 +188,10 @@ test("mọi route import @/lib/tai-chinh/ đều nhận luật tai-chinh-route",
         const src = fs.readFileSync(path.join(ROOT, rel), "utf8");
         if (!src.includes("@/lib/tai-chinh/")) continue;
         if (Object.keys(KHONG_PHAI_ROUTE_TAI_CHINH).some((g) => rel.startsWith(`${g}/`))) continue;
-        if (resolveRuleId(manifest, rel) !== "tai-chinh-route") thieu.push(rel);
+        // Mục cụ thể hơn (vd xuất Excel thanh toán) được ghép luật tài chính vào luật riêng của nó.
+        const id = resolveRuleId(manifest, rel);
+        const muc = manifest.rules.find((r: { id: string }) => r.id === id);
+        if (!muc?.fragments.includes("tai-chinh")) thieu.push(rel);
       }
     }
   };

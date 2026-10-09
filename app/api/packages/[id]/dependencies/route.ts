@@ -3,6 +3,7 @@ import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
 import { packageProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -109,11 +110,19 @@ export async function POST(
   );
   if (dup) return NextResponse.json({ id: dup.id, existed: true });
 
-  const id = await insertId(
-    `INSERT INTO package_dependencies (predecessor_id, successor_id, created_by) VALUES (?, ?, ?)`,
-    predecessorId,
-    successorId,
-    user.id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    () =>
+      insertId(
+        `INSERT INTO package_dependencies (predecessor_id, successor_id, created_by) VALUES (?, ?, ?)`,
+        predecessorId,
+        successorId,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin/PM được sửa phụ thuộc" }, { status: 403 });
+  const id = kq.value;
   return NextResponse.json({ id }, { status: 201 });
 }

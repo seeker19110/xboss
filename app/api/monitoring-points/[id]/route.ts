@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getPoint, parsePointBody, validatePointInput } from "@/lib/hien-truong/monitoring";
 
@@ -70,19 +71,29 @@ export async function PATCH(
     if (dup) return NextResponse.json({ error: "Mã mốc quan trắc đã tồn tại" }, { status: 409 });
   }
 
-  await run(
-    `UPDATE monitoring_points SET code = ?, kind = ?, location = ?, warn_threshold = ?,
-            alarm_threshold = ?, unit = ?, status = ?
-      WHERE id = ?`,
-    input.code,
-    input.kind,
-    input.location,
-    input.warnThreshold,
-    input.alarmThreshold,
-    input.unit,
-    input.status,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageMonitoring(user.role),
+    () =>
+      run(
+        `UPDATE monitoring_points SET code = ?, kind = ?, location = ?, warn_threshold = ?,
+                alarm_threshold = ?, unit = ?, status = ?
+          WHERE id = ?`,
+        input.code,
+        input.kind,
+        input.location,
+        input.warnThreshold,
+        input.alarmThreshold,
+        input.unit,
+        input.status,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa mốc quan trắc (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -110,7 +121,16 @@ export async function DELETE(
     if (!existing)
       return NextResponse.json({ error: "Không tìm thấy mốc quan trắc" }, { status: 404 });
 
-    await run(`DELETE FROM monitoring_points WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageMonitoring(user.role),
+      () => run(`DELETE FROM monitoring_points WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá mốc quan trắc (chỉ Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
 
     return NextResponse.json({ deleted: id });
   } catch (err) {

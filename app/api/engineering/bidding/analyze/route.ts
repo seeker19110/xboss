@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { runBiddingAnalysis } from "@/lib/ky-thuat/engineering-bidding-matrix";
 import { phanHoiLoi } from "@/lib/nen/loi";
@@ -35,7 +36,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Thiếu tham số packageId" }, { status: 400 });
     }
 
-    const result = await runBiddingAnalysis(projectId, body.packageId, user.id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageEngineeringGraph(user.role),
+      () => runBiddingAnalysis(projectId, body.packageId, user.id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Không có quyền thực hiện phân tích đấu thầu" },
+        { status: 403 },
+      );
+    const result = kq.value;
     return NextResponse.json({ success: true, data: result });
   } catch (err: unknown) {
     // Gói thầu không tồn tại HOẶC thuộc dự án khác (`runBiddingAnalysis` đã lọc `project_id`

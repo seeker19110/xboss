@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,13 @@ export async function DELETE(
     if (!thayDuHaiDau || !dsProj.every((p) => visible.includes(p.projectId as number)))
       return NextResponse.json({ error: "Không tìm thấy quan hệ phụ thuộc" }, { status: 404 });
 
-    await run(`DELETE FROM package_dependencies WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.editStructure(user.role),
+      () => run(`DELETE FROM package_dependencies WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin/PM được sửa phụ thuộc" }, { status: 403 });
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

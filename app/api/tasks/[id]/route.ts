@@ -15,6 +15,7 @@ import { validateCustom } from "@/lib/ha-tang/custom-fields";
 import { storageDelete } from "@/lib/nen/storage";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
 import { khoaNhatKyCuaAnhTask } from "@/lib/hien-truong/diary";
+import { ghiNeuConQuyen, kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +96,16 @@ export async function PATCH(
   // (null = đưa về kế thừa người phụ trách nhóm/hệ).
   let assignedHandled = false;
   if (body.assignedTo !== undefined) {
-    await assignTask(id, body.assignedTo === null ? null : Number(body.assignedTo), me.id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi phân công.
+    const kqGan = await ghiNeuConQuyen(
+      () => CAN.editStructure(me.role),
+      () => assignTask(id, body.assignedTo === null ? null : Number(body.assignedTo), me.id),
+    );
+    if (!kqGan.ok)
+      return NextResponse.json(
+        { error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" },
+        { status: 403 },
+      );
     assignedHandled = true;
   }
 
@@ -145,6 +155,9 @@ export async function PATCH(
       id,
     );
     if (!before) return { error: "Task không tồn tại", httpStatus: 404 } as const;
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay sau khi khoá dòng, trước lần ghi đầu.
+    if (!(await kiemQuyenTaiLucGhi(() => CAN.editStructure(me.role))))
+      return { error: "Không có quyền chỉnh sửa (chỉ Admin/PM)", httpStatus: 403 } as const;
     const progressPercent = before.progress_percent ?? 0;
     // Bất biến nghiệm thu (L1, audit 2026-09-22): task đang `nghiem_thu` chỉ đổi trạng thái
     // qua POST/DELETE /api/tasks/:id/approve (có kiểm quyền + audit). Chặn TRƯỚC
@@ -243,24 +256,30 @@ export async function DELETE(
     );
 
     // Xoá toàn bộ dữ liệu liên quan trong 1 transaction — không để lại trạng thái nửa chừng.
-    await withTransaction(async () => {
-      // Khoá nhật ký gắn ảnh của task TRƯỚC mọi DELETE (thứ tự "nhật ký → ảnh" như PUT nhật ký, S06).
-      await khoaNhatKyCuaAnhTask([id]);
-      await run(`DELETE FROM notifications WHERE task_id = ?`, id);
-      await run(`DELETE FROM baseline_tasks WHERE task_id = ?`, id);
-      await run(`DELETE FROM task_photos WHERE task_id = ?`, id);
-      await run(`DELETE FROM task_documents WHERE task_id = ?`, id);
-      await run(`DELETE FROM task_comments WHERE task_id = ?`, id);
-      await run(`DELETE FROM task_history WHERE task_id = ?`, id);
-      // material_transactions trước materials (FK: material_transactions.material_id → materials.id).
-      await run(
-        `DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE task_id = ?)`,
-        id,
-      );
-      await run(`DELETE FROM materials WHERE task_id = ?`, id);
-      await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, id);
-      await run(`DELETE FROM tasks WHERE id = ?`, id);
-    });
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay đầu transaction xoá.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.editStructure(user.role),
+      async () => {
+        // Khoá nhật ký gắn ảnh của task TRƯỚC mọi DELETE (thứ tự "nhật ký → ảnh" như PUT nhật ký, S06).
+        await khoaNhatKyCuaAnhTask([id]);
+        await run(`DELETE FROM notifications WHERE task_id = ?`, id);
+        await run(`DELETE FROM baseline_tasks WHERE task_id = ?`, id);
+        await run(`DELETE FROM task_photos WHERE task_id = ?`, id);
+        await run(`DELETE FROM task_documents WHERE task_id = ?`, id);
+        await run(`DELETE FROM task_comments WHERE task_id = ?`, id);
+        await run(`DELETE FROM task_history WHERE task_id = ?`, id);
+        // material_transactions trước materials (FK: material_transactions.material_id → materials.id).
+        await run(
+          `DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE task_id = ?)`,
+          id,
+        );
+        await run(`DELETE FROM materials WHERE task_id = ?`, id);
+        await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, id);
+        await run(`DELETE FROM tasks WHERE id = ?`, id);
+      },
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được task" }, { status: 403 });
 
     // Xoá file sau khi DB commit thành công — file mồ côi trên disk ít hại hơn row mồ côi trong DB.
     for (const f of [...photos, ...docs]) {

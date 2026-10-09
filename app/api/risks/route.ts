@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { withUniqueRetry } from "@/lib/ha-tang/seqcode";
 import {
@@ -53,23 +54,32 @@ export async function POST(req: NextRequest) {
   const invalid = validateRiskInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  const { id, code } = await withUniqueRetry(async () => {
-    const code = await nextRiskCode();
-    const id = await insertId(
-      `INSERT INTO risks (code, title, description, category, probability, impact, mitigation, owner, created_by, project_id)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await withUniqueRetry(() =>
+    ghiNeuConQuyen(
+      () => CAN.manageRisks(user.role),
+      async () => {
+        const code = await nextRiskCode();
+        const id = await insertId(
+          `INSERT INTO risks (code, title, description, category, probability, impact, mitigation, owner, created_by, project_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      code,
-      input.title,
-      input.description,
-      input.category,
-      input.probability,
-      input.impact,
-      input.mitigation,
-      input.owner,
-      user.id,
-      projectId,
-    );
-    return { id, code };
-  });
+          code,
+          input.title,
+          input.description,
+          input.category,
+          input.probability,
+          input.impact,
+          input.mitigation,
+          input.owner,
+          user.id,
+          projectId,
+        );
+        return { id, code };
+      },
+    ),
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Không có quyền ghi nhận rủi ro" }, { status: 403 });
+  const { id, code } = kq.value;
   return NextResponse.json({ id, code }, { status: 201 });
 }

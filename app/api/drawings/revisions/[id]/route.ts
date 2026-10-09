@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   REVISION_STATUSES,
@@ -111,7 +112,17 @@ export async function PATCH(
       ? body.decisionNote.trim()
       : null;
 
-  const result = await setRevisionStatus(id, status, decisionNote);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.decideDrawingRevision(user.role),
+    () => setRevisionStatus(id, status, decisionNote),
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền duyệt bản vẽ (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  const result = kq.value;
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: 404 });
 
   await notifyRevisionDecision(id, status, decisionNote, user.id);

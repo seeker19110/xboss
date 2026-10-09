@@ -5,6 +5,7 @@ import { newBbntFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/pho
 import { storagePut, storageGet, storageDelete } from "@/lib/nen/storage";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
 import { packageProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -115,17 +116,26 @@ export async function POST(
   const fileName = newBbntFileName(id, mime);
   await storagePut(user.orgId, fileName, fileBuf);
 
-  // Xoá file cũ sau khi ghi file mới thành công
-  if (wp.bbntFileName) await storageDelete(user.orgId, wp.bbntFileName);
-
   const bbntUrl = `/api/workpackages/${id}/bbnt`;
-  await run(
-    `UPDATE work_packages SET bbnt_url = ?, bbnt_file_name = ?, bbnt_original_name = ? WHERE id = ?`,
-    bbntUrl,
-    fileName,
-    file.name || null,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi DB; bị thu hồi ⇒ dọn file vừa lưu.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editProgress(user.role),
+    () =>
+      run(
+        `UPDATE work_packages SET bbnt_url = ?, bbnt_file_name = ?, bbnt_original_name = ? WHERE id = ?`,
+        bbntUrl,
+        fileName,
+        file.name || null,
+        id,
+      ),
   );
+  if (!kq.ok) {
+    await storageDelete(user.orgId, fileName).catch(() => {});
+    return NextResponse.json({ error: "Không có quyền" }, { status: 403 });
+  }
+
+  // Xoá file cũ chỉ sau khi DB đã COMMIT trỏ sang file mới.
+  if (wp.bbntFileName) await storageDelete(user.orgId, wp.bbntFileName);
 
   return NextResponse.json({ bbntUrl, fileName }, { status: 201 });
 }
@@ -162,10 +172,16 @@ export async function DELETE(
       { status: 403 },
     );
 
-  await run(
-    `UPDATE work_packages SET bbnt_url = NULL, bbnt_file_name = NULL, bbnt_original_name = NULL WHERE id = ?`,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi; file chỉ xoá sau COMMIT.
+  const kqXoa = await ghiNeuConQuyen(
+    () => CAN.editProgress(user.role),
+    () =>
+      run(
+        `UPDATE work_packages SET bbnt_url = NULL, bbnt_file_name = NULL, bbnt_original_name = NULL WHERE id = ?`,
+        id,
+      ),
   );
+  if (!kqXoa.ok) return NextResponse.json({ error: "Không có quyền" }, { status: 403 });
 
   if (wp?.bbntFileName) await storageDelete(user.orgId, wp.bbntFileName);
 

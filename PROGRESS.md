@@ -1,5 +1,50 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — S16/D01: tái kiểm quyền lúc ghi cho route miền vật tư/kỹ thuật
+
+- Kiểm kê toàn bộ route ghi của `materials`, `equipment`, `vehicles`, `engineering`, `drawings`,
+  `design-changes`, `qc`, `ncrs`, `inspection-requests`, `tech-links`, `om-documents`, `commissioning`,
+  `certifications`, `monitoring-points`, `env-monitoring`, `env-permits`, `v1` — bảng §2.2 trong
+  `docs/nang-cap/AUDIT-S16-QUYEN-LUC-GHI.md`. 53 file route qua cổng `CAN.<x>` đã bọc
+  `ghiNeuConQuyen`/`kiemQuyenTaiLucGhi` (403 với thông điệp cũ); `materials*`/`vehicles*` (vai trò
+  cứng), `qc/inspections` POST, `ncrs` POST, `v1/*` (API key) KHÔNG ÁP; `drawings/scan-local` HOÃN.
+- `certifications/[id]`, `env-permits/[id]` PATCH: xoá file cũ chuyển ra SAU commit (trước đây xoá
+  trước khi UPDATE). Không đổi `lib/**`.
+- Test `tests/s16-quyen-luc-ghi-vat-tu-ky-thuat.test.ts`: 53 ca thu hồi giữa chừng + 5 đối chứng;
+  trên code cũ 53 ca đỏ.
+
+## 2026-10-09 — S16 D01: tái kiểm quyền lúc ghi cho route miền tiến độ / cấu trúc
+
+- Kiểm kê + áp `ghiNeuConQuyen`/`kiemQuyenTaiLucGhi` cho route ghi gác bằng `CAN.<x>` của tasks,
+  workpackages, dimensions, towers, baselines, phụ thuộc nhóm, công tác, mặt bằng, nghiệm thu tầng
+  (nộp hồ sơ), album, ảnh/bình luận/tài liệu, RACI — bảng §2.1 `docs/nang-cap/AUDIT-S16-QUYEN-LUC-GHI.md`.
+  Chỉ sửa tầng route, không đổi `lib/**`. bbnt/drawing: file cũ giờ chỉ xoá sau COMMIT.
+- Còn HOÃN `import/excel` POST (`importWorkbook` không transaction).
+- Test `tests/s16-quyen-luc-ghi-tien-do.test.ts`: 43 ca thu hồi giữa chừng ⇒ 403 + DB không đổi (đỏ trên
+  code cũ) + 7 ca đối chứng.
+
+## 2026-10-09 — S16 D01: tái kiểm quyền lúc ghi cho route miền hiện trường / hồ sơ
+
+- Kiểm kê toàn bộ route GHI miền hiện trường/hồ sơ (HSE, nhật ký, tổ đội/nhân sự/chấm công, huy
+  động/giải thể, rủi ro, họp, công văn, punch-list, bàn giao, bảo hành, bài học, pháp lý, hồ sơ dự
+  án, chất thải, cộng đồng, hồ sơ NTP) — bảng `docs/nang-cap/AUDIT-S16-QUYEN-LUC-GHI.md` §2.3.
+- Handler gate bằng `CAN.<x>` bọc `ghiNeuConQuyen` (handover-items PATCH: `kiemQuyenTaiLucGhi` sau
+  `FOR UPDATE`); bị thu hồi ⇒ 403 thông điệp cũ. Route có file: lưu file trước, ghi DB trong tái
+  kiểm, bị từ chối ⇒ dọn file mới, file cũ chỉ xoá sau commit (legal-documents, handover-items).
+  Vai trò cứng (nhật ký, HSE POST/DELETE, xoá rủi ro/họp/việc sau họp) ghi rõ KHÔNG ÁP.
+- Test `tests/s16-quyen-luc-ghi-hien-truong.test.ts` (52 ca; 45 ca thu hồi đỏ trên code cũ).
+
+## 2026-10-09 — Nút Excel trang Thanh toán xuất đúng bảng tầng × hệ
+
+- `/api/export/excel?type=payments` trước đây bỏ qua `type`, trả workbook tracking. Nay xuất tab
+  "Thanh toán" (Hệ, Tầng, Người phụ trách, Số CV, Trễ, Tiến độ, Giá trị HĐ, Giá trị theo tiến độ;
+  dòng "Tổng cộng" lấy tổng SQL), quyền `CAN.viewPayments` (bch được), dự án strict → 404,
+  `type` lạ → 400; không `type` giữ nguyên hành vi cũ.
+- Tách 2 câu SQL của `GET /api/payments` sang `lib/tai-chinh/gia-tri-tang.ts`
+  (`giaTriTheoTangHe`) dùng chung. Test: `tests/export-thanh-toan.test.ts`.
+- Luật review OCR: mục mới `xuat-file-tai-chinh` (`app/api/export/excel/**`) ghép luật xuất file và
+  tài chính, vì route này giờ import `lib/tai-chinh/`.
+
 ## 2026-10-09 — Dọn nợ nhỏ: seed mẫu xoá bảng offline, S00 nhận resolver Strict, bỏ `payrollTotals`
 
 - `scripts/seed-sample.ts`: TRUNCATE thêm `offline_vault_keys`, `audit_operation_receipts` (CASCADE kéo

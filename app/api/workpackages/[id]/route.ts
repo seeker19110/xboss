@@ -1,6 +1,6 @@
 import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { query, queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId, visibleProjectIds } from "@/lib/ha-tang/projects";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
@@ -9,6 +9,7 @@ import { recomputePackage, recomputeTasksInheritingDates } from "@/lib/tien-do/r
 import { packageProjectId } from "@/lib/tien-do/workpackages";
 import { storageDelete } from "@/lib/nen/storage";
 import { khoaNhatKyCuaAnhTask } from "@/lib/hien-truong/diary";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -103,23 +104,29 @@ export async function PATCH(
   // Lớp phòng thủ thứ hai (vá W0): dù đã kiểm dự án ở trên, câu UPDATE tự nó cũng ràng buộc
   // lại — nhóm phải nằm trong 1 sheet của đúng dự án `pid` mới bị sửa.
   vals.push(id, pid);
-  await withTransaction(async () => {
-    await run(
-      `UPDATE work_packages SET ${sets.join(", ")}
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay đầu transaction ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    async () => {
+      await run(
+        `UPDATE work_packages SET ${sets.join(", ")}
         WHERE id = ? AND sheet_type_id IN (
           SELECT st.id FROM sheet_types st LEFT JOIN towers tw ON tw.id = st.tower_id
            WHERE tw.project_id = ?
         )`,
-      ...vals,
-    );
-    // Đổi deadline có thể đổi trạng thái trễ (tre ⇄ dang_thi_cong) của nhóm → tính lại.
-    if (body.endDate !== undefined || body.startDate !== undefined) {
-      await recomputePackage(id);
-      // Task con có end_date NULL (đang kế thừa ngày nhóm) phải tính lại trạng thái trễ
-      // theo ngày MỚI của nhóm — không tự động qua recomputePackage (xem lib/recompute.ts).
-      await recomputeTasksInheritingDates(id);
-    }
-  });
+        ...vals,
+      );
+      // Đổi deadline có thể đổi trạng thái trễ (tre ⇄ dang_thi_cong) của nhóm → tính lại.
+      if (body.endDate !== undefined || body.startDate !== undefined) {
+        await recomputePackage(id);
+        // Task con có end_date NULL (đang kế thừa ngày nhóm) phải tính lại trạng thái trễ
+        // theo ngày MỚI của nhóm — không tự động qua recomputePackage (xem lib/recompute.ts).
+        await recomputeTasksInheritingDates(id);
+      }
+    },
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" }, { status: 403 });
   // Bump updated_at của tất cả task trong nhóm → sheetVersion đổi → client refresh.
   await run(`UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE package_id = ?`, id);
   const wp = await queryOne(
@@ -172,33 +179,39 @@ export async function DELETE(
 
     // Toàn bộ chuỗi xoá trong MỘT transaction: 23503 (còn bảng khác tham chiếu) ở bước sau
     // rollback cả các bước trước, không để nhóm mất task/ảnh/lịch sử một nửa.
-    await withTransaction(async () => {
-      if (taskIds.length > 0) {
-        // Khoá nhật ký gắn ảnh của các task TRƯỚC mọi DELETE (thứ tự "nhật ký → ảnh", S06).
-        await khoaNhatKyCuaAnhTask(taskIds);
-        await run(`DELETE FROM notifications WHERE task_id = ANY(?)`, taskIds);
-        await run(`DELETE FROM baseline_tasks WHERE task_id = ANY(?)`, taskIds);
-        await run(`DELETE FROM task_photos WHERE task_id = ANY(?)`, taskIds);
-        await run(`DELETE FROM task_documents WHERE task_id = ANY(?)`, taskIds);
-        await run(`DELETE FROM task_comments WHERE task_id = ANY(?)`, taskIds);
-        await run(`DELETE FROM task_history WHERE task_id = ANY(?)`, taskIds);
-        await run(`DELETE FROM materials WHERE task_id = ANY(?)`, taskIds);
-        await run(`DELETE FROM progress_dimensions WHERE task_id = ANY(?)`, taskIds);
-        await run(`DELETE FROM tasks WHERE package_id = ?`, id);
-      }
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay đầu transaction ghi.
+    const kqXoa = await ghiNeuConQuyen(
+      () => CAN.editStructure(user.role),
+      async () => {
+        if (taskIds.length > 0) {
+          // Khoá nhật ký gắn ảnh của các task TRƯỚC mọi DELETE (thứ tự "nhật ký → ảnh", S06).
+          await khoaNhatKyCuaAnhTask(taskIds);
+          await run(`DELETE FROM notifications WHERE task_id = ANY(?)`, taskIds);
+          await run(`DELETE FROM baseline_tasks WHERE task_id = ANY(?)`, taskIds);
+          await run(`DELETE FROM task_photos WHERE task_id = ANY(?)`, taskIds);
+          await run(`DELETE FROM task_documents WHERE task_id = ANY(?)`, taskIds);
+          await run(`DELETE FROM task_comments WHERE task_id = ANY(?)`, taskIds);
+          await run(`DELETE FROM task_history WHERE task_id = ANY(?)`, taskIds);
+          await run(`DELETE FROM materials WHERE task_id = ANY(?)`, taskIds);
+          await run(`DELETE FROM progress_dimensions WHERE task_id = ANY(?)`, taskIds);
+          await run(`DELETE FROM tasks WHERE package_id = ?`, id);
+        }
 
-      // Lớp phòng thủ thứ hai (vá W0): dù đã kiểm dự án ở trên, câu DELETE tự nó cũng ràng buộc
-      // lại — nhóm phải nằm trong 1 sheet của đúng dự án `pid` mới bị xoá.
-      await run(
-        `DELETE FROM work_packages
+        // Lớp phòng thủ thứ hai (vá W0): dù đã kiểm dự án ở trên, câu DELETE tự nó cũng ràng buộc
+        // lại — nhóm phải nằm trong 1 sheet của đúng dự án `pid` mới bị xoá.
+        await run(
+          `DELETE FROM work_packages
         WHERE id = ? AND sheet_type_id IN (
           SELECT st.id FROM sheet_types st LEFT JOIN towers tw ON tw.id = st.tower_id
            WHERE tw.project_id = ?
         )`,
-        id,
-        pid,
-      );
-    });
+          id,
+          pid,
+        );
+      },
+    );
+    if (!kqXoa.ok)
+      return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được nhóm" }, { status: 403 });
 
     // Xoá file vật lý SAU khi DB commit — file mồ côi ít hại hơn bản ghi mất file.
     for (const name of filesToDelete) await storageDelete(user.orgId, name);
