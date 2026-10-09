@@ -524,3 +524,14 @@ test(
     }
   },
 );
+
+test(
+  "A1-AC06: script membership:dry-run chạy bằng xboss_app vẫn thấy mọi tổ chức (phạm vi '*' tường minh)",
+  S,
+  async () => {
+    const { thuThapMembershipDryRun } = await import("../scripts/lib/membership-dry-run");
+    const kq = await voiPoolApp(() => thuThapMembershipDryRun());
+    const orgIds = kq.orgs.map((o) => Number(o.id));
+    assert.ok(orgIds.includes(A.org) && orgIds.includes(B.org), JSON.stringify(orgIds));
+  },
+);
