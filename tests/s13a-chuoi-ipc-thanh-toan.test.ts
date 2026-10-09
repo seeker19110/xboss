@@ -873,3 +873,101 @@ test(
     }
   },
 );
+
+// ── A5-AC08 (S15): approved ≠ paid + không lộ tiền qua export/audit-view ───────────────────
+
+test(
+  "A5-AC08: đợt nháp/trình/từ chối KHÔNG vào 'thực chi'; chỉ đợt duyệt sinh 1 phiếu; báo cáo = Σ payment_bills của dự án (đối soát nguồn)",
+  S,
+  async () => {
+    const f = new SoFixture();
+    try {
+      const he = await f.heThong();
+      const c = await dungHopDong(
+        f,
+        { value: 100000, advancePct: 0, retentionPct: 0 },
+        { qtyContract: 100, unitPrice: 1000 },
+        he,
+      );
+      const actual = async () => tongDuAn((await baoCaoChiPhi()).body).actual;
+      const tongPhieu = async () => {
+        const { queryOne } = await import("@/lib/db");
+        return (await queryOne<{ s: string }>(
+          `SELECT COALESCE(SUM(amount),0)::text AS s FROM payment_bills WHERE project_id = ?`,
+          c.projectId,
+        ))!.s;
+      };
+
+      // Nháp: chưa có phiếu, thực chi 0.
+      const dot1 = (await lapDot(c.contractId)).body!.id as number;
+      await suaDot(dot1, [{ boqItemId: c.boqId, qtyPeriod: 10 }]);
+      assert.equal(await actual(), "0.00");
+      assert.deepEqual(await phieuCuaDot(dot1), []);
+
+      // Đã trình (chờ duyệt): vẫn 0.
+      assert.equal((await trinh(dot1)).status, 200);
+      assert.equal(await actual(), "0.00", "đợt submitted chưa phải đã trả");
+      assert.deepEqual(await phieuCuaDot(dot1), []);
+
+      // Từ chối: không phiếu, thực chi 0.
+      const tc = await quyetDinh(dot1, { decision: "rejected", rejectReason: "Sai khối lượng" });
+      assert.equal(tc.status, 200, JSON.stringify(tc.body));
+      assert.equal(await trangThaiDot(dot1), "rejected");
+      assert.equal(await actual(), "0.00", "đợt rejected không vào thực chi");
+      assert.deepEqual(await phieuCuaDot(dot1), []);
+
+      // Đợt mới được duyệt → đúng 1 phiếu, thực chi = phiếu = nguồn.
+      const dot2 = await dotDuyet(c.contractId, c.boqId, 10);
+      assert.deepEqual(await phieuCuaDot(dot2), ["10000.00"]);
+      assert.equal(await actual(), "10000.00");
+      assert.equal(await actual(), await tongPhieu(), "báo cáo khớp Σ payment_bills");
+      const meta = (await baoCaoChiPhi()).body?.metadata as { coverage: { reconciled: boolean } };
+      assert.equal(meta.coverage.reconciled, true);
+
+      // Duyệt lặp không sinh phiếu thứ 2.
+      await quyetDinh(dot2, { decision: "approved" });
+      assert.deepEqual(await phieuCuaDot(dot2), ["10000.00"]);
+      assert.equal(await actual(), "10000.00");
+    } finally {
+      await f.don();
+    }
+  },
+);
+
+test(
+  "A5-AC08: export Excel IPC + audit-view không lộ giá trị thương mại cho vai trò bị cấm",
+  S,
+  async () => {
+    const f = new SoFixture();
+    try {
+      const c = await dungHopDong(
+        f,
+        { value: 100000, advancePct: 0, retentionPct: 0 },
+        { qtyContract: 100, unitPrice: 1000 },
+      );
+      const dot = await dotDuyet(c.contractId, c.boqId, 37);
+      const tienBiMat = "37000";
+      const { GET: EXCEL } = await import("@/app/api/payment-certs/[id]/excel/route");
+      const { GET: AUDIT } = await import("@/app/api/admin/audit-log/route");
+      const { GET: AUDIT_EXPORT } = await import("@/app/api/admin/audit-log/export/route");
+      const { GET: AUDIT2 } = await import("@/app/api/admin/audit/route");
+
+      for (const role of ["engineer", "subcon", "cdt", "viewer"] as const) {
+        const u = await f.user(role);
+        await f.vao(u, c.projectId);
+        const kq = [
+          await goi(EXCEL(jreq(`/api/payment-certs/${dot}/excel`, undefined, "GET"), P(dot))),
+          await goi(AUDIT(jreq(`/api/admin/audit-log`, undefined, "GET"))),
+          await goi(AUDIT_EXPORT(jreq(`/api/admin/audit-log/export`, undefined, "GET"))),
+          await goi(AUDIT2(jreq(`/api/admin/audit`, undefined, "GET"))),
+        ];
+        for (const r of kq) {
+          assert.equal(r.status, 403, `${role}: ${JSON.stringify(r.body)}`);
+          assert.ok(!JSON.stringify(r.body).includes(tienBiMat), `${role} lộ tiền`);
+        }
+      }
+    } finally {
+      await f.don();
+    }
+  },
+);

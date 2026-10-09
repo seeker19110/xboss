@@ -488,7 +488,9 @@ export function parseQuantityInput(
     }
   } else if (typeof value === "string") {
     raw = value.trim();
-    if (raw.includes(",") || raw.indexOf(".") !== raw.lastIndexOf(".") || NHOM_NGHIN_VI.test(raw)) {
+    // Phần nguyên "0" ("0.125") không thể là nhóm nghìn → thập phân hợp lệ, không báo mơ hồ.
+    const nhomNghin = NHOM_NGHIN_VI.test(raw) && !/^0\./.test(raw);
+    if (raw.includes(",") || raw.indexOf(".") !== raw.lastIndexOf(".") || nhomNghin) {
       throw loi(
         "quantity_locale_format",
         `${label} không được dùng dấu phẩy hay dấu chấm nhóm nghìn — gửi số thuần, vd 1234.5`,

@@ -2,16 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { VO_REASONS, type VoReason, getVariation, canEditVo } from "@/lib/tai-chinh/vo";
+import {
+  VO_REASONS,
+  type VoReason,
+  type VoRowMasked,
+  getVariation,
+  canEditVo,
+  variationsToWire,
+} from "@/lib/tai-chinh/vo";
+import { MONEY_FORMAT_HEADER, isMoneyPrecisionError, moneyWireFormat } from "@/lib/nen/money";
+import {
+  HEADERS_API_TIEN,
+  LOI_TIEN_VUOT_DINH_DANG_CU,
+  nhanDinhDangTien,
+} from "@/lib/nen/money-dto";
 import { getEntityApprovalStatus } from "@/lib/tien-do/approvals";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/variations/:id — chi tiết VO kèm dòng KL + file đính kèm, scoped theo
-// dự án đang chọn (M22).
+// dự án đang chọn (M22). Định dạng tiền opt-in như GET /api/variations (S15, A3-FR06).
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
   const params = await paramsP;
@@ -46,9 +59,22 @@ export async function GET(
   if (!scoped) return NextResponse.json({ error: "Không tìm thấy phát sinh" }, { status: 404 });
   const { variation, documents, approvalStatus } = scoped;
 
-  // M50 PR2: che giá trị/đơn giá VO cho user thiếu viewPayments trước khi trả.
-  const [maskedVariation] = stripSensitive("variation", [variation], user);
-  return NextResponse.json({ variation: maskedVariation, documents, approvalStatus });
+  // M50 PR2: che giá trị/đơn giá VO cho user thiếu viewPayments TRƯỚC khi đổi wire.
+  const format = moneyWireFormat(req.headers.get(MONEY_FORMAT_HEADER));
+  const masked = stripSensitive<VoRowMasked>("variation", [variation], user);
+  try {
+    const [wire] = variationsToWire(masked, format);
+    return NextResponse.json(
+      { variation: wire, documents, approvalStatus, ...nhanDinhDangTien(format) },
+      { headers: HEADERS_API_TIEN },
+    );
+  } catch (err) {
+    if (!isMoneyPrecisionError(err)) throw err;
+    return NextResponse.json(LOI_TIEN_VUOT_DINH_DANG_CU, {
+      status: 422,
+      headers: HEADERS_API_TIEN,
+    });
+  }
 }
 
 // PATCH /api/variations/:id — sửa thông tin chung (tên/lý do/mô tả/hệ). Không sửa

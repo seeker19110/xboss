@@ -405,6 +405,42 @@ test(
   },
 );
 
+test(
+  "Q-AC06/A4-AC03: PO qty NaN/±Infinity không thành 0 — loại khỏi tổng, đếm đối soát, không 500",
+  S,
+  async () => {
+    const dien = await systemId("dien");
+    const p = await taoDuAn("qac06");
+    const st = await taoSheet(p, dien, "qac06");
+    await taoPoItem(p, st, 2, "1000.00"); // hợp lệ: 2000
+    await taoPoItem(p, st, Number.NaN, "999.00");
+    await taoPoItem(p, st, Number.POSITIVE_INFINITY, "999.00");
+    await taoPoItem(p, st, Number.NEGATIVE_INFINITY, "999.00");
+    await dangNhapPm(p);
+
+    for (const headers of [{}, V1]) {
+      const res = await goiCosts("", headers);
+      assert.equal(res.status, 200);
+      const row = rowOfSystem(res.body, dien)!;
+      const totals = res.body.totals as Totals;
+      if (headers === V1) {
+        assert.equal(row.committed, "2000.00");
+        assert.equal(totals.committed, "2000.00");
+      } else {
+        assert.equal(row.committed, 2000, "chỉ PO hợp lệ — NaN không làm tổng thành NaN/0");
+        assert.equal(totals.committed, 2000);
+      }
+      const cov = (res.body.metadata as { coverage: Record<string, unknown> }).coverage as {
+        reconciled: boolean;
+        invalidQuantity: { poItems: number };
+      };
+      assert.equal(cov.invalidQuantity.poItems, 3, "đếm đủ 3 dòng nonfinite để đối soát");
+      assert.equal(cov.reconciled, false);
+      assert.doesNotMatch(JSON.stringify(res.body), /NaN|Infinity/);
+    }
+  },
+);
+
 // ─────────────────────────────── A4-AC04 ───────────────────────────────
 
 test(
@@ -596,6 +632,70 @@ test(
     const legacy = await goiCosts();
     assert.equal(legacy.status, 422);
     assert.equal(legacy.body.code, "money_precision_unsupported");
+  },
+);
+
+// ─────────────────────────────── A4-AC06 ───────────────────────────────
+
+test(
+  "A4-AC06: nhãn tầng trùng 'T1' ở hai sheet không ghép nhầm — mỗi dòng đúng số sheet mình",
+  S,
+  async () => {
+    const dien = await systemId("dien");
+    const p = await taoDuAn("ac06-t1");
+    const st1 = await taoSheet(p, dien, "ac06-a");
+    const st2 = await taoSheet(p, dien, "ac06-b");
+    await taoTangHopDong(st1, "T1", "10000.00");
+    await taoTangHopDong(st2, "T1", "70000.00");
+    await taoThanhToan({ projectId: p, amount: "1000.00", sheetTypeId: st1, floorLabel: "T1" });
+    await taoThanhToan({ projectId: p, amount: "3000.00", sheetTypeId: st2, floorLabel: "T1" });
+    await taoThanhToan({ projectId: p, amount: "5000.00", sheetTypeId: st2, floorLabel: "T1" });
+    await dangNhapPm(p);
+
+    const floor = await goiCosts("?groupBy=floor");
+    assert.equal(floor.status, 200);
+    const t1 = rowsOf(floor.body).filter((r) => r.label.endsWith("· T1"));
+    assert.equal(t1.length, 2, "hai sheet cùng nhãn T1 phải là 2 dòng riêng");
+    const r1 = t1.find((r) => r.sheetTypeId === st1)!;
+    const r2 = t1.find((r) => r.sheetTypeId === st2)!;
+    assert.ok(r1 && r2, "mỗi dòng gắn đúng sheetTypeId");
+    assert.equal(r1.committed, 10000);
+    assert.equal(r1.actual, 1000);
+    assert.equal(r2.committed, 70000);
+    assert.equal(r2.actual, 8000);
+    assert.equal(r1.key === r2.key, false, "key dòng không được trùng");
+  },
+);
+
+test(
+  "A4-AC06: vai trò bị che (engineer/subcon/viewer/cdt) → 403, body lỗi + không lộ số tiền",
+  S,
+  async () => {
+    const dien = await systemId("dien");
+    const p = await taoDuAn("ac06-mask");
+    const st = await taoSheet(p, dien, "ac06-mask");
+    await taoBoq(p, dien, "1", "987654321.00");
+    await taoThanhToan({ projectId: p, amount: "123456789.00", sheetTypeId: st });
+    const { insertId, queryOne } = await import("@/lib/db");
+    for (const role of ["engineer", "subcon", "viewer", "cdt"]) {
+      const id = await insertId(
+        `INSERT INTO users (name, email, password_hash, role, org_id) VALUES ('Mask S11', ?, 'hash-s11', ?, 1)`,
+        `s11-${uniq("mask")}@test.local`,
+        role,
+      );
+      const u = await queryOne<{ password_hash: string }>(
+        `SELECT password_hash FROM users WHERE id = ?`,
+        id,
+      );
+      await dangNhapDuAn({ id, passwordHash: u!.password_hash }, p);
+      for (const q of ["", "?groupBy=floor", "?export=excel"]) {
+        const r = await goiCosts(q);
+        assert.equal(r.status, 403, `${role} ${q}`);
+        const txt = JSON.stringify(r.body);
+        assert.equal(/987654321|123456789/.test(txt), false, `${role} lộ số tiền: ${txt}`);
+        assert.equal("alerts" in r.body || "metadata" in r.body || "rows" in r.body, false);
+      }
+    }
   },
 );
 

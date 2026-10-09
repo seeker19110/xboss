@@ -217,3 +217,46 @@ test(
     assert.equal(kpiOrg1.avgProgress, null);
   },
 );
+
+test(
+  "A4-AC06: list và KPI khớp theo status (active/handover/closed) và theo visibility cùng org",
+  S,
+  async () => {
+    const { run } = await import("@/lib/db");
+    const pActive = await taoDuAn();
+    const pHandover = await taoDuAn();
+    const pClosed = await taoDuAn();
+    const pKhongGan = await taoDuAn(); // cùng org nhưng PM không được gán
+    await run(`UPDATE projects SET status = 'handover' WHERE id = ?`, pHandover);
+    await run(`UPDATE projects SET status = 'closed' WHERE id = ?`, pClosed);
+    await run(`UPDATE projects SET status = 'active' WHERE id = ?`, pKhongGan);
+    for (const p of [pActive, pHandover, pClosed, pKhongGan]) await taoTask(await taoNhom(p), 0.5);
+
+    const pm = await taoPm();
+    await dangNhapDuAn(pm, pActive);
+    await dangNhapDuAn(pm, pHandover);
+    await dangNhapDuAn(pm, pClosed);
+
+    const duAn = await (async () => {
+      const { GET } = await import("@/app/api/projects/route");
+      const { NextRequest } = await import("next/server");
+      const res = await GET(new NextRequest("http://localhost/api/projects"));
+      return (await res.json()).projects as { id: number; status: string }[];
+    })();
+    const kpi = await goiKpi();
+
+    const ids = duAn.map((p) => p.id).sort((a, b) => a - b);
+    assert.deepEqual(
+      ids,
+      [pActive, pHandover, pClosed].sort((a, b) => a - b),
+    );
+    assert.ok(!ids.includes(pKhongGan), "dự án không được gán không được lộ trong list");
+    assert.equal(kpi.totalProjects, duAn.length);
+    assert.equal(kpi.activeCount, duAn.filter((p) => p.status === "active").length);
+    assert.equal(kpi.handoverCount, duAn.filter((p) => p.status === "handover").length);
+    assert.equal(kpi.closedCount, duAn.filter((p) => p.status === "closed").length);
+    assert.equal(kpi.activeCount + kpi.handoverCount + kpi.closedCount, kpi.totalProjects);
+    // Task của dự án không gán không lọt vào mẫu số KPI.
+    assert.equal(kpi.taskCount, 3);
+  },
+);

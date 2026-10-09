@@ -1,5 +1,5 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
-import { dangNhapDuAn } from "./helpers/phien"; // mock next/headers — trước mọi import route
+import { dangNhapDuAn, requestRieng } from "./helpers/phien"; // mock next/headers — trước mọi import route
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -54,6 +54,25 @@ test("parsePoQuantity: lỗi 400 quantity_* / 422 quantity_overflow", () => {
   assert.equal(ma("1.0000001"), "400:quantity_scale");
   assert.equal(ma("1234567890123456789"), "422:quantity_overflow");
   assert.equal(ma(Number.NaN), "400:quantity_invalid");
+});
+
+test("S15: '0.125'/'0.500' là thập phân (phần nguyên 0 không thể là nhóm nghìn); '1.500' vẫn mơ hồ", () => {
+  assert.equal(parseQuantityInput("0.125"), "0.125");
+  assert.equal(parseQuantityInput("0.500"), "0.500");
+  assert.equal(parsePoQuantity("0.125"), "0.125");
+  assert.equal(parsePoQuantity("0.500"), "0.5");
+  for (const mo of ["1.500", "12.345", "123.456", "1.234.567"]) {
+    assert.throws(
+      () => parseQuantityInput(mo),
+      (e: QuantityInputError) => e.code === "quantity_locale_format",
+      mo,
+    );
+    assert.throws(
+      () => parsePoQuantity(mo),
+      (e: QuantityInputError) => e.code === "quantity_locale_format",
+      mo,
+    );
+  }
 });
 
 test("parseQuantityInput mặc định giữ nguyên hành vi bill (3 lẻ, 12 nguyên, không cắt đuôi)", () => {
@@ -284,5 +303,202 @@ test(
     assert.deepEqual(await doc(prLegacy), { e: "0.1", p: "legacy_float_text" });
     assert.equal(lai.find((r) => r.table === "purchase_requests")!.changed, 0);
     assert.deepEqual(await doc(prExact), { e: "1.000001", p: "exact_input_v1" });
+  },
+);
+
+// ===== S15 — Q-AC06: nonfinite không thành 0; khoá dòng không để shadow exact lệch =====
+
+test(
+  "Q-AC06 (a): backfill gặp NaN/±Infinity → đối soát trung thực, exact/provenance vẫn NULL, chạy lại không đổi",
+  S,
+  async () => {
+    const { insertId, queryOne } = await import("@/lib/db");
+    const { projectId, matId, uid } = await dungDuAn();
+    const { backfillPoQtyExact } = await import("../scripts/backfill-po-qty-exact");
+    const prNaN = await insertId(
+      `INSERT INTO purchase_requests (pr_code, material_id, qty_requested, requested_by, project_id)
+     VALUES (?, ?, 'NaN'::float8, ?, ?)`,
+      uniq("PRQ-"),
+      matId,
+      uid,
+      projectId,
+    );
+    const poId = await insertId(
+      `INSERT INTO purchase_orders (po_code, created_by, project_id) VALUES (?, ?, ?)`,
+      uniq("POQ-"),
+      uid,
+      projectId,
+    );
+    const itInf = await insertId(
+      `INSERT INTO po_items (po_id, material_id, qty_ordered, qty_received)
+     VALUES (?, ?, 'Infinity'::float8, '-Infinity'::float8)`,
+      poId,
+      matId,
+    );
+
+    const docPr = () =>
+      queryOne<{ e: string | null; p: string | null }>(
+        `SELECT qty_requested_exact::text AS e, qty_requested_provenance AS p
+         FROM purchase_requests WHERE id = ?`,
+        prNaN,
+      );
+    const docPo = () =>
+      queryOne<{ oe: string | null; op: string | null; re: string | null; rp: string | null }>(
+        `SELECT qty_ordered_exact::text AS oe, qty_ordered_provenance AS op,
+              qty_received_exact::text AS re, qty_received_provenance AS rp
+         FROM po_items WHERE id = ?`,
+        itInf,
+      );
+    type Reps = Awaited<ReturnType<typeof backfillPoQtyExact>>;
+    const giaTriDoiSoat = (reps: Reps, table: string, column: string, id: number) =>
+      reps
+        .find((r) => r.table === table && r.column === column)!
+        .reconciliation.find((x) => x.id === id)?.value;
+
+    for (let lan = 1; lan <= 2; lan++) {
+      const reps = await backfillPoQtyExact({ batch: 50 });
+      // Giá trị đối soát là chuỗi gốc của float8 — không "0", không rỗng.
+      assert.equal(giaTriDoiSoat(reps, "purchase_requests", "qty_requested", prNaN), "NaN");
+      assert.equal(giaTriDoiSoat(reps, "po_items", "qty_ordered", itInf), "Infinity");
+      assert.equal(giaTriDoiSoat(reps, "po_items", "qty_received", itInf), "-Infinity");
+      assert.deepEqual(await docPr(), { e: null, p: null }, `lần ${lan}: PR NaN không ghi 0`);
+      assert.deepEqual(
+        await docPo(),
+        { oe: null, op: null, re: null, rp: null },
+        `lần ${lan}: PO ±Infinity không ghi gì`,
+      );
+    }
+  },
+);
+
+test(
+  "Q-AC06 (a): CHECK *_finite của migration 0162 chặn NaN/±Infinity ở mọi cột exact (23514)",
+  S,
+  async () => {
+    const { insertId, run } = await import("@/lib/db");
+    const { projectId, matId, uid } = await dungDuAn();
+    const prId = await insertId(
+      `INSERT INTO purchase_requests (pr_code, material_id, qty_requested, requested_by, project_id)
+     VALUES (?, ?, 1, ?, ?)`,
+      uniq("PRQ-"),
+      matId,
+      uid,
+      projectId,
+    );
+    const poId = await insertId(
+      `INSERT INTO purchase_orders (po_code, created_by, project_id) VALUES (?, ?, ?)`,
+      uniq("POQ-"),
+      uid,
+      projectId,
+    );
+    const itemId = await insertId(
+      `INSERT INTO po_items (po_id, material_id, qty_ordered, qty_received) VALUES (?, ?, 1, 0)`,
+      poId,
+      matId,
+    );
+    const receiptId = await insertId(
+      `INSERT INTO warehouse_receipts (receipt_code, po_id, received_by) VALUES (?, ?, ?)`,
+      uniq("WRQ-"),
+      poId,
+      uid,
+    );
+    const riId = await insertId(
+      `INSERT INTO receipt_items (receipt_id, material_id, po_item_id, qty_received)
+     VALUES (?, ?, ?, 1)`,
+      receiptId,
+      matId,
+      itemId,
+    );
+    const cot: [string, string, number, string][] = [
+      ["purchase_requests", "qty_requested_exact", prId, "pr_qty_finite"],
+      ["po_items", "qty_ordered_exact", itemId, "po_ordered_finite"],
+      ["po_items", "qty_received_exact", itemId, "po_received_finite"],
+      ["receipt_items", "qty_received_exact", riId, "receipt_qty_finite"],
+    ];
+    for (const [bang, cotExact, id, rangBuoc] of cot) {
+      for (const v of ["NaN", "Infinity", "-Infinity"]) {
+        // Tên bảng/cột lấy từ hằng ở trên (không từ input); giá trị qua placeholder.
+        await assert.rejects(
+          run(`UPDATE ${bang} SET ${cotExact} = ?::numeric WHERE id = ?`, v, id),
+          (e: { code?: string; constraint?: string }) =>
+            e.code === "23514" && e.constraint === rangBuoc,
+          `${bang}.${cotExact} = ${v} phải bị ${rangBuoc} chặn`,
+        );
+      }
+    }
+  },
+);
+
+test(
+  "Q-AC06 (b): 4 lần nhận hàng song song cùng dòng PO — exact khớp float, không mất cập nhật",
+  S,
+  async () => {
+    const { queryOne, run } = await import("@/lib/db");
+    const { matId } = await dungDuAn();
+    const { POST: taoPO } = await import("@/app/api/purchase-orders/route");
+    const rPo = await taoPO(jreq({ items: [{ materialId: matId, qtyOrdered: "1" }] }));
+    assert.equal(rPo.status, 201);
+    const poId = (await rPo.json()).id as number;
+    await run(`UPDATE purchase_orders SET status = 'confirmed' WHERE id = ?`, poId);
+    const it = await queryOne<{ id: number }>(`SELECT id FROM po_items WHERE po_id = ?`, poId);
+
+    // Số nhị phân chính xác (0,5 + 0,25 + 0,0625 + 0,03125) để cột float cũ cũng so được bằng ===.
+    // (Không dùng "0.125": parser coi chuỗi d.ddd là nhóm nghìn vi-VN mơ hồ → 400.)
+    const { POST: nhan } = await import("@/app/api/purchase-orders/[id]/receive/route");
+    const kq = await Promise.all(
+      ["0.5", "0.25", "0.0625", "0.03125"].map((q) =>
+        // Mỗi lần nhận là một request riêng (ngữ cảnh request tách biệt như production).
+        requestRieng(() =>
+          nhan(jreq({ items: [{ poItemId: it!.id, qtyReceived: q }] }), thamSo(poId)),
+        ),
+      ),
+    );
+    assert.deepEqual(
+      kq.map((r) => r.status),
+      [201, 201, 201, 201],
+    );
+
+    const sau = await queryOne<{
+      f: number;
+      e: string;
+      p: string;
+      nPhieu: number;
+      tongPhieu: string;
+    }>(
+      `SELECT pi.qty_received AS f, pi.qty_received_exact::text AS e,
+            pi.qty_received_provenance AS p,
+            (SELECT COUNT(*) FROM receipt_items ri WHERE ri.po_item_id = pi.id)::int AS "nPhieu",
+            (SELECT SUM(ri.qty_received_exact) FROM receipt_items ri
+              WHERE ri.po_item_id = pi.id)::text AS "tongPhieu"
+         FROM po_items pi WHERE pi.id = ?`,
+      it!.id,
+    );
+    assert.equal(sau!.nPhieu, 4);
+    assert.equal(sau!.f, 0.84375, "cột float: không mất lần cộng nào");
+    assert.equal(sau!.e, "0.84375", "cột exact: không mất lần cộng nào");
+    assert.equal(sau!.tongPhieu, "0.84375", "exact dòng PO == Σ exact phiếu nhận");
+    assert.equal(sau!.p, "exact_input_v1");
+
+    // Hai lần nhận song song cùng vượt số đặt (0,75 + 0,75 > 1): khoá FOR UPDATE cho đúng một
+    // lần qua, lần kia 409 và rollback cả phiếu — shadow exact không cộng phần bị từ chối.
+    const rPo2 = await taoPO(jreq({ items: [{ materialId: matId, qtyOrdered: "1" }] }));
+    const poId2 = (await rPo2.json()).id as number;
+    await run(`UPDATE purchase_orders SET status = 'confirmed' WHERE id = ?`, poId2);
+    const it2 = await queryOne<{ id: number }>(`SELECT id FROM po_items WHERE po_id = ?`, poId2);
+    const kq2 = await Promise.all(
+      [1, 2].map(() =>
+        requestRieng(() =>
+          nhan(jreq({ items: [{ poItemId: it2!.id, qtyReceived: "0.75" }] }), thamSo(poId2)),
+        ),
+      ),
+    );
+    assert.deepEqual(kq2.map((r) => r.status).sort(), [201, 409]);
+    const sau2 = await queryOne<{ f: number; e: string; nPhieu: number }>(
+      `SELECT pi.qty_received AS f, pi.qty_received_exact::text AS e,
+            (SELECT COUNT(*) FROM receipt_items ri WHERE ri.po_item_id = pi.id)::int AS "nPhieu"
+         FROM po_items pi WHERE pi.id = ?`,
+      it2!.id,
+    );
+    assert.deepEqual(sau2, { f: 0.75, e: "0.75", nPhieu: 1 });
   },
 );

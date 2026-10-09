@@ -46,6 +46,8 @@ export type DrTarget = {
   expectedUser: string;
   expectedMarker: string;
   markerDatabase: string;
+  /** Role ứng dụng trên đích cần kiểm RLS (mặc định `xboss_app`, ADR-0005). */
+  appRole?: string;
 };
 export type DrInput = {
   /** Migration của mã nguồn đang dùng để khôi phục (tên + SHA-256 nội dung tệp). */
@@ -61,6 +63,18 @@ export type DrInput = {
 const MARKER_PATTERN = /^xboss-disposable:[A-Za-z0-9_-]{16,}$/;
 const DB_NAME_PATTERN = /^[A-Za-z0-9_-]{1,63}$/;
 const MAX_LISTED = 20;
+export const DEFAULT_APP_ROLE = "xboss_app";
+// Bảng tài chính có cột project_id/org_id trực tiếp: migration 0069/0080 bật + FORCE RLS. Bảng con
+// (contract_addenda, boq_items, payment_cert_items) không có RLS riêng — cô lập qua bảng cha.
+const FINANCE_RLS_TABLES = [
+  "contracts",
+  "payment_bills",
+  "invoices",
+  "advances",
+  "claims",
+  "cash_transactions",
+] as const;
+const ROLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
 
 /** host:port/database (chữ thường) — danh tính rút gọn, không chứa user/mật khẩu. */
 export function connectionIdentity(raw: string): string {
@@ -104,7 +118,18 @@ export function readDrTarget(env: Record<string, string | undefined>): DrTarget 
     // Không đưa URI, username/password hoặc thông điệp lỗi parser ra log.
     throw new Error("Đích DR không hợp lệ hoặc trùng database ứng dụng; cần bản sao cách ly.");
   }
-  return { connectionString, expectedDatabase, expectedUser, expectedMarker, markerDatabase };
+  const appRole = env.DR_VERIFY_APP_ROLE?.trim() || DEFAULT_APP_ROLE;
+  if (!ROLE_NAME_PATTERN.test(appRole)) {
+    throw new Error("DR_VERIFY_APP_ROLE không hợp lệ.");
+  }
+  return {
+    connectionString,
+    expectedDatabase,
+    expectedUser,
+    expectedMarker,
+    markerDatabase,
+    appRole,
+  };
 }
 
 /**
@@ -152,7 +177,11 @@ export function summarizeDrChecks(results: readonly DrCheck[]) {
 
 export async function runDrChecks(
   client: DrClient,
-  target: Pick<DrTarget, "expectedDatabase" | "expectedUser" | "expectedMarker" | "markerDatabase">,
+  target: Pick<
+    DrTarget,
+    "expectedDatabase" | "expectedUser" | "expectedMarker" | "markerDatabase"
+  > &
+    Partial<Pick<DrTarget, "appRole">>,
   input: DrInput,
 ): Promise<DrCheck[]> {
   const results: DrCheck[] = [];
@@ -237,6 +266,9 @@ export async function runDrChecks(
     );
     await check("app-sha", "fixture", async () => appShaResult(v1, input.appSha, needV1));
     await check("audit-role-access", "fixture", () => checkReadAccess(client));
+    await check("app-role-rls", "fixture", () =>
+      checkAppRoleRls(client, target.appRole ?? DEFAULT_APP_ROLE),
+    );
     await check("migration-names", "fixture", () => checkMigrationNames(client, input.migrations));
     await check("migration-checksums", "fixture", async () =>
       v1 ? checkMigrationChecksums(client, v1, input.migrations) : needV1("migration checksum"),
@@ -444,6 +476,56 @@ async function checkReadAccess(client: DrClient): Promise<CheckOutcome> {
   return {
     status: "PASS",
     reason: `Role kiểm đọc toàn phần ${READ_TABLES.length} bảng trọng yếu.`,
+  };
+}
+
+/**
+ * A6-AC04: role ứng dụng trên đích phải còn bị RLS ràng buộc — NOBYPASSRLS, không superuser,
+ * không sở hữu bảng có RLS (owner bỏ qua policy nếu không FORCE) và bảng tài chính bật + FORCE RLS.
+ * Chỉ đọc catalog; không in tên role/URI nào ngoài tên role app (không phải secret).
+ */
+async function checkAppRoleRls(client: DrClient, appRole: string): Promise<CheckOutcome> {
+  const role = await client.query(
+    `SELECT r.rolsuper, r.rolbypassrls,
+            ARRAY(SELECT c.relname::text FROM pg_catalog.pg_class c
+                  WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p')
+                    AND c.relrowsecurity AND c.relowner = r.oid
+                  ORDER BY c.relname) AS owned_rls
+     FROM pg_catalog.pg_roles r WHERE r.rolname = $1`,
+    [appRole],
+  );
+  const row = role.rows[0];
+  if (!row) {
+    return {
+      status: "FAIL",
+      reason: `Đích thiếu role ứng dụng "${appRole}" — restore chưa đủ (role là đối tượng cấp cluster, cần tạo/gán lại trước khi chạy app).`,
+      expected: appRole,
+    };
+  }
+  const problems: Json[] = [];
+  if (row.rolsuper === true) problems.push("superuser");
+  if (row.rolbypassrls === true) problems.push("bypassrls");
+  const owned = Array.isArray(row.owned_rls) ? (row.owned_rls as string[]) : [];
+  if (owned.length) problems.push({ ownsRlsTables: limited(owned) });
+  const financeTables: string[] = [...FINANCE_RLS_TABLES];
+  const finance = await client.query(
+    `SELECT c.relname::text AS name, c.relrowsecurity AS rls, c.relforcerowsecurity AS force_rls
+     FROM pg_catalog.pg_class c
+     WHERE c.relnamespace = 'public'::regnamespace AND c.relname = ANY($1::text[])`,
+    [financeTables],
+  );
+  const byName = new Map(finance.rows.map((item) => [String(item.name), item]));
+  const weak = financeTables.filter((name) => {
+    const item = byName.get(name);
+    return !item || item.rls !== true || item.force_rls !== true;
+  });
+  if (weak.length) problems.push({ financeWithoutForcedRls: limited(weak) });
+  return {
+    status: problems.length ? "FAIL" : "PASS",
+    reason: problems.length
+      ? `Role ứng dụng "${appRole}" không bị RLS ràng buộc đúng thiết kế (ADR-0005).`
+      : `Role "${appRole}" NOBYPASSRLS, không superuser, không sở hữu bảng RLS; ${financeTables.length} bảng tài chính bật + FORCE RLS.`,
+    actual: problems.length ? problems : undefined,
   };
 }
 

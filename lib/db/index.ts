@@ -29,7 +29,17 @@ export class DatabaseSchemaNotReadyError extends Error {
 }
 
 // Transaction context: query/run/insertId tự dùng client này nếu đang trong withTransaction.
-const txStorage = new AsyncLocalStorage<PoolClient>();
+// Kèm "khung" ngữ cảnh đã gắn cho transaction (A1-AC04): chế độ chỉ-đọc, actor lúc BEGIN và
+// phạm vi dự án (giá trị GUC app.project_id hiện hành) — lời gọi LỒNG đối chiếu với khung này
+// để không âm thầm đổi actor/dự án hay nâng quyền giữa chừng transaction.
+type TxFrame = {
+  client: PoolClient;
+  readOnly: boolean;
+  actor: { userId?: number; role?: string; orgId?: number; projectId?: number };
+  /** Giá trị app.project_id đã đặt: '' = chưa gắn dự án, '*' = liên dự án, 'N' = dự án N. */
+  scope: string;
+};
+const txStorage = new AsyncLocalStorage<TxFrame>();
 
 // Schema DB được quản qua các file .sql đánh số trong migrations/ (chạy bởi runMigrations,
 // xem lib/db/migrate.ts + docs/adr/0003-migrations.md). Không còn chuỗi SCHEMA inline ở đây.
@@ -162,7 +172,7 @@ export async function query<T = Record<string, unknown>>(
   ...params: unknown[]
 ): Promise<T[]> {
   await ensureSchemaCompatible();
-  const tx = txStorage.getStore();
+  const tx = txStorage.getStore()?.client;
   const pgSql = toPg(sql);
   const r = await timedPgQuery(
     () => (tx ? tx.query(pgSql, params) : getPool().query(pgSql, params)),
@@ -181,7 +191,7 @@ export async function queryOne<T = Record<string, unknown>>(
 
 export async function run(sql: string, ...params: unknown[]): Promise<{ changes: number }> {
   await ensureSchemaCompatible();
-  const tx = txStorage.getStore();
+  const tx = txStorage.getStore()?.client;
   const pgSql = toPg(sql);
   const r = await timedPgQuery(
     () => (tx ? tx.query(pgSql, params) : getPool().query(pgSql, params)),
@@ -197,7 +207,7 @@ export async function insertId(sql: string, ...params: unknown[]): Promise<numbe
   const pgSql = toPg(sql);
   const needsReturning = !/returning\s+id\s*$/i.test(pgSql.trim());
   const finalSql = needsReturning ? pgSql + " RETURNING id" : pgSql;
-  const tx = txStorage.getStore();
+  const tx = txStorage.getStore()?.client;
   const r = await timedPgQuery(
     () => (tx ? tx.query(finalSql, params) : getPool().query(finalSql, params)),
     sql,
@@ -211,11 +221,35 @@ export function dangTrongGiaoDich(): boolean {
   return txStorage.getStore() != null;
 }
 
+// A1-AC04 — lời gọi LỒNG chỉ được tái dùng transaction đang mở khi KHÔNG đổi ngữ cảnh đã gắn:
+// cùng actor (user/vai trò/tổ chức/dự án của request lúc BEGIN), không đòi REPEATABLE READ mới,
+// và không nâng transaction chỉ-đọc thành ghi. Vi phạm → throw (transaction ngoài ROLLBACK),
+// không âm thầm chạy tiếp với ngữ cảnh sai. Trường lúc BEGIN chưa có (undefined) được phép có
+// sau đó (getCurrentUser/getCurrentProjectId vá ngữ cảnh muộn) — chỉ chặn khi ĐỔI giá trị.
+function kiemTraLoiGoiLong(
+  frame: TxFrame,
+  opts: { isolation?: "repeatable_read"; readOnly?: boolean },
+  ham: string,
+): void {
+  if (opts.isolation === "repeatable_read")
+    throw new Error(
+      `${ham}: không thể yêu cầu REPEATABLE READ khi đang lồng trong transaction có sẵn`,
+    );
+  if (frame.readOnly && !opts.readOnly)
+    throw new Error(`${ham}: không thể nâng transaction chỉ-đọc thành ghi trong lời gọi lồng`);
+  const ctx = getRequestContext();
+  for (const k of ["userId", "role", "orgId", "projectId"] as const) {
+    if (frame.actor[k] !== undefined && ctx?.[k] !== frame.actor[k])
+      throw new Error(`${ham}: lời gọi lồng mang ngữ cảnh actor/dự án khác transaction đang mở`);
+  }
+}
+
 // Bọc nhiều thao tác ghi vào 1 transaction — COMMIT khi fn thành công, ROLLBACK khi throw.
 // Mọi query/run/insertId bên trong fn tự dùng cùng client (qua AsyncLocalStorage).
 // Reentrant: gọi lồng bên trong 1 withTransaction khác (vd recomputePackage tự bọc
 // nhưng được recomputeTask gọi từ trong transaction của route) tái dùng luôn client hiện
 // có thay vì mở connection/transaction thứ 2 — tránh treo (2 client cùng chờ khoá nhau).
+// Lời gọi lồng phải qua kiemTraLoiGoiLong (cùng actor, không nâng chỉ-đọc → ghi).
 // opts.isolation = "repeatable_read": mở transaction MỚI bằng BEGIN ISOLATION LEVEL REPEATABLE
 // READ (phải nằm ngay trong BEGIN — set_config chạy sau BEGIN khiến SET TRANSACTION ISOLATION
 // lỗi) để mọi câu đọc trong fn thấy cùng 1 snapshot. Lồng trong transaction có sẵn mà đòi
@@ -225,15 +259,17 @@ export async function withTransaction<T>(
   opts?: { isolation?: "repeatable_read"; readOnly?: boolean },
 ): Promise<T> {
   const repeatableRead = opts?.isolation === "repeatable_read";
-  if (txStorage.getStore()) {
-    if (repeatableRead)
-      throw new Error(
-        "withTransaction: không thể yêu cầu REPEATABLE READ khi đang lồng trong transaction có sẵn",
-      );
+  const frameNgoai = txStorage.getStore();
+  if (frameNgoai) {
+    kiemTraLoiGoiLong(frameNgoai, opts ?? {}, "withTransaction");
     return fn();
   }
   await ensureSchemaCompatible();
   const client = await getPool().connect();
+  // Lỗi khi ROLLBACK (mất kết nối, timeout…) → huỷ hẳn connection thay vì trả về pool: một
+  // connection chưa chắc đã thoát transaction có thể mang GUC app.* (SET LOCAL) của request này
+  // sang request sau (A1-AC04).
+  let loiHuyKetNoi: Error | undefined;
   try {
     // Mọi tuỳ chọn (isolation/READ ONLY) nằm ngay trong câu BEGIN — không SET TRANSACTION
     // sau đó, để chế độ đọc-chỉ có hiệu lực từ câu lệnh đầu tiên (A4-FR06).
@@ -260,14 +296,31 @@ export async function withTransaction<T>(
         ],
       );
     }
-    const result = await txStorage.run(client, fn);
+    // Chụp giá trị (không giữ tham chiếu) — patchRequestContext sửa tại chỗ object ngữ cảnh.
+    const frame: TxFrame = {
+      client,
+      readOnly: !!opts?.readOnly,
+      actor: {
+        userId: ctx?.userId ?? undefined,
+        role: ctx?.role || undefined,
+        orgId: ctx?.orgId ?? undefined,
+        projectId: ctx?.projectId ?? undefined,
+      },
+      scope: ctx?.projectId != null ? String(ctx.projectId) : "",
+    };
+    const result = await txStorage.run(frame, fn);
     await client.query("COMMIT");
     return result;
   } catch (err) {
-    await client.query("ROLLBACK");
+    try {
+      await client.query("ROLLBACK");
+    } catch (rbErr) {
+      loiHuyKetNoi = rbErr instanceof Error ? rbErr : new Error(String(rbErr));
+      log.error("rollback_failed", { error: loiHuyKetNoi.message });
+    }
     throw err;
   } finally {
-    client.release();
+    client.release(loiHuyKetNoi);
   }
 }
 
@@ -285,6 +338,7 @@ export async function withProjectScope<T>(
   opts?: { readOnly?: boolean; isolation?: "repeatable_read" },
 ): Promise<T> {
   const readOnly = opts?.readOnly ?? true;
+  const scope = String(projectId);
   // Lồng bên trong 1 withProjectScope/withTransaction khác (vd hàm đọc gọi lại chính nó,
   // hoặc 1 hàm ghi gọi 1 hàm đọc nội bộ trước khi ghi) tái dùng transaction hiện có — CHỈ
   // đặt READ ONLY (trong BEGIN) khi ĐANG MỞ transaction mới (client này thật sự chạy BEGIN).
@@ -292,15 +346,32 @@ export async function withProjectScope<T>(
   // (mặc định readOnly=true vì là đọc) tự đặt READ ONLY trên transaction cha ĐANG GHI, mọi
   // câu lệnh ghi sau đó trong transaction cha sẽ lỗi "cannot execute ... in a read-only
   // transaction" dù bản thân transaction cha gọi với readOnly:false.
-  const alreadyInTransaction = !!txStorage.getStore();
+  // A1-AC04: lời gọi lồng phải CÙNG phạm vi dự án với transaction đang mở. Transaction chưa
+  // gắn dự án (GUC rỗng — mở ngoài ngữ cảnh dự án) được gắn đúng 1 lần; đã gắn rồi thì mọi
+  // phạm vi khác (dự án khác, '*' ↔ dự án) đều bị từ chối — GUC SET LOCAL sống tới hết
+  // transaction nên đổi giữa chừng sẽ áp nhầm cho cả phần còn lại của transaction ngoài.
+  const frameNgoai = txStorage.getStore();
+  if (frameNgoai) {
+    kiemTraLoiGoiLong(frameNgoai, { isolation: opts?.isolation, readOnly }, "withProjectScope");
+    if (frameNgoai.scope === scope) return fn();
+    if (frameNgoai.scope !== "")
+      throw new Error(
+        `withProjectScope: lời gọi lồng đổi phạm vi dự án ('${frameNgoai.scope}' → '${scope}') bị từ chối`,
+      );
+    // Gán khung TRƯỚC khi await để lời gọi lồng chạy song song (Promise.all) thấy ngay.
+    frameNgoai.scope = scope;
+    await frameNgoai.client.query(`SELECT set_config('app.project_id', $1, true)`, [scope]);
+    return fn();
+  }
   return withTransaction(
     async () => {
-      const client = txStorage.getStore();
-      if (!client) throw new Error("withProjectScope: thiếu transaction client (không thể xảy ra)");
-      await client.query(`SELECT set_config('app.project_id', $1, true)`, [String(projectId)]);
+      const frame = txStorage.getStore();
+      if (!frame) throw new Error("withProjectScope: thiếu transaction client (không thể xảy ra)");
+      frame.scope = scope;
+      await frame.client.query(`SELECT set_config('app.project_id', $1, true)`, [scope]);
       return fn();
     },
-    { isolation: opts?.isolation, readOnly: readOnly && !alreadyInTransaction },
+    { isolation: opts?.isolation, readOnly },
   );
 }
 

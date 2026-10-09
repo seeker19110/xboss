@@ -55,6 +55,7 @@ const artifactsDir = join(work, "artifacts");
 const manifestPath = join(work, `xboss-${sfx}.recovery-v1.json`);
 const dumpPath = join(artifactsDir, `xboss-${sfx}.snapshot.dump`);
 const createdDbs: string[] = [];
+const createdRoles: string[] = [];
 let manifest: RecoveryManifestV1;
 let repoMigrations: ReturnType<typeof readRepoMigrations>;
 
@@ -265,6 +266,7 @@ async function verifyInProcess(
     artifacts?: string | null;
     marker?: string;
     expectedDatabase?: string;
+    appRole?: string;
   } = {},
 ): Promise<{ results: DrCheck[]; commands: string[] }> {
   const db = options.db ?? TGT;
@@ -295,6 +297,7 @@ async function verifyInProcess(
         expectedUser: user,
         expectedMarker: options.marker ?? MARKER,
         markerDatabase: db,
+        appRole: options.appRole,
       },
       input,
     );
@@ -398,8 +401,78 @@ describe("DR verifier trên recovery set tổng hợp (PostgreSQL thật)", { sk
       for (const role of [AUDIT_ROLE, NORLS_ROLE]) {
         await admin.query(`DROP ROLE IF EXISTS ${role}`);
       }
+      for (const role of createdRoles) await admin.query(`DROP OWNED BY ${role}`).catch(() => {});
+      for (const role of createdRoles) await admin.query(`DROP ROLE IF EXISTS ${role}`);
     });
     rmSync(work, { recursive: true, force: true });
+  });
+
+  // A6-AC04: app role của đích. Role là đối tượng cấp cluster nên mỗi ca dùng role riêng (hậu tố
+  // ngẫu nhiên) tạo bằng role CREATEROLE/superuser của TEST_DATABASE_URL (vd
+  // `su postgres -c "psql -c 'CREATE ROLE <tên> NOLOGIN'"`), dọn ở after().
+  async function appRoleCase(
+    name: string,
+    setup: (admin: Client, role: string, db: string) => Promise<void>,
+    options: { missing?: boolean } = {},
+  ): Promise<DrCheck | undefined> {
+    const role = `dr_app_${name}_${sfx}`;
+    const db = await cloneTarget(`ar_${name}`);
+    await withAdmin(async (admin) => {
+      if (!options.missing) {
+        await admin.query(`CREATE ROLE ${role} NOLOGIN NOSUPERUSER NOBYPASSRLS`);
+        createdRoles.push(role);
+      }
+      await setup(admin, role, db);
+    });
+    const { results } = await verifyInProcess({ db, appRole: role });
+    return results.find((r) => r.name === "app-role-rls");
+  }
+
+  test("A6-AC04: app role đúng thiết kế (NOBYPASSRLS, không owner bảng RLS, tài chính FORCE) → PASS", async () => {
+    const check = await appRoleCase("ok", async () => {});
+    assert.equal(check?.status, "PASS", JSON.stringify(check));
+  });
+
+  test("A6-AC04: app role bị cấp BYPASSRLS → FAIL (không NOT_RUN)", async () => {
+    const check = await appRoleCase("bypass", async (admin, role) => {
+      await admin.query(`ALTER ROLE ${role} BYPASSRLS`);
+    });
+    assert.equal(check?.status, "FAIL");
+    assert.match(JSON.stringify(check?.actual), /bypassrls/);
+  });
+
+  test("A6-AC04: app role là superuser → FAIL", async () => {
+    const check = await appRoleCase("super", async (admin, role) => {
+      await admin.query(`ALTER ROLE ${role} SUPERUSER`);
+    });
+    assert.equal(check?.status, "FAIL");
+    assert.match(JSON.stringify(check?.actual), /superuser/);
+  });
+
+  test("A6-AC04: app role sở hữu bảng có RLS → FAIL", async () => {
+    const check = await appRoleCase("owner", async (_admin, role, db) => {
+      await withAdmin((target) => target.query(`ALTER TABLE contracts OWNER TO ${role}`), db);
+    });
+    assert.equal(check?.status, "FAIL");
+    assert.match(JSON.stringify(check?.actual), /ownsRlsTables/);
+  });
+
+  test("A6-AC04: bảng tài chính mất FORCE RLS → FAIL", async () => {
+    const check = await appRoleCase("noforce", async (_admin, _role, db) => {
+      await withAdmin(
+        (target) => target.query("ALTER TABLE contracts NO FORCE ROW LEVEL SECURITY"),
+        db,
+      );
+    });
+    assert.equal(check?.status, "FAIL");
+    assert.match(JSON.stringify(check?.actual), /financeWithoutForcedRls/);
+  });
+
+  test("A6-AC04: đích thiếu role app → FAIL kèm thông điệp rõ, không lộ URI", async () => {
+    const check = await appRoleCase("missing", async () => {}, { missing: true });
+    assert.equal(check?.status, "FAIL");
+    assert.match(check!.reason, /thiếu role ứng dụng/);
+    assert.ok(!/postgres(ql)?:\/\//.test(JSON.stringify(check)));
   });
 
   test("manifest v1 sinh từ snapshot: đủ trường A6-FR01, tiền là chuỗi exact, chỉ tham chiếu key", () => {

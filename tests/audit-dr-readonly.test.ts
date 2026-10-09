@@ -79,6 +79,7 @@ class FakeClient implements DrClient {
       migrationError?: boolean;
       relationViolations?: string;
       rlsBlocked?: boolean;
+      appRole?: "bypass" | "missing";
     } = {},
   ) {}
 
@@ -96,6 +97,22 @@ class FakeClient implements DrClient {
             marker_ok: !this.options.noMarker,
           },
         ],
+      };
+    }
+    if (sql.includes("pg_catalog.pg_roles")) {
+      assert.deepEqual(Array.from(params ?? []), ["xboss_app"]);
+      if (this.options.appRole === "missing") return { rows: [] };
+      return {
+        rows: [{ rolsuper: false, rolbypassrls: this.options.appRole === "bypass", owned_rls: [] }],
+      };
+    }
+    if (sql.includes("relforcerowsecurity AS force_rls") && !sql.includes("has_table_privilege")) {
+      return {
+        rows: ((params?.[0] ?? []) as string[]).map((name) => ({
+          name,
+          rls: true,
+          force_rls: true,
+        })),
       };
     }
     if (sql.includes("FROM pg_roles")) {
@@ -250,6 +267,15 @@ for (const options of [{ wrongTarget: true }, { writable: true }, { noMarker: tr
     assert.ok(!JSON.stringify(result).includes(MARKER));
   });
 }
+
+test("A6-AC04: app-role-rls — đúng PASS, BYPASSRLS/thiếu role FAIL (không NOT_RUN)", async () => {
+  const { runDrChecks } = moduleUnderTest();
+  const run = async (options: ConstructorParameters<typeof FakeClient>[0]) =>
+    statusOf(await runDrChecks(new FakeClient(options), target, input()), "app-role-rls");
+  assert.equal(await run({}), "PASS");
+  assert.equal(await run({ appRole: "bypass" }), "FAIL");
+  assert.equal(await run({ appRole: "missing" }), "FAIL");
+});
 
 for (const options of [{ emptyAudit: true }, { unsignedAudit: true }]) {
   test(`DR: audit chưa có coverage không được báo PASS (${JSON.stringify(options)})`, async () => {

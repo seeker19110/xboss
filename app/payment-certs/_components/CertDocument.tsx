@@ -433,7 +433,9 @@ export function useCertDocument({
         return;
       }
       if (e.key === "Escape") {
-        if (document.querySelector('[role="dialog"]')) return;
+        // Modal đã xử lý Esc (preventDefault) thì thôi — không dò [role=dialog] vì Modal
+        // gỡ DOM trước khi listener này chạy.
+        if (e.defaultPrevented || document.querySelector('[role="dialog"]')) return;
         // Đang gõ dở trong 1 ô nhập thì Esc chỉ thoát focus ô đó (hành vi quen thuộc),
         // không đóng luôn cả chứng từ.
         const active = document.activeElement;
@@ -753,7 +755,7 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
       </Section>
 
       {vuotHopDong.length > 0 && (
-        <div className="bento-card border-rose-900/60 bg-rose-950/20 px-4 py-3 text-xs text-rose-200 space-y-1.5">
+        <div className="bento-card border-rose-900/60 bg-rose-950/20 px-4 py-3 text-xs text-rose-300 space-y-1.5">
           <p className="font-semibold">
             {vuotHopDong.length} dòng có khối lượng luỹ kế VƯỢT khối lượng hợp đồng
           </p>
@@ -768,7 +770,7 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
               </li>
             ))}
           </ul>
-          <p className="text-rose-300/80">
+          <p className="text-rose-300">
             Chỉ là cảnh báo — đợt vẫn lưu được, vì thi công vượt khối lượng trong khi phụ lục/VO còn
             chờ duyệt là tình huống thật. Đối chiếu phụ lục trước khi trình duyệt.
           </p>
@@ -852,7 +854,7 @@ export default function CertDocument({ ctrl, nav }: { ctrl: CertDocumentCtrl; na
         )}
       </Card>
 
-      <div className="grid lg:grid-cols-[1fr_1.1fr] gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr] gap-4 items-start">
         <Card tone="sunken" pad="md" className="space-y-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
             Trạng thái &amp; lịch sử duyệt

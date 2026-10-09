@@ -5,6 +5,7 @@ import { Coins, FileSignature, Receipt, Scale, TrendingUp, FilePlus2 } from "luc
 import HubShell, { type HubTab, type HubStat } from "@/app/components/HubShell";
 import { Skeleton } from "@/app/components/Skeleton";
 import { addMoney, formatVnd, parseMoney } from "@/lib/nen/money";
+import { HEADER_TIEN_V1 } from "@/lib/nen/money-dto";
 import ContractsTab from "./_components/ContractsTab";
 import IpcPaymentsTab from "./_components/IpcPaymentsTab";
 import VariationsTab from "./_components/VariationsTab";
@@ -49,8 +50,10 @@ function CommercialContent() {
   ]);
 
   useEffect(() => {
+    // decimal-string-v1: không gửi header thì HĐ vượt biên safe-integer làm /api/contracts trả 422
+    // (ô KPI thành "—"). Tổng vẫn cộng bằng bigint trên `valueText` (chuỗi exact).
     const get = (url: string) =>
-      fetch(url)
+      fetch(url, { headers: HEADER_TIEN_V1 })
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null);
 

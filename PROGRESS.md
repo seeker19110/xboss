@@ -1,5 +1,68 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — QUALITY-FINAL-1 S15: audit cuối và release candidate
+
+Ánh xạ bằng chứng 54 AC (TEST-MATRIX) trên main `e5ce67b` bằng 4 lượt đọc-chạy độc lập theo trụ A1 /
+A2 / A3+A4 / A5+A6 (+ Q-AC01..08): 13 PASS · 28 PARTIAL (tự động xanh, còn thiếu lớp M/O hoặc B thật) ·
+13 GAP · 0 FAIL. Bảng bằng chứng + verdict từng AC trong `docs/nang-cap/AUDIT-S15-RELEASE-CANDIDATE.md`
+(cùng PR này). Đợt vá GAP trong S15:
+
+- **Q-AC04 (lỗi thật, đã sửa):** `GET /api/variations` + `/[id]` trả tiền float (kể cả trong `json_agg`).
+  Nay tổng `ROUND(SUM(qty×giá),2)::text` trong SQL, dòng KL `::text`, adapter `variationsToWire`
+  (opt-in `decimal-string-v1`, legacy ngoài biên → 422, che `stripSensitive` TRƯỚC khi wire);
+  client variations/commercial đọc v1 + cộng bigint (`app/variations/_components/tienVo.ts`).
+  Tiện thể sửa `VariationsTab` (đọc sai khoá nên luôn rỗng). `tests/s15-vo-exact.test.ts` 5/6 đỏ trên code cũ.
+- **Q-AC06:** test qty PO nonfinite (NaN/±Inf không thành 0, CHECK `*_finite` 0162), nhận hàng song song
+  `FOR UPDATE` giữ `qty_received_exact` khớp (`tests/po-qty-exact.test.ts`). Không lộ lỗi.
+- **A6-AC04/FR07 (verifier DR):** hạng mục mới `app-role-rls` — app role đích (`DR_VERIFY_APP_ROLE`, mặc định
+  `xboss_app`) phải tồn tại, NOBYPASSRLS, không superuser, không sở hữu bảng RLS; 6 bảng tài chính giữ FORCE
+  RLS; vi phạm → FAIL (không NOT_RUN). Test đỏ trên code cũ (1 ca), xanh sau.
+- **Test lớp P/H đóng GAP:** A4-AC06 (list↔KPI cùng filter, PM chỉ thấy dự án được gán, nhãn tầng trùng,
+  403 không lộ tiền), A5-AC08 (nháp/trình/từ chối không vào thực chi, duyệt lặp không sinh phiếu 2, export/
+  audit-log 403), A5-AC03 (`tests/s15-dong-thoi-lo.test.ts`: lô tick chồng, replay, 2 PM duyệt tầng song
+  song → 1 thành công/1 409, không `nghiem_thu` khi <100%), A5-AC01 (`tests/s15-import-route-rerun.test.ts`:
+  import 3 lần không nhân dòng), A2-AC03/AC06-H (nhật ký cùng ngày khác chủ/dự án độc lập; 403/404/422 từ
+  route thật → `rejected` bền vững).
+- **A1 (scope/auth), lỗi thật đã sửa — `lib/db/index.ts` (A1-AC04):** transaction lồng trước đây đổi GUC
+  `app.project_id` âm thầm (write tx dự án A → lồng `withProjectScope(B)` chạy tiếp với B). Nay
+  `txStorage` giữ khung `{client, readOnly, actor, scope}` chụp lúc BEGIN: lồng khác actor/dự án, đòi
+  REPEATABLE READ, nâng chỉ-đọc → ghi, hay đổi scope đã gắn ('*'↔N) đều throw; tx chưa gắn dự án được gắn
+  đúng 1 lần (gán trước await nên Promise.all 2 scope bị chặn); ROLLBACK lỗi → `client.release(err)` huỷ
+  connection (không mang GUC cũ sang request sau). `tests/db-scope-nested.test.ts` 8/9 đỏ trên code cũ;
+  244 file test chạm DB không vỡ. Test mới: `permissions-fail-closed` (DB lỗi khi nạp snapshot → CAN false,
+  route approve 500 không ghi; 20 request 2 org không lẫn snapshot; override deny → 403),
+  `rls-app-role-route` (xboss_app NOBYPASSRLS/không owner; `/api/contracts` bằng app role đúng scope),
+  `auth-session-revoke-http` (revoke/đổi mật khẩu → 401; `proxy` chặn flag2fa), `s02-import-project-id`
+  (11 cookie sai → 404, không tạo batch), `runtime-app-role-schema` (DB chưa migrate: health 503
+  `schema_not_ready`, login/me ném `XBOSS_SCHEMA_NOT_READY`, chỉ SELECT, không DDL).
+- **Lỗi nhỏ:** `parseQuantityInput` từ chối `"0.125"` (regex nhóm nghìn khớp cả `0.ddd`) — sửa + test đỏ
+  trên code cũ; `/commercial` gửi header tiền v1 cho mọi fetch (HĐ vượt biên không còn làm KPI "—").
+- **Lớp B (e2e Chromium, desktop+mobile, 35 pass, `--repeat-each=6` spec IPC):** `portfolio-kpi.spec.ts`
+  (A4-AC05: 10% không 50%, rỗng → "Chưa có dữ liệu"), `payment-certs-canh-bao.spec.ts` (A5-AC04: 409
+  `acknowledgement_required`, hộp xác nhận khoá tới khi tick + lý do; A5-AC09: 409 `warning_changed` không
+  tự ack/không retry ngầm, bàn phím Tab/Enter/Esc, axe; A3-AC05: "100.50"/"9999999999999.99" exact trên
+  màn, kỹ sư 403 không lộ số), `offline-idb-abort.spec.ts` (A2-AC05: IDB thật abort → toast
+  OFFLINE_SAVE_ERROR, không "đã lưu", form giữ, ops2 = 0). Helper `e2e/helpers/co-lap.ts` (org/dự án/user
+  riêng cho spec cần số tuyệt đối). **3 lỗi UI thật lộ ra, đã sửa cùng PR** (fixme đã gỡ): cảnh báo vượt
+  HĐ ở theme sáng tương phản 1,32:1 — 3 khối IPC dùng `text-rose-200` (mức không có token sáng) đổi sang
+  `text-rose-300` theo ADR-0010; Modal `preventDefault` Esc (hộp xác nhận không đóng luôn chứng từ, giữ
+  focus); lưới `grid-cols-1`+`min-w-0` + select hợp đồng `min-w-0 flex-1` trên mobile (hết tràn ngang
+  393px). **Bài học CI đỏ 4 shard:** lần đầu sửa bằng cách thêm override `--color-*-200` cho theme sáng
+  trong `globals.css` → vỡ ~180 chip `bg-*-900 text-*-200` ở mọi trang (axe 1,25–1,97:1); `-200` là chữ
+  nhạt trên nền tối, **không** được override toàn cục — đã hoàn tác, chỉ sửa class tại chỗ.
+- **Kết quả sau vá (@5a36ff2, chờ CI xác nhận):** 19 PASS · 32 PARTIAL · 3 GAP (A1-AC02 chờ cutover,
+  A2-AC07/AC08 offline sâu B/M) · 0 FAIL. State S15 = **CODE_COMPLETE có điều kiện / WAITING_RELEASE**
+  (`docs/nang-cap/AUDIT-S15-RELEASE-CANDIDATE.md`). Bộ test đầy đủ `--release-gate`: 4662 pass, chỉ 2 file
+  hỏng do môi trường cục bộ (`restore-check-postgres`, `db-runtime-migration-boundary` — CI xanh).
+- **WAITING_RELEASE / cần chủ dự án quyết (không code trong S15):** cutover membership rỗng (A1-AC02) + "cookie
+  sai → dự án đầu" (A1-AC03) chờ dry-run membership production; **RLS nhánh "GUC rỗng cho qua" còn trên
+  ~18 bảng org/dự án** (users, projects, suppliers, role_permissions, api_keys, webhooks, baselines…): app
+  role không GUC đọc được 2 org — lớp app vẫn lọc org nên xếp P2 defense-in-depth, sửa cần migration + đổi
+  login/`getCurrentUser` sang scope '*' tường minh → slice riêng qua staging; tính năng adjustment
+  (A5-AC07); retention cleanup diễn tập (A6-AC06); PITR VPS chưa bật (RPO thực ~24h), RPO 5m/RTO 60m chưa
+  đo; Safari/iOS thật; "approved ≠ paid" không biểu diễn được vì duyệt IPC sinh phiếu ngay (đổi thiết kế
+  nếu cần); login/me khi thiếu schema ném lỗi → 500 thay vì 503 JSON (đổi contract auth nếu muốn).
+
 ## 2026-10-08 — QUALITY-FINAL-1 S08: UI phục hồi hàng đợi ngoại tuyến và browser acceptance
 
 Đặc tả lát cắt `docs/nang-cap/AUDIT-S08-OFFLINE-RECOVERY.md` (spec cha A2 §5, A2-FR01/FR02/FR11,

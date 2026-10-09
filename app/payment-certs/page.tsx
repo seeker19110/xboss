@@ -186,8 +186,8 @@ function PaymentCertsInner() {
         ) : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <label className="flex items-center gap-2 text-xs font-semibold text-zinc-300">
-                Hợp đồng:
+              <label className="flex min-w-0 max-w-full items-center gap-2 text-xs font-semibold text-zinc-300">
+                <span className="shrink-0">Hợp đồng:</span>
                 <select
                   value={contractId}
                   onChange={(e) => {
@@ -195,7 +195,7 @@ function PaymentCertsInner() {
                     setContractId(cid);
                     capNhatUrl({ contractId: cid, id: null });
                   }}
-                  className="min-w-[260px] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 h-10 transition"
+                  className="min-w-0 flex-1 sm:flex-none sm:min-w-[260px] max-w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 h-10 transition"
                 >
                   {contracts.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -241,13 +241,13 @@ function PaymentCertsInner() {
             )}
 
             {overContract && (
-              <div className="bento-card border-rose-900/60 bg-rose-950/20 px-4 py-3 text-xs text-rose-200">
+              <div className="bento-card border-rose-900/60 bg-rose-950/20 px-4 py-3 text-xs text-rose-300">
                 Luỹ kế đã duyệt vượt giá trị hợp đồng (gồm phụ lục) — kiểm tra lại phụ lục/VO trước
                 khi lập đợt tiếp theo.
               </div>
             )}
 
-            <div className="grid lg:grid-cols-[320px_1fr] gap-4 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 items-start">
               {/* Cột trái — danh sách đợt; ẩn dưới lg khi đang mở một chứng từ. */}
               <div className={selected ? "hidden lg:block" : "block"}>
                 {certs.length === 0 ? (
@@ -296,7 +296,7 @@ function PaymentCertsInner() {
               </div>
 
               {/* Cột phải — chứng từ đang mở. */}
-              <div className={selected ? "block" : "hidden lg:block"}>
+              <div className={selected ? "block min-w-0" : "hidden lg:block min-w-0"}>
                 {selected ? (
                   <CertDocument
                     ctrl={ctrl}

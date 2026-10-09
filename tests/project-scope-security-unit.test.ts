@@ -32,6 +32,12 @@ mock.module("@/lib/db", {
           .map((p) => ({ projectId: p.id }));
       if (sql.includes("FROM projects WHERE org_id"))
         return projects.filter((p) => p.orgId === args[0]);
+      if (sql.includes("FROM projects WHERE id IN")) {
+        const orgId = args[args.length - 1];
+        return projects
+          .filter((p) => args.slice(0, -1).includes(p.id) && p.orgId === orgId)
+          .map((p) => ({ id: p.id, name: `P${p.id}` }));
+      }
       throw new Error("Truy vấn ngoài phạm vi fixture scope");
     },
     queryOne: async (_sql: string, id: unknown) => projects.find((p) => p.id === id) ?? null,
@@ -95,6 +101,36 @@ test("phạm vi ghi: không ép input sai thành dự án hợp lệ", async () 
   const { chotProjectIdChoGhi } = await import("@/lib/ha-tang/projects");
   for (const input of [true, [101], {}, "0101", "1.01e2", "0x65", " 101", -1, Infinity, 1.5])
     assert.deepEqual(await chotProjectIdChoGhi(actor, input, 101), { ok: false });
+});
+
+test("A1-AC03: projectId vượt safe-integer/sai kiểu → từ chối ghi lẫn đọc, không làm tròn thành dự án", async () => {
+  assigned = [101];
+  const { chotProjectIdChoGhi, chotProjectIdChoDoc } = await import("@/lib/ha-tang/projects");
+  const vuot = [
+    "9007199254740993",
+    "9007199254740992",
+    Number.MAX_SAFE_INTEGER + 1,
+    2 ** 53 + 2,
+    1e21,
+    "1e0",
+    "1e2",
+    NaN,
+    BigInt(101),
+    "101n",
+    "１０１", // chữ số toàn-độ rộng
+  ];
+  for (const input of vuot) {
+    assert.deepEqual(await chotProjectIdChoGhi(actor, input, 101), { ok: false }, String(input));
+    assert.deepEqual(
+      await chotProjectIdChoDoc(actor, input),
+      { ok: false, lyDo: "khong-thay" },
+      String(input),
+    );
+  }
+  // MAX_SAFE_INTEGER là số hợp lệ về cú pháp nhưng không thuộc quyền → vẫn từ chối.
+  assert.deepEqual(await chotProjectIdChoGhi(actor, Number.MAX_SAFE_INTEGER, 101), { ok: false });
+  // Đối chứng: cùng actor, id hợp lệ trong quyền vẫn được chốt.
+  assert.deepEqual(await chotProjectIdChoGhi(actor, 101, null), { ok: true, projectId: 101 });
 });
 
 test("dự án hiện tại: không tái dùng context cũ sau khi mất membership", async () => {
