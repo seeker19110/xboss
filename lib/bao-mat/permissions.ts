@@ -1,7 +1,7 @@
 // Snapshot quyền chỉ sống trong request đã xác thực, không dùng quyền cũ giữa các request.
 // Thiếu snapshot/đang nạp/lỗi DB => từ chối; chỉ dùng mặc định sau khi đọc DB thành công.
 // KHÔNG import auth (auth import ngược module này).
-import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { dangTrongGiaoDich, query, queryOne, run, withTransaction } from "@/lib/db";
 import { getRequestContext, type RequestContext } from "@/lib/nen/request-context";
 import { log } from "@/lib/nen/log";
 import type { Role } from "@/lib/nen/roles";
@@ -117,6 +117,28 @@ export async function invalidatePermissionCache(orgId: number): Promise<void> {
   state.overrides = next;
 }
 
+// Khoá advisory theo org tuần tự hoá "tái kiểm quyền lúc ghi" (khoá chia sẻ) với ghi override
+// (khoá độc quyền) — cả hai chỉ sống trong transaction (pg_advisory_xact_*).
+const khoaQuyenOrg = (orgId: number) => `role_permissions:${orgId}`;
+
+// D01 (A1-AC05) — tái kiểm quyền NGAY TRƯỚC GHI ở đường nghiệm thu/tài chính. Snapshot nạp lúc
+// xác thực có thể đã stale khi admin đổi override trong lúc request còn await (khoá dòng, I/O…).
+// Cho ghi chỉ khi `kiem()` đúng ở CẢ snapshot lúc xác thực LẪN dữ liệu có hiệu lực đọc lại trong
+// transaction ghi — fail-closed hai chiều: allow→deny giữa chừng bị chặn; deny→allow giữa chừng
+// không nâng quyền request đang chạy (request mới mới thấy allow). Khoá chia sẻ giữ tới COMMIT nên
+// setPermissionOverride phải chờ các lần ghi đã qua kiểm, không còn khe "kiểm xong → deny commit →
+// ghi commit". Lỗi DB khi đọc lại ⇒ throw (caller ROLLBACK) và snapshot ở trạng thái đang nạp ⇒
+// CAN false; không bao giờ rơi về mặc định allow. Sau lời gọi, snapshot của request là bản mới.
+export async function kiemQuyenTaiLucGhi(kiem: () => boolean): Promise<boolean> {
+  if (!kiem()) return false;
+  const ctx = getRequestContext();
+  if (!ctx || !positiveId(ctx.orgId) || !dangTrongGiaoDich())
+    throw new Error("Tái kiểm quyền lúc ghi phải chạy trong transaction của request đã xác thực");
+  await run(`SELECT pg_advisory_xact_lock_shared(hashtextextended(?, 0))`, khoaQuyenOrg(ctx.orgId));
+  await invalidatePermissionCache(ctx.orgId);
+  return kiem();
+}
+
 // Chỉ dùng trong test; không có đường cấp quyền giả hoặc fallback mặc định.
 export function _resetPermissionCacheForTests(): void {
   snapshots = new WeakMap();
@@ -165,6 +187,8 @@ export async function setPermissionOverride(
     throw new Error("Thiếu ngữ cảnh tổ chức để cấu hình quyền");
   clearPermissionSnapshot();
   await withTransaction(async () => {
+    // Chờ các transaction ghi đã tái kiểm quyền (khoá chia sẻ) COMMIT xong — xem kiemQuyenTaiLucGhi.
+    await run(`SELECT pg_advisory_xact_lock(hashtextextended(?, 0))`, khoaQuyenOrg(orgId));
     await assertProjectOrg(orgId, projectId);
     if (allowed === null) {
       await run(

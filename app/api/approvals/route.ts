@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { recomputePackage } from "@/lib/tien-do/recompute";
@@ -140,6 +141,11 @@ export async function POST(req: NextRequest) {
 
       if (tasks.length === 0)
         throw Object.assign(new Error("Không tìm thấy task nào trong tầng này"), { status: 404 });
+
+      // D01: CAN.approve đầu route dùng snapshot lúc xác thực — tái kiểm với dữ liệu có hiệu lực
+      // dưới khoá tầng/task, trước mọi lần ghi (admin có thể vừa siết quyền trong lúc chờ khoá).
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.approve(user.role))))
+        throw Object.assign(new Error("Chỉ Admin/PM được duyệt nghiệm thu"), { status: 403 });
 
       const notDone = tasks.filter((t) => (t.progress_percent ?? 0) < 1);
       if (notDone.length > 0)
