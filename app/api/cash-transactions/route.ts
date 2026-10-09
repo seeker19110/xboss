@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { moneyInputErrorBody } from "@/lib/nen/money";
 import { insertId, query, queryOne, withProjectScope, withTransaction } from "@/lib/db";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
@@ -99,6 +100,8 @@ export async function POST(req: NextRequest) {
 
   // A1-AC03: hợp đồng cùng dự án, NCC cùng tổ chức — kiểm + ghi trong 1 transaction.
   const result = await withTransaction(async () => {
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    if (!(await kiemQuyenTaiLucGhi(() => CAN.manageFinance(user.role)))) return { denied: true };
     const parentErr = await checkCashTransactionParents(input, projectId, user.orgId);
     if (parentErr) return { error: parentErr };
     const id = await insertId(
@@ -120,6 +123,11 @@ export async function POST(req: NextRequest) {
     );
     return { id };
   });
+  if ("denied" in result)
+    return NextResponse.json(
+      { error: "Bạn không có quyền ghi dòng tiền (Admin/PM)" },
+      { status: 403 },
+    );
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: 422 });
 
   return NextResponse.json({ id: result.id }, { status: 201 });

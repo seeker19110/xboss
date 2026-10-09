@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/nen/storage";
+import { storageDelete, storagePut } from "@/lib/nen/storage";
 import { query, insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { newClaimDocFileName, MAX_DOC_BYTES, sha256Hex, parseUploadedFile } from "@/lib/nen/photos";
 import { getClaim } from "@/lib/tai-chinh/claims";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -71,18 +72,28 @@ export async function POST(
   await storagePut(user.orgId, fileName, fileBuf);
   const sha256 = sha256Hex(fileBuf);
 
-  const id = await insertId(
-    `INSERT INTO claim_documents (claim_id, title, file_name, original_name, mime_type, size_bytes, uploaded_by, sha256)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi DB; bị thu hồi ⇒ dọn file vừa lưu.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageClaims(user.role),
+    () =>
+      insertId(
+        `INSERT INTO claim_documents (claim_id, title, file_name, original_name, mime_type, size_bytes, uploaded_by, sha256)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    claimId,
-    title,
-    fileName,
-    file.name || null,
-    file.type,
-    file.size,
-    user.id,
-    sha256,
+        claimId,
+        title,
+        fileName,
+        file.name || null,
+        file.type,
+        file.size,
+        user.id,
+        sha256,
+      ),
   );
+  if (!kq.ok) {
+    await storageDelete(user.orgId, fileName).catch(() => {});
+    return NextResponse.json({ error: "Bạn không có quyền tải hồ sơ claim" }, { status: 403 });
+  }
+  const id = kq.value;
 
   return NextResponse.json({ id, claimId, title, sizeBytes: file.size }, { status: 201 });
 }

@@ -5,6 +5,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { moneyInputErrorBody, parseOptionalMoneyInput } from "@/lib/nen/money";
 import { parseBidPrices, validateBidPrices, type BidPriceInput } from "@/lib/tai-chinh/tender";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -73,22 +74,32 @@ export async function PATCH(
     if (validationErr) return NextResponse.json({ error: validationErr }, { status: 422 });
   }
 
-  await withTransaction(async () => {
-    if (lumpSum !== undefined)
-      await run(`UPDATE tender_bids SET lump_sum = ? WHERE id = ?`, lumpSum, bidId);
-    if (note !== undefined) await run(`UPDATE tender_bids SET note = ? WHERE id = ?`, note, bidId);
-    if (prices) {
-      await run(`DELETE FROM tender_bid_prices WHERE bid_id = ?`, bidId);
-      for (const p of prices) {
-        await run(
-          `INSERT INTO tender_bid_prices (bid_id, boq_item_id, unit_price) VALUES (?, ?, ?)`,
-          bidId,
-          p.boqItemId,
-          p.unitPrice,
-        );
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageTenders(user.role),
+    async () => {
+      if (lumpSum !== undefined)
+        await run(`UPDATE tender_bids SET lump_sum = ? WHERE id = ?`, lumpSum, bidId);
+      if (note !== undefined)
+        await run(`UPDATE tender_bids SET note = ? WHERE id = ?`, note, bidId);
+      if (prices) {
+        await run(`DELETE FROM tender_bid_prices WHERE bid_id = ?`, bidId);
+        for (const p of prices) {
+          await run(
+            `INSERT INTO tender_bid_prices (bid_id, boq_item_id, unit_price) VALUES (?, ?, ?)`,
+            bidId,
+            p.boqItemId,
+            p.unitPrice,
+          );
+        }
       }
-    }
-  });
+    },
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa báo giá (chỉ Admin/PM)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: bidId });
 }
@@ -119,7 +130,16 @@ export async function DELETE(
     if (found.tenderStatus === "awarded")
       return NextResponse.json({ error: "Gói thầu đã trao thầu — khoá sửa" }, { status: 409 });
 
-    await run(`DELETE FROM tender_bids WHERE id = ?`, bidId);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageTenders(user.role),
+      () => run(`DELETE FROM tender_bids WHERE id = ?`, bidId),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá báo giá (chỉ Admin/PM)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: bidId });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, insertId, withTransaction, withProjectScope } from "@/lib/db";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { withUniqueRetry, isUniqueViolation } from "@/lib/ha-tang/seqcode";
@@ -77,6 +78,11 @@ export async function POST(req: NextRequest) {
   try {
     const { id, code } = await withUniqueRetry(() =>
       withTransaction(async () => {
+        // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+        if (!(await kiemQuyenTaiLucGhi(() => CAN.manageTenders(user.role))))
+          throw Object.assign(new Error("Bạn không có quyền tạo gói thầu (chỉ Admin/PM)"), {
+            status: 403,
+          });
         const code = await nextTenderCode();
         const id = await insertId(
           `INSERT INTO tender_packages (code, name, scope, due_date, created_by, project_id)
@@ -106,6 +112,8 @@ export async function POST(req: NextRequest) {
         { error: "Mã gói thầu bị trùng do tạo đồng thời — vui lòng thử lại" },
         { status: 409 },
       );
+    if ((err as { status?: number }).status === 403)
+      return NextResponse.json({ error: (err as Error).message }, { status: 403 });
     throw err;
   }
 }

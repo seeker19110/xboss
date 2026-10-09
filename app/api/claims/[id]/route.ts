@@ -10,6 +10,7 @@ import {
   parseClaimBody,
   validateClaimInput,
 } from "@/lib/tai-chinh/claims";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -98,27 +99,33 @@ export async function PATCH(
   }
 
   // A1-AC03: kiểm cặp hợp đồng/VO SAU khi merge với giá trị đang lưu, cùng transaction.
-  const refErr = await withTransaction(async () => {
-    const err = await checkClaimRefs(input, projectId);
-    if (err) return err;
-    await run(
-      `UPDATE claims
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageClaims(user.role),
+    async () => {
+      const err = await checkClaimRefs(input, projectId);
+      if (err) return err;
+      await run(
+        `UPDATE claims
         SET kind = ?, title = ?, contract_id = ?, vo_id = ?, notice_date = ?, cause = ?,
             amount_requested = ?, days_requested = ?, status = ?
       WHERE id = ?`,
-      input.kind,
-      input.title,
-      input.contractId,
-      input.voId,
-      input.noticeDate,
-      input.cause,
-      input.amountRequested,
-      input.daysRequested,
-      status,
-      id,
-    );
-    return null;
-  });
+        input.kind,
+        input.title,
+        input.contractId,
+        input.voId,
+        input.noticeDate,
+        input.cause,
+        input.amountRequested,
+        input.daysRequested,
+        status,
+        id,
+      );
+      return null;
+    },
+  );
+  if (!kq.ok) return NextResponse.json({ error: "Bạn không có quyền sửa claim" }, { status: 403 });
+  const refErr = kq.value;
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
   return NextResponse.json({ ok: true });
 }
@@ -146,6 +153,11 @@ export async function DELETE(
   if (editErr) return NextResponse.json({ error: editErr }, { status: 403 });
 
   // Soft-delete (M45 PR4) — khôi phục qua POST /api/claims/:id/restore.
-  await run(`UPDATE claims SET deleted_at = now() WHERE id = ? AND deleted_at IS NULL`, id);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageClaims(user.role),
+    () => run(`UPDATE claims SET deleted_at = now() WHERE id = ? AND deleted_at IS NULL`, id),
+  );
+  if (!kq.ok) return NextResponse.json({ error: "Bạn không có quyền xoá claim" }, { status: 403 });
   return NextResponse.json({ deleted: id });
 }

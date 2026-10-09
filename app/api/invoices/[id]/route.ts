@@ -9,6 +9,7 @@ import {
   validateInvoiceInput,
   type InvoiceInput,
 } from "@/lib/tai-chinh/finance";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -98,28 +99,38 @@ export async function PATCH(
   // A1-AC03: chỉ kiểm khi body đổi contractId/paymentBillId; kiểm cả cặp sau merge để
   // nhất quán với giá trị còn lại đang lưu. Kiểm + ghi trong 1 transaction (cha FOR SHARE).
   const touchesParents = "contractId" in body || "paymentBillId" in body;
-  const parentErr = await withTransaction(async () => {
-    if (touchesParents) {
-      const err = await checkInvoiceParents(input, projectId as number);
-      if (err) return err;
-    }
-    await run(
-      `UPDATE invoices SET invoice_no = ?, invoice_date = ?, direction = ?, net_amount = ?,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageFinance(user.role),
+    async () => {
+      if (touchesParents) {
+        const err = await checkInvoiceParents(input, projectId as number);
+        if (err) return err;
+      }
+      await run(
+        `UPDATE invoices SET invoice_no = ?, invoice_date = ?, direction = ?, net_amount = ?,
             vat_amount = ?, vat_rate = ?, counterparty = ?, contract_id = ?, payment_bill_id = ?
       WHERE id = ?`,
-      input.invoiceNo,
-      input.invoiceDate,
-      input.direction,
-      input.netAmount,
-      input.vatAmount,
-      input.vatRate,
-      input.counterparty,
-      input.contractId,
-      input.paymentBillId,
-      id,
+        input.invoiceNo,
+        input.invoiceDate,
+        input.direction,
+        input.netAmount,
+        input.vatAmount,
+        input.vatRate,
+        input.counterparty,
+        input.contractId,
+        input.paymentBillId,
+        id,
+      );
+      return null;
+    },
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa hoá đơn (Admin/PM)" },
+      { status: 403 },
     );
-    return null;
-  });
+  const parentErr = kq.value;
   if (parentErr) return NextResponse.json({ error: parentErr }, { status: 422 });
 
   return NextResponse.json({ updated: id });
@@ -147,6 +158,15 @@ export async function DELETE(
   if (!existing) return NextResponse.json({ error: "Không tìm thấy hoá đơn" }, { status: 404 });
 
   // Soft-delete (M45 PR4) — khôi phục qua POST /api/invoices/:id/restore.
-  await run(`UPDATE invoices SET deleted_at = now() WHERE id = ? AND deleted_at IS NULL`, id);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageFinance(user.role),
+    () => run(`UPDATE invoices SET deleted_at = now() WHERE id = ? AND deleted_at IS NULL`, id),
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền xoá hoá đơn (Admin/PM)" },
+      { status: 403 },
+    );
   return NextResponse.json({ deleted: id });
 }

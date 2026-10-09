@@ -15,6 +15,7 @@ import {
   LOI_TIEN_VUOT_DINH_DANG_CU,
   nhanDinhDangTien,
 } from "@/lib/nen/money-dto";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -119,13 +120,23 @@ export async function PATCH(
 
   if (!name) return NextResponse.json({ error: "Thiếu tên gói thầu" }, { status: 422 });
 
-  await run(
-    `UPDATE tender_packages SET name = ?, scope = ?, due_date = ?, status = ? WHERE id = ?`,
-    name,
-    scope,
-    dueDate,
-    status,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageTenders(user.role),
+    () =>
+      run(
+        `UPDATE tender_packages SET name = ?, scope = ?, due_date = ?, status = ? WHERE id = ?`,
+        name,
+        scope,
+        dueDate,
+        status,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa gói thầu (chỉ Admin/PM)" },
+      { status: 403 },
+    );
   return NextResponse.json({ updated: id });
 }

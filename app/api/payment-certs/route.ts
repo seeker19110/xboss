@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, withTransaction, withProjectScope } from "@/lib/db";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { isUniqueViolation, withUniqueRetry } from "@/lib/ha-tang/seqcode";
@@ -134,6 +135,12 @@ export async function POST(req: NextRequest) {
         // định chủ dự án 2026-10-01: chặn, duyệt/từ chối đợt trước rồi mới lập đợt sau. Khoá
         // dòng hợp đồng để 2 lần lập đồng thời không cùng vượt qua kiểm tra này.
         await queryOne(`SELECT id FROM contracts WHERE id = ? FOR UPDATE`, contractId);
+        // D01: quyền kiểm đầu route dùng snapshot lúc xác thực — tái kiểm với dữ liệu có hiệu lực
+        // dưới khoá hợp đồng/đợt, trước mọi lần ghi.
+        if (!(await kiemQuyenTaiLucGhi(() => CAN.manageContracts(user.role))))
+          throw Object.assign(new Error("Bạn không có quyền lập đợt thanh toán (chỉ Admin/PM)"), {
+            status: 403,
+          });
         const dangCho = await queryOne<{ code: string; status: string }>(
           `SELECT code, status FROM payment_certs
             WHERE contract_id = ? AND status IN ('draft', 'submitted')

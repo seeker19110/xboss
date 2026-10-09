@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, withProjectScope } from "@/lib/db";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
@@ -107,28 +108,39 @@ export async function POST(req: NextRequest) {
 
   let id: number;
   try {
-    id = await insertId(
-      `INSERT INTO contracts (code, kind, title, party_supplier_id, party_name, system_id,
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageContracts(user.role),
+      () =>
+        insertId(
+          `INSERT INTO contracts (code, kind, title, party_supplier_id, party_name, system_id,
                               value, advance_pct, retention_pct, signed_date, valid_from, valid_to,
                               status, note, created_by, project_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      input.code,
-      input.kind,
-      input.title,
-      input.partySupplierId,
-      input.partyName,
-      input.systemId,
-      input.value,
-      input.advancePct,
-      input.retentionPct,
-      input.signedDate,
-      input.validFrom,
-      input.validTo,
-      input.status,
-      input.note,
-      user.id,
-      projectId,
+          input.code,
+          input.kind,
+          input.title,
+          input.partySupplierId,
+          input.partyName,
+          input.systemId,
+          input.value,
+          input.advancePct,
+          input.retentionPct,
+          input.signedDate,
+          input.validFrom,
+          input.validTo,
+          input.status,
+          input.note,
+          user.id,
+          projectId,
+        ),
     );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền tạo hợp đồng (chỉ Admin/PM)" },
+        { status: 403 },
+      );
+    id = kq.value;
   } catch (err) {
     if ((err as { code?: string }).code === "23505")
       return NextResponse.json(

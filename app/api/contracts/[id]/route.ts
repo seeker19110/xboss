@@ -27,6 +27,7 @@ import {
   LOI_TIEN_VUOT_DINH_DANG_CU,
   nhanDinhDangTien,
 } from "@/lib/nen/money-dto";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -207,27 +208,44 @@ export async function PATCH(
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
 
   try {
-    await run(
-      `UPDATE contracts SET code = ?, kind = ?, title = ?, party_supplier_id = ?, party_name = ?,
+    // D01: tái kiểm quyền lúc ghi, UPDATE chính + merge custom cùng một transaction.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageContracts(user.role),
+      async () => {
+        await run(
+          `UPDATE contracts SET code = ?, kind = ?, title = ?, party_supplier_id = ?, party_name = ?,
               system_id = ?, value = ?, advance_pct = ?, retention_pct = ?, signed_date = ?,
               valid_from = ?, valid_to = ?, status = ?, note = ?
         WHERE id = ?`,
-      input.code,
-      input.kind,
-      input.title,
-      input.partySupplierId,
-      input.partyName,
-      input.systemId,
-      input.value,
-      input.advancePct,
-      input.retentionPct,
-      input.signedDate,
-      input.validFrom,
-      input.validTo,
-      input.status,
-      input.note,
-      id,
+          input.code,
+          input.kind,
+          input.title,
+          input.partySupplierId,
+          input.partyName,
+          input.systemId,
+          input.value,
+          input.advancePct,
+          input.retentionPct,
+          input.signedDate,
+          input.validFrom,
+          input.validTo,
+          input.status,
+          input.note,
+          id,
+        );
+        if (customPatch !== null)
+          await run(
+            `UPDATE contracts SET custom = custom || ?::jsonb WHERE id = ?`,
+            JSON.stringify(customPatch),
+            id,
+          );
+      },
     );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền sửa hợp đồng (chỉ Admin/PM)" },
+        { status: 403 },
+      );
   } catch (err) {
     if ((err as { code?: string }).code === "23505")
       return NextResponse.json(
@@ -236,13 +254,6 @@ export async function PATCH(
       );
     throw err;
   }
-
-  if (customPatch !== null)
-    await run(
-      `UPDATE contracts SET custom = custom || ?::jsonb WHERE id = ?`,
-      JSON.stringify(customPatch),
-      id,
-    );
 
   return NextResponse.json({ updated: id });
 }

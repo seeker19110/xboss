@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, queryOne, withTransaction } from "@/lib/db";
 import { getCurrentProjectId, getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
@@ -230,6 +231,10 @@ export async function PATCH(req: NextRequest) {
         if (contracts.length !== contractIds.length) return { ok: false as const };
       }
 
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale). Chạy dưới các khoá sheet/HĐ tầng ở trên, trước lần ghi duy nhất.
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.editStructure(user.role))))
+        throw new Error("QUYEN_BI_THU_HOI");
+
       // A single guarded upsert is the only mutation. The conditional conflict clause also
       // protects against an out-of-scope contract pointer appearing after the validation read.
       const written = await query<{ sheetTypeId: number; floorLabel: string }>(
@@ -258,6 +263,11 @@ export async function PATCH(req: NextRequest) {
       return { ok: true as const, count: written.length };
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "QUYEN_BI_THU_HOI")
+      return NextResponse.json(
+        { error: "Chỉ Admin/PM được sửa giá trị hợp đồng" },
+        { status: 403 },
+      );
     if (error instanceof Error && error.message === "FLOOR_CONTRACT_SCOPE_CONFLICT")
       return NextResponse.json(
         { error: "Không tìm thấy dữ liệu trong dự án đang chọn" },

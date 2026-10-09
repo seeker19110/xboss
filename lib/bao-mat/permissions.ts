@@ -147,6 +147,22 @@ export async function kiemQuyenTaiLucGhi(kiem: () => boolean): Promise<boolean> 
   return kiem();
 }
 
+// Tiện ích cho route ghi: chạy `ghi` trong MỘT transaction, chỉ sau khi tái kiểm quyền lúc ghi
+// (kiemQuyenTaiLucGhi) còn đúng. Bị thu hồi ⇒ `{ ok: false }` TRƯỚC mọi lần ghi (transaction không
+// ghi gì) — route tự trả 403 với thông điệp cũ. Ngoại lệ trong `ghi` ⇒ ROLLBACK và ném tiếp.
+// Gọi lồng được (withTransaction reentrant); khoá dòng chính (nếu có) nên đặt TRONG `ghi` trước
+// khi cần, còn kiểm quyền chạy ngay đầu — đủ vì nó đọc lại dữ liệu có hiệu lực và giữ khoá chia sẻ
+// tới COMMIT. Route cần kiểm SAU khi khoá dòng thì gọi trực tiếp kiemQuyenTaiLucGhi trong tx.
+export async function ghiNeuConQuyen<T>(
+  kiem: () => boolean,
+  ghi: () => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false }> {
+  return withTransaction(async () => {
+    if (!(await kiemQuyenTaiLucGhi(kiem))) return { ok: false as const };
+    return { ok: true as const, value: await ghi() };
+  });
+}
+
 // Chỉ dùng trong test; không có đường cấp quyền giả hoặc fallback mặc định.
 export function _resetPermissionCacheForTests(): void {
   snapshots = new WeakMap();

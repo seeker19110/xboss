@@ -4,6 +4,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { isValidDateISO } from "@/lib/nen/date";
 import { moneyInputErrorBody, parseOptionalMoneyInput } from "@/lib/nen/money";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -59,17 +60,28 @@ export async function POST(
 
   let id: number;
   try {
-    id = await insertId(
-      `INSERT INTO contract_addenda (contract_id, code, title, value_delta, signed_date, note, created_by)
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageContracts(user.role),
+      () =>
+        insertId(
+          `INSERT INTO contract_addenda (contract_id, code, title, value_delta, signed_date, note, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      contractId,
-      code,
-      title,
-      valueDelta,
-      signedDate,
-      note,
-      user.id,
+          contractId,
+          code,
+          title,
+          valueDelta,
+          signedDate,
+          note,
+          user.id,
+        ),
     );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền thêm phụ lục (chỉ Admin/PM)" },
+        { status: 403 },
+      );
+    id = kq.value;
   } catch (err) {
     if ((err as { code?: string }).code === "23505")
       return NextResponse.json(

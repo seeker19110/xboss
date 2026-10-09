@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getClaim, rejectClaim } from "@/lib/tai-chinh/claims";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,14 @@ export async function POST(
   if (!settlementNote.trim())
     return NextResponse.json({ error: "Từ chối claim cần ghi rõ lý do" }, { status: 422 });
 
-  const result = await rejectClaim({ claimId: id, settlementNote, settledBy: user.id });
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực trong cùng transaction với rejectClaim (reentrant).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.approve(user.role),
+    () => rejectClaim({ claimId: id, settlementNote, settledBy: user.id }),
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin/PM được từ chối claim" }, { status: 403 });
+  const result = kq.value;
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: 409 });
   return NextResponse.json({ ok: true });
 }

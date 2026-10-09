@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, queryOne, withProjectScope } from "@/lib/db";
 import { getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
@@ -156,7 +157,7 @@ function phanTramHienThi(tyLe: string | number): string {
 }
 
 type KetQuaGhiBill =
-  { ok: true; id: number; amount: string } | { ok: false; status: 400 | 404; error: string };
+  { ok: true; id: number; amount: string } | { ok: false; status: 400 | 403 | 404; error: string };
 
 // POST /api/payments/bills
 // Body: { responsible, type, amount, paidDate, period?, description?, note?,
@@ -289,6 +290,10 @@ export async function POST(req: NextRequest) {
       }
       if (parseMoneyExact(amount) <= 0n)
         return { ok: false, status: 400, error: "Số tiền không hợp lệ" };
+
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale). Chạy dưới khoá dòng HĐ tầng, trước lần ghi.
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.editStructure(user.role))))
+        return { ok: false, status: 403, error: "Chỉ Admin/PM được tạo mục thanh toán" };
 
       const saved = await queryOne<{ id: number; amount: string }>(
         `
