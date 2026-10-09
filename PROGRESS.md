@@ -1,5 +1,40 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — PR-B 6(b): RLS nghiêm ngặt 18 bảng tổ chức/dự án (migration 0165, QUA STAGING)
+
+Đóng mục 6(b) của `AUDIT-S15-RELEASE-CANDIDATE.md` (A1-AC06): bỏ nhánh "GUC rỗng → cho qua" khỏi 15
+bảng theo tổ chức (0080/0161) + 3 bảng kế hoạch theo dự án (0149). Chi tiết, kiểm kê `pg_policies`,
+bất biến và checklist staging ở `docs/nang-cap/AUDIT-S16-RLS-STRICT.md`; ADR-0005 thêm "Cạm bẫy #3".
+
+- **Migration `0165_org_rls_strict.sql`:** chỉ `DROP POLICY IF EXISTS` + `CREATE POLICY` (USING =
+  WITH CHECK = `cột = GUC OR GUC = '*'`), idempotent (đã chạy 2 lần), không đụng dữ liệu nhưng **đổi
+  hành vi đọc/ghi của mọi đường** → **bắt buộc staging trước production** (`bash deploy.sh --staging`,
+  kiểm login/me/route/cron bằng `xboss_app`). `construction_stages` giữ nhánh `project_id IS NULL`
+  (danh mục dùng chung, D1 M123). Trước khi áp: kiểm `baselines`/`floor_stage_fronts` không có dòng
+  `project_id IS NULL` (query trong AUDIT-S16-RLS-STRICT §5), và view BI Metabase (`xboss_bi`) đọc
+  `users`/`projects` cần GUC/BYPASSRLS — chủ dự án quyết.
+- **`lib/db`:** câu lệnh ngoài transaction của request đã xác thực được bọc `BEGIN; set_config
+('app.org_id', org, true) … COMMIT` (SET LOCAL, không rò qua pool/PgBouncer, ROLLBACK + release khi
+  lỗi); `withOrgScope(orgId | '*', fn, { readOnly })` cho đường chưa có actor (login, 2FA, OIDC, api-key,
+  cron bằng secret, script). **Bất biến:** lồng đổi org/nâng '_' → throw; ngoài transaction mà request
+  đã có org cũng không được đổi/nâng (phát hiện audit, đã sửa + test); '_' không bao giờ lấy từ client.
+- **Cron hệ thống** chạy theo từng tổ chức qua `lib/ha-tang/to-chuc.ts` (`theoTungToChuc`): 1 tổ chức
+  lỗi → log kèm orgId, chạy tiếp, ném lỗi tổng hợp sau cùng (cách ly tenant, không nuốt lỗi). Health-
+  check chỉ tra admin mọi org khi gọi bằng CRON_SECRET. Script `membership:dry-run` chạy `withOrgScope
+('*')` tường minh (nếu không sẽ thấy 0 user và báo nhầm "không ai mất quyền").
+- **Test:** `tests/s16-rls-strict.test.ts` (12 ca, chạy bằng pool `xboss_app`: GUC rỗng = 0 dòng từng
+  bảng, WITH CHECK rỗng + chéo org, '*' thấy cả hai, lồng/ngoài transaction bị từ chối, login+me+
+  suppliers+cron trọn đường bằng app role, cron không đếm lặp, dry-run thấy mọi org, cách ly lỗi
+  cron); `tests/migrations-rls-scope.test.ts` quét migration sau 0165 ghi lên 18 bảng phải tự
+  `set_config('app.org_id','*')` (Cạm bẫy #3: role migration production không superuser → thiếu GUC
+  thì UPDATE lặng lẽ 0 dòng; CI không bắt vì role ci là superuser).
+- **Nợ ghi nhận:** 2FA bước 2, OIDC `upsertSsoUser`, `/api/v1/*`, cron sync-sheets chưa có ca chạy
+  bằng `xboss_app` (mock `withOrgScope` ở unit test chạy thẳng, không kiểm đối số) — kiểm trên
+  staging theo checklist; mỗi query ngoài transaction nay 3 lượt khứ hồi (BEGIN/câu/COMMIT) → đo
+  `poolStats`/dashboard trên staging; `code-lists.getList` cache kết quả rỗng theo org (fail-open 2FA
+  nếu sau này gọi sai phạm vi); `stageMissingList(undefined)` dùng `'*'` đếm tầng chờ mọi org (lỗi
+  sẵn có); health-check cron gửi 1 email `To:` chứa admin mọi org (hành vi cũ).
+
 ## 2026-10-09 — Sau S15 (PR-A): đóng 6(a)/6(d)/6(f), A1-AC05 toàn diện, A1-AC03 null-scope, A2-AC07/08 lớp B + đặc tả M128/M129/M130
 
 Đợt làm tiếp ngay sau khi merge PR #614 ("làm tiếp các việc còn mở"). Mỗi việc một worktree/nhánh riêng,
@@ -65,9 +100,7 @@ settings` thông báo mọi PM toàn hệ; `audit_log`/`custom_field_defs` khôn
 - **Đặc tả mới (chủ dự án chốt 2026-10-09):** `M128` chứng từ điều chỉnh IPC (sau M129), `M129` tách
   "đã duyệt" ≠ "đã chi" (`payment_bills.pay_status/paid_at`), `M130` (đã làm ở trên) — đều "Approved
   for implementation".
-- **Tiếp theo:** PR-B 6(b) RLS strict (migration 0165 bỏ nhánh GUC rỗng, scope `'*'` tường minh ở
-  login/cron/script; nhánh `s16-rls-strict` đã code, rebase lên main sau PR-A; Metabase view cần GUC);
-  M129 rồi M128; nợ
+- **Tiếp theo:** PR-B 6(b) RLS strict (xem mục trên); M129 rồi M128; nợ
   null-scope ở trên; `.env.example` (người có quyền) thêm `XBOSS_STRICT_MEMBERSHIP=0`,
   `XBOSS_OFFLINE_KEK`, `GOOGLE_SHEET_PROJECT_ID`.
 
