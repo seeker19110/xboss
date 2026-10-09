@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { listPoints, parsePointBody, validatePointInput } from "@/lib/hien-truong/monitoring";
 
@@ -46,19 +47,30 @@ export async function POST(req: NextRequest) {
   );
   if (dup) return NextResponse.json({ error: "Mã mốc quan trắc đã tồn tại" }, { status: 409 });
 
-  const id = await insertId(
-    `INSERT INTO monitoring_points (project_id, code, kind, location, warn_threshold,
-       alarm_threshold, unit, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.code,
-    input.kind,
-    input.location,
-    input.warnThreshold,
-    input.alarmThreshold,
-    input.unit,
-    input.status,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageMonitoring(user.role),
+    () =>
+      insertId(
+        `INSERT INTO monitoring_points (project_id, code, kind, location, warn_threshold,
+           alarm_threshold, unit, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        projectId,
+        input.code,
+        input.kind,
+        input.location,
+        input.warnThreshold,
+        input.alarmThreshold,
+        input.unit,
+        input.status,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo mốc quan trắc (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +64,13 @@ export async function PATCH(
 
   if (sets.length === 0) return NextResponse.json({ ok: true });
 
-  await run(`UPDATE ncrs SET ${sets.join(", ")} WHERE id = ?`, ...values, id);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  // Chỉ nhánh đóng NCR đi qua cổng CAN.approve; sửa thường không có cổng CAN để tái kiểm.
+  const dongNcr = body?.status === "closed";
+  const kq = await ghiNeuConQuyen(
+    () => !dongNcr || CAN.approve(user.role),
+    () => run(`UPDATE ncrs SET ${sets.join(", ")} WHERE id = ?`, ...values, id),
+  );
+  if (!kq.ok) return NextResponse.json({ error: "Chỉ Admin/PM được đóng NCR" }, { status: 403 });
   return NextResponse.json({ ok: true });
 }

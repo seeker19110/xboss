@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   createAndSealMerkleBatch,
@@ -76,12 +77,14 @@ export async function POST(req: NextRequest) {
     ];
     const metadata = body.metadata || { source: "XBoss Core Audit Stream", sealedBy: user.id };
 
-    const { record, tree } = await createAndSealMerkleBatch(
-      projectId,
-      batchCode,
-      records,
-      metadata,
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageEngineeringTwin(user.role),
+      () => createAndSealMerkleBatch(projectId, batchCode, records, metadata),
     );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Không có quyền niêm phong khối Merkle" }, { status: 403 });
+    const { record, tree } = kq.value;
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   TECH_CATEGORIES,
@@ -52,17 +53,28 @@ export async function POST(req: NextRequest) {
   const invalid = validateTechLink(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  const id = await insertId(
-    `INSERT INTO tech_links (project_id, category, title, url, embed, note, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.category,
-    input.title,
-    input.url,
-    input.embed,
-    input.note,
-    user.id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageTech(user.role),
+    () =>
+      insertId(
+        `INSERT INTO tech_links (project_id, category, title, url, embed, note, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        projectId,
+        input.category,
+        input.title,
+        input.url,
+        input.embed,
+        input.note,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo link công nghệ (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

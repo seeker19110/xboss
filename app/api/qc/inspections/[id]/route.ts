@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchTask, canTouchPackage } from "@/lib/bao-mat/auth";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   taskInProject,
@@ -65,7 +66,8 @@ export async function PATCH(
 
       const isApproval = nextStatus === "passed" || nextStatus === "failed";
       if (isApproval) {
-        if (!CAN.approve(user.role))
+        // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay sau khi khoá dòng, trước lần ghi đầu.
+        if (!(await kiemQuyenTaiLucGhi(() => CAN.approve(user.role))))
           throw Object.assign(new Error("Chỉ Admin/PM được duyệt kết quả kiểm tra"), {
             status: 403,
           });

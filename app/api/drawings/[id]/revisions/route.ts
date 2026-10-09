@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/nen/storage";
+import { storageDelete, storagePut } from "@/lib/nen/storage";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { newDrawingRevisionFileName, MAX_DRAWING_BYTES, parseUploadedFile } from "@/lib/nen/photos";
 
@@ -58,19 +59,32 @@ export async function POST(
 
   let id: number;
   try {
-    id = await insertId(
-      `INSERT INTO drawing_revisions
-         (drawing_id, rev, file_name, original_name, mime_type, size_bytes, submitted_at, uploaded_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      drawingId,
-      rev,
-      fileName,
-      file.name || null,
-      file.type,
-      file.size,
-      submittedAt,
-      user.id,
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageDrawings(user.role),
+      () =>
+        insertId(
+          `INSERT INTO drawing_revisions
+             (drawing_id, rev, file_name, original_name, mime_type, size_bytes, submitted_at, uploaded_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          drawingId,
+          rev,
+          fileName,
+          file.name || null,
+          file.type,
+          file.size,
+          submittedAt,
+          user.id,
+        ),
     );
+    if (!kq.ok) {
+      await storageDelete(user.orgId, fileName).catch(() => {});
+      return NextResponse.json(
+        { error: "Bạn không có quyền upload bản vẽ (chỉ Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
+    }
+    id = kq.value;
   } catch (err) {
     if ((err as { code?: string }).code === "23505")
       return NextResponse.json(

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { withUniqueRetry } from "@/lib/ha-tang/seqcode";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
@@ -64,26 +65,39 @@ export async function POST(req: NextRequest) {
   const refErr = await checkDesignChangeRefs(input, projectId);
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
 
-  const { id, code } = await withUniqueRetry(async () => {
-    const code = await nextDesignChangeCode();
-    const id = await insertId(
-      `INSERT INTO design_changes
-         (project_id, code, title, system_id, drawing_id, requested_by_note, reason,
-          impact_technical, impact_cost, impact_schedule, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      projectId,
-      code,
-      input.title,
-      input.systemId,
-      input.drawingId,
-      input.requestedByNote,
-      input.reason,
-      input.impactTechnical,
-      input.impactCost,
-      input.impactSchedule,
-      user.id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  // Mỗi lần thử là một transaction riêng (lỗi trùng mã làm hỏng transaction nên phải thử lại từ đầu).
+  const kq = await withUniqueRetry(() =>
+    ghiNeuConQuyen(
+      () => CAN.manageDesignChanges(user.role),
+      async () => {
+        const code = await nextDesignChangeCode();
+        const id = await insertId(
+          `INSERT INTO design_changes
+           (project_id, code, title, system_id, drawing_id, requested_by_note, reason,
+            impact_technical, impact_cost, impact_schedule, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          projectId,
+          code,
+          input.title,
+          input.systemId,
+          input.drawingId,
+          input.requestedByNote,
+          input.reason,
+          input.impactTechnical,
+          input.impactCost,
+          input.impactSchedule,
+          user.id,
+        );
+        return { id, code };
+      },
+    ),
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo thay đổi thiết kế (Admin/PM/Kỹ sư)" },
+      { status: 403 },
     );
-    return { id, code };
-  });
+  const { id, code } = kq.value;
   return NextResponse.json({ id, code }, { status: 201 });
 }

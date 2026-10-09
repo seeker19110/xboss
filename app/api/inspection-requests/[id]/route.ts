@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
@@ -108,6 +109,11 @@ export async function PATCH(
         id,
       );
       if (!existing) throw Object.assign(new Error("Không tìm thấy phiếu YCNT"), { status: 404 });
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay sau khi khoá dòng, trước lần ghi đầu.
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.approve(user.role))))
+        throw Object.assign(new Error("Chỉ Admin/PM được đổi trạng thái phiếu YCNT"), {
+          status: 403,
+        });
       await run(`UPDATE inspection_requests SET status = ? WHERE id = ?`, status, id);
     });
   } catch (err: unknown) {

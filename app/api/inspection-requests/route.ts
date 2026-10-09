@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, insertId, run, withTransaction } from "@/lib/db";
+import { query, insertId, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { nextSeqCode, withUniqueRetry } from "@/lib/ha-tang/seqcode";
 import { emitWebhook } from "@/lib/bao-mat/webhooks";
@@ -112,27 +113,34 @@ export async function POST(req: NextRequest) {
       { status: 422 },
     );
 
-  const id = await withUniqueRetry(() =>
-    withTransaction(async () => {
-      const code = await nextSeqCode("inspection_requests", "code", "YCNT-", 4);
-      const reqId = await insertId(
-        `INSERT INTO inspection_requests (code, scheduled_at, note, created_by)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale);
+  // mỗi lần thử mã là một transaction riêng.
+  const kq = await withUniqueRetry(() =>
+    ghiNeuConQuyen(
+      () => CAN.createInspectionRequest(user.role),
+      async () => {
+        const code = await nextSeqCode("inspection_requests", "code", "YCNT-", 4);
+        const reqId = await insertId(
+          `INSERT INTO inspection_requests (code, scheduled_at, note, created_by)
          VALUES (?, ?, ?, ?)`,
-        code,
-        scheduledAt,
-        note,
-        user.id,
-      );
-      for (const taskId of taskIds) {
-        await run(
-          `INSERT INTO inspection_request_tasks (request_id, task_id) VALUES (?, ?)`,
-          reqId,
-          taskId,
+          code,
+          scheduledAt,
+          note,
+          user.id,
         );
-      }
-      return reqId;
-    }),
+        for (const taskId of taskIds) {
+          await run(
+            `INSERT INTO inspection_request_tasks (request_id, task_id) VALUES (?, ?)`,
+            reqId,
+            taskId,
+          );
+        }
+        return reqId;
+      },
+    ),
   );
+  if (!kq.ok) return NextResponse.json({ error: "Không có quyền tạo phiếu YCNT" }, { status: 403 });
+  const id = kq.value;
 
   // Phiếu YCNT vừa tạo thành công. taskId chỉ đưa vào khi phiếu đúng 1 task (nếu nhiều task
   // thì bỏ trường taskId — data theo đặc tả {requestId, taskId?}).

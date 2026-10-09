@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   createTcMatrix,
@@ -57,20 +58,28 @@ export async function POST(req: NextRequest) {
     const action = body.action || "create_matrix";
 
     if (action === "create_matrix") {
-      const saved = await createTcMatrix(projectId, user.id, {
-        matrixCode: body.matrixCode || `TC-${Date.now().toString(36).toUpperCase()}`,
-        title: body.title || "Gói thử nghiệm T&C",
-        testType: (body.testType as TcTestType) || "hydrostatic_pipe",
-        systemCode: body.systemCode || "FP",
-        floorLabel: body.floorLabel || "Tầng 5",
-        zoneLabel: body.zoneLabel || "Zone A",
-        testPackageName: body.testPackageName || "Test Package 01",
-        designPressureBar: body.designPressureBar,
-        testPressureBar: body.testPressureBar,
-        holdingDurationMinutes: body.holdingDurationMinutes,
-        allowableDropBar: body.allowableDropBar,
-        interlockLogic: body.interlockLogic,
-      });
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+      const kq = await ghiNeuConQuyen(
+        () => CAN.manageEngineeringTwin(user.role),
+        () =>
+          createTcMatrix(projectId, user.id, {
+            matrixCode: body.matrixCode || `TC-${Date.now().toString(36).toUpperCase()}`,
+            title: body.title || "Gói thử nghiệm T&C",
+            testType: (body.testType as TcTestType) || "hydrostatic_pipe",
+            systemCode: body.systemCode || "FP",
+            floorLabel: body.floorLabel || "Tầng 5",
+            zoneLabel: body.zoneLabel || "Zone A",
+            testPackageName: body.testPackageName || "Test Package 01",
+            designPressureBar: body.designPressureBar,
+            testPressureBar: body.testPressureBar,
+            holdingDurationMinutes: body.holdingDurationMinutes,
+            allowableDropBar: body.allowableDropBar,
+            interlockLogic: body.interlockLogic,
+          }),
+      );
+      if (!kq.ok)
+        return NextResponse.json({ error: "Không có quyền thực hiện MEPF T&C" }, { status: 403 });
+      const saved = kq.value;
       return NextResponse.json({ success: true, matrixId: saved.id });
     }
 
@@ -78,14 +87,22 @@ export async function POST(req: NextRequest) {
       if (!body.matrixId) {
         return NextResponse.json({ error: "Thiếu matrixId" }, { status: 400 });
       }
-      const log = await addTcLog(projectId, user.id, body.matrixId, {
-        recordedValue: body.recordedValue,
-        unit: body.unit || "Bar",
-        sensorCode: body.sensorCode,
-        ambientTempC: body.ambientTempC,
-        notes: body.notes,
-        isAnomaly: body.isAnomaly,
-      });
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+      const kq = await ghiNeuConQuyen(
+        () => CAN.manageEngineeringTwin(user.role),
+        () =>
+          addTcLog(projectId, user.id, body.matrixId, {
+            recordedValue: body.recordedValue,
+            unit: body.unit || "Bar",
+            sensorCode: body.sensorCode,
+            ambientTempC: body.ambientTempC,
+            notes: body.notes,
+            isAnomaly: body.isAnomaly,
+          }),
+      );
+      if (!kq.ok)
+        return NextResponse.json({ error: "Không có quyền thực hiện MEPF T&C" }, { status: 403 });
+      const log = kq.value;
       return NextResponse.json({ success: true, logId: log.id });
     }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { listQcChecklists, validateChecklistItems } from "@/lib/ky-thuat/qaqc";
 
@@ -52,16 +53,24 @@ export async function POST(req: NextRequest) {
 
   const required = body?.required === true;
 
-  const id = await insertId(
-    `INSERT INTO qc_checklists (name, category, system_id, required, items, project_id)
-     VALUES (?, ?, ?, ?, ?::jsonb, ?)`,
-    name,
-    category,
-    systemId,
-    required,
-    JSON.stringify(items),
-    projectId,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    () =>
+      insertId(
+        `INSERT INTO qc_checklists (name, category, system_id, required, items, project_id)
+         VALUES (?, ?, ?, ?, ?::jsonb, ?)`,
+        name,
+        category,
+        systemId,
+        required,
+        JSON.stringify(items),
+        projectId,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin/PM được tạo mẫu checklist" }, { status: 403 });
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   ENV_MONITORING_CATEGORIES,
@@ -55,22 +56,33 @@ export async function POST(req: NextRequest) {
   const { error, passed } = validateMonitoringInput(input);
   if (error) return NextResponse.json({ error }, { status: 422 });
 
-  const id = await insertId(
-    `INSERT INTO env_monitoring (project_id, measured_at, category, indicator, value, unit,
-                                  threshold, passed, location, note, recorded_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.measuredAt,
-    input.category,
-    input.indicator,
-    input.value,
-    input.unit,
-    input.threshold,
-    passed,
-    input.location,
-    input.note,
-    user.id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageEnv(user.role),
+    () =>
+      insertId(
+        `INSERT INTO env_monitoring (project_id, measured_at, category, indicator, value, unit,
+                                      threshold, passed, location, note, recorded_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        projectId,
+        input.measuredAt,
+        input.category,
+        input.indicator,
+        input.value,
+        input.unit,
+        input.threshold,
+        passed,
+        input.location,
+        input.note,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền ghi kết quả quan trắc (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

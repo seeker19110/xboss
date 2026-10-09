@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   transitionWorkflow,
@@ -37,7 +38,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const { id } = await params;
   try {
-    await transitionWorkflow(projectId, id, user.id, to, reason);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.createEngineeringWorkflow(user.role),
+      () => transitionWorkflow(projectId, id, user.id, to, reason),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Không có quyền chuyển trạng thái workflow" },
+        { status: 403 },
+      );
   } catch (err) {
     if (err instanceof WorkflowError)
       return NextResponse.json({ error: err.message }, { status: 422 });

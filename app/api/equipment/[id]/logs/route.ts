@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   addEquipmentLog,
@@ -58,7 +59,9 @@ export async function POST(
   const invalid = validateEquipmentLogInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  if (!CAN.manageEquipment(user.role)) {
+  // Qua cổng CAN (không phải nhánh subcon tự trả thiết bị) ⇒ phải tái kiểm lúc ghi.
+  const quaCan = CAN.manageEquipment(user.role);
+  if (!quaCan) {
     if (user.role !== "subcon" || input.action !== "return")
       return NextResponse.json(
         { error: "Bạn không có quyền thao tác thiết bị (chỉ trả thiết bị mình đang giữ)" },
@@ -75,7 +78,17 @@ export async function POST(
       );
   }
 
-  const result = await addEquipmentLog(equipmentId, input, user.id);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi; nhánh subcon tự trả không qua CAN.
+  const kq = await ghiNeuConQuyen(
+    () => !quaCan || CAN.manageEquipment(user.role),
+    () => addEquipmentLog(equipmentId, input, user.id),
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền thao tác thiết bị (chỉ trả thiết bị mình đang giữ)" },
+      { status: 403 },
+    );
+  const result = kq.value;
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: 404 });
 
   return NextResponse.json({ ok: true }, { status: 201 });

@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiLoiCoStatus, phanHoiXungDotPhuThuoc } from "@/li
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen, kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   parseCommissioningBody,
@@ -117,6 +118,15 @@ export async function PATCH(
         id,
       );
       if (!locked) throw Object.assign(new Error("Không tìm thấy hệ thống T&C"), { status: 404 });
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay sau khi khoá dòng, trước lần ghi đầu.
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.manageHandover(user.role))))
+        throw Object.assign(new Error("Bạn không có quyền sửa hệ thống T&C (Admin/PM/kỹ sư)"), {
+          status: 403,
+        });
+      if (changingToDecision && !(await kiemQuyenTaiLucGhi(() => CAN.approve(user.role))))
+        throw Object.assign(new Error("Chỉ Admin/PM được đặt kết quả Đạt/Không đạt"), {
+          status: 403,
+        });
 
       await run(
         `UPDATE commissioning SET code = ?, system_name = ?, system_id = ?, checklist = ?::jsonb,
@@ -162,7 +172,16 @@ export async function DELETE(
     if (!existing)
       return NextResponse.json({ error: "Không tìm thấy hệ thống T&C" }, { status: 404 });
 
-    await run(`DELETE FROM commissioning WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageHandover(user.role),
+      () => run(`DELETE FROM commissioning WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá hệ thống T&C (Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
