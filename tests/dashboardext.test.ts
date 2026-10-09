@@ -15,7 +15,7 @@ test(
 );
 
 test(
-  "workfrontBlock: đếm đúng tầng chưa sẵn sàng mặt bằng (công tác cuối chưa bàn giao) có task tới hạn + tổng ngày chờ luỹ kế (M46 — model tầng×công tác, thay M14 cũ)",
+  "workfrontBlock: đếm đúng tầng chưa sẵn sàng mặt bằng (công tác cuối chưa bàn giao) có task tới hạn + tổng ngày chờ luỹ kế (M46 — model tầng×công tác, thay M14 cũ); S16: thiếu dự án = 0, không JOIN task dự án khác cùng tên tầng",
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
@@ -28,37 +28,89 @@ test(
     const stageId = await insertId(
       `INSERT INTO construction_stages (name, sort_order, duration_days) VALUES ('Test D9 stage cuối', 9999, 1)`,
     );
-    const sheetId = await insertId(
-      `INSERT INTO sheet_types (code, name, slug) VALUES ('D9-WF', 'Sheet test D9 WF', 'd9-wf')`,
-    );
-    const frontId = await insertId(
-      // project_id suy từ MIN(projects) (M123 PR1): DB test có dự án thì cột đã NOT NULL,
-      // DB trống thì vẫn NULL hợp lệ — không phụ thuộc thứ tự migrate/seed.
-      `INSERT INTO floor_stage_fronts (project_id, floor_label, stage_id)
-       VALUES ((SELECT MIN(id) FROM projects), '9F', ?)`,
-      stageId,
-    );
-    const wpId = await insertId(
-      `INSERT INTO work_packages (code, name, sheet_type_id, floor_label) VALUES ('D9-WF-1', 'Nhóm test D9 WF', ?, '9F')`,
-      sheetId,
-    );
-    const taskId = await insertId(
-      `INSERT INTO tasks (code, name, package_id, start_date, status, progress_percent)
-       VALUES ('T-D9-WF', 'Task test D9 WF', ?, ?, 'chuan_bi', 0)`,
-      wpId,
-      daysFromTodayISO(-4), // đã quá hạn bắt đầu 4 ngày
-    );
+    // 3 dự án mới (đếm theo dự án nên con số chính xác, không lẫn dữ liệu test khác):
+    // A có tầng D9F + task quá hạn; B chỉ có task ở tầng D9G; C có tầng D9G nhưng không có task.
+    const ids: {
+      projects: number[];
+      towers: number[];
+      sheets: number[];
+      wps: number[];
+      tasks: number[];
+      fronts: number[];
+    } = { projects: [], towers: [], sheets: [], wps: [], tasks: [], fronts: [] };
+    const duAn = async (ten: string) => {
+      const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, ten);
+      const towerId = await insertId(
+        `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp')`,
+        projectId,
+      );
+      const sheetId = await insertId(
+        `INSERT INTO sheet_types (code, name, slug, tower_id) VALUES (?, ?, ?, ?)`,
+        `WF-${projectId}`,
+        `Sheet WF ${projectId}`,
+        `d9-wf-${projectId}`,
+        towerId,
+      );
+      ids.projects.push(projectId);
+      ids.towers.push(towerId);
+      ids.sheets.push(sheetId);
+      return { projectId, sheetId };
+    };
+    const tang = async (projectId: number, floor: string) =>
+      ids.fronts.push(
+        await insertId(
+          `INSERT INTO floor_stage_fronts (project_id, floor_label, stage_id) VALUES (?, ?, ?)`,
+          projectId,
+          floor,
+          stageId,
+        ),
+      );
+    const taskQuaHan = async (sheetId: number, floor: string) => {
+      const wpId = await insertId(
+        `INSERT INTO work_packages (code, name, sheet_type_id, floor_label) VALUES (?, 'Nhóm test WF', ?, ?)`,
+        `WF-${sheetId}-${floor}`,
+        sheetId,
+        floor,
+      );
+      ids.wps.push(wpId);
+      ids.tasks.push(
+        await insertId(
+          `INSERT INTO tasks (code, name, package_id, start_date, status, progress_percent)
+           VALUES (?, 'Task test WF', ?, ?, 'chuan_bi', 0)`,
+          `T-${wpId}`,
+          wpId,
+          daysFromTodayISO(-4), // đã quá hạn bắt đầu 4 ngày
+        ),
+      );
+    };
 
-    const block = await workfrontBlock();
-    assert.ok(block !== null);
-    assert.ok(block!.waitingFloors >= 1);
-    assert.ok(block!.cumulativeWaitDays >= 4);
+    try {
+      const a = await duAn("Test WF A");
+      const b = await duAn("Test WF B");
+      const c = await duAn("Test WF C");
+      await tang(a.projectId, "D9F");
+      await taskQuaHan(a.sheetId, "D9F");
+      await taskQuaHan(b.sheetId, "D9G");
+      await tang(c.projectId, "D9G");
 
-    await run(`DELETE FROM tasks WHERE id = ?`, taskId);
-    await run(`DELETE FROM work_packages WHERE id = ?`, wpId);
-    await run(`DELETE FROM sheet_types WHERE id = ?`, sheetId);
-    await run(`DELETE FROM floor_stage_fronts WHERE id = ?`, frontId);
-    await run(`DELETE FROM construction_stages WHERE id = ?`, stageId);
+      const blockA = await workfrontBlock(a.projectId);
+      assert.ok(blockA !== null);
+      assert.equal(blockA!.waitingFloors, 1);
+      assert.equal(blockA!.cumulativeWaitDays, 4);
+
+      // S16: tầng D9G của C không được đếm task tầng D9G của dự án B.
+      assert.equal((await workfrontBlock(c.projectId))!.waitingFloors, 0);
+      // S16: chưa chọn dự án → không đếm xuyên dự án/tổ chức (trước đây phạm vi '*').
+      assert.equal((await workfrontBlock(null))!.waitingFloors, 0);
+    } finally {
+      for (const id of ids.tasks) await run(`DELETE FROM tasks WHERE id = ?`, id);
+      for (const id of ids.wps) await run(`DELETE FROM work_packages WHERE id = ?`, id);
+      for (const id of ids.fronts) await run(`DELETE FROM floor_stage_fronts WHERE id = ?`, id);
+      for (const id of ids.sheets) await run(`DELETE FROM sheet_types WHERE id = ?`, id);
+      for (const id of ids.towers) await run(`DELETE FROM towers WHERE id = ?`, id);
+      for (const id of ids.projects) await run(`DELETE FROM projects WHERE id = ?`, id);
+      await run(`DELETE FROM construction_stages WHERE id = ?`, stageId);
+    }
   },
 );
 
