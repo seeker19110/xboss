@@ -485,6 +485,29 @@ export class QueueDb implements QueueStore {
     });
   }
 
+  /**
+   * "Gửi lại ngay" (người dùng bấm, S08): op `pending` đang chờ backoff được đưa về hạn gửi ngay.
+   * GIỮ hạn của op vừa nhận 429/503 — Retry-After là yêu cầu của máy chủ, không retry mù (D04).
+   */
+  async datLaiHanGui(phamVi: ChuSoHuu, now: number) {
+    return this.db.tx([STORE_OPS, STORE_META], "readwrite", async (t) => {
+      const ops = await t.getAllByIndex<QueueRecord>(STORE_OPS, "owner", khoaChu(phamVi));
+      let n = 0;
+      for (const r of ops) {
+        if (!cungPhamVi(r, phamVi) || r.state !== "pending" || r.nextAttemptAt <= now) continue;
+        const s = r.lastResult?.status;
+        if (s === 429 || s === 503) continue;
+        await t.put(STORE_OPS, { ...r, nextAttemptAt: now });
+        n++;
+      }
+      if (n) {
+        const meta = await docMeta(t);
+        await t.put(STORE_META, { ...meta, rev: meta.rev + 1 });
+      }
+      return n;
+    });
+  }
+
   /** Tổng số op v2 trên thiết bị (mọi chủ) — chỉ đếm. */
   async demOp(): Promise<number> {
     return this.db.tx([STORE_OPS], "readonly", (t) => t.count(STORE_OPS));
@@ -511,9 +534,14 @@ export class QueueDb implements QueueStore {
    * blocker đối soát legacy (D03), không bao giờ tự nhận chủ.
    */
   async coLegacy(): Promise<boolean> {
+    return (await this.demLegacy()) > 0;
+  }
+
+  /** Số bản ghi queue v1 không chủ (CHỈ đếm — màn phục hồi S08 giải thích, không hiện nội dung). */
+  async demLegacy(): Promise<number> {
     const names = await this.db.storeNames();
-    if (!names.includes(LEGACY_STORE)) return false;
-    return this.db.tx([LEGACY_STORE], "readonly", async (t) => (await t.count(LEGACY_STORE)) > 0);
+    if (!names.includes(LEGACY_STORE)) return 0;
+    return this.db.tx([LEGACY_STORE], "readonly", (t) => t.count(LEGACY_STORE));
   }
 }
 

@@ -40,4 +40,7 @@ regexes = [
   # tests/route-vat-tu-sync-pham-vi.test.ts — CRON_SECRET giả cho route cron đồng bộ Sheet
   # (A1), chỉ dùng trong test; rule generic-api-key báo nhầm vì tên biến chứa "SECRET".
   '''secret-cron-a1-dai-hon-32-ky-tu-xx''',
+  # e2e/constants.ts (S08) — keyring XBOSS_OFFLINE_KEK giả cho vault offline trong E2E (DB
+  # ephemeral), không phải bí mật thật; rule generic-api-key báo nhầm vì tên biến chứa "KEK".
+  '''e2e-offline-kek-khong-bi-mat-du-32-ky-tu''',
 ]

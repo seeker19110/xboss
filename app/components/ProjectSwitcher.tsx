@@ -4,6 +4,7 @@ import { ChevronDown, Star, LayoutGrid, Search } from "lucide-react";
 import { systemColorClasses } from "@/lib/nen/systemColors";
 import type { ProjectListItem } from "@/lib/ha-tang/projects";
 import { phatDoiNguCanh } from "@/app/lib/contextEpoch";
+import { clearServiceWorkerCache } from "@/app/lib/serviceWorkerCache";
 import { showToast } from "@/app/components/Toast";
 
 const PINNED_KEY = "xboss_pinned";
@@ -115,6 +116,9 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
         }
         // S05: cookie dự án dùng chung mọi tab — báo các tab khác khoá ngữ cảnh cũ trước khi tải lại.
         phatDoiNguCanh("switch");
+        // S08: bỏ cache đọc API của dự án cũ trong SW (chờ ACK tối đa 3s; lỗi vẫn an toàn vì cache
+        // gắn nhãn phiên vault của tab — tải lại là phiên mới).
+        await clearServiceWorkerCache().catch(() => undefined);
         window.location.reload();
       } else {
         showToast("Không chuyển được dự án — vui lòng thử lại", "error");

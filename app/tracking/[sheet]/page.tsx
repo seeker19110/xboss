@@ -26,6 +26,7 @@ import EditModeToggle from "@/app/components/EditModeToggle";
 import { ROLE_LABELS } from "@/lib/nen/roles";
 import { fetchMe } from "@/app/lib/me";
 import { offlineQueue } from "@/app/components/offlineQueue";
+import { moManPhucHoiNgoaiTuyen } from "@/app/components/OfflineRecoveryPanel";
 import { sortFloorsDesc } from "@/lib/nen/floors";
 import { useTrackingData } from "./useTrackingData";
 import { TrackingToolbar } from "./TrackingToolbar";
@@ -671,6 +672,17 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
               {offlinePending > 0 ? ` (${offlinePending} chờ gửi)` : ""}, chưa lên máy chủ; tự gửi
               khi có mạng
             </>
+          )}
+          {offlinePending > 0 && (
+            // S08: mở màn phục hồi (xem từng thao tác, gửi lại, xử lý xung đột).
+            <button
+              type="button"
+              onClick={moManPhucHoiNgoaiTuyen}
+              aria-haspopup="dialog"
+              className="min-h-10 -my-2 px-2 rounded-lg font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2"
+            >
+              Chi tiết
+            </button>
           )}
         </div>
       )}

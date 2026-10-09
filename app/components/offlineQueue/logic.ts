@@ -540,7 +540,8 @@ const MAX_THU_OCC = 6;
 /** Cache giải mã theo operationId (ciphertext bất biến theo operationId). */
 export type BoNhoGiaiMa = Map<string, OpBody>;
 
-async function giaiMaCo(
+/** Giải mã một op (dùng cache nếu có); không giải được (khoá thiếu/sai chủ/hỏng) → null. */
+export async function giaiMaCo(
   vault: VaultMoKhoa,
   rec: QueueRecord,
   cache?: BoNhoGiaiMa,

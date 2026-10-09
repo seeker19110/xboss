@@ -1,5 +1,46 @@
 # PROGRESS — XBoss
 
+## 2026-10-08 — QUALITY-FINAL-1 S08: UI phục hồi hàng đợi ngoại tuyến và browser acceptance
+
+Đặc tả lát cắt `docs/nang-cap/AUDIT-S08-OFFLINE-RECOVERY.md` (spec cha A2 §5, A2-FR01/FR02/FR11,
+APPROVAL D03/D04, PLAN §S08). Không thêm dependency, không migration, không đổi contract server S05/S06.
+
+- **Màn phục hồi** `app/components/OfflineRecoveryPanel.tsx` (mới), mở từ badge AppHeader (nay là nút) và
+  nút "Chi tiết" trên chip lưới tracking: nhóm Chờ gửi / Chờ gửi lại / Đang gửi / Cần xác minh / Bị từ chối
+  (HTTP status + mã dịch tiếng Việt) / Tạm dừng — cần đăng nhập / Bị khoá / Dữ liệu cũ chưa rõ chủ (legacy:
+  chỉ đếm + giải thích). Luôn phân biệt "lưu trên thiết bị" với "đã lên máy chủ". Hành động: Gửi lại ngay
+  (bỏ chờ backoff, **giữ Retry-After 429/503**), Mở khoá (xác minh online S07), Bỏ **từng** op
+  conflict/rejected sau `appConfirm` (`boThaoTac` — không xoá hàng loạt/op chờ/op chủ khác/legacy). Focus
+  tiêu đề khi mở, `aria-live`, Esc trả focus.
+- **Xung đột nhật ký (A2-FR11)**: "Xem & giải quyết" đọc bản thiết bị (vault) + `GET /api/diaries/:date`
+  (server kiểm quyền), so hai cột; "Giữ bản trên thiết bị" tạo op **mới** (operationId mới, `If-Match` =
+  etag máy chủ vừa xem) và **chỉ bỏ op cũ sau khi op mới commit**; có bản nháp mới hơn/khoá sổ → không cho
+  giữ; "Dùng bản máy chủ" = bỏ đúng op đó.
+- **Đăng xuất / đổi người (A2-AC01)**: `khoaPhien` khoá vault + xoá cache giải mã/bản đồ ô trong bộ nhớ +
+  báo SW, giữ ciphertext; đăng xuất/đổi tài khoản còn quên "chủ cuối" — **sửa lỗi** badge tab khác vẫn đếm op
+  của người vừa đăng xuất (`userCuoi` giữ qua epoch `logout/actor`) và kết quả refresh muộn hiện lại số op
+  chủ cũ. Trang tài khoản khoá ngay khi đăng xuất; lớp khoá nói "Đã đăng xuất trên thiết bị này", không nói
+  như máy chủ thu hồi.
+- **SW allowlist (A2-FR01/FR02/AC09)**: `public/sw.js` v21 — API mặc định network-only; network-first CHỈ
+  `GET /api/tasks?sheet=<slug>` và `GET /api/workpackages/:id/dimensions` (query khớp tuyệt đối), gắn nhãn
+  phiên vault + hạn lease **theo tab** (`OFFLINE_CONTEXT`, báo lại khi `controllerchange`/mỗi 20 s), phục
+  vụ cache chỉ khi lỗi mạng; 401/403/404/409/5xx trả nguyên + xoá bản cũ. Tài chính/auth/offline/SSE
+  network-only kể cả khi allowlist bị nới. `CLEAR_CACHE` xoá cả cache API + ngữ cảnh; đổi dự án
+  (`ProjectSwitcher`, `portfolio`) nay cũng gửi `CLEAR_CACHE`.
+- **E2E**: `e2e/authed/offline-recovery.spec.ts` (a) tick offline → online gửi xong, (b) A đăng xuất → B
+  không thấy/không gửi op A, (c) màn phục hồi axe 2 theme + focus/Esc/aria-live, (d) SW cache lưới khi mất
+  mạng, tài chính lỗi mạng. `XBOSS_OFFLINE_KEK` TEST qua `e2e/constants.ts` → `playwright.config.ts`
+  webServer (allowlist `.gitleaks.toml`) — **không cần sửa workflow CI**.
+- **Test**: `tests/audit-s08-offline-recovery.test.ts` (9 ca), `tests/audit-s08-sw-allowlist.test.ts` (9 ca),
+  thông điệp đăng xuất trong `service-worker-cache-ack.test.ts`, version v21 ở `audit-sw-network-only`.
+  `test:mutation` +4 (chỉ bỏ op conflict/rejected; op cũ chỉ bỏ sau op mới; đăng xuất quên chủ cũ; tài
+  chính network-only) — cả 4 bị bắt. E2E chạy cục bộ trên build `next build --webpack` + Chromium 1194: spec
+  mới 8/8 (2 lượt DB mới) + 12 spec liên quan xanh; build Turbopack cục bộ NOT_RUN (môi trường worktree).
+- **Cần quyết/còn mở:** Safari/iOS thật **NOT_RUN**; đối soát legacy v1 theo thiết bị (D03) chưa có quy
+  trình/UI quản trị; server đối chiếu op với manifest khoá + kiểm context request online (từ S07); FIFO khi
+  op cũ không giải mã được; xung đột tick/ảnh chỉ có "bỏ"; cache đọc ngoài lưới tracking (profile) chưa quyết;
+  `scripts/seed-sample.ts` chạy lại trên DB đã có `offline_vault_keys` lỗi FK (CI dùng DB mới nên chưa đỏ).
+
 ## 2026-10-08 — QUALITY-FINAL-1 A4-AC08: đối chiếu báo cáo, query count và benchmark p95
 
 Đặc tả `docs/nang-cap/AUDIT-A4-AC08-BENCHMARK.md` (spec cha A4-AC08, APPROVAL §D09). Không đổi logic

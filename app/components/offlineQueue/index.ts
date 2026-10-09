@@ -15,9 +15,11 @@ import { showToast } from "@/app/components/Toast";
 import { ngheDoiNguCanh } from "@/app/lib/contextEpoch";
 import {
   computeStats,
+  cungChu,
   docOpDaGiai,
   flushQueue,
   FLUSH_INTERVAL_MS,
+  giaiMaCo,
   khoaChu,
   themOp,
   THONG_KE_RONG,
@@ -35,6 +37,8 @@ const SYNC_TAG = "xboss-flush";
 export const OFFLINE_QUEUE_QUARANTINED = false;
 /** Thông điệp khi KHÔNG lưu được trên thiết bị — form/ô giữ nguyên để người dùng xử lý. */
 export const OFFLINE_SAVE_ERROR = "Chưa lưu được trên thiết bị. Hãy kết nối mạng rồi thử lại.";
+/** Nhịp báo lại ngữ cảnh cho SW (< ~30s SW rảnh bị dừng) khi vault đang mở. */
+const SW_NHIP_MS = 20_000;
 /** Trần số task mỗi khoá vault (khớp MAX_MANIFEST_TASKS phía server). */
 const TASK_MOI_KHOA = 500;
 
@@ -98,12 +102,31 @@ export type ThaoTacHangDoi = {
   tries: number;
   nextAttemptAt: number;
   lastResult?: { status: number; code?: string; at: number };
+  /** Khoá vault của op đang mở trong phiên này (false = bị khoá, chưa đọc/gửi được). */
+  moDuoc: boolean;
+  /** Ngày nhật ký (chỉ op diary_note đã giải mã được) — để người dùng nhận ra thao tác. */
+  ngayNhatKy?: string;
+  /** Số ô của thao tác tick (1 với tick lẻ). */
+  soO?: number;
 };
+
+/** Bản nháp nhật ký đang xung đột (chỉ đọc từ vault của chính chủ) để so với bản máy chủ. */
+export type NhatKyXungDot = {
+  operationId: string;
+  payload: DiaryNotePayload;
+  /** Có thao tác nhật ký MỚI HƠN cùng ngày trên thiết bị → không cho "giữ bản này" (bản mới thắng). */
+  coBanMoiHon: boolean;
+};
+
+/** Thông điệp gửi service worker: chỉ nhãn phiên ngẫu nhiên + hạn lease, không PII/khoá/context. */
+type ThongDiepSw = { type: "OFFLINE_CONTEXT"; tag: string | null; expiresAt: number };
 
 type ManagerDeps = {
   store?: QueueDb;
   vault?: VaultSession;
   send?: (req: YeuCauGui) => Promise<SendOutcome>;
+  /** Kênh báo SW (test thay được); mặc định postMessage tới SW đang điều khiển trang. */
+  baoSw?: (m: ThongDiepSw) => void;
 };
 
 const taoId = (): string =>
@@ -134,12 +157,35 @@ export class OfflineQueueManager {
   /** dimId → taskId của lưới đang hiển thị (để kiểm manifest khi tick offline). */
   private oCuaTask = new Map<number, number>();
   private daChuanBi = new Set<string>();
+  /** Nhãn phiên vault cho SW (đổi mỗi lần vault ACTIVE) — cache đọc chỉ hợp lệ trong đúng phiên. */
+  private swTag: string | null = null;
+  private baoSw: (m: ThongDiepSw) => void;
 
   constructor(deps: ManagerDeps = {}) {
     this.storeLazy = deps.store ?? null;
     this.vault = deps.vault ?? new VaultSession();
     this.send = deps.send ?? guiYeuCau;
-    this.vault.onDoi(() => this.setSnap({ vault: this.vault.trangThai }));
+    this.baoSw = deps.baoSw ?? guiChoSw;
+    this.vault.onDoi(() => {
+      this.setSnap({ vault: this.vault.trangThai });
+      this.dongBoNguCanhSw();
+    });
+  }
+
+  /**
+   * S08 (A2-FR02/AC09): SW chỉ phục vụ cache đọc tracking cho tab có vault ACTIVE, trong hạn
+   * lease; vault khoá (hết lease/đăng xuất/đổi ngữ cảnh) → báo SW bỏ ngữ cảnh của tab này.
+   */
+  private dongBoNguCanhSw(): void {
+    const han = this.vault.hanLeaseTuong();
+    if (han == null) {
+      if (this.swTag === null) return;
+      this.swTag = null;
+      this.baoSw({ type: "OFFLINE_CONTEXT", tag: null, expiresAt: 0 });
+      return;
+    }
+    this.swTag ??= taoId();
+    this.baoSw({ type: "OFFLINE_CONTEXT", tag: this.swTag, expiresAt: han });
   }
 
   private get store(): QueueDb {
@@ -184,6 +230,9 @@ export class OfflineQueueManager {
     }
     this.userCuoi = chu.ownerUserId;
     const { ops } = await this.store.docChu(khoaChu(chu));
+    // Vault vừa khoá/đổi chủ trong lúc đọc (đăng xuất giữa chừng) → bỏ kết quả cũ, không hiện lại
+    // số op của chủ trước (lần refresh của khoaPhien đã đặt trạng thái đúng).
+    if (this.vault.chu() !== chu) return;
     this.setSnap({ ...computeStats(ops, chu, (k) => this.vault.coKhoa(k)), ...extra });
   }
 
@@ -212,17 +261,37 @@ export class OfflineQueueManager {
     navigator.serviceWorker?.addEventListener?.("message", (e: MessageEvent) => {
       if ((e.data as { type?: unknown } | null)?.type === "FLUSH_QUEUE") this.kichFlush();
     });
-    ngheDoiNguCanh(() => {
-      this.tamDungNguCanh = true;
-      this.cache.clear();
-      this.vault.khoa();
-      void this.refreshStats();
+    ngheDoiNguCanh((m) => {
+      // Đăng xuất/đổi tài khoản ở tab khác: actor hiện tại KHÔNG còn là chủ cũ → không đếm op của
+      // họ nữa (A2-AC01). Đổi dự án: vẫn đúng người, giữ số op bị khoá để không báo "0 chờ".
+      this.khoaPhien(m.r !== "switch");
     });
     // Poll foreground: không phụ thuộc Background Sync/Web Locks (D02, A2-FR12).
     setInterval(() => {
       if (this.snap.total > 0) this.kichFlush();
     }, FLUSH_INTERVAL_MS);
+    // S08: SW mới nhận quyền điều khiển trang, hoặc SW bị trình duyệt dừng khi rảnh rồi khởi động
+    // lại (mất ngữ cảnh trong bộ nhớ) → báo lại ngữ cảnh của vault ĐANG mở (kiểm lease mỗi lần).
+    // Vault khoá thì không gửi gì.
+    navigator.serviceWorker?.addEventListener?.("controllerchange", () => this.dongBoNguCanhSw());
+    setInterval(() => this.dongBoNguCanhSw(), SW_NHIP_MS);
     void this.khoiDong();
+  }
+
+  /**
+   * Khoá phiên offline của tab (đăng xuất / ngữ cảnh đổi): khoá vault, xoá cache giải mã + bản đồ
+   * ô/khoá đã chuẩn bị trong bộ nhớ, dừng gửi. Ciphertext trên thiết bị GIỮ NGUYÊN (D03) để chính
+   * chủ đăng nhập lại online rồi phục hồi. Không khẳng định máy chủ đã thu hồi gì.
+   */
+  khoaPhien(quenChu: boolean): void {
+    this.tamDungNguCanh = true;
+    this.cache.clear();
+    this.oCuaTask.clear();
+    this.daChuanBi.clear();
+    if (quenChu) this.userCuoi = null;
+    this.vault.khoa();
+    this.dongBoNguCanhSw();
+    void this.refreshStats().catch(() => undefined);
   }
 
   /** Lần đầu: báo legacy; nếu chính user hiện tại còn op chờ trên thiết bị → mở vault rồi gửi. */
@@ -287,6 +356,7 @@ export class OfflineQueueManager {
       )
         this.daChuanBi.add(dau);
     }
+    this.dongBoNguCanhSw();
     await this.refreshStats().catch(() => undefined);
   }
 
@@ -547,10 +617,13 @@ export class OfflineQueueManager {
     const chu = this.vault.chu();
     if (!chu) return [];
     const { ops } = await this.store.docChu(khoaChu(chu));
-    return ops
-      .filter((r) => r.projectId === chu.projectId)
-      .sort((a, b) => a.sequence - b.sequence)
-      .map((r) => ({
+    const out: ThaoTacHangDoi[] = [];
+    const cuaDuAn = ops.filter((o) => cungChu(o, chu)).sort((a, b) => a.sequence - b.sequence);
+    for (const r of cuaDuAn) {
+      const coKhoa = this.vault.coKhoa(r.vaultKeyId);
+      // Ảnh không giải mã ở đây (byte lớn) — chỉ tick/nhật ký để người dùng nhận ra thao tác.
+      const body = coKhoa && r.kind !== "photo" ? await giaiMaCo(this.vault, r, this.cache) : null;
+      out.push({
         operationId: r.operationId,
         kind: r.kind,
         state: r.state,
@@ -558,14 +631,140 @@ export class OfflineQueueManager {
         tries: r.tries,
         nextAttemptAt: r.nextAttemptAt,
         lastResult: r.lastResult,
-      }));
+        moDuoc: coKhoa && (r.kind === "photo" || body !== null),
+        ...(body?.kind === "diary_note" ? { ngayNhatKy: body.payload.date } : {}),
+        ...(body?.kind === "tick" ? { soO: 1 } : {}),
+        ...(body?.kind === "tick_batch" ? { soO: body.payload.dimIds.length } : {}),
+      });
+    }
+    return out;
+  }
+
+  /** Số bản ghi queue v1 không chủ trên thiết bị — chỉ đếm, không đọc nội dung (D03). */
+  demLegacy(): Promise<number> {
+    return this.store.demLegacy().catch(() => 0);
+  }
+
+  /**
+   * Bỏ MỘT thao tác `conflict`/`rejected` của chủ hiện hành ở dự án hiện hành — chỉ gọi sau khi
+   * người dùng xác nhận. Không xoá hàng loạt, không xoá op đang chờ/đang gửi, không đụng legacy
+   * hay op của chủ khác. Trả false khi op không còn/không đủ điều kiện (UI tải lại danh sách).
+   */
+  async boThaoTac(operationId: string): Promise<boolean> {
+    const chu = this.vault.chu();
+    if (!chu) return false;
+    const { ops } = await this.store.docChu(khoaChu(chu));
+    const r = ops.find((o) => o.operationId === operationId);
+    if (!r || !cungChu(r, chu) || (r.state !== "conflict" && r.state !== "rejected")) return false;
+    await this.store.xoaTheoYeuCau(khoaChu(chu), [r.operationId]);
+    this.cache.delete(r.operationId);
+    await this.refreshStats().catch(() => undefined);
+    return true;
+  }
+
+  /** Đọc bản nháp nhật ký đang `conflict` của chính chủ (giải mã trong bộ nhớ) để so sánh. */
+  async xemNhatKyXungDot(operationId: string): Promise<NhatKyXungDot | null> {
+    const ds = await docOpDaGiai(this.store, this.vault, this.cache);
+    const op = ds.find((o) => o.rec.operationId === operationId);
+    if (!op || op.rec.state !== "conflict" || op.body.kind !== "diary_note") return null;
+    const ngay = op.body.payload.date;
+    const coBanMoiHon = ds.some(
+      (o) =>
+        o.rec.sequence > op.rec.sequence &&
+        o.body.kind === "diary_note" &&
+        o.body.payload.date === ngay,
+    );
+    return { operationId, payload: op.body.payload, coBanMoiHon };
+  }
+
+  /**
+   * A2-FR11 — người dùng chọn "giữ bản trên thiết bị" sau khi đã XEM bản máy chủ (etag `etagMayChu`
+   * do GET /api/diaries/:date trả, server đã kiểm quyền). Tạo thao tác MỚI (operationId mới) cùng
+   * nội dung, precondition = etag máy chủ vừa xem; CHỈ sau khi op mới đã commit mới bỏ op xung đột
+   * cũ. Không tự gộp trường, không dùng giờ máy làm phiên bản. Máy chủ đổi tiếp trong lúc chờ gửi
+   * → op mới lại 412 → conflict (không đè).
+   */
+  async giuBanNhatKyThietBi(
+    operationId: string,
+    etagMayChu: string | null,
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    const loi = (error: string) => ({ ok: false as const, error });
+    if (OFFLINE_QUEUE_QUARANTINED || this.tamDungNguCanh) return loi(OFFLINE_SAVE_ERROR);
+    const chu = this.vault.chu();
+    if (!chu) return loi("Kho ngoại tuyến đang khoá — kết nối mạng rồi mở khoá trước.");
+    const xem = await this.xemNhatKyXungDot(operationId);
+    if (!xem) return loi("Thao tác này không còn ở trạng thái xung đột — tải lại danh sách.");
+    if (xem.coBanMoiHon)
+      return loi("Có bản nháp mới hơn cho ngày này trên thiết bị — bản mới hơn sẽ được gửi thay.");
+    const { ops } = await this.store.docChu(khoaChu(chu));
+    const cu = ops.find((o) => o.operationId === operationId);
+    const keyId =
+      this.vault.timKhoa("diary_note", { date: xem.payload.date }) ??
+      (cu && this.vault.coKhoa(cu.vaultKeyId) ? cu.vaultKeyId : null);
+    if (!keyId) return loi(OFFLINE_SAVE_ERROR);
+    try {
+      await themOp({
+        store: this.store,
+        vault: this.vault,
+        keyId,
+        body: { kind: "diary_note", payload: xem.payload, baseVersion: etagMayChu },
+        now: Date.now,
+        uuid: taoId,
+        cache: this.cache,
+      });
+    } catch {
+      // Op mới CHƯA lưu → giữ nguyên op xung đột cũ, người dùng thử lại được.
+      await this.refreshStats().catch(() => undefined);
+      return loi(OFFLINE_SAVE_ERROR);
+    }
+    // Op mới đã commit: bỏ op xung đột cũ. Lỗi ở bước này không mất gì — op cũ (conflict) vẫn
+    // chặn FIFO cùng ngày trước op mới cho tới khi người dùng bỏ nó lần nữa.
+    await this.store.xoaTheoYeuCau(khoaChu(chu), [operationId]).catch(() => undefined);
+    this.cache.delete(operationId);
+    await this.refreshStats().catch(() => undefined);
+    this.afterEnqueue();
+    return { ok: true };
+  }
+
+  /** "Gửi lại ngay": bỏ chờ backoff (giữ Retry-After của 429/503) rồi kích gửi. */
+  async guiLaiNgay(): Promise<void> {
+    const chu = this.vault.chu();
+    if (chu) await this.store.datLaiHanGui(chu, Date.now()).catch(() => 0);
+    await this.flush();
+  }
+
+  /**
+   * "Mở khoá" từ màn phục hồi (cần mạng): xác minh lại online (auth/me → context → unlock). Tab đã
+   * nhận tín hiệu đổi ngữ cảnh thì không mở — phải tải lại trang theo ngữ cảnh mới.
+   */
+  async moKhoa(): Promise<boolean> {
+    if (OFFLINE_QUEUE_QUARANTINED || this.tamDungNguCanh || !this.dangOnline()) return false;
+    const ok = await this.damBaoVault();
+    await this.refreshStats().catch(() => undefined);
+    if (ok) this.kichFlush();
+    return ok;
   }
 
   /** Không bao giờ xoá hàng loạt (legacy lẫn vault): chỉ xoá theo quyết định rõ từng thao tác. */
   async clear(): Promise<void> {}
 }
 
+/** Gửi thông điệp cho SW đang điều khiển trang (không có SW → bỏ qua: SW không cache gì). */
+function guiChoSw(m: ThongDiepSw): void {
+  try {
+    if (typeof navigator === "undefined") return;
+    navigator.serviceWorker?.controller?.postMessage(m);
+  } catch {
+    /* SW không nhận — SW tự fail-closed (không có ngữ cảnh → không phục vụ cache) */
+  }
+}
+
 export const offlineQueue = new OfflineQueueManager();
+
+/** Đăng xuất (trang tài khoản): khoá vault + xoá bản giải mã trong bộ nhớ, GIỮ ciphertext (D03). */
+export function khoaNgoaiTuyenKhiDangXuat(): void {
+  offlineQueue.khoaPhien(true);
+}
 
 // ── API công khai ────────────────────────────────────────────────────────────────────────
 export function enqueuePhoto(input: { taskId: number; blob: Blob; caption?: string }) {

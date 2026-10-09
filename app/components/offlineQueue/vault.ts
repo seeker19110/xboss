@@ -151,6 +151,11 @@ export class VaultSession implements VaultMoKhoa {
     return true;
   }
 
+  /** Mốc hết lease theo đồng hồ tường (ms) khi vault ACTIVE — báo cho SW giới hạn cache đọc. */
+  hanLeaseTuong(): number | null {
+    return this.conHieuLuc() && this.nguCanh ? this.nguCanh.hanTuong : null;
+  }
+
   // ── Mạng ────────────────────────────────────────────────────────────────────────────────
 
   private async goi(
