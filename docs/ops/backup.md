@@ -150,6 +150,14 @@ thao tác tay của admin, không tự động hoá trong repo:
 2. Thêm monitor HTTP(S) trỏ tới `https://<domain-production>/api/health`, chu kỳ 1 phút.
 3. Cấu hình cảnh báo khi HTTP status khác 200 (endpoint trả 503 khi DB fail) — gửi email/Telegram/SMS
    tuỳ gói.
+4. **Liveness vs readiness (Q-AC07):** `/api/health` = app còn sống + DB ping (503 `degraded` khi DB/schema
+   lỗi). `GET /api/ready` = **readiness**, public, chỉ SELECT (không auto-migrate/seed/ghi): 200
+   `{ ready: true, schema: "ok", migrationsApplied, appliedHead }`; 503 `{ ready: false, reason, error }` với
+   `reason` = `schema_missing` (chưa có/không đọc được `schema_migrations`), `schema_behind` (còn migration
+   chưa áp), `db_unavailable` (không kết nối). Deploy/orchestrator dùng `/api/ready` làm cổng nhận traffic
+   sau khi job migration riêng (`npm run db:migrate` với `MIGRATE_DATABASE_URL`) chạy xong; 503 ở đây nghĩa là
+   **chạy migration**, không phải restart app. Khi đó `POST /api/auth/login` và `GET /api/auth/me` trả 503 JSON
+   `{ code: "schema_not_ready" }` + `Retry-After: 30`; `/api/ready` không bị cache bởi service worker.
 
 ## Quy trình phục hồi — kịch bản "mất DB" (VPS còn sống)
 

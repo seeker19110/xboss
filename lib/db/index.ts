@@ -21,9 +21,12 @@ const g = globalThis as unknown as {
 
 export class DatabaseSchemaNotReadyError extends Error {
   readonly code = "XBOSS_SCHEMA_NOT_READY";
+  /** missing = chưa có/không đọc được schema_migrations; behind = còn migration chưa áp. */
+  readonly reason: "missing" | "behind";
 
-  constructor(message: string, options?: ErrorOptions) {
+  constructor(message: string, options?: ErrorOptions & { reason?: "missing" | "behind" }) {
     super(message, options);
+    this.reason = options?.reason ?? "missing";
     this.name = "DatabaseSchemaNotReadyError";
   }
 }
@@ -138,7 +141,7 @@ function ensureSchemaCompatible(): Promise<void> {
         if (code === "42P01" || code === "42501") {
           throw new DatabaseSchemaNotReadyError(
             "Database schema is missing or unreadable. Run `npm run db:migrate` with MIGRATE_DATABASE_URL before starting the app.",
-            { cause: err },
+            { cause: err, reason: "missing" },
           );
         }
         throw err;
@@ -151,6 +154,7 @@ function ensureSchemaCompatible(): Promise<void> {
         const more = missing.length > 3 ? ` (+${missing.length - 3} more)` : "";
         throw new DatabaseSchemaNotReadyError(
           `Database schema is behind this app (${missing.length} migration(s) missing: ${preview}${more}). Run npm run db:migrate with MIGRATE_DATABASE_URL before starting the app.`,
+          { reason: "behind" },
         );
       }
     })().catch((err) => {
@@ -159,6 +163,16 @@ function ensureSchemaCompatible(): Promise<void> {
     });
   }
   return g.__xbossSchemaCompatible;
+}
+
+// Readiness (Q-AC07): đi đúng đường ensureSchemaCompatible rồi chỉ SELECT đếm/đầu marker.
+// Không migrate/seed/ghi. Schema thiếu/lỗi thời → ném DatabaseSchemaNotReadyError.
+export async function checkSchemaReady(): Promise<{ applied: number; head: string | null }> {
+  await ensureSchemaCompatible();
+  const r = await getPool().query<{ applied: number; head: string | null }>(
+    "SELECT COUNT(*)::int AS applied, MAX(name) AS head FROM schema_migrations",
+  );
+  return { applied: r.rows[0].applied, head: r.rows[0].head };
 }
 
 // Chuyển placeholder `?` → $1..$n (SQL trong codebase không chứa '?' trong literal).
