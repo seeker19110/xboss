@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { listLessons, parseLessonBody, validateLessonInput } from "@/lib/hien-truong/handover";
 
@@ -39,15 +40,26 @@ export async function POST(req: NextRequest) {
   const invalid = validateLessonInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  const id = await insertId(
-    `INSERT INTO lessons_learned (project_id, title, category, content, created_by)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageHandover(user.role),
+    () =>
+      insertId(
+        `INSERT INTO lessons_learned (project_id, title, category, content, created_by)
      VALUES (?, ?, ?, ?, ?)`,
-    projectId,
-    input.title,
-    input.category,
-    input.content,
-    user.id,
+        projectId,
+        input.title,
+        input.category,
+        input.content,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền thêm bài học kinh nghiệm (Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

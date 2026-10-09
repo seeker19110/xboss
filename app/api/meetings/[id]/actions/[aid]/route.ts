@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
 import {
@@ -79,14 +80,21 @@ export async function PATCH(
       return NextResponse.json({ error: "Task liên kết không tồn tại" }, { status: 422 });
   }
 
-  await run(
-    `UPDATE meeting_actions SET content = ?, assignee = ?, due_date = ?, task_id = ? WHERE id = ?`,
-    input.content,
-    input.assignee,
-    input.dueDate,
-    input.taskId,
-    aid,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageMeetings(user.role),
+    () =>
+      run(
+        `UPDATE meeting_actions SET content = ?, assignee = ?, due_date = ?, task_id = ? WHERE id = ?`,
+        input.content,
+        input.assignee,
+        input.dueDate,
+        input.taskId,
+        aid,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Không có quyền sửa việc sau họp" }, { status: 403 });
   return NextResponse.json({ ok: true });
 }
 

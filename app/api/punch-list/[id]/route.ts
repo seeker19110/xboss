@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { parsePunchBody, validatePunchInput, type PunchInput } from "@/lib/hien-truong/handover";
 
@@ -100,18 +101,28 @@ export async function PATCH(
       return NextResponse.json({ error: "Người được gán không tồn tại" }, { status: 422 });
   }
 
-  await run(
-    `UPDATE punch_list SET handover_item_id = ?, description = ?, severity = ?, status = ?,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageHandover(user.role),
+    () =>
+      run(
+        `UPDATE punch_list SET handover_item_id = ?, description = ?, severity = ?, status = ?,
             due_date = ?, assignee = ?
       WHERE id = ?`,
-    input.handoverItemId,
-    input.description,
-    input.severity,
-    input.status,
-    input.dueDate,
-    input.assignee,
-    id,
+        input.handoverItemId,
+        input.description,
+        input.severity,
+        input.status,
+        input.dueDate,
+        input.assignee,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa tồn tại (Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -138,7 +149,16 @@ export async function DELETE(
     const existing = await loadExisting(id, projectId);
     if (!existing) return NextResponse.json({ error: "Không tìm thấy tồn tại" }, { status: 404 });
 
-    await run(`DELETE FROM punch_list WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageHandover(user.role),
+      () => run(`DELETE FROM punch_list WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá tồn tại (Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

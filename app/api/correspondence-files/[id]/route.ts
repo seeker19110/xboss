@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { storageGet, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
@@ -92,7 +93,17 @@ export async function DELETE(
         { status: 403 },
       );
 
-    await run(`DELETE FROM correspondence_files WHERE id = ?`, id);
+    // D01: nhánh dùng CAN tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (nhánh người
+    // upload không phụ thuộc override). File chỉ xoá khỏi storage sau khi DB đã commit.
+    const kq = await ghiNeuConQuyen(
+      () => doc.uploaded_by === user.id || CAN.manageCorrespondence(user.role),
+      () => run(`DELETE FROM correspondence_files WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Chỉ người upload hoặc Admin/PM/kỹ sư được xoá tài liệu" },
+        { status: 403 },
+      );
     await storageDelete(user.orgId, doc.file_name);
 
     return NextResponse.json({ deleted: id });

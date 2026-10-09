@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   parseMobilizationBody,
@@ -68,19 +69,29 @@ export async function PATCH(
   const doneDate =
     input.status === "done" ? (existing.status === "done" ? existing.doneDate : todayISO()) : null;
 
-  await run(
-    `UPDATE mobilization_items SET category = ?, title = ?, status = ?, due_date = ?,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageKickoff(user.role),
+    () =>
+      run(
+        `UPDATE mobilization_items SET category = ?, title = ?, status = ?, due_date = ?,
             done_date = ?, assignee = ?, note = ?
       WHERE id = ?`,
-    input.category,
-    input.title,
-    input.status,
-    input.dueDate,
-    doneDate,
-    input.assignee,
-    input.note,
-    id,
+        input.category,
+        input.title,
+        input.status,
+        input.dueDate,
+        doneDate,
+        input.assignee,
+        input.note,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa hạng mục huy động (chỉ Admin/PM)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -107,7 +118,16 @@ export async function DELETE(
     const existing = await loadExisting(id, projectId);
     if (!existing) return NextResponse.json({ error: "Không tìm thấy hạng mục" }, { status: 404 });
 
-    await run(`DELETE FROM mobilization_items WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageKickoff(user.role),
+      () => run(`DELETE FROM mobilization_items WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá hạng mục huy động (chỉ Admin/PM)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

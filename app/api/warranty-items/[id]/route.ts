@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   getWarrantyItem,
@@ -102,20 +103,30 @@ export async function PATCH(
       );
   }
 
-  await run(
-    `UPDATE warranty_items SET title = ?, system_id = ?, handover_item_id = ?,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageWarranty(user.role),
+    () =>
+      run(
+        `UPDATE warranty_items SET title = ?, system_id = ?, handover_item_id = ?,
             warranty_from = ?, warranty_months = ?, guarantee_id = ?, status = ?, note = ?
       WHERE id = ?`,
-    input.title,
-    input.tradeId,
-    input.handoverItemId,
-    input.warrantyFrom,
-    input.warrantyMonths,
-    input.guaranteeId,
-    input.status,
-    input.note,
-    id,
+        input.title,
+        input.tradeId,
+        input.handoverItemId,
+        input.warrantyFrom,
+        input.warrantyMonths,
+        input.guaranteeId,
+        input.status,
+        input.note,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa hạng mục bảo hành (Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -143,7 +154,16 @@ export async function DELETE(
     if (!existing)
       return NextResponse.json({ error: "Không tìm thấy hạng mục bảo hành" }, { status: 404 });
 
-    await run(`DELETE FROM warranty_items WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageWarranty(user.role),
+      () => run(`DELETE FROM warranty_items WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá hạng mục bảo hành (Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

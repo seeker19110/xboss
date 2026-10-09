@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   parseWasteBody,
@@ -87,19 +88,29 @@ export async function PATCH(
   const invalid = validateWasteInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  await run(
-    `UPDATE waste_logs SET log_date = ?, waste_type = ?, quantity = ?, unit = ?,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageEnv(user.role),
+    () =>
+      run(
+        `UPDATE waste_logs SET log_date = ?, waste_type = ?, quantity = ?, unit = ?,
             disposal_method = ?, handler = ?, note = ?
       WHERE id = ?`,
-    input.logDate,
-    input.wasteType,
-    input.quantity,
-    input.unit,
-    input.disposalMethod,
-    input.handler,
-    input.note,
-    id,
+        input.logDate,
+        input.wasteType,
+        input.quantity,
+        input.unit,
+        input.disposalMethod,
+        input.handler,
+        input.note,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa lượt ghi chất thải (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -126,7 +137,16 @@ export async function DELETE(
     const existing = await loadExisting(id, projectId);
     if (!existing) return NextResponse.json({ error: "Không tìm thấy lượt ghi" }, { status: 404 });
 
-    await run(`DELETE FROM waste_logs WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageEnv(user.role),
+      () => run(`DELETE FROM waste_logs WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá lượt ghi chất thải (chỉ Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

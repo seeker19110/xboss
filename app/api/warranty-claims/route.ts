@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
 import {
@@ -87,23 +88,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Người được gán không tồn tại" }, { status: 422 });
   }
 
-  const id = await insertId(
-    `INSERT INTO warranty_claims (project_id, warranty_item_id, code, reported_date,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageWarranty(user.role),
+    () =>
+      insertId(
+        `INSERT INTO warranty_claims (project_id, warranty_item_id, code, reported_date,
        description, severity, status, due_date, resolution, closed_date, assignee, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.warrantyItemId,
-    input.code,
-    input.reportedDate,
-    input.description,
-    input.severity,
-    input.status,
-    input.dueDate,
-    input.resolution,
-    input.status === "closed" ? (input.closedDate ?? todayISO()) : input.closedDate,
-    input.assignee,
-    user.id,
+        projectId,
+        input.warrantyItemId,
+        input.code,
+        input.reportedDate,
+        input.description,
+        input.severity,
+        input.status,
+        input.dueDate,
+        input.resolution,
+        input.status === "closed" ? (input.closedDate ?? todayISO()) : input.closedDate,
+        input.assignee,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo claim bảo hành (Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

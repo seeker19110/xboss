@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   findPersonnelById,
@@ -79,19 +80,29 @@ export async function PATCH(
       return NextResponse.json({ error: "Nhà thầu phụ không tồn tại" }, { status: 422 });
   }
 
-  await run(
-    `UPDATE personnel SET code = ?, full_name = ?, role_title = ?, supplier_id = ?, phone = ?,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageHr(user.role),
+    () =>
+      run(
+        `UPDATE personnel SET code = ?, full_name = ?, role_title = ?, supplier_id = ?, phone = ?,
             id_number = ?, status = ?
       WHERE id = ?`,
-    input.code,
-    input.fullName,
-    input.roleTitle,
-    input.supplierId,
-    input.phone,
-    input.idNumber,
-    input.status,
-    id,
+        input.code,
+        input.fullName,
+        input.roleTitle,
+        input.supplierId,
+        input.phone,
+        input.idNumber,
+        input.status,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa nhân sự (chỉ Admin/PM)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -118,7 +129,16 @@ export async function DELETE(
     const existing = await findPersonnelById(id, projectId);
     if (!existing) return NextResponse.json({ error: "Không tìm thấy nhân sự" }, { status: 404 });
 
-    await run(`DELETE FROM personnel WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageHr(user.role),
+      () => run(`DELETE FROM personnel WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá nhân sự (chỉ Admin/PM)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

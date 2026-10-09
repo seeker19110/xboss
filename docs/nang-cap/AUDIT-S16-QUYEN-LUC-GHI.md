@@ -151,6 +151,88 @@ Ba route nghiệm thu đã áp ở `2820ebe` ngoài bảng này: `tasks/[id]/app
 | `variations`                     | POST   | createVariation       | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
 | `vo-documents/[id]`              | DELETE | (none)                | có       | **KHÔNG ÁP** — `canEditVo`/`isAdminOrPm`/người upload — vai trò cứng, không override CAN                                                                                  |
 
+### 2.z Miền hiện trường / hồ sơ (2026-10-09)
+
+Phạm vi: mọi handler GHI dưới `app/api/{hse, hse-photos, diaries, crews, personnel, attendance, mobilization,
+demob, risks, meetings, correspondences, correspondence-files, punch-list, handover-items, warranty-claims,
+warranty-items, lessons-learned, legal-documents, project-documents, waste-logs, community-cases,
+subcon-documents, contract-documents, claim-documents, vo-documents}` (chỉ lớp route, không đổi `lib/**`).
+Bị thu hồi ⇒ 403 với đúng thông điệp 403 sẵn có của handler. Thư mục `correspondences/[id]` không có DELETE.
+Ca test: `tests/s16-quyen-luc-ghi-hien-truong.test.ts` — mỗi file route đã áp có ≥1 ca thu hồi giữa chừng
+(body treo sau kiểm CAN cho POST/PATCH; `LOCK TABLE` bảng đích cho DELETE) ⇒ 403 + DB không đổi.
+
+| Route (`app/api/…`)           | Method | CAN                     | tx trước                 | Quyết định                                                                                                                            |
+| ----------------------------- | ------ | ----------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `attendance`                  | POST   | recordAttendance        | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `attendance/[id]`             | PATCH  | recordAttendance        | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `attendance/[id]`             | DELETE | recordAttendance        | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `claim-documents/[id]`        | DELETE | (none)                  | chưa                     | **ĐÃ CÓ Ở §2** — KHÔNG ÁP (vai trò cứng), không đổi                                                                                   |
+| `community-cases`             | POST   | manageMonitoring        | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `community-cases/[id]`        | PATCH  | manageMonitoring        | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `community-cases/[id]`        | DELETE | manageMonitoring        | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `contract-documents/[id]`     | DELETE | manageContracts         | chưa                     | **ĐÃ CÓ Ở §2** — đã áp từ trước, không đổi                                                                                            |
+| `correspondence-files/[id]`   | DELETE | manageCorrespondence    | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen (nhánh người upload ‖ CAN; xoá file sau commit)                                                            |
+| `correspondences`             | POST   | manageCorrespondence    | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `correspondences/[id]`        | PATCH  | manageCorrespondence    | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `correspondences/[id]/files`  | POST   | manageCorrespondence    | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen (storagePut trước; bị thu hồi ⇒ dọn file mới)                                                              |
+| `correspondences/[id]/reply`  | POST   | manageCorrespondence    | có (trong `createReply`) | **ĐÃ ÁP** — ghiNeuConQuyen (bọc `createReply`, withTransaction reentrant)                                                             |
+| `crews`                       | POST   | manageHr                | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `crews/[id]`                  | PATCH  | manageHr                | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `crews/[id]`                  | DELETE | manageHr                | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `crews/[id]/members`          | POST   | manageHr                | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `crews/[id]/members`          | DELETE | manageHr                | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `demob`                       | POST   | manageHandover          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `demob/[id]`                  | PATCH  | manageHandover          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `demob/[id]`                  | DELETE | manageHandover          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `diaries/[date]`              | PUT    | (none)                  | có                       | **KHÔNG ÁP** — `DIARY_EDIT_ROLES` (vai trò cứng admin/pm/engineer) — không override CAN                                               |
+| `diaries/[date]/lock`         | POST   | (none)                  | có                       | **KHÔNG ÁP** — `canLockDiary` (vai trò cứng admin/pm) — không override CAN                                                            |
+| `diaries/[date]/lock`         | DELETE | (none)                  | có                       | **KHÔNG ÁP** — `canUnlockDiary` (vai trò cứng admin) — không override CAN                                                             |
+| `handover-items`              | POST   | manageHandover, approve | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen (cùng điều kiện: manageHandover ∧ (status≠accepted ∨ approve))                                             |
+| `handover-items/[id]`         | PATCH  | manageHandover, approve | có                       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi sau `FOR UPDATE handover_items`; file biên bản mới lưu trước, bị thu hồi ⇒ dọn; file cũ xoá sau commit |
+| `handover-items/[id]`         | DELETE | manageHandover          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `hse`                         | POST   | (none)                  | chưa                     | **KHÔNG ÁP** — vai trò cứng (chặn `cdt`/`viewer`/`bch`) — không override CAN                                                          |
+| `hse/[id]`                    | PATCH  | manageHse               | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen (cả nhánh `closeAction`)                                                                                   |
+| `hse/[id]`                    | DELETE | (none)                  | chưa                     | **KHÔNG ÁP** — vai trò cứng `admin`/`pm` — không override CAN                                                                         |
+| `hse/[id]/photos`             | POST   | (none)                  | chưa                     | **KHÔNG ÁP** — vai trò cứng (chặn `cdt`/`viewer`/`bch`) — không override CAN                                                          |
+| `hse-photos/[id]`             | DELETE | manageHse               | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen (nhánh người upload ‖ CAN; xoá file sau commit)                                                            |
+| `legal-documents`             | POST   | manageKickoff           | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `legal-documents/[id]`        | PATCH  | manageKickoff           | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen (sắp lại: file mới lưu trước, bị thu hồi ⇒ dọn; file cũ xoá sau commit)                                    |
+| `legal-documents/[id]`        | DELETE | manageKickoff           | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `lessons-learned`             | POST   | manageHandover          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `lessons-learned/[id]`        | PATCH  | manageHandover          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `lessons-learned/[id]`        | DELETE | manageHandover          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `meetings`                    | POST   | manageMeetings          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `meetings/[id]`               | PATCH  | manageMeetings          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen (tái kiểm phần CAN; điều kiện người tạo/`isAdminOrPm` là vai trò cứng)                                     |
+| `meetings/[id]`               | DELETE | (none)                  | chưa                     | **KHÔNG ÁP** — `isAdminOrPm` (vai trò cứng) — không override CAN                                                                      |
+| `meetings/[id]/actions`       | POST   | manageMeetings          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `meetings/[id]/actions/[aid]` | PATCH  | manageMeetings          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen cho nhánh sửa nội dung; nhánh đổi `status` (người được giao/`isAdminOrPm`, không CAN) KHÔNG ÁP             |
+| `meetings/[id]/actions/[aid]` | DELETE | (none)                  | chưa                     | **KHÔNG ÁP** — `isAdminOrPm` (vai trò cứng) — không override CAN                                                                      |
+| `mobilization`                | POST   | manageKickoff           | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `mobilization/[id]`           | PATCH  | manageKickoff           | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `mobilization/[id]`           | DELETE | manageKickoff           | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `personnel`                   | POST   | manageHr                | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `personnel/[id]`              | PATCH  | manageHr                | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `personnel/[id]`              | DELETE | manageHr                | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `project-documents`           | POST   | editStructure           | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen (storagePut trước; bị thu hồi ⇒ dọn file mới)                                                              |
+| `project-documents/[id]`      | DELETE | editStructure           | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen (nhánh người upload ‖ CAN; xoá file sau commit)                                                            |
+| `punch-list`                  | POST   | manageHandover          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `punch-list/[id]`             | PATCH  | manageHandover          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `punch-list/[id]`             | DELETE | manageHandover          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `risks`                       | POST   | manageRisks             | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen (trong `withUniqueRetry`, như `purchase-requests`)                                                         |
+| `risks/[id]`                  | PATCH  | manageRisks             | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen (cả nhánh chỉ đổi `status`)                                                                                |
+| `risks/[id]`                  | DELETE | (none)                  | chưa                     | **KHÔNG ÁP** — `isAdminOrPm` (vai trò cứng) — không override CAN                                                                      |
+| `subcon-documents/[id]`       | DELETE | manageSuppliers         | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen (nhánh người upload ‖ CAN; xoá file sau commit)                                                            |
+| `vo-documents/[id]`           | DELETE | (none)                  | có                       | **ĐÃ CÓ Ở §2** — KHÔNG ÁP (vai trò cứng), không đổi                                                                                   |
+| `warranty-claims`             | POST   | manageWarranty          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `warranty-claims/[id]`        | PATCH  | manageWarranty          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `warranty-claims/[id]`        | DELETE | manageWarranty          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `warranty-items`              | POST   | manageWarranty          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `warranty-items/[id]`         | PATCH  | manageWarranty          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `warranty-items/[id]`         | DELETE | manageWarranty          | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `waste-logs`                  | POST   | manageEnv               | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `waste-logs/[id]`             | PATCH  | manageEnv               | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+| `waste-logs/[id]`             | DELETE | manageEnv               | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
+
 ## 3. Kiểm chứng
 
 - `tests/s16-quyen-ghi-mo-rong.test.ts` — 4 route đại diện, mỗi route 1 ca "allow→deny giữa chừng" và 1 ca đối
@@ -173,3 +255,5 @@ Ba route nghiệm thu đã áp ở `2820ebe` ngoài bảng này: `tasks/[id]/app
   ghi DB trong `ghiNeuConQuyen` → mới xoá file cũ (best-effort, lỗi chỉ log); bị từ chối/ghi lỗi thì dọn file mới.
   Ca test `tests/s16-quyen-luc-ghi-file.test.ts`. Route file báo giá không có DELETE.
 - Các route ghi ngoài hai nhóm (tiến độ, vật tư, HSE, nhật ký…) chưa kiểm kê trong đợt này.
+- Miền hiện trường / hồ sơ (HSE, nhật ký, nhân sự/chấm công, họp, công văn, bàn giao, bảo hành, hồ sơ…): ĐÃ
+  kiểm kê và đóng (§2.z, 2026-10-09). Còn lại chưa kiểm kê: tiến độ, vật tư và các miền ngoài danh sách §2.z.

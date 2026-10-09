@@ -1,5 +1,16 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — S16 D01: tái kiểm quyền lúc ghi cho route miền hiện trường / hồ sơ
+
+- Kiểm kê toàn bộ route GHI miền hiện trường/hồ sơ (HSE, nhật ký, tổ đội/nhân sự/chấm công, huy
+  động/giải thể, rủi ro, họp, công văn, punch-list, bàn giao, bảo hành, bài học, pháp lý, hồ sơ dự
+  án, chất thải, cộng đồng, hồ sơ NTP) — bảng `docs/nang-cap/AUDIT-S16-QUYEN-LUC-GHI.md` §2.z.
+- Handler gate bằng `CAN.<x>` bọc `ghiNeuConQuyen` (handover-items PATCH: `kiemQuyenTaiLucGhi` sau
+  `FOR UPDATE`); bị thu hồi ⇒ 403 thông điệp cũ. Route có file: lưu file trước, ghi DB trong tái
+  kiểm, bị từ chối ⇒ dọn file mới, file cũ chỉ xoá sau commit (legal-documents, handover-items).
+  Vai trò cứng (nhật ký, HSE POST/DELETE, xoá rủi ro/họp/việc sau họp) ghi rõ KHÔNG ÁP.
+- Test `tests/s16-quyen-luc-ghi-hien-truong.test.ts` (52 ca; 45 ca thu hồi đỏ trên code cũ).
+
 ## 2026-10-09 — Nút Excel trang Thanh toán xuất đúng bảng tầng × hệ
 
 - `/api/export/excel?type=payments` trước đây bỏ qua `type`, trả workbook tracking. Nay xuất tab

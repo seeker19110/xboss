@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { listMeetings, parseMeetingBody, validateMeetingInput } from "@/lib/hien-truong/meetings";
 
@@ -36,16 +37,24 @@ export async function POST(req: NextRequest) {
   const invalid = validateMeetingInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  const id = await insertId(
-    `INSERT INTO meetings (meeting_date, kind, title, attendees, content, created_by, project_id)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageMeetings(user.role),
+    () =>
+      insertId(
+        `INSERT INTO meetings (meeting_date, kind, title, attendees, content, created_by, project_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    input.meetingDate,
-    input.kind,
-    input.title,
-    input.attendees,
-    input.content,
-    user.id,
-    projectId,
+        input.meetingDate,
+        input.kind,
+        input.title,
+        input.attendees,
+        input.content,
+        user.id,
+        projectId,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Không có quyền tạo biên bản họp" }, { status: 403 });
+  const id = kq.value;
   return NextResponse.json({ id }, { status: 201 });
 }

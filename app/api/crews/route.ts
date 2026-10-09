@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { listCrews, parseCrewBody, validateCrewInput } from "@/lib/hien-truong/hr";
 
@@ -74,15 +75,26 @@ export async function POST(req: NextRequest) {
   if (existing)
     return NextResponse.json({ error: "Tên tổ đội đã tồn tại trong dự án" }, { status: 409 });
 
-  const id = await insertId(
-    `INSERT INTO crews (project_id, name, system_id, supplier_id, leader_id)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageHr(user.role),
+    () =>
+      insertId(
+        `INSERT INTO crews (project_id, name, system_id, supplier_id, leader_id)
      VALUES (?, ?, ?, ?, ?)`,
-    projectId,
-    input.name,
-    input.systemId,
-    input.supplierId,
-    input.leaderId,
+        projectId,
+        input.name,
+        input.systemId,
+        input.supplierId,
+        input.leaderId,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo tổ đội (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

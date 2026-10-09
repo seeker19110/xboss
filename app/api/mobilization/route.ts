@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   listMobilization,
@@ -54,20 +55,31 @@ export async function POST(req: NextRequest) {
 
   const doneDate = input.status === "done" ? todayISO() : null;
 
-  const id = await insertId(
-    `INSERT INTO mobilization_items (project_id, category, title, status, due_date, done_date,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageKickoff(user.role),
+    () =>
+      insertId(
+        `INSERT INTO mobilization_items (project_id, category, title, status, due_date, done_date,
                                       assignee, note, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.category,
-    input.title,
-    input.status,
-    input.dueDate,
-    doneDate,
-    input.assignee,
-    input.note,
-    user.id,
+        projectId,
+        input.category,
+        input.title,
+        input.status,
+        input.dueDate,
+        doneDate,
+        input.assignee,
+        input.note,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo hạng mục huy động (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

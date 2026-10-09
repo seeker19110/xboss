@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
 import { getClaim, parseClaimBody, validateClaimInput } from "@/lib/hien-truong/warranty";
@@ -89,23 +90,33 @@ export async function PATCH(
       return NextResponse.json({ error: "Người được gán không tồn tại" }, { status: 422 });
   }
 
-  await run(
-    `UPDATE warranty_claims SET warranty_item_id = ?, code = ?, reported_date = ?,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageWarranty(user.role),
+    () =>
+      run(
+        `UPDATE warranty_claims SET warranty_item_id = ?, code = ?, reported_date = ?,
             description = ?, severity = ?, status = ?, due_date = ?, resolution = ?,
             closed_date = ?, assignee = ?
       WHERE id = ?`,
-    input.warrantyItemId,
-    input.code,
-    input.reportedDate,
-    input.description,
-    input.severity,
-    input.status,
-    input.dueDate,
-    input.resolution,
-    input.closedDate,
-    input.assignee,
-    id,
+        input.warrantyItemId,
+        input.code,
+        input.reportedDate,
+        input.description,
+        input.severity,
+        input.status,
+        input.dueDate,
+        input.resolution,
+        input.closedDate,
+        input.assignee,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa claim bảo hành (Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -133,7 +144,16 @@ export async function DELETE(
     if (!existing)
       return NextResponse.json({ error: "Không tìm thấy claim bảo hành" }, { status: 404 });
 
-    await run(`DELETE FROM warranty_claims WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageWarranty(user.role),
+      () => run(`DELETE FROM warranty_claims WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá claim bảo hành (Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

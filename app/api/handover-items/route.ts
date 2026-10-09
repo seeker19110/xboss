@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   HANDOVER_ITEM_STATUSES,
@@ -77,18 +78,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nhóm công việc không tồn tại" }, { status: 422 });
   }
 
-  const id = await insertId(
-    `INSERT INTO handover_items (project_id, title, system_id, work_package_id, status,
-                                  handover_date, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.title,
-    input.tradeId,
-    input.workPackageId,
-    input.status,
-    input.handoverDate,
-    user.id,
+  // D01: tái kiểm quyền (cùng điều kiện ở trên) với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageHandover(user.role) && (input.status !== "accepted" || CAN.approve(user.role)),
+    () =>
+      insertId(
+        `INSERT INTO handover_items (project_id, title, system_id, work_package_id, status,
+                                      handover_date, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        projectId,
+        input.title,
+        input.tradeId,
+        input.workPackageId,
+        input.status,
+        input.handoverDate,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      {
+        error: CAN.manageHandover(user.role)
+          ? "Chỉ Admin/PM được đặt trạng thái Đã nghiệm thu"
+          : "Bạn không có quyền tạo hạng mục bàn giao (Admin/PM/kỹ sư)",
+      },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

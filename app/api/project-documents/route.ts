@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/nen/storage";
+import { storageDelete, storagePut } from "@/lib/nen/storage";
 import { query, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { newProjectDocFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
@@ -66,19 +67,32 @@ export async function POST(req: NextRequest) {
   // được (scan ảnh, hỏng, quá giới hạn trang/thời gian), không chặn upload.
   const extractedText = ext === ".pdf" ? await extractPdfText(fileBuf) : null;
 
-  const id = await insertId(
-    `INSERT INTO project_documents (title, category, file_name, original_name, mime_type, size_bytes, uploaded_by, project_id, extracted_text)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi DB; bị thu hồi ⇒ dọn file vừa lưu.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    () =>
+      insertId(
+        `INSERT INTO project_documents (title, category, file_name, original_name, mime_type, size_bytes, uploaded_by, project_id, extracted_text)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    title,
-    category,
-    fileName,
-    file.name || null,
-    file.type,
-    file.size,
-    user.id,
-    projectId,
-    extractedText,
+        title,
+        category,
+        fileName,
+        file.name || null,
+        file.type,
+        file.size,
+        user.id,
+        projectId,
+        extractedText,
+      ),
   );
+  if (!kq.ok) {
+    await storageDelete(user.orgId, fileName).catch(() => {});
+    return NextResponse.json(
+      { error: "Bạn không có quyền tải lên hồ sơ dự án (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  }
+  const id = kq.value;
 
   return NextResponse.json({ id, title, category, sizeBytes: file.size }, { status: 201 });
 }

@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
@@ -48,12 +49,22 @@ export async function POST(
   );
   if (!personnel) return NextResponse.json({ error: "Không tìm thấy nhân sự" }, { status: 404 });
 
-  await run(
-    `INSERT INTO crew_members (crew_id, personnel_id) VALUES (?, ?)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageHr(user.role),
+    () =>
+      run(
+        `INSERT INTO crew_members (crew_id, personnel_id) VALUES (?, ?)
      ON CONFLICT (crew_id, personnel_id) DO NOTHING`,
-    crewId,
-    personnelId,
+        crewId,
+        personnelId,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa thành viên tổ đội (chỉ Admin/PM)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }
@@ -84,11 +95,17 @@ export async function DELETE(
     if (!Number.isInteger(personnelId))
       return NextResponse.json({ error: "Thiếu personnelId hợp lệ" }, { status: 422 });
 
-    await run(
-      `DELETE FROM crew_members WHERE crew_id = ? AND personnel_id = ?`,
-      crewId,
-      personnelId,
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageHr(user.role),
+      () =>
+        run(`DELETE FROM crew_members WHERE crew_id = ? AND personnel_id = ?`, crewId, personnelId),
     );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền sửa thành viên tổ đội (chỉ Admin/PM)" },
+        { status: 403 },
+      );
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

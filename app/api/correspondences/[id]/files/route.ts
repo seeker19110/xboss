@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/nen/storage";
+import { storageDelete, storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { newCorrespondenceFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
 
@@ -82,16 +83,29 @@ export async function POST(
   const fileName = newCorrespondenceFileName(correspondenceId, file.type);
   await storagePut(user.orgId, fileName, fileBuf);
 
-  const id = await insertId(
-    `INSERT INTO correspondence_files (correspondence_id, file_name, original_name, mime_type, size_bytes, uploaded_by)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi DB; bị thu hồi ⇒ dọn file vừa lưu.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageCorrespondence(user.role),
+    () =>
+      insertId(
+        `INSERT INTO correspondence_files (correspondence_id, file_name, original_name, mime_type, size_bytes, uploaded_by)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    correspondenceId,
-    fileName,
-    file.name || null,
-    file.type,
-    file.size,
-    user.id,
+        correspondenceId,
+        fileName,
+        file.name || null,
+        file.type,
+        file.size,
+        user.id,
+      ),
   );
+  if (!kq.ok) {
+    await storageDelete(user.orgId, fileName).catch(() => {});
+    return NextResponse.json(
+      { error: "Bạn không có quyền upload file công văn (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  }
+  const id = kq.value;
 
   return NextResponse.json({ id, correspondenceId, sizeBytes: file.size }, { status: 201 });
 }

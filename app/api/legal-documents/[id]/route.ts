@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { storagePut, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   newLegalDocFileName,
@@ -142,8 +143,6 @@ export async function PATCH(
     if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: checked.status });
     const fileBuf = checked.buf;
 
-    if (existing.fileName) await storageDelete(user.orgId, existing.fileName);
-
     const fileName = newLegalDocFileName(id, file.type);
     await storagePut(user.orgId, fileName, fileBuf);
     fileCols = {
@@ -154,42 +153,58 @@ export async function PATCH(
     };
   }
 
-  if (fileCols) {
-    await run(
-      `UPDATE legal_documents SET kind = ?, code = ?, title = ?, issued_by = ?, issued_date = ?,
-              expiry_date = ?, status = ?, note = ?,
-              file_name = ?, original_name = ?, mime_type = ?, size_bytes = ?
-        WHERE id = ?`,
-      input.kind,
-      input.code,
-      input.title,
-      input.issuedBy,
-      input.issuedDate,
-      input.expiryDate,
-      input.status,
-      input.note,
-      fileCols.fileName,
-      fileCols.originalName,
-      fileCols.mimeType,
-      fileCols.sizeBytes,
-      id,
-    );
-  } else {
-    await run(
-      `UPDATE legal_documents SET kind = ?, code = ?, title = ?, issued_by = ?, issued_date = ?,
-              expiry_date = ?, status = ?, note = ?
-        WHERE id = ?`,
-      input.kind,
-      input.code,
-      input.title,
-      input.issuedBy,
-      input.issuedDate,
-      input.expiryDate,
-      input.status,
-      input.note,
-      id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi DB. File mới đã lưu trước —
+  // bị thu hồi ⇒ dọn file mới; file cũ chỉ xoá sau khi DB đã commit.
+  const fc = fileCols;
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageKickoff(user.role),
+    async () => {
+      if (fc) {
+        await run(
+          `UPDATE legal_documents SET kind = ?, code = ?, title = ?, issued_by = ?, issued_date = ?,
+                expiry_date = ?, status = ?, note = ?,
+                file_name = ?, original_name = ?, mime_type = ?, size_bytes = ?
+          WHERE id = ?`,
+          input.kind,
+          input.code,
+          input.title,
+          input.issuedBy,
+          input.issuedDate,
+          input.expiryDate,
+          input.status,
+          input.note,
+          fc.fileName,
+          fc.originalName,
+          fc.mimeType,
+          fc.sizeBytes,
+          id,
+        );
+      } else {
+        await run(
+          `UPDATE legal_documents SET kind = ?, code = ?, title = ?, issued_by = ?, issued_date = ?,
+                expiry_date = ?, status = ?, note = ?
+          WHERE id = ?`,
+          input.kind,
+          input.code,
+          input.title,
+          input.issuedBy,
+          input.issuedDate,
+          input.expiryDate,
+          input.status,
+          input.note,
+          id,
+        );
+      }
+    },
+  );
+  if (!kq.ok) {
+    if (fc?.fileName) await storageDelete(user.orgId, fc.fileName).catch(() => {});
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa hồ sơ pháp lý (chỉ Admin/PM)" },
+      { status: 403 },
     );
   }
+  if (fc && existing.fileName) await storageDelete(user.orgId, existing.fileName);
 
   return NextResponse.json({ updated: id });
 }
@@ -216,7 +231,16 @@ export async function DELETE(
     const existing = await loadExisting(id, projectId);
     if (!existing) return NextResponse.json({ error: "Không tìm thấy hồ sơ" }, { status: 404 });
 
-    await run(`DELETE FROM legal_documents WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageKickoff(user.role),
+      () => run(`DELETE FROM legal_documents WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá hồ sơ pháp lý (chỉ Admin/PM)" },
+        { status: 403 },
+      );
     if (existing.fileName) await storageDelete(user.orgId, existing.fileName);
 
     return NextResponse.json({ deleted: id });

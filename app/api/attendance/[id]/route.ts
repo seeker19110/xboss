@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   parseAttendanceBody,
@@ -77,19 +78,29 @@ export async function PATCH(
       return NextResponse.json({ error: "Không tìm thấy nhân sự" }, { status: 422 });
   }
 
-  await run(
-    `UPDATE attendance SET work_date = ?, crew_id = ?, personnel_id = ?, headcount = ?,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.recordAttendance(user.role),
+    () =>
+      run(
+        `UPDATE attendance SET work_date = ?, crew_id = ?, personnel_id = ?, headcount = ?,
             present = ?, hours = ?, note = ?
       WHERE id = ?`,
-    input.workDate,
-    input.crewId,
-    input.personnelId,
-    input.headcount,
-    input.present,
-    input.hours,
-    input.note,
-    id,
+        input.workDate,
+        input.crewId,
+        input.personnelId,
+        input.headcount,
+        input.present,
+        input.hours,
+        input.note,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa chấm công (Admin/PM/Kỹ sư)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -117,7 +128,16 @@ export async function DELETE(
     if (!existing)
       return NextResponse.json({ error: "Không tìm thấy bản ghi chấm công" }, { status: 404 });
 
-    await run(`DELETE FROM attendance WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.recordAttendance(user.role),
+      () => run(`DELETE FROM attendance WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá chấm công (Admin/PM/Kỹ sư)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

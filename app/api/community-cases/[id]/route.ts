@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
 import {
@@ -68,19 +69,29 @@ export async function PATCH(
   const invalid = validateCommunityCaseInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  await run(
-    `UPDATE community_cases SET code = ?, title = ?, source = ?, received_date = ?,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageMonitoring(user.role),
+    () =>
+      run(
+        `UPDATE community_cases SET code = ?, title = ?, source = ?, received_date = ?,
             status = ?, resolution = ?, closed_date = ?
       WHERE id = ?`,
-    input.code,
-    input.title,
-    input.source,
-    input.receivedDate,
-    input.status,
-    input.resolution,
-    input.closedDate,
-    id,
+        input.code,
+        input.title,
+        input.source,
+        input.receivedDate,
+        input.status,
+        input.resolution,
+        input.closedDate,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa khiếu nại (chỉ Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -107,7 +118,16 @@ export async function DELETE(
     const existing = projectId != null ? await getCommunityCase(id, projectId) : null;
     if (!existing) return NextResponse.json({ error: "Không tìm thấy khiếu nại" }, { status: 404 });
 
-    await run(`DELETE FROM community_cases WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageMonitoring(user.role),
+      () => run(`DELETE FROM community_cases WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá khiếu nại (chỉ Admin/PM/kỹ sư)" },
+        { status: 403 },
+      );
 
     return NextResponse.json({ deleted: id });
   } catch (err) {

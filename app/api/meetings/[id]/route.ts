@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getMeeting, parseMeetingBody, validateMeetingInput } from "@/lib/hien-truong/meetings";
 
@@ -62,15 +63,22 @@ export async function PATCH(
   const invalid = validateMeetingInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  await run(
-    `UPDATE meetings SET meeting_date = ?, kind = ?, title = ?, attendees = ?, content = ? WHERE id = ?`,
-    input.meetingDate,
-    input.kind,
-    input.title,
-    input.attendees,
-    input.content,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageMeetings(user.role),
+    () =>
+      run(
+        `UPDATE meetings SET meeting_date = ?, kind = ?, title = ?, attendees = ?, content = ? WHERE id = ?`,
+        input.meetingDate,
+        input.kind,
+        input.title,
+        input.attendees,
+        input.content,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Không có quyền sửa biên bản họp" }, { status: 403 });
   return NextResponse.json({ ok: true });
 }
 

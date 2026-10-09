@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   checkHseRefs,
@@ -41,11 +42,12 @@ export async function PATCH(
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageHse(user.role))
-    return NextResponse.json(
+  const camSua = () =>
+    NextResponse.json(
       { error: "Bạn không có quyền sửa/đóng action HSE (chỉ Admin/PM/kỹ sư)" },
       { status: 403 },
     );
+  if (!CAN.manageHse(user.role)) return camSua();
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
@@ -57,7 +59,16 @@ export async function PATCH(
     return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
   if (body.closeAction) {
-    const ok = projectId != null ? await closeHseAction(id, projectId) : false;
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq =
+      projectId != null
+        ? await ghiNeuConQuyen(
+            () => CAN.manageHse(user.role),
+            () => closeHseAction(id, projectId),
+          )
+        : { ok: true as const, value: false };
+    if (!kq.ok) return camSua();
+    const ok = kq.value;
     if (!ok)
       return NextResponse.json(
         { error: "Không tìm thấy ghi nhận hoặc action không ở trạng thái mở" },
@@ -84,27 +95,32 @@ export async function PATCH(
       : "open"
     : "none";
 
-  await run(
-    `UPDATE hse_records
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageHse(user.role),
+    () =>
+      run(
+        `UPDATE hse_records
         SET kind = ?, record_date = ?, floor_label = ?, area = ?, description = ?, severity = ?,
             permit_type = ?, permit_from = ?, permit_to = ?, action_required = ?,
             action_assignee = ?, action_due = ?, action_status = ?
       WHERE id = ?`,
-    input.kind,
-    input.recordDate,
-    input.floorLabel,
-    input.area,
-    input.description,
-    input.severity,
-    input.permitType,
-    input.permitFrom,
-    input.permitTo,
-    input.actionRequired,
-    input.actionAssignee,
-    input.actionDue,
-    actionStatus,
-    id,
+        input.kind,
+        input.recordDate,
+        input.floorLabel,
+        input.area,
+        input.description,
+        input.severity,
+        input.permitType,
+        input.permitFrom,
+        input.permitTo,
+        input.actionRequired,
+        input.actionAssignee,
+        input.actionDue,
+        actionStatus,
+        id,
+      ),
   );
+  if (!kq.ok) return camSua();
 
   return NextResponse.json({ updated: id });
 }

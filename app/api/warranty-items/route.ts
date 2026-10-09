@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   WARRANTY_ITEM_STATUSES,
@@ -85,21 +86,32 @@ export async function POST(req: NextRequest) {
       );
   }
 
-  const id = await insertId(
-    `INSERT INTO warranty_items (project_id, title, system_id, handover_item_id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageWarranty(user.role),
+    () =>
+      insertId(
+        `INSERT INTO warranty_items (project_id, title, system_id, handover_item_id,
        warranty_from, warranty_months, guarantee_id, status, note, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.title,
-    input.tradeId,
-    input.handoverItemId,
-    input.warrantyFrom,
-    input.warrantyMonths,
-    input.guaranteeId,
-    input.status,
-    input.note,
-    user.id,
+        projectId,
+        input.title,
+        input.tradeId,
+        input.handoverItemId,
+        input.warrantyFrom,
+        input.warrantyMonths,
+        input.guaranteeId,
+        input.status,
+        input.note,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo hạng mục bảo hành (Admin/PM/kỹ sư)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }
