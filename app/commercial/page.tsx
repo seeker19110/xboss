@@ -50,17 +50,17 @@ function CommercialContent() {
   ]);
 
   useEffect(() => {
-    const get = (url: string, init?: RequestInit) =>
-      fetch(url, init)
+    // decimal-string-v1: không gửi header thì HĐ vượt biên safe-integer làm /api/contracts trả 422
+    // (ô KPI thành "—"). Tổng vẫn cộng bằng bigint trên `valueText` (chuỗi exact).
+    const get = (url: string) =>
+      fetch(url, { headers: HEADER_TIEN_V1 })
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null);
 
     Promise.all([
       get("/api/contracts"),
       get("/api/payment-certs"),
-      // Chỉ đếm theo trạng thái, nhưng chọn decimal-string-v1 để VO giá trị lớn không làm cả ô
-      // thành "—" vì 422 của định dạng number cũ (S15).
-      get("/api/variations", { headers: HEADER_TIEN_V1 }),
+      get("/api/variations"),
       get("/api/claims"),
     ]).then(([cData, certData, voData, clmData]) => {
       const cList: { valueText?: string }[] | null = cData?.contracts ?? null;

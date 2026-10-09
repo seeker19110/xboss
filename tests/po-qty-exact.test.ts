@@ -56,6 +56,25 @@ test("parsePoQuantity: lỗi 400 quantity_* / 422 quantity_overflow", () => {
   assert.equal(ma(Number.NaN), "400:quantity_invalid");
 });
 
+test("S15: '0.125'/'0.500' là thập phân (phần nguyên 0 không thể là nhóm nghìn); '1.500' vẫn mơ hồ", () => {
+  assert.equal(parseQuantityInput("0.125"), "0.125");
+  assert.equal(parseQuantityInput("0.500"), "0.500");
+  assert.equal(parsePoQuantity("0.125"), "0.125");
+  assert.equal(parsePoQuantity("0.500"), "0.5");
+  for (const mo of ["1.500", "12.345", "123.456", "1.234.567"]) {
+    assert.throws(
+      () => parseQuantityInput(mo),
+      (e: QuantityInputError) => e.code === "quantity_locale_format",
+      mo,
+    );
+    assert.throws(
+      () => parsePoQuantity(mo),
+      (e: QuantityInputError) => e.code === "quantity_locale_format",
+      mo,
+    );
+  }
+});
+
 test("parseQuantityInput mặc định giữ nguyên hành vi bill (3 lẻ, 12 nguyên, không cắt đuôi)", () => {
   assert.equal(parseQuantityInput("1.5"), "1.500");
   assert.throws(() => parseQuantityInput("1.0001"), /tối đa 3 chữ số/);
