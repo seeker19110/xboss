@@ -1,5 +1,37 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — QUALITY-FINAL-1 S15: audit cuối và release candidate (đang làm)
+
+Ánh xạ bằng chứng 54 AC (TEST-MATRIX) trên main `e5ce67b` bằng 4 lượt đọc-chạy độc lập theo trụ A1 /
+A2 / A3+A4 / A5+A6 (+ Q-AC01..08): 13 PASS · 28 PARTIAL (tự động xanh, còn thiếu lớp M/O hoặc B thật) ·
+13 GAP · 0 FAIL. Bảng bằng chứng + verdict từng AC sẽ chốt trong `docs/nang-cap/AUDIT-S15-RELEASE-CANDIDATE.md`
+(cùng PR này). Đợt vá GAP đang tích hợp dần trên nhánh:
+
+- **Q-AC04 (lỗi thật, đã sửa):** `GET /api/variations` + `/[id]` trả tiền float (kể cả trong `json_agg`).
+  Nay tổng `ROUND(SUM(qty×giá),2)::text` trong SQL, dòng KL `::text`, adapter `variationsToWire`
+  (opt-in `decimal-string-v1`, legacy ngoài biên → 422, che `stripSensitive` TRƯỚC khi wire);
+  client variations/commercial đọc v1 + cộng bigint (`app/variations/_components/tienVo.ts`).
+  Tiện thể sửa `VariationsTab` (đọc sai khoá nên luôn rỗng). `tests/s15-vo-exact.test.ts` 5/6 đỏ trên code cũ.
+- **Q-AC06:** test qty PO nonfinite (NaN/±Inf không thành 0, CHECK `*_finite` 0162), nhận hàng song song
+  `FOR UPDATE` giữ `qty_received_exact` khớp (`tests/po-qty-exact.test.ts`). Không lộ lỗi.
+- **A6-AC04/FR07 (verifier DR):** hạng mục mới `app-role-rls` — app role đích (`DR_VERIFY_APP_ROLE`, mặc định
+  `xboss_app`) phải tồn tại, NOBYPASSRLS, không superuser, không sở hữu bảng RLS; 6 bảng tài chính giữ FORCE
+  RLS; vi phạm → FAIL (không NOT_RUN). Test đỏ trên code cũ (1 ca), xanh sau.
+- **Test lớp P/H đóng GAP:** A4-AC06 (list↔KPI cùng filter, PM chỉ thấy dự án được gán, nhãn tầng trùng,
+  403 không lộ tiền), A5-AC08 (nháp/trình/từ chối không vào thực chi, duyệt lặp không sinh phiếu 2, export/
+  audit-log 403), A5-AC03 (`tests/s15-dong-thoi-lo.test.ts`: lô tick chồng, replay, 2 PM duyệt tầng song
+  song → 1 thành công/1 409, không `nghiem_thu` khi <100%), A5-AC01 (`tests/s15-import-route-rerun.test.ts`:
+  import 3 lần không nhân dòng), A2-AC03/AC06-H (nhật ký cùng ngày khác chủ/dự án độc lập; 403/404/422 từ
+  route thật → `rejected` bền vững).
+- **Đang chạy:** vá A1 (nested scope từ chối, pool đồng thời, quyền fail-closed khi DB lỗi, revoke
+  session/2FA proxy → 401, safe-integer projectId, app role khi thiếu schema), e2e lớp B (portfolio 10%,
+  cảnh báo vượt HĐ + xác nhận/bàn phím/axe, tiền exact trên màn, IDB abort), parser KL `"0.125"` + commercial
+  contracts v1.
+- **WAITING_RELEASE / cần chủ dự án quyết (không code trong S15):** cutover membership rỗng (A1-AC02) + "cookie
+  sai → dự án đầu" (A1-AC03) chờ dry-run membership production; tính năng adjustment (A5-AC07); retention
+  cleanup diễn tập (A6-AC06); PITR VPS chưa bật (RPO thực ~24h), RPO 5m/RTO 60m chưa đo; Safari/iOS thật;
+  "approved ≠ paid" không biểu diễn được vì duyệt IPC sinh phiếu ngay (đổi thiết kế nếu cần).
+
 ## 2026-10-08 — QUALITY-FINAL-1 S08: UI phục hồi hàng đợi ngoại tuyến và browser acceptance
 
 Đặc tả lát cắt `docs/nang-cap/AUDIT-S08-OFFLINE-RECOVERY.md` (spec cha A2 §5, A2-FR01/FR02/FR11,
