@@ -47,6 +47,7 @@
     "check:ui-ux-guard": "tsx .agents/skills/ui-ux-craftsman/scripts/ui_ux_validator.ts",
     "check:ui-ux": "npm run check:ui-ux-guard && npm run check:mau-accent && npm run check:contrast && npm run check:hex-hardcode",
     "gate": "tsx scripts/gate.ts",
+    "bench:reports": "tsx --experimental-test-module-mocks scripts/bench-reports.ts",
     "ecc:vendor": "tsx scripts/ecc-vendor.ts"
   },
   "dependencies": {
