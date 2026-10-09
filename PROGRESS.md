@@ -1,5 +1,17 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — Tạm tính tiền IPC phía client tính exact như server
+
+- `/payment-certs` gửi `X-XBoss-Money-Format: decimal-string-v1` cho `/api/contracts` và
+  `/api/payment-certs`: đơn giá/khối lượng/giá trị HĐ về dạng chuỗi canonical, không qua float.
+- Tạm tính theo KL đang nhập, luỹ kế dự kiến khi duyệt, luỹ kế đã duyệt và % dùng HĐ tính bằng
+  bigint theo ipc-sum-v1 (round tổng một lần) — khớp từng đồng với số server ghi. KL gõ tay quy về
+  đúng số PG sẽ lưu vào `qty_period NUMERIC(15,3)` (`decimalTuSoJs`, không qua `toFixed` nhị
+  phân); thành tiền từng dòng tròn tới đồng như PDF (`thanhTienDongExact`, `certLineDong` dùng chung).
+- Helper mới: `decimalTuSoJs`/`thanhTienDongExact` (`lib/nen/money.ts`), `mTongTichTien`/
+  `mThanhTienDong` (`app/lib/masked.ts`, giữ quy tắc lan truyền che). Test
+  `tests/ipc-tam-tinh-exact.test.ts` so khớp client với PostgreSQL trên các ca float lệch.
+
 ## 2026-10-09 — Thẻ dự án không còn hiện "0%" cho dự án chưa có việc
 
 - `listProjects` (`lib/ha-tang/projects.ts`) trả thêm `progressAvailable` (có ≥1 việc hợp lệ, cùng

@@ -9,7 +9,7 @@ import {
   ipcSumV1,
   moneyToWire,
   mulRatio,
-  parseFixedDecimalExact,
+  thanhTienDongExact,
   type MoneyWireFormat,
 } from "@/lib/nen/money";
 import { thapPhanTextToWire } from "@/lib/nen/money-dto";
@@ -486,9 +486,7 @@ export async function certTotals(certId: number): Promise<CertTotals> {
  * 100,5 → 101 đ, float cho 100,4999… → 100 đ). Tổng đợt vẫn theo ipc-sum-v1, không cộng số này.
  */
 export function certLineDong(line: { qtyPeriod: string; unitPrice: string }): bigint {
-  const product =
-    parseFixedDecimalExact(line.qtyPeriod, 3) * parseFixedDecimalExact(line.unitPrice, 2);
-  return mulRatio(product, 1n, 100000n);
+  return thanhTienDongExact(line.qtyPeriod, line.unitPrice, 3);
 }
 
 /** Đồng nguyên (bigint) → "1.234.567 đ" kiểu vi-VN, không qua Number. */

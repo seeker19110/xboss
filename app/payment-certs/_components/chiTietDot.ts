@@ -2,7 +2,13 @@
 // test được không cần render. QUALITY-FINAL-1 S10a: client CHỌN decimal-string-v1 nên tổng tiền
 // về dạng chuỗi canonical exact (không bao giờ dính 422 money_precision_unsupported của định
 // dạng number cũ) và hiển thị bằng bigint, không qua float.
-import { isCanonicalDecimal, moneyToDecimal, mulRatio, parseMoneyExact } from "@/lib/nen/money";
+import {
+  decimalTuSoJs,
+  isCanonicalDecimal,
+  moneyToDecimal,
+  mulRatio,
+  parseMoneyExact,
+} from "@/lib/nen/money";
 import type { EntityApprovalStatus } from "@/lib/tien-do/approvals";
 
 /** Header + giá trị opt-in (A3-FR06) — trùng hằng trong lib/nen/money, ghi rõ ở nơi gọi fetch. */
@@ -73,6 +79,26 @@ export function fmtVNDExact(s: string, am = false): string {
   const minor = parseMoneyExact(s);
   if (minor === 0n) return "—";
   return `${am ? "−" : ""}${mulRatio(minor, 1n, 100n).toLocaleString("vi-VN")} đ`;
+}
+
+/** bigint đồng×100 → "1.234.567 đ" (tròn tới đồng, ties xa 0); đúng 0 → "—" như `fmtVND`. */
+export function fmtVNDMinor(minor: bigint): string {
+  return minor === 0n ? "—" : `${mulRatio(minor, 1n, 100n).toLocaleString("vi-VN")} đ`;
+}
+
+/** bigint đồng NGUYÊN (vd thành tiền dòng `mThanhTienDong`) → "1.234.567 đ"; 0 → "—". */
+export function fmtVNDDong(dong: bigint): string {
+  return dong === 0n ? "—" : `${dong.toLocaleString("vi-VN")} đ`;
+}
+
+/**
+ * Khối lượng người dùng đang gõ → chuỗi scale 3 ĐÚNG số server sẽ ghi: client gửi
+ * `Number(raw) || 0` (xem saveItems), PG làm tròn vào qty_period NUMERIC(15,3). Không hữu hạn
+ * (vd "1e400") → "0.000" — server sẽ từ chối khi lưu, tạm tính không hiện "•••" như bị che.
+ */
+export function khoiLuongNhapScale3(raw: string): string {
+  const n = Number(raw) || 0;
+  return decimalTuSoJs(Number.isFinite(n) ? n : 0, 3);
 }
 
 /** Response → dữ liệu chứng từ. Lỗi HTTP thành thông báo, không nuốt thành "không có quyền". */
