@@ -1,5 +1,14 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — Tái kiểm quyền lúc ghi cho route BOQ và định mức (S16 §4 mục BOQ)
+
+- Áp `ghiNeuConQuyen`/`kiemQuyenTaiLucGhi` cho 8 handler ghi dưới `app/api/boq/**` và
+  `app/api/boq-norms/**` (POST/PATCH/DELETE dòng BOQ, map PUT, định mức POST/PATCH/DELETE, import
+  ?commit=1): quyền `CAN` bị thu hồi giữa lúc xác thực và lúc ghi ⇒ 403 với thông điệp cũ, DB không
+  đổi. Chỉ đổi tầng route, không đổi logic `lib/khoi-luong/*`.
+- Bảng kiểm kê `docs/nang-cap/AUDIT-S16-QUYEN-LUC-GHI.md` §2 chuyển 8 dòng HOÃN → ĐÃ ÁP, §4 đóng mục BOQ.
+- Test `tests/s16-quyen-luc-ghi-boq.test.ts`: 14 ca (8 deny đỏ trên code cũ, 6 đối chứng).
+
 ## 2026-10-09 — S16 §4: tái kiểm quyền lúc ghi cho bảo lãnh kèm file + file báo giá thầu
 
 Đóng 2 mục HOÃN trong `docs/nang-cap/AUDIT-S16-QUYEN-LUC-GHI.md` §4:

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { moneyInputErrorBody, parseOptionalMoneyInput } from "@/lib/nen/money";
 import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
@@ -244,21 +245,32 @@ export async function POST(req: NextRequest) {
 
   let id: number;
   try {
-    id = await insertId(
-      `INSERT INTO boq_items (code, name, unit, system_id, qty_contract, unit_price, qty_sub, sub_unit_price, note, sort_order, project_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      code,
-      name,
-      unit,
-      systemId,
-      qtyContract,
-      unitPrice,
-      qtySub,
-      subUnitPrice,
-      note,
-      sortOrder,
-      projectId,
+    // S16: tái kiểm quyền lúc ghi — quyền có thể bị thu hồi giữa lúc xác thực và lúc ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.editStructure(user.role),
+      () =>
+        insertId(
+          `INSERT INTO boq_items (code, name, unit, system_id, qty_contract, unit_price, qty_sub, sub_unit_price, note, sort_order, project_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          code,
+          name,
+          unit,
+          systemId,
+          qtyContract,
+          unitPrice,
+          qtySub,
+          subUnitPrice,
+          note,
+          sortOrder,
+          projectId,
+        ),
     );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền tạo dòng BOQ (chỉ Admin/PM)" },
+        { status: 403 },
+      );
+    id = kq.value;
   } catch (err) {
     if ((err as { code?: string }).code === "23505")
       return NextResponse.json({ error: `Mã "${code}" đã tồn tại` }, { status: 409 });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { query, queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { kiemTraTongTyTrong } from "@/lib/khoi-luong/boq-coverage";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
@@ -87,17 +88,23 @@ export async function PUT(
       );
   }
 
-  await withTransaction(async () => {
-    await run(`DELETE FROM boq_task_map WHERE boq_item_id = ?`, id);
-    for (const e of entries) {
-      await run(
-        `INSERT INTO boq_task_map (boq_item_id, task_id, weight) VALUES (?, ?, ?)`,
-        id,
-        e.taskId,
-        e.weight,
-      );
-    }
-  });
+  // S16: tái kiểm quyền lúc ghi — cùng transaction với phần thay map.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    async () => {
+      await run(`DELETE FROM boq_task_map WHERE boq_item_id = ?`, id);
+      for (const e of entries) {
+        await run(
+          `INSERT INTO boq_task_map (boq_item_id, task_id, weight) VALUES (?, ?, ?)`,
+          id,
+          e.taskId,
+          e.weight,
+        );
+      }
+    },
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Không có quyền sửa map (chỉ Admin/PM)" }, { status: 403 });
 
   return NextResponse.json({ ok: true, sumWeight, warning: canhBao });
 }

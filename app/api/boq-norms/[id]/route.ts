@@ -2,6 +2,7 @@ import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   checkNormMaterial,
@@ -57,18 +58,28 @@ export async function PATCH(
   const matErr = await checkNormMaterial(input, projectId);
   if (matErr) return NextResponse.json({ error: matErr }, { status: 422 });
 
-  await run(
-    `UPDATE boq_norms
+  // S16: tái kiểm quyền lúc ghi — quyền có thể bị thu hồi giữa lúc xác thực và lúc ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageNorms(user.role),
+    () =>
+      run(
+        `UPDATE boq_norms
         SET resource_type = ?, material_id = ?, resource_name = ?, qty_per_unit = ?, unit_label = ?, note = ?
       WHERE id = ?`,
-    input.resourceType,
-    input.materialId,
-    input.resourceName,
-    input.qtyPerUnit,
-    input.unitLabel,
-    input.note,
-    id,
+        input.resourceType,
+        input.materialId,
+        input.resourceName,
+        input.qtyPerUnit,
+        input.unitLabel,
+        input.note,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Không có quyền sửa định mức (chỉ Admin/PM)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -97,7 +108,16 @@ export async function DELETE(
     const norm = await getNorm(id, projectId);
     if (!norm) return NextResponse.json({ error: "Không tìm thấy định mức" }, { status: 404 });
 
-    await run(`DELETE FROM boq_norms WHERE id = ?`, id);
+    // S16: tái kiểm quyền lúc ghi — quyền có thể bị thu hồi giữa lúc xác thực và lúc ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageNorms(user.role),
+      () => run(`DELETE FROM boq_norms WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Không có quyền xoá định mức (chỉ Admin/PM)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

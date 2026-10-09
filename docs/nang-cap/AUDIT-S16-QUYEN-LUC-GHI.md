@@ -54,14 +54,14 @@ Ba route nghiệm thu đã áp ở `2820ebe` ngoài bảng này: `tasks/[id]/app
 | `advances/[id]`                  | PATCH  | manageFinance         | chưa     | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
 | `advances/[id]`                  | DELETE | manageFinance         | chưa     | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
 | `advances`                       | POST   | manageFinance         | chưa     | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
-| `boq-norms/[id]`                 | PATCH  | manageNorms           | chưa     | **HOÃN** — miền khối lượng/BOQ (vùng rủi ro `lib/khoi-luong/boq.ts`) — ngoài phạm vi tài chính/quản trị của đợt này                                                       |
-| `boq-norms/[id]`                 | DELETE | manageNorms           | chưa     | **HOÃN** — miền khối lượng/BOQ (vùng rủi ro `lib/khoi-luong/boq.ts`) — ngoài phạm vi tài chính/quản trị của đợt này                                                       |
-| `boq/[id]/map`                   | PUT    | editStructure         | có       | **HOÃN** — miền khối lượng/BOQ (vùng rủi ro `lib/khoi-luong/boq.ts`) — ngoài phạm vi tài chính/quản trị của đợt này                                                       |
-| `boq/[id]/norms`                 | POST   | manageNorms           | chưa     | **HOÃN** — miền khối lượng/BOQ (vùng rủi ro `lib/khoi-luong/boq.ts`) — ngoài phạm vi tài chính/quản trị của đợt này                                                       |
-| `boq/[id]`                       | PATCH  | editStructure         | có       | **HOÃN** — miền khối lượng/BOQ (vùng rủi ro `lib/khoi-luong/boq.ts`) — ngoài phạm vi tài chính/quản trị của đợt này                                                       |
-| `boq/[id]`                       | DELETE | editStructure         | có       | **HOÃN** — miền khối lượng/BOQ (vùng rủi ro `lib/khoi-luong/boq.ts`) — ngoài phạm vi tài chính/quản trị của đợt này                                                       |
-| `boq/import`                     | POST   | import                | chưa     | **HOÃN** — miền khối lượng/BOQ (vùng rủi ro `lib/khoi-luong/boq.ts`) — ngoài phạm vi tài chính/quản trị của đợt này                                                       |
-| `boq`                            | POST   | editStructure         | chưa     | **HOÃN** — miền khối lượng/BOQ (vùng rủi ro `lib/khoi-luong/boq.ts`) — ngoài phạm vi tài chính/quản trị của đợt này                                                       |
+| `boq-norms/[id]`                 | PATCH  | manageNorms           | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen (2026-10-09)                                                                                                                                   |
+| `boq-norms/[id]`                 | DELETE | manageNorms           | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen (2026-10-09)                                                                                                                                   |
+| `boq/[id]/map`                   | PUT    | editStructure         | có       | **ĐÃ ÁP** — ghiNeuConQuyen thay withTransaction cũ (route không khoá dòng) (2026-10-09)                                                                                   |
+| `boq/[id]/norms`                 | POST   | manageNorms           | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen (2026-10-09)                                                                                                                                   |
+| `boq/[id]`                       | PATCH  | editStructure         | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi sau `FOR UPDATE boq_items`, trước lần ghi đầu (2026-10-09)                                                                                 |
+| `boq/[id]`                       | DELETE | editStructure         | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi sau `FOR UPDATE boq_items`, trước lần ghi đầu (2026-10-09)                                                                                 |
+| `boq/import`                     | POST   | import                | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen bọc trọn `commitBoqImport` (nhánh ?commit=1) (2026-10-09)                                                                                      |
+| `boq`                            | POST   | editStructure         | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen (2026-10-09)                                                                                                                                   |
 | `cash-transactions/[id]`         | PATCH  | manageFinance         | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
 | `cash-transactions/[id]`         | DELETE | manageFinance         | chưa     | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
 | `cash-transactions`              | POST   | manageFinance         | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
@@ -166,7 +166,9 @@ Ba route nghiệm thu đã áp ở `2820ebe` ngoài bảng này: `tasks/[id]/app
 
 ## 4. Còn mở
 
-- Miền khối lượng/BOQ (`boq*`, `boq-norms*`) ngoài phạm vi đợt này (HOÃN) — `lib/khoi-luong/boq.ts` là vùng rủi ro cao.
+- ~~Miền khối lượng/BOQ (`boq*`, `boq-norms*`)~~ — **ĐÃ ĐÓNG 2026-10-09**: áp tái kiểm cho cả 8 handler
+  ghi (bảng §2), chỉ đổi tầng route, không đổi `lib/khoi-luong/*`; test
+  `tests/s16-quyen-luc-ghi-boq.test.ts` (8 ca deny đỏ trên code cũ + 6 ca đối chứng).
 - ~~`insurance-bonds/:id` PATCH và `tenders/:id/bids/:bidId/file` POST~~ — **ĐÃ ÁP** (2026-10-09): lưu file mới →
   ghi DB trong `ghiNeuConQuyen` → mới xoá file cũ (best-effort, lỗi chỉ log); bị từ chối/ghi lỗi thì dọn file mới.
   Ca test `tests/s16-quyen-luc-ghi-file.test.ts`. Route file báo giá không có DELETE.

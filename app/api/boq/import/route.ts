@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { parseBoqWorkbook, previewBoqImport, commitBoqImport } from "@/lib/khoi-luong/boq-import";
@@ -86,13 +87,15 @@ export async function POST(req: NextRequest) {
   if (projectId == null)
     return NextResponse.json({ error: "Chưa có dự án nào để import BOQ" }, { status: 422 });
 
-  const result = await commitBoqImport(
-    parsed.rows,
-    systemId,
-    system.code,
-    projectId,
-    user.orgId,
-    user.id,
+  // S16: tái kiểm quyền lúc ghi — bọc toàn bộ lần ghi import trong một transaction.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.import(user.role),
+    () => commitBoqImport(parsed.rows, systemId, system.code, projectId, user.orgId, user.id),
   );
-  return NextResponse.json(result);
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền import (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  return NextResponse.json(kq.value);
 }
