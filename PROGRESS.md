@@ -25,17 +25,24 @@
   `alert_rules`, mặc định 30). **UI:** `CertDocument` chip "Đã duyệt · chưa chi"/"Đã chi dd/mm/yyyy" + hộp
   "Đánh dấu đã chi" (`DanhDauDaChiDialog`, ẩn với chính người duyệt); `/payments` chip + bộ lọc Tất cả/Chưa
   chi/Đã chi; KPI "Đã duyệt chưa chi" cạnh "Thực chi" ở `/costs`; e2e `payment-certs-canh-bao` thêm ca M129.
-- **Hậu audit (m129b-api):** xoá phiếu gắn IPC → 409 `bill_ipc_locked`; POST phiếu `paid` ngày tương lai
-  → 422; migration `0167` dựng lại `mv_cost_by_month` (chỉ `paid`) + `bi.cash_fin` thêm `pay_status`/`paid_at`;
-  `approvedUnpaid` dùng chung phạm vi `PB_TONG_HOP_OK`; +3 mutation M129.
-- **Test:** `tests/m129-ipc-da-chi.test.ts` 9 ca (8 ca §4 spec + thông báo), ca (1)(2) đỏ trên code cũ;
+- **Hậu audit (bao-mat/logic/ui):** xoá phiếu gắn IPC → 409 `bill_ipc_locked` kể cả `committed` (HIGH:
+  người duyệt xoá phiếu rồi nhập tay phiếu `paid` để lách SoD); POST phiếu `paid` ngày tương lai → 422;
+  migration `0167` dựng lại `mv_cost_by_month` + `bi.cost_by_month_fin` (chỉ `paid`, tháng theo
+  `COALESCE(paid_at, paid_date)`) và `bi.cash_fin` thêm `pay_status`/`paid_at`; `approvedUnpaid` dùng chung
+  phạm vi `PB_TONG_HOP_OK` với cost; `unpaidBillsOverdue` đúng "quá N ngày"; phiếu từ đề xuất ghi `paid_by`;
+  `/payments` KPI "Đã thanh toán" chỉ phiếu đã chi (HIGH: trước cộng cả `committed`), tổng tính trước bộ
+  lọc, KPI "Đã duyệt chưa chi"; chi tiết HĐ + tab IPC `/commercial` (nay đọc `/api/payments/bills`) hiện
+  trạng thái chi; dialog `min` = ngày duyệt, 409 `already_paid` coi là xong; +3 mutation M129.
+- **Test:** `tests/m129-ipc-da-chi.test.ts` 11 ca (8 ca §4 spec + thông báo + khoá xoá committed + ngày
+  phiếu nhập tay; oracle SQL đối chiếu `actual`), ca (1)(2) đỏ trên code cũ; `matviews` thêm ca paid+committed;
   cập nhật kỳ vọng `s13a-chuoi-ipc-thanh-toan`, `cost`, `audit-cost-query-reuse`, `alerts`.
 - **Lệch spec (ghi nhận):** route đặt ở `/api/payments/bills/:id/pay` (bám cây route sẵn có); `/finance` không
   có "tab thanh toán"/KPI "Thực chi" nên KPI chưa chi đặt ở `/costs` và tổng theo tháng ở
   `/api/finance/summary` (dòng tiền `finance.ts` đọc `cash_transactions`, không đọc `payment_bills`);
   phiếu sinh từ đề xuất (proposals) giữ `paid`.
-- **Nợ:** matview `mv_cost_by_month` (0159) vẫn dùng `paid_date` + mọi phiếu (chỉ gồm phiếu theo tầng nên
-  chưa ảnh hưởng; sửa cần migration dựng lại matview); BI `xboss_bi` chưa lộ `pay_status`.
+- **Nợ:** dashboard Metabase "thực chi" phải tự lọc `bi.cash_fin.pay_status='paid'`; SoD chỉ so với người
+  quyết định bước cuối (flow nhiều bước M46: người duyệt bước trước vẫn đánh dấu chi được — theo spec);
+  `audit_log.project_id` NULL khi ghi ở phạm vi `'*'` là khuôn có từ trước (admin audit-log chưa lọc org).
 
 ## 2026-10-09 — PR-B 6(b): RLS nghiêm ngặt 18 bảng tổ chức/dự án (migration 0165, QUA STAGING)
 
