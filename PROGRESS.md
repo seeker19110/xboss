@@ -1,5 +1,33 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — Dọn nợ nhỏ: seed mẫu xoá bảng offline, S00 nhận resolver Strict, bỏ `payrollTotals`
+
+- `scripts/seed-sample.ts`: TRUNCATE thêm `offline_vault_keys`, `audit_operation_receipts` (CASCADE kéo
+  theo bảng con) — trước đây `DELETE FROM projects` vấp FK khi DB đã có khoá vault/receipt offline (nợ S08).
+  Chạy seed 2 lần liên tiếp trên DB đã migrate tới 0170: xanh.
+- `scripts/audit-route-inventory.ts`: thêm `getCurrentProjectIdStrict` vào `RESOLVER_CORE` (regex
+  `RESOLVER_OTHER` chỉ bắt tên kết thúc `ProjectId`) — `materials/sync` POST, `import/excel` hết `NOT_MAPPED`.
+- Bỏ `payrollTotals`/`PayrollTotals` trong `lib/tai-chinh/finance.ts` (không còn caller từ S10).
+
+## 2026-10-09 — Tái kiểm quyền lúc ghi cho route BOQ và định mức (S16 §4 mục BOQ)
+
+- Áp `ghiNeuConQuyen`/`kiemQuyenTaiLucGhi` cho 8 handler ghi dưới `app/api/boq/**` và
+  `app/api/boq-norms/**` (POST/PATCH/DELETE dòng BOQ, map PUT, định mức POST/PATCH/DELETE, import
+  ?commit=1): quyền `CAN` bị thu hồi giữa lúc xác thực và lúc ghi ⇒ 403 với thông điệp cũ, DB không
+  đổi. Chỉ đổi tầng route, không đổi logic `lib/khoi-luong/*`.
+- Bảng kiểm kê `docs/nang-cap/AUDIT-S16-QUYEN-LUC-GHI.md` §2 chuyển 8 dòng HOÃN → ĐÃ ÁP, §4 đóng mục BOQ.
+- Test `tests/s16-quyen-luc-ghi-boq.test.ts`: 14 ca (8 deny đỏ trên code cũ, 6 đối chứng).
+
+## 2026-10-09 — S16 §4: tái kiểm quyền lúc ghi cho bảo lãnh kèm file + file báo giá thầu
+
+Đóng 2 mục HOÃN trong `docs/nang-cap/AUDIT-S16-QUYEN-LUC-GHI.md` §4:
+
+- `PATCH /api/insurance-bonds/:id` và `POST /api/tenders/:id/bids/:bidId/file`: lưu file mới → ghi DB
+  trong `ghiNeuConQuyen` (tái kiểm `manageContracts`/`manageTenders`) → mới xoá file cũ (best-effort,
+  lỗi chỉ log). Bị thu hồi quyền lúc ghi ⇒ 403 + dọn file mới, DB và file cũ giữ nguyên (trước: xoá
+  file cũ TRƯỚC câu UPDATE, không tái kiểm).
+- Test `tests/s16-quyen-luc-ghi-file.test.ts` (đỏ trên code cũ, xanh sau sửa).
+
 ## 2026-10-09 — M131 phần 2: khôi phục vault khi mất proof (Admin duyệt) + trang Thiết bị offline
 
 - Đóng "Cần quyết (3)" S05/S07 theo `docs/nang-cap/M131-vault-offline-bao-tri-va-khoi-phuc.md` §3.

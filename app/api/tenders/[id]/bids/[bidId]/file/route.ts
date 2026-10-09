@@ -4,6 +4,8 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { newTenderBidFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
 import { storagePut, storageGet, storageDelete } from "@/lib/nen/storage";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 
@@ -87,20 +89,47 @@ export async function POST(
   if (!up.ok) return NextResponse.json({ error: up.error }, { status: up.status });
   const { file, buf: fileBuf } = up;
 
-  // Xoá file cũ nếu có (mỗi báo giá chỉ giữ 1 file chào thầu gốc).
-  if (bid.fileName) await storageDelete(user.orgId, bid.fileName);
-
+  // Thứ tự (S16): lưu file mới → ghi DB (tái kiểm quyền lúc ghi, D01) → mới xoá file cũ
+  // (mỗi báo giá chỉ giữ 1 file chào thầu gốc).
   const fileName = newTenderBidFileName(bidId, file.type);
   await storagePut(user.orgId, fileName, fileBuf);
 
-  await run(
-    `UPDATE tender_bids SET file_name = ?, original_name = ?, mime_type = ?, size_bytes = ? WHERE id = ?`,
-    fileName,
-    file.name || null,
-    file.type,
-    file.size,
-    bidId,
-  );
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageTenders(user.role),
+    () =>
+      run(
+        `UPDATE tender_bids SET file_name = ?, original_name = ?, mime_type = ?, size_bytes = ? WHERE id = ?`,
+        fileName,
+        file.name || null,
+        file.type,
+        file.size,
+        bidId,
+      ),
+  ).catch(async (e: unknown) => {
+    // Ghi DB lỗi ⇒ dọn file mới vừa lưu (DB vẫn trỏ file cũ) rồi ném tiếp.
+    await storageDelete(user.orgId, fileName);
+    throw e;
+  });
+  if (!kq.ok) {
+    // Bị thu hồi quyền lúc ghi ⇒ không ghi DB; dọn file mới, giữ nguyên file cũ.
+    await storageDelete(user.orgId, fileName);
+    return NextResponse.json(
+      { error: "Bạn không có quyền upload file (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  }
+
+  // DB đã trỏ file mới ⇒ xoá file cũ (best-effort, lỗi chỉ ghi log, không làm hỏng request).
+  if (bid.fileName) {
+    const fileCu = bid.fileName;
+    await storageDelete(user.orgId, fileCu).catch((e: unknown) =>
+      log.warn("Không xoá được file chào thầu cũ", {
+        route: "tenders.bids.file.post",
+        fileName: fileCu,
+        error: e instanceof Error ? e.message : String(e),
+      }),
+    );
+  }
 
   return NextResponse.json({ fileName, sizeBytes: file.size }, { status: 201 });
 }

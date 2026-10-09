@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
@@ -79,18 +80,28 @@ export async function POST(
   const matErr = await checkNormMaterial(input, projectId);
   if (matErr) return NextResponse.json({ error: matErr }, { status: 422 });
 
-  const id = await insertId(
-    `INSERT INTO boq_norms (boq_item_id, resource_type, material_id, resource_name, qty_per_unit, unit_label, note, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    boqItemId,
-    input.resourceType,
-    input.materialId,
-    input.resourceName,
-    input.qtyPerUnit,
-    input.unitLabel,
-    input.note,
-    user.id,
+  // S16: tái kiểm quyền lúc ghi — quyền có thể bị thu hồi giữa lúc xác thực và lúc ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageNorms(user.role),
+    () =>
+      insertId(
+        `INSERT INTO boq_norms (boq_item_id, resource_type, material_id, resource_name, qty_per_unit, unit_label, note, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        boqItemId,
+        input.resourceType,
+        input.materialId,
+        input.resourceName,
+        input.qtyPerUnit,
+        input.unitLabel,
+        input.note,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Không có quyền tạo định mức (chỉ Admin/PM)" },
+      { status: 403 },
+    );
 
-  return NextResponse.json({ id }, { status: 201 });
+  return NextResponse.json({ id: kq.value }, { status: 201 });
 }

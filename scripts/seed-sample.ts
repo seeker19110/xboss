@@ -87,7 +87,8 @@ async function main() {
   await run(`TRUNCATE TABLE
     contracts, variation_orders, materials, boq_items, purchase_orders, purchase_requests,
     meetings, risks, proposals, correspondences, drawings, qc_checklists, ncrs,
-    hse_records, site_diaries, equipment, vehicle_logs, tender_packages, project_documents
+    hse_records, site_diaries, equipment, vehicle_logs, tender_packages, project_documents,
+    offline_vault_keys, audit_operation_receipts
     CASCADE`);
 
   // Reset (theo thứ tự FK).

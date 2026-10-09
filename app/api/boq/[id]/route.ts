@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { moneyInputErrorBody, parseMoneyInput } from "@/lib/nen/money";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { boqTakenBy, phuThuocDongBoq } from "@/lib/khoi-luong/boq";
@@ -143,7 +144,7 @@ export async function PATCH(
   if (fields.length === 0) return NextResponse.json({ ok: true });
 
   try {
-    await withTransaction(async () => {
+    const kq = await withTransaction(async () => {
       // Khoá dòng trước khi đọc "giá trị cũ" để so sánh — chống lost update / old_value lỗi
       // thời khi 2 PATCH chạy xen kẽ (xem ghi chú ở SELECT `existing` phía trên).
       const locked = await queryOne<{
@@ -163,7 +164,9 @@ export async function PATCH(
            FROM boq_items WHERE id = ? FOR UPDATE`,
         id,
       );
-      if (!locked) return; // Dòng vừa bị xoá giữa lúc kiểm 404 và lúc vào transaction.
+      if (!locked) return "ok" as const; // Dòng vừa bị xoá giữa lúc kiểm 404 và lúc vào transaction.
+      // S16: tái kiểm quyền lúc ghi sau khi khoá dòng, trước lần ghi đầu.
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.editStructure(user.role)))) return "cam" as const;
 
       const oldValueOf = (field: string): string | null => {
         switch (field) {
@@ -202,7 +205,13 @@ export async function PATCH(
 
       await run(`UPDATE boq_items SET ${fields.join(", ")} WHERE id = ?`, ...values, id);
       await ghiLichSuBoq(id, changes, user.id);
+      return "ok" as const;
     });
+    if (kq === "cam")
+      return NextResponse.json(
+        { error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" },
+        { status: 403 },
+      );
   } catch (err) {
     if ((err as { code?: string }).code === "23505")
       return NextResponse.json({ error: "Mã BOQ đã tồn tại" }, { status: 409 });
@@ -258,6 +267,8 @@ export async function DELETE(
         projectId,
       );
       if (!dong) return "khong_thay" as const;
+      // S16: tái kiểm quyền lúc ghi sau khi khoá dòng, trước lần ghi đầu.
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.editStructure(user.role)))) return "cam" as const;
       const pt = await phuThuocDongBoq(id);
       if (pt.dotThanhToan > 0 || pt.goiThau > 0) return pt;
       await run(`DELETE FROM boq_items WHERE id = ? AND project_id = ?`, id, projectId);
@@ -265,6 +276,8 @@ export async function DELETE(
     });
     if (kq === "khong_thay")
       return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
+    if (kq === "cam")
+      return NextResponse.json({ error: "Không có quyền xoá (chỉ Admin/PM)" }, { status: 403 });
     // M128: dòng đã nằm trong đợt IPC ĐÃ DUYỆT còn hiệu lực → KHÔNG BAO GIỜ xoá được (đợt đã
     // duyệt là hồ sơ chốt, kể cả sau điều chỉnh/huỷ hiệu lực). Muốn bỏ KL của dòng thì chỉ có thể
     // huỷ hiệu lực đợt — khi đó dòng thành hồ sơ lưu trữ của đợt. 409 adjustment_required kèm link.
