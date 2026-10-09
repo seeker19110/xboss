@@ -1,6 +1,6 @@
 // Dữ liệu mẫu mô phỏng cấu trúc Excel AVIO Tháp A (chạy khi chưa có file Excel thật).
 import "./env";
-import { run, insertId, queryOne, todayISO } from "@/lib/db";
+import { run, insertId, query, queryOne, todayISO } from "@/lib/db";
 import type { StatusSlug } from "@/lib/tien-do/status";
 import { slugFromCode, toSlug } from "@/lib/nen/sheets";
 import { trongToChuc } from "@/lib/ha-tang/to-chuc";
@@ -81,15 +81,31 @@ function deriveStatus(progress: number, endDate: string): StatusSlug {
 async function main() {
   console.log("🌱 Seeding dữ liệu mẫu AVIO Tháp A...");
 
-  // Xoá các bảng nghiệp vụ mang project_id (M22) trước — TRUNCATE CASCADE tự xoá theo
-  // đúng thứ tự FK (kể cả bảng con không mang project_id riêng như payment_certs,
-  // po_items, qc_inspections...) mà không cần liệt kê tay từng cấp con.
-  await run(`TRUNCATE TABLE
-    contracts, variation_orders, materials, boq_items, purchase_orders, purchase_requests,
-    meetings, risks, proposals, correspondences, drawings, qc_checklists, ncrs,
-    hse_records, site_diaries, equipment, vehicle_logs, tender_packages, project_documents,
-    offline_vault_keys, audit_operation_receipts
-    CASCADE`);
+  // Xoá dữ liệu nghiệp vụ gắn dự án trước khi xoá `projects`. Danh sách bảng lấy từ catalog (mọi
+  // FK trỏ vào projects KHÔNG ON DELETE CASCADE) thay vì liệt kê tay — liệt kê tay luôn thiếu bảng
+  // mới (vd tech_links) và seed chạy lại trên DB có dữ liệu sẽ lỗi FK. Bảng đang có dòng TOÀN CỤC
+  // (cột dự án NULL — vd mẫu `construction_stages` do migration seed, `integrations`) chỉ xoá dòng
+  // gắn dự án; bảng còn lại TRUNCATE CASCADE (kéo theo bảng con không mang project_id như
+  // payment_certs, po_items…). Bảng FK ON DELETE CASCADE (nav_settings, alert_rules…) tự dọn khi xoá
+  // projects, dòng toàn cục giữ nguyên.
+  const fkDuAn = await query<{ t: string; col: string }>(
+    `SELECT c.conrelid::regclass::text AS t, a.attname AS col
+       FROM pg_constraint c
+       JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+      WHERE c.contype = 'f' AND c.confrelid = 'projects'::regclass AND c.confdeltype <> 'c'
+      ORDER BY 1`,
+  );
+  const giuToanCuc: { t: string; col: string }[] = [];
+  const canTruncate: string[] = [];
+  for (const fk of fkDuAn) {
+    const coToanCuc = await queryOne<{ co: boolean }>(
+      `SELECT EXISTS (SELECT 1 FROM ${fk.t} WHERE ${fk.col} IS NULL) AS co`,
+    );
+    if (coToanCuc?.co) giuToanCuc.push(fk);
+    else if (!canTruncate.includes(fk.t)) canTruncate.push(fk.t);
+  }
+  if (canTruncate.length > 0) await run(`TRUNCATE TABLE ${canTruncate.join(", ")} CASCADE`);
+  for (const { t, col } of giuToanCuc) await run(`DELETE FROM ${t} WHERE ${col} IS NOT NULL`);
 
   // Reset (theo thứ tự FK).
   for (const t of [
