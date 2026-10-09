@@ -11,11 +11,14 @@ import { todayISO } from "@/lib/nen/date";
 export default function DanhDauDaChiDialog({
   billId,
   maDot,
+  ngayDuyet,
   onDong,
   onXong,
 }: {
   billId: number;
   maDot: string;
+  /** Ngày duyệt đợt (YYYY-MM-DD) → chặn chọn ngày chi trước đó. Bỏ trống = không chặn. */
+  ngayDuyet?: string | null;
   onDong: () => void;
   onXong: () => void | Promise<void>;
 }) {
@@ -42,7 +45,16 @@ export default function DanhDauDaChiDialog({
         }),
       });
       if (!res.ok) {
-        const j = (await res.json().catch(() => null)) as { error?: unknown } | null;
+        const j = (await res.json().catch(() => null)) as {
+          error?: unknown;
+          code?: unknown;
+        } | null;
+        // Đã chi rồi (bấm đúp / người khác chi trước) = mục tiêu đã đạt → làm mới và đóng.
+        if (res.status === 409 && j?.code === "already_paid") {
+          await onXong();
+          onDong();
+          return;
+        }
         setLoi(
           typeof j?.error === "string" ? j.error : `Đánh dấu đã chi thất bại (mã ${res.status})`,
         );
@@ -85,6 +97,7 @@ export default function DanhDauDaChiDialog({
             id={idNgay}
             type="date"
             value={paidAt}
+            min={ngayDuyet || undefined}
             max={todayISO()}
             disabled={busy}
             onChange={(e) => setPaidAt(e.target.value)}

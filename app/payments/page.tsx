@@ -45,6 +45,11 @@ import {
   type FloorRow,
 } from "./_components/tienThanhToan";
 
+// Phiếu đã chi thật: paid, hoặc thiếu payStatus (API/phiếu cũ). committed/void bị loại.
+function daChi(b: Bill): boolean {
+  return b.payStatus === "paid" || b.payStatus == null;
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 // S10c: kiểu tiền là bigint đồng×100 — xem ./_components/tienThanhToan.ts.
 type AddInput = {
@@ -407,8 +412,13 @@ export default function PaymentsPage() {
     billsByPerson.set(b.responsible, list);
   }
   // KPI toàn dự án: chỉ tính type='bill' (tạm ứng & phát sinh là nội bộ từng đợt).
+  // Chỉ phiếu ĐÃ CHI (paid hoặc payStatus thiếu = phiếu/API cũ); committed/void không tính.
   const totalPaid = tongTien(
-    bills.filter((b) => b.type === "bill"),
+    bills.filter((b) => b.type === "bill" && daChi(b)),
+    (b) => b.amount,
+  );
+  const totalCommitted = tongTien(
+    bills.filter((b) => b.type === "bill" && b.payStatus === "committed"),
     (b) => b.amount,
   );
 
@@ -450,7 +460,7 @@ export default function PaymentsPage() {
         </datalist>
 
         {/* KPI */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
           <KpiCard
             label="Tổng giá trị HĐ"
             value={fmtVND(filteredContract)}
@@ -471,6 +481,12 @@ export default function PaymentsPage() {
                 ? `${phanTram(totalPaid, data.totalEarned).toFixed(1)}% nghiệm thu`
                 : "Toàn bộ kỳ"
             }
+          />
+          <KpiCard
+            label="Đã duyệt chưa chi"
+            value={fmtVND(totalCommitted)}
+            accent="text-amber-300"
+            sub="Phiếu đã duyệt, chờ chi"
           />
           <KpiCard
             label="Chờ thanh toán"
@@ -589,7 +605,7 @@ export default function PaymentsPage() {
               const personBills = isNone ? [] : (billsByPerson.get(person) ?? []);
               // Chỉ tính bills thực để hiển thị đã TT trên header.
               const paid = tongTien(
-                personBills.filter((b) => b.type === "bill"),
+                personBills.filter((b) => b.type === "bill" && daChi(b)),
                 (b) => b.amount,
               );
               return (
@@ -751,7 +767,11 @@ function BillsSection({
   );
   const itemRows = bills.filter((b) => b.type === "item");
   const advRows = bills.filter((b) => b.type === "advance");
-  const sumBills = tongTien(billRows, (b) => b.amount);
+  // Tổng trên TOÀN BỘ bills (không theo bộ lọc hiển thị), chỉ phiếu đã chi.
+  const sumBills = tongTien(
+    bills.filter((b) => b.type === "bill" && daChi(b)),
+    (b) => b.amount,
+  );
   const sumItems = tongTien(itemRows, (b) => b.amount);
   const sumAdvs = tongTien(advRows, (b) => b.amount);
 

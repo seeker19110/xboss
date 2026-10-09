@@ -19,6 +19,7 @@ import { HEADER_TIEN_V1, fmtDongMinor, minorTuWire } from "@/lib/nen/money-dto";
 import EmptyState from "@/app/components/EmptyState";
 import { appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
+import { formatDateVN } from "@/lib/nen/date";
 import CustomFieldsSection from "@/app/components/CustomFieldsSection";
 import {
   Button,
@@ -122,6 +123,9 @@ export type ContractDetail = {
     type: string;
     amount: string | null;
     paidDate: string;
+    // M129: trạng thái chi (API cũ có thể thiếu → coi như đã chi).
+    payStatus?: "committed" | "paid" | "void";
+    paidAt?: string | null;
   }[];
   purchaseOrders: {
     id: number;
@@ -1085,7 +1089,14 @@ function LinksTab({ detail }: { detail: ContractDetail | null }) {
           <ul className="space-y-1">
             {detail.bills.map((b) => (
               <li key={b.id} className="flex justify-between gap-2 text-zinc-300">
-                <span>{b.paidDate}</span>
+                <span className="flex flex-wrap items-center gap-2">
+                  {b.paidAt ? formatDateVN(b.paidAt) : b.paidDate}
+                  {b.payStatus === "committed" && <Chip tone="warning">Chưa chi</Chip>}
+                  {b.payStatus === "void" && <Chip tone="neutral">Đã huỷ</Chip>}
+                  {(b.payStatus === "paid" || b.payStatus == null) && (
+                    <Chip tone="success">Đã chi</Chip>
+                  )}
+                </span>
                 <span className="font-mono tabular-nums">
                   <MaskedValue value={b.amount} format={fmtVND} />
                 </span>

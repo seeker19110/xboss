@@ -15,6 +15,7 @@ import {
   Banknote,
   Percent,
 } from "lucide-react";
+import Chip from "@/app/components/ui/Chip";
 import { Skeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { formatDateVN } from "@/lib/nen/date";
@@ -255,7 +256,22 @@ export default function IpcPaymentsTab() {
                         {fmtVND(p.amount)}
                       </td>
                       <td className="py-3 px-3 font-mono text-zinc-400">
-                        {p.paidDate ? formatDateVN(p.paidDate) : "—"}
+                        {p.paidAt || p.paidDate ? formatDateVN(p.paidAt || p.paidDate) : "—"}
+                        {p.payStatus === "committed" && (
+                          <Chip tone="warning" className="ml-2">
+                            Chưa chi
+                          </Chip>
+                        )}
+                        {p.payStatus === "void" && (
+                          <Chip tone="neutral" className="ml-2">
+                            Đã huỷ
+                          </Chip>
+                        )}
+                        {(p.payStatus === "paid" || p.payStatus == null) && (
+                          <Chip tone="success" className="ml-2">
+                            Đã chi
+                          </Chip>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-zinc-500 truncate max-w-xs">
                         {p.description || p.note || "—"}
