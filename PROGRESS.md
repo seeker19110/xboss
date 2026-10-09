@@ -1,9 +1,38 @@
 # PROGRESS — XBoss
 
-## 2026-10-09 — M129 UI (đang làm): IPC đã duyệt → "chưa chi"/"Đã chi"
+## 2026-10-09 — M129: IPC "đã duyệt" ≠ "đã chi" (migration 0166 có backfill → QUA STAGING)
 
-Phần UI của M129 (`docs/nang-cap/M129-*.md` §2.4), backend làm ở nhánh khác: badge + hộp "Đánh dấu đã chi"
-trong `CertDocument`, cột/bộ lọc trạng thái chi ở `/payments`, KPI "Đã duyệt chưa chi" ở `/costs`, ca e2e.
+Đóng mục 6(e) của `AUDIT-S15-RELEASE-CANDIDATE.md` (A5-AC08, D07) theo `docs/nang-cap/M129-ipc-da-chi-tach-cam-ket-thuc-chi.md`.
+
+- **Schema `0166_payment_bills_paid_state.sql`:** `payment_bills.pay_status (committed|paid|void)` +
+  `paid_at/paid_by/paid_ref/paid_note`, backfill `paid_at = paid_date` cho phiếu cũ (`pay_status='paid'`
+  mặc định → số liệu báo cáo không đổi lúc deploy), trigger `audit_row_change` gắn SAU backfill, cột
+  `notifications.payment_bill_id` (FK CASCADE + unique một phần). Migration tự `set_config('app.project_id','*')`
+  trước UPDATE (FORCE RLS — thiếu GUC thì backfill 0 dòng, đã thử bằng role `xboss_app`). **Có UPDATE →
+  staging trước production.**
+- **Luồng:** duyệt IPC bước cuối sinh phiếu `committed` (không còn coi là thực chi). Mới
+  `POST /api/payments/bills/:id/pay` `{ paidAt, paidRef?, paidNote? }` (Admin/PM, `kiemQuyenTaiLucGhi`,
+  SoD người chi ≠ `payment_certs.decided_by` → 403 `sod_same_actor`; 409 `already_paid`/`bill_void`;
+  422 `paid_at_invalid` khi trước ngày duyệt/sau hôm nay; idempotent bằng `FOR UPDATE` + UPDATE điều kiện
+  `pay_status='committed'`). Không `/unpay` (quay lại = M128). Phiếu `paid` có IPC: không xoá/sửa amount
+  (409). `POST /api/payments/bills` nhận `payStatus:'committed'`, mặc định `paid`. Logic ở
+  `lib/tai-chinh/payment-bills.ts`.
+- **Báo cáo (SQL exact):** `actual` chỉ phiếu `paid`; thêm `approvedUnpaid` (Σ `committed`) ở
+  `/api/costs` (totals/rows), `/api/finance/summary` (+ `approvedUnpaidMonths`); EVM AC/báo cáo tháng/công nợ
+  NCC/`listContracts.paid` cùng lọc `paid` và lấy ngày `COALESCE(paid_at, paid_date)`. `GET /api/payment-certs`
+  (+`[id]`) trả `bill {id, payStatus, paidAt, paidRef}` + `decidedBy`.
+- **Thông báo** `bill_unpaid` (Admin/PM, phiếu `committed` quá N ngày; metric `bill_unpaid_days` trong
+  `alert_rules`, mặc định 30). **UI:** `CertDocument` chip "Đã duyệt · chưa chi"/"Đã chi dd/mm/yyyy" + hộp
+  "Đánh dấu đã chi" (`DanhDauDaChiDialog`, ẩn với chính người duyệt); `/payments` chip + bộ lọc Tất cả/Chưa
+  chi/Đã chi; KPI "Đã duyệt chưa chi" cạnh "Thực chi" ở `/costs`; e2e `payment-certs-canh-bao` thêm ca M129.
+- **Test:** `tests/m129-ipc-da-chi.test.ts` 9 ca (8 ca §4 spec + thông báo), ca (1)(2) đỏ trên code cũ;
+  cập nhật kỳ vọng `s13a-chuoi-ipc-thanh-toan`, `cost`, `audit-cost-query-reuse`, `alerts`.
+- **Lệch spec (ghi nhận):** route đặt ở `/api/payments/bills/:id/pay` (bám cây route sẵn có); `/finance` không
+  có "tab thanh toán"/KPI "Thực chi" nên KPI chưa chi đặt ở `/costs` và tổng theo tháng ở
+  `/api/finance/summary` (dòng tiền `finance.ts` đọc `cash_transactions`, không đọc `payment_bills`);
+  phiếu sinh từ đề xuất (proposals) giữ `paid`.
+- **Nợ:** matview `mv_cost_by_month` (0159) vẫn dùng `paid_date` + mọi phiếu (chỉ gồm phiếu theo tầng nên
+  chưa ảnh hưởng; sửa cần migration dựng lại matview); BI `xboss_bi` chưa lộ `pay_status`.
 
 ## 2026-10-09 — PR-B 6(b): RLS nghiêm ngặt 18 bảng tổ chức/dự án (migration 0165, QUA STAGING)
 

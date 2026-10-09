@@ -518,7 +518,7 @@ test.describe("IPC đã duyệt — đánh dấu đã chi (M129, lớp B)", () =
     expect(nangDlg, JSON.stringify(nangDlg, null, 2)).toEqual([]);
 
     await dlg.getByLabel("Số chứng từ chi (tuỳ chọn)").fill("UNC-E2E-01");
-    await bam(dlg.getByRole("button", { name: "Xác nhận đánh dấu đã chi" }));
+    await bam(dlg.getByRole("button", { name: "Xác nhận đã chi" }));
     await expect(dlg).toHaveCount(0, { timeout: 20_000 });
     await expect(tieuDeDot(page)).toContainText("Đã chi", { timeout: 20_000 });
     await expect(tieuDeDot(page)).not.toContainText("chưa chi");

@@ -123,7 +123,7 @@ thay đổi; lần đo dùng role owner (không RLS).
 | A5-AC05 | P/H   | s13a-chuoi-ipc-thanh-toan                                                           | PASS     | PASS     | —                           |
 | A5-AC06 | P/H/M | s13a-chuoi-ipc-thanh-toan; s13e                                                     | PARTIAL  | PARTIAL  | M UAT hợp đồng thật         |
 | A5-AC07 | P/H/M | s13a-chuoi-ipc-thanh-toan; s13c                                                     | PARTIAL  | PARTIAL  | adjustment, M               |
-| A5-AC08 | P/H/B | s13a-chuoi-ipc-thanh-toan (+2 ca S15)                                               | GAP      | PARTIAL  | approved≠paid, B            |
+| A5-AC08 | P/H/B | s13a-chuoi-ipc-thanh-toan (+2 ca S15); m129-ipc-da-chi (9 ca)                       | GAP      | PASS     | M129 (pay_status), B        |
 | A5-AC09 | B/M   | s13c; s13a; e2e payment-certs-canh-bao (retry không tự ack, bàn phím, axe)          | GAP      | PARTIAL  | M (7 vai trò thiết bị thật) |
 
 ### A6 — Vận hành, PITR, DR
@@ -205,7 +205,8 @@ Không mục nào dưới đây được tự quyết hoặc code trong S15.
 - **(d) Retention/cleanup diễn tập (A6-AC06):** chưa có chính sách retention evidence và quyền cleanup;
   `docs/ops/backup.md` đang giao `rm -rf` thủ công cho người vận hành.
 - **(e) "approved ≠ paid" (A5-AC08):** duyệt IPC sinh phiếu thanh toán ngay nên không biểu diễn được trạng
-  thái chưa-chi/đã-chi. Đổi thiết kế nếu chủ dự án muốn tách.
+  thái chưa-chi/đã-chi. → **xong (M129):** `payment_bills.pay_status` committed/paid, route đánh dấu chi
+  (SoD), `actual` chỉ phiếu đã chi, `approvedUnpaid` tách riêng (xem `M129-*.md`, PROGRESS 2026-10-09).
 - **(f) Readiness endpoint riêng và login/me trả 503 JSON khi schema thiếu (Q-AC07):** hiện chỉ có
   `/api/health`; login/me ném lỗi → 500. Cần quyết có làm không.
 - **(g) PITR VPS chưa bật:** RPO thực ~24 giờ; RPO 5 phút / RTO 60 phút **NOT_RUN**; canary và archive lag

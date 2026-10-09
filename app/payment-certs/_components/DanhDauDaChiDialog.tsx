@@ -136,7 +136,6 @@ export default function DanhDauDaChiDialog({
           icon={Banknote}
           variant="primary"
           disabled={busy || !paidAt}
-          aria-label="Xác nhận đánh dấu đã chi"
           onClick={() => void gui()}
         >
           {busy ? "Đang lưu…" : "Xác nhận đã chi"}

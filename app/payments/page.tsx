@@ -745,7 +745,9 @@ function BillsSection({
     (b) =>
       b.type === "bill" &&
       (locChi === "all" ||
-        (locChi === "committed" ? b.payStatus === "committed" : b.payStatus !== "committed")),
+        (locChi === "committed"
+          ? b.payStatus === "committed"
+          : b.payStatus === "paid" || b.payStatus == null)),
   );
   const itemRows = bills.filter((b) => b.type === "item");
   const advRows = bills.filter((b) => b.type === "advance");
@@ -888,6 +890,11 @@ function BillsSection({
             <ChevronRight className="w-3.5 h-3.5" />
           )}
         </button>
+        {locChi !== "all" && (
+          <span className="text-[11px] text-zinc-300">
+            Đang lọc: {locChi === "committed" ? "Chưa chi" : "Đã chi"}
+          </span>
+        )}
         {sumBills > 0n && (
           <span className="text-[11px] text-sky-400 tabular-nums">TT: {fmtVND(sumBills)}</span>
         )}
@@ -1005,6 +1012,13 @@ function BillsSection({
                   </td>
                 </tr>
 
+                {billRows.length === 0 && locChi !== "all" && (
+                  <tr>
+                    <td colSpan={COL} className="px-2 py-3 text-center text-zinc-400">
+                      Không có phiếu phù hợp bộ lọc
+                    </td>
+                  </tr>
+                )}
                 {billRows.map((b, i) => {
                   const fl = floors.find(
                     (f) => f.sheetTypeId === b.sheetTypeId && f.floorLabel === b.floorLabel,
@@ -1117,6 +1131,11 @@ function BillsSection({
                           {b.payStatus === "committed" && (
                             <Chip tone="warning" className="mt-1">
                               Chưa chi
+                            </Chip>
+                          )}
+                          {b.payStatus === "void" && (
+                            <Chip tone="neutral" className="mt-1">
+                              Đã huỷ
                             </Chip>
                           )}
                           {b.payStatus === "paid" && (
