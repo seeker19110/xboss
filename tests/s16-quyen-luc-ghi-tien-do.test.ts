@@ -194,8 +194,9 @@ async function chen(sql: string, ...args: unknown[]): Promise<number> {
 type Ca = {
   ten: string;
   perm: string;
-  /** Có ghi file lên storage — kiểm thêm file vừa lưu bị dọn khi bị thu hồi. */
-  file?: boolean;
+  /** Có ghi file lên storage — tiền tố tên file của CHÍNH ca này (newXxxFileName), để kiểm file
+   *  vừa lưu bị dọn khi bị thu hồi mà không đếm nhầm file của test khác chạy song song. */
+  file?: (n: Ngu, x: number) => string;
   /** Dựng dữ liệu riêng của ca; trả id/ngữ cảnh cho goi + chup. */
   dung?: (n: Ngu) => Promise<number>;
   goi: (n: Ngu, x: number) => Promise<Response>;
@@ -225,7 +226,7 @@ const CA: Ca[] = [
   {
     ten: "tasks/:id/documents POST (file)",
     perm: "editProgress",
-    file: true,
+    file: (n) => `d${n.w.taskId}-`,
     goi: async (n) => {
       const { POST } = await import("@/app/api/tasks/[id]/documents/route");
       return POST(formReq(`/api/tasks/${n.w.taskId}/documents`, "pdf"), P(n.w.taskId));
@@ -251,7 +252,7 @@ const CA: Ca[] = [
   {
     ten: "tasks/:id/photos POST (file)",
     perm: "editProgress",
-    file: true,
+    file: (n) => `t${n.w.taskId}-`,
     goi: async (n) => {
       const { POST } = await import("@/app/api/tasks/[id]/photos/route");
       return POST(formReq(`/api/tasks/${n.w.taskId}/photos`, "png"), P(n.w.taskId));
@@ -304,7 +305,7 @@ const CA: Ca[] = [
   {
     ten: "workpackages/:id/bbnt POST (file)",
     perm: "editProgress",
-    file: true,
+    file: (n) => `wp${n.w.packageId}-bbnt-`,
     goi: async (n) => {
       const { POST } = await import("@/app/api/workpackages/[id]/bbnt/route");
       return POST(formReq(`/api/workpackages/${n.w.packageId}/bbnt`, "pdf"), P(n.w.packageId));
@@ -363,7 +364,7 @@ const CA: Ca[] = [
   {
     ten: "workpackages/:id/drawing POST (file)",
     perm: "editProgress",
-    file: true,
+    file: (n) => `wp${n.w.packageId}-drw-`,
     goi: async (n) => {
       const { POST } = await import("@/app/api/workpackages/[id]/drawing/route");
       return POST(formReq(`/api/workpackages/${n.w.packageId}/drawing`, "pdf"), P(n.w.packageId));
@@ -576,7 +577,7 @@ const CA: Ca[] = [
   {
     ten: "floor-stage-fronts/:id/documents POST (file)",
     perm: "manageWorkFronts",
-    file: true,
+    file: (_n, x) => `fsf${x}-`,
     dung: async (n) => {
       const st = await chen(
         `INSERT INTO construction_stages (name, sort_order, project_id) VALUES ('CT', 1, ?)`,
@@ -689,7 +690,7 @@ const CA: Ca[] = [
   {
     ten: "work-fronts/:id/documents POST (file)",
     perm: "manageWorkFronts",
-    file: true,
+    file: (_n, x) => `wf${x}-`,
     dung: (n) =>
       chen(
         `INSERT INTO work_fronts (sheet_type_id, floor_label) VALUES (?, 'T1')`,
@@ -748,7 +749,7 @@ const CA: Ca[] = [
   {
     ten: "progress-albums/:id/photos POST (file)",
     perm: "manageTech",
-    file: true,
+    file: (_n, x) => `alb${x}-`,
     dung: (n) =>
       chen(
         `INSERT INTO progress_albums (project_id, milestone_label) VALUES (?, 'Mốc')`,
@@ -866,7 +867,8 @@ for (const ca of CA) {
         assert.equal(r.status, 403, `ghi bằng snapshot stale: ${JSON.stringify(r.body)}`);
         assert.deepEqual(await ca.chup(n, x), truoc, "DB đổi dù đã bị thu hồi quyền");
         if (ca.file) {
-          const moi = [...fileUpload()].filter((t) => !fileTruoc.has(t));
+          const tienTo = ca.file(n, x);
+          const moi = [...fileUpload()].filter((t) => t.startsWith(tienTo) && !fileTruoc.has(t));
           assert.deepEqual(moi, [], "file vừa lưu không được dọn khi bị thu hồi");
         }
       } finally {

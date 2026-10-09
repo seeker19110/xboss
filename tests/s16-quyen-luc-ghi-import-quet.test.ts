@@ -52,11 +52,14 @@ async function pidCua(c: PoolClient): Promise<number> {
   return (await c.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0].pid;
 }
 
-/** Chờ (tối đa ~2s) tới khi có tiến trình bị `pid` chặn; trả false nếu `xong()` trước đó. */
-async function choBiChan(pid: number, xong: () => boolean): Promise<boolean> {
+/** Chờ (tối đa ~10s — CI song song chậm) tới khi có tiến trình bị `pid` chặn; trả false nếu `xong()` trước đó.
+ *  `c`: hỏi qua client đang giữ sẵn — CI chạy song song với XBOSS_PG_POOL_MAX=3, ca giữ 2 client
+ *  + 1 transaction đang kẹt thì không còn kết nối pool trống để hỏi. */
+async function choBiChan(pid: number, xong: () => boolean, c?: PoolClient): Promise<boolean> {
   const { getPool } = await import("@/lib/db");
-  for (let i = 0; i < 80 && !xong(); i++) {
-    const r = await getPool().query<{ n: number }>(
+  const hoi = c ?? getPool();
+  for (let i = 0; i < 400 && !xong(); i++) {
+    const r = await hoi.query<{ n: number }>(
       `SELECT COUNT(*)::int AS n FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))`,
       [pid],
     );
@@ -337,21 +340,27 @@ test("quét bản vẽ: thu hồi quyền sau tệp đầu ⇒ dừng vòng lặ
     const dangBay = goiQuet().finally(() => {
       xong = true;
     });
-    assert.ok(await choBiChan(await pidCua(c1), () => xong), "tệp 2 phải kẹt ở unique revision");
+    assert.ok(
+      await choBiChan(await pidCua(c1), () => xong, c2),
+      "tệp 2 phải kẹt ở unique revision",
+    );
     // C2 xếp hàng khoá độc quyền phía sau transaction của tệp 2 (đang giữ khoá chia sẻ).
     await c2.query("BEGIN");
     const pid2 = await pidCua(c2);
     const khoa = c2.query(`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, [
       "role_permissions:1",
     ]);
-    for (let i = 0; i < 80; i++) {
-      const r = await getPool().query<{ n: number }>(
+    let c2XepHang = false;
+    for (let i = 0; i < 400 && !c2XepHang; i++) {
+      // Hỏi qua c1 (đang rảnh, giữ transaction) — pool CI chỉ 3 kết nối, đều đang bận.
+      const r = await c1.query<{ n: number }>(
         `SELECT cardinality(pg_blocking_pids($1))::int AS n`,
         [pid2],
       );
-      if (r.rows[0].n > 0) break;
-      await new Promise((ok) => setTimeout(ok, 25));
+      c2XepHang = r.rows[0].n > 0;
+      if (!c2XepHang) await new Promise((ok) => setTimeout(ok, 25));
     }
+    assert.ok(c2XepHang, "C2 phải xếp hàng khoá quyền sau transaction của tệp 2");
     await c1.query("ROLLBACK"); // tệp 2 ghi xong + COMMIT ⇒ C2 lấy được khoá trước tệp 3
     await khoa;
     for (const p of QUYEN_QUET) await c2.query(SQL_DENY, ["engineer", p, projectId]);

@@ -122,7 +122,7 @@ type Ca = {
   dung: (
     projectId: number,
     u: Nguoi,
-  ) => Promise<{ goi: () => Promise<KetQua>; chup: () => Promise<unknown>; file?: boolean }>;
+  ) => Promise<{ goi: () => Promise<KetQua>; chup: () => Promise<unknown>; file?: string }>;
 };
 
 async function chayCaThuHoi(ca: Ca): Promise<void> {
@@ -131,6 +131,7 @@ async function chayCaThuHoi(ca: Ca): Promise<void> {
   await dangNhapDuAn(u, projectId);
   const { goi: r1, chup, file } = await ca.dung(projectId, u);
   const truoc = await chup();
+  // `file` = tiền tố tên file của chính ca này — không đếm nhầm file của test khác chạy song song.
   const fileTruoc = file ? await fileUpload() : null;
   await dangNhapDuAn(u, projectId);
   const { kq, ket } = await thuHoiGiuaChung(projectId, u.role, ca.perm, r1);
@@ -138,7 +139,7 @@ async function chayCaThuHoi(ca: Ca): Promise<void> {
   assert.ok(ket, "R1 phải chờ khoá tái kiểm quyền lúc ghi");
   assert.deepEqual(await chup(), truoc, "DB phải giữ nguyên khi bị thu hồi quyền giữa chừng");
   if (fileTruoc) {
-    const moi = [...(await fileUpload())].filter((f) => !fileTruoc.has(f));
+    const moi = [...(await fileUpload())].filter((f) => f.startsWith(file!) && !fileTruoc.has(f));
     assert.deepEqual(moi, [], "file vừa lưu phải được dọn khi bị từ chối");
   }
 }
@@ -305,7 +306,7 @@ const CAC_CA: Ca[] = [
       return {
         goi: () => rq(() => POST(formReq(`/x`, pdfForm()), P(id))),
         chup: () => q1(`SELECT cert_file_name FROM equipment WHERE id = ?`, id),
-        file: true,
+        file: `eq${id}-cert-`,
       };
     },
   },
@@ -361,7 +362,7 @@ const CAC_CA: Ca[] = [
       return {
         goi: () => rq(() => POST(formReq(`/x`, pdfForm({ rev: "B" })), P(id))),
         chup: () => q1(`SELECT COUNT(*)::int AS n FROM drawing_revisions WHERE drawing_id = ?`, id),
-        file: true,
+        file: `dr${id}-b-`,
       };
     },
   },
@@ -561,7 +562,7 @@ const CAC_CA: Ca[] = [
       return {
         goi: () => rq(() => POST(formReq("/x", pdfForm({ title: "HDSD" })))),
         chup: () => dem("om_documents", pid),
-        file: true,
+        file: `om${pid}-`,
       };
     },
   },
@@ -640,7 +641,7 @@ const CAC_CA: Ca[] = [
             ),
           ),
         chup: () => q1(`SELECT kind, file_name FROM certifications WHERE id = ?`, id),
-        file: true,
+        file: `cert${id}-`,
       };
     },
   },
@@ -751,7 +752,7 @@ const CAC_CA: Ca[] = [
             ),
           ),
         chup: () => q1(`SELECT title, file_name FROM env_permits WHERE id = ?`, id),
-        file: true,
+        file: `ep${id}-`,
       };
     },
   },
