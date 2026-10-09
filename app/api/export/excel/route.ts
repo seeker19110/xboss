@@ -3,7 +3,8 @@ import ExcelJS from "exceljs";
 import { query, queryOne, todayISO } from "@/lib/db";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/tien-do/status";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getCurrentProjectId, getCurrentProjectIdStrict } from "@/lib/ha-tang/projects";
+import { giaTriTheoTangHe } from "@/lib/tai-chinh/gia-tri-tang";
 import {
   buildTrackingTab,
   safeTabName,
@@ -21,6 +22,9 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  const type = req.nextUrl.searchParams.get("type");
+  if (type === "payments") return exportThanhToan(user);
+  if (type) return NextResponse.json({ error: "Loại export không hợp lệ" }, { status: 400 });
   if (!CAN.export(user.role))
     return NextResponse.json(
       { error: "Bạn không có quyền export (chỉ Admin/PM)" },
@@ -212,6 +216,86 @@ export async function GET(req: NextRequest) {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="XBoss-${fileTag}${onlySheet ? "-" + slug : ""}-${today}.xlsx"`,
+    },
+  });
+}
+
+// `?type=payments` — bảng giá trị theo tầng × hệ của trang Thanh toán (cùng quyền/dự án với
+// GET /api/payments). Tiền ghi `Number(text)` CHỈ để hiển thị; dòng tổng lấy tổng SQL.
+async function exportThanhToan(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
+  if (!CAN.viewPayments(user.role))
+    return NextResponse.json({ error: "Chỉ Admin/PM/BCH được xem thanh toán" }, { status: 403 });
+  const projectId = await getCurrentProjectIdStrict(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án đang chọn" }, { status: 404 });
+
+  const { rows, totalContract, totalEarned } = await giaTriTheoTangHe(projectId);
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Thanh toán");
+  ws.columns = [
+    { width: 14 },
+    { width: 10 },
+    { width: 22 },
+    { width: 14 },
+    { width: 8 },
+    { width: 14 },
+    { width: 20 },
+    { width: 24 },
+  ];
+  styleHeader(
+    ws.addRow([
+      "Hệ",
+      "Tầng",
+      "Người phụ trách",
+      "Số công việc",
+      "Trễ",
+      "Tiến độ (%)",
+      "Giá trị HĐ (đ)",
+      "Giá trị theo tiến độ (đ)",
+    ]),
+  );
+  for (const r of rows) {
+    const row = ws.addRow([
+      r.sheetType,
+      r.floorLabel,
+      r.responsible ?? "",
+      r.taskCount,
+      r.delayed,
+      r.progress ?? 0,
+      Number(r.contractValue),
+      Number(r.earned),
+    ]);
+    row.getCell(6).numFmt = "0.0%";
+    row.getCell(7).numFmt = "#,##0";
+    row.getCell(8).numFmt = "#,##0";
+  }
+  const tong = ws.addRow([
+    "Tổng cộng",
+    "",
+    "",
+    "",
+    "",
+    "",
+    Number(totalContract),
+    Number(totalEarned),
+  ]);
+  tong.font = { bold: true };
+  tong.getCell(7).numFmt = "#,##0";
+  tong.getCell(8).numFmt = "#,##0";
+  ws.views = [{ state: "frozen", ySplit: 1 }];
+
+  const project = await queryOne<{ code: string | null }>(
+    `SELECT code FROM projects WHERE id = ?`,
+    projectId,
+  );
+  const fileTag = (project?.code ?? String(projectId)).replace(/[^\w-]/g, "-");
+  const buf = await wb.xlsx.writeBuffer();
+  return new NextResponse(new Uint8Array(buf), {
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="thanh-toan-${fileTag}-${todayISO()}.xlsx"`,
+      "Cache-Control": "private, no-store",
     },
   });
 }

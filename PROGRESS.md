@@ -1,5 +1,14 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — Nút Excel trang Thanh toán xuất đúng bảng tầng × hệ
+
+- `/api/export/excel?type=payments` trước đây bỏ qua `type`, trả workbook tracking. Nay xuất tab
+  "Thanh toán" (Hệ, Tầng, Người phụ trách, Số CV, Trễ, Tiến độ, Giá trị HĐ, Giá trị theo tiến độ;
+  dòng "Tổng cộng" lấy tổng SQL), quyền `CAN.viewPayments` (bch được), dự án strict → 404,
+  `type` lạ → 400; không `type` giữ nguyên hành vi cũ.
+- Tách 2 câu SQL của `GET /api/payments` sang `lib/tai-chinh/gia-tri-tang.ts`
+  (`giaTriTheoTangHe`) dùng chung. Test: `tests/export-thanh-toan.test.ts`.
+
 ## 2026-10-09 — Dọn nợ nhỏ: seed mẫu xoá bảng offline, S00 nhận resolver Strict, bỏ `payrollTotals`
 
 - `scripts/seed-sample.ts`: TRUNCATE thêm `offline_vault_keys`, `audit_operation_receipts` (CASCADE kéo
