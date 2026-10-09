@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
-import { resolveSystemId } from "@/lib/tien-do/systems";
+import { PHAM_VI_UPLOAD, resolveSystemId } from "@/lib/tien-do/systems";
 import { query } from "@/lib/db";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
@@ -25,7 +25,7 @@ export async function GET(
   }
 
   // A1-AC02: không có dự án khả kiến → 404, không query lịch sử upload toàn hệ. Bản ghi
-  // project_id NULL là lịch sử cũ trước khi có đa dự án — vẫn hiện như trước.
+  // project_id NULL là lịch sử cũ trước khi có đa dự án — chỉ hiện trong tổ chức người upload.
   const projectId = await getCurrentProjectId(user);
   if (projectId == null) return NextResponse.json({ error: "Không tìm thấy hệ" }, { status: 404 });
 
@@ -48,12 +48,13 @@ export async function GET(
             su.created_at AS "createdAt"
        FROM system_uploads su
        LEFT JOIN users u ON su.uploaded_by = u.id
-      WHERE su.system_id = ? AND su.kind = ? AND (su.project_id = ? OR su.project_id IS NULL)
+      WHERE su.system_id = ? AND su.kind = ? AND ${PHAM_VI_UPLOAD}
       ORDER BY su.created_at DESC
       LIMIT 20`,
     systemId,
     kind,
     projectId,
+    user.orgId,
   );
 
   const formatted = list.map((item) => ({

@@ -1807,7 +1807,8 @@ test("GET /api/system-uploads/:id/file: không tồn tại → 404", S, async ()
   assert.equal(res.status, 404);
 });
 
-test("GET /api/system-uploads/:id/file: thuộc dự án khác → 403", S, async () => {
+// AUDIT-S16 nợ 8: khác dự án → 404 như không tồn tại (403 cũ lộ id có thật).
+test("GET /api/system-uploads/:id/file: thuộc dự án khác → 404", S, async () => {
   const { insertId } = await import("@/lib/db");
   const projectA = await taoDuAn("sysupfile-403A");
   const projectB = await taoDuAn("sysupfile-403B");
@@ -1825,7 +1826,7 @@ test("GET /api/system-uploads/:id/file: thuộc dự án khác → 403", S, asyn
   const res = await GET(getreq("/x"), {
     params: Promise.resolve({ id: String(uploadId) }),
   });
-  assert.equal(res.status, 403);
+  assert.equal(res.status, 404);
 });
 
 test("GET /api/system-uploads/:id/file: file tồn tại → trả đúng byte đã lưu", S, async () => {

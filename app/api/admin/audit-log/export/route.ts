@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
   const projectId = await getCurrentProjectId(me);
   if (projectId == null)
     return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
-  const { where, params } = buildAuditFilter(req.nextUrl.searchParams, projectId);
+  const { where, params } = buildAuditFilter(req.nextUrl.searchParams, projectId, me.orgId);
 
   const rows = await query<AuditExportRow>(
     `SELECT al.at, u.name AS "actorName", al.actor_role AS "actorRole",

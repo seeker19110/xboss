@@ -103,20 +103,25 @@ có thể tái phát lỗi**; nên siết dần sang `projectId: number`:
   engineering-workflow, qaqc, tech
 - `lib/khoi-luong/norms.ts` `overNormItems`, `lib/vat-tu/equipment.ts`, `lib/van-hanh/alerts.ts`
 
-## Phát hiện ngoài phạm vi (CHƯA sửa — chuyển phiên chính)
+## Phát hiện ngoài phạm vi (chuyển phiên chính — trạng thái cập nhật 2026-10-09)
 
-1. **`POST /api/dimensions/rename` không có scope dự án/org**: `packageId` lấy từ body, đổi tên cột
-   dimension của sheet bất kỳ — ghi xuyên org vào vùng tracking. Mức cao.
-2. `PATCH /api/nav-settings` (global) gửi thông báo cho **mọi PM toàn hệ**
-   (`SELECT id FROM users WHERE role = 'pm'`), không lọc org.
-3. `audit_log` không có `org_id` → hàng `project_id IS NULL` của org khác vẫn hiện trong
-   `admin/audit-log` (cần cột org hoặc lọc qua `users.org_id` của actor).
-4. `custom_field_defs` toàn cục (`project_id NULL`) không lọc org.
-5. Unique index `ux_flow_active` toàn hệ: flow toàn cục active của org B chặn org A tạo flow cùng loại.
-6. `allocationOverNorm` gọi `overNormItems()` không tham số (toàn hệ).
-7. `stageMissingList` JOIN `work_packages` theo `floor_label` không ràng dự án ở phía WP.
-8. `system-uploads/[id]/file`: hàng `project_id NULL` legacy vẫn đọc được bởi user có dự án; 403 (thay
-   vì 404) khi khác dự án lộ sự tồn tại của id.
+1. ~~**`POST /api/dimensions/rename` không có scope dự án/org**~~ — đã sửa cùng PR S16 (JOIN theo dự án
+   hiện hành, test `route-tien-do-3`).
+2. ~~`PATCH /api/nav-settings` (global) gửi thông báo cho mọi PM toàn hệ~~ — đã sửa 2026-10-09: chỉ PM
+   `org_id` của admin.
+3. ~~`audit_log` không có `org_id` → hàng `project_id IS NULL` của org khác vẫn hiện~~ — đã sửa
+   2026-10-09: `buildAuditFilter(…, orgId)` chỉ giữ bản ghi toàn cục khi `users.org_id` của người thao
+   tác = org người xem (dòng không có người thao tác bị ẩn). Không thêm cột.
+4. ~~`custom_field_defs` toàn cục không lọc org~~ — đọc đã do FORCE RLS org (0165) chặn; unique index
+   `(entity_type, phạm vi, key)` toàn hệ đổi sang theo org ở migration 0169.
+5. ~~Unique index `ux_flow_active` toàn hệ~~ — migration 0169: `ux_flow_org_active (org_id, entity_type,
+COALESCE(project_id, 0)) WHERE active` (cùng mẫu `ux_alert_rule_org_active` ở 0161).
+6. ~~`allocationOverNorm` gọi `overNormItems()` không tham số~~ — đã sửa 2026-10-09: lọc theo
+   `proposals.project_id`.
+7. ~~`stageMissingList` JOIN `work_packages` không ràng dự án~~ — đã sửa 2026-10-09 (PR #621).
+8. ~~`system-uploads/[id]/file`: legacy NULL đọc được; 403 lộ id~~ — đã sửa 2026-10-09: hàng NULL chỉ
+   hiện/tải được khi người upload cùng tổ chức (`PHAM_VI_UPLOAD`, `lib/tien-do/systems.ts`, dùng chung
+   cho route lịch sử upload); khác dự án → 404.
 9. `tests/project-scope-invariant.test.ts` đỏ sẵn trên `3d09fa5` vì `app/api/ready` (Q-AC07) chưa vào
    WHITELIST — không do PR này.
 

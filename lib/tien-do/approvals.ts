@@ -813,8 +813,8 @@ export async function listApprovalFlows(
   }));
 }
 
-// Tạo flow mới + bước. Unique index ux_flow_active (entity_type, COALESCE(project_id,0))
-// chặn 2 flow active cùng lúc cho cùng (loại, phạm vi dự án) → dịch 23505 thành lỗi
+// Tạo flow mới + bước. Unique index ux_flow_org_active (org_id, entity_type, COALESCE(project_id,0))
+// chặn 2 flow active cùng lúc cho cùng (tổ chức, loại, phạm vi dự án) → dịch 23505 thành lỗi
 // thân thiện thay vì để lộ lỗi Postgres thô.
 export async function createApprovalFlow(input: FlowInput): Promise<{ id: number } | string> {
   const err = validateFlowInput(input);

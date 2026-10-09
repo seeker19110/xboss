@@ -404,9 +404,12 @@ test("GET /api/admin/audit-log: lọc theo entity trả đúng dòng", S, async 
   const projectId = await taoDuAn("aud-filter");
   const admin = await taoUser("admin", "aud-filter");
   const entityId = 424242 + seq;
+  // Bản ghi toàn cục chỉ hiện khi người thao tác cùng tổ chức người xem (AUDIT-S16 nợ 3).
   await insertId(
-    `INSERT INTO audit_log (entity_type, entity_id, action, changes) VALUES ('contracts', ?, 'INSERT', '{}')`,
+    `INSERT INTO audit_log (entity_type, entity_id, action, changes, actor_id)
+     VALUES ('contracts', ?, 'INSERT', '{}', ?)`,
     entityId,
+    admin.id,
   );
   await dangNhapDuAn(admin, projectId);
   const { GET } = await import("@/app/api/admin/audit-log/route");
