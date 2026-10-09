@@ -3,6 +3,7 @@ import { queryOne, query, run, withTransaction } from "@/lib/db";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { sheetTypeProjectId } from "@/lib/tien-do/workpackages";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { deriveStatus, recomputePackage } from "@/lib/tien-do/recompute";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,10 @@ export async function DELETE(
       `SELECT is_approved FROM floor_approvals WHERE id = ? FOR UPDATE`,
       id,
     );
+    // D01: CAN.approve đầu route dùng snapshot lúc xác thực — tái kiểm với dữ liệu có hiệu lực
+    // dưới khoá dòng nghiệm thu tầng, trước mọi lần ghi.
+    if (!(await kiemQuyenTaiLucGhi(() => CAN.approve(user.role))))
+      throw Object.assign(new Error("Chỉ Admin/PM được huỷ nghiệm thu"), { status: 403 });
     if (!locked?.is_approved)
       throw Object.assign(new Error("Tầng này chưa được duyệt nghiệm thu"), { status: 409 });
 

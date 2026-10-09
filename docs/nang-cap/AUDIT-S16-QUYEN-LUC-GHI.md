@@ -25,7 +25,7 @@ của nhóm tài chính + quản trị và ghi rõ route nào đã áp, route n�
 ## 2. Bảng kiểm kê (route · method · quyền CAN · transaction ghi trước khi áp · quyết định)
 
 Cột "tx trước": route đã có `withTransaction`/`withProjectScope` quanh phần ghi ở `2820ebe` hay chưa.
-Ba route nghiệm thu đã áp ở `2820ebe` ngoài bảng này: `tasks/[id]/approve` (POST, DELETE), `approvals` (POST).
+Ba route nghiệm thu đã áp ở `2820ebe` ngoài bảng này: `tasks/[id]/approve` (POST, DELETE), `approvals` (POST). Bổ sung theo audit-logic: `floor-approvals/[id]` DELETE (huỷ nghiệm thu tầng, `CAN.approve`, đã có transaction + `FOR UPDATE floor_approvals`) — ĐÃ ÁP, ca test trong `tests/s16-stale-snapshot.test.ts`.
 
 | Route (`app/api/…`)              | Method | CAN                   | tx trước | Quyết định                                                                                                                                                                |
 | -------------------------------- | ------ | --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -158,6 +158,7 @@ Ba route nghiệm thu đã áp ở `2820ebe` ngoài bảng này: `tasks/[id]/app
   `payment-certs/:id` PATCH (manageContracts, kẹt khoá HĐ), `variations/:id/contract-add` POST
   (manageContracts, kẹt khoá VO), `advances/:id` PATCH hoàn ứng (manageFinance, kẹt `LOCK TABLE advances`),
   `admin/webhooks/:id` PATCH (manageIntegrations — đường quản trị).
+- Huỷ nghiệm thu tầng: 2 ca (deny giữa chừng, đối chứng) trong `tests/s16-stale-snapshot.test.ts`; ca deny đỏ trên code cũ (`200 !== 403`).
 - Trên code `2820ebe` (route cũ), 4 ca deny ĐỎ (`200 !== 403`, `201 !== 403`), 4 ca đối chứng xanh; sau khi áp
   cả 8 xanh.
 - Không có ca "deny→allow" riêng cho 4 route này vì route có kiểm `CAN` ở đầu: snapshot deny thì 403 ngay trước

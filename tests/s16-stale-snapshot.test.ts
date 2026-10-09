@@ -383,6 +383,93 @@ test(
   },
 );
 
+// ── Huỷ nghiệm thu tầng: DELETE /api/floor-approvals/:id ────────────────────────────────
+
+async function dungTangDaDuyet(f: SoFixture) {
+  const { insertId, run } = await import("@/lib/db");
+  const pm = await f.user("pm");
+  const admin = await f.user("admin");
+  const projectId = await f.duAn("S16FLOOR");
+  const cay = await f.wbs(projectId, { soO: 1, floorLabel: "T1" });
+  await run(
+    `UPDATE tasks SET progress_percent = 1, status = 'nghiem_thu' WHERE id = ?`,
+    cay.taskId,
+  );
+  const approvalId = await insertId(
+    `INSERT INTO floor_approvals (sheet_type_id, floor_label, is_approved, approved_at)
+     VALUES (?, 'T1', TRUE, now())`,
+    cay.sheetTypeId,
+  );
+  return { pm, admin, projectId, approvalId, taskId: cay.taskId };
+}
+
+async function huyTang(f: SoFixture, pm: NguoiTest, projectId: number, approvalId: number) {
+  const { DELETE } = await import("@/app/api/floor-approvals/[id]/route");
+  await f.vao(pm, projectId);
+  return goi(
+    requestRieng(() =>
+      DELETE(jreq(`/api/floor-approvals/${approvalId}`, {}, "DELETE"), P(approvalId)),
+    ),
+  );
+}
+
+async function trangThaiTang(approvalId: number, taskId: number) {
+  const { queryOne } = await import("@/lib/db");
+  const a = await queryOne<{ is_approved: boolean }>(
+    `SELECT is_approved FROM floor_approvals WHERE id = ?`,
+    approvalId,
+  );
+  const t = await queryOne<{ status: string }>(`SELECT status FROM tasks WHERE id = ?`, taskId);
+  return { duyet: a?.is_approved, task: t?.status };
+}
+
+const KHOA_TANG = `SELECT id FROM floor_approvals WHERE id = $1 FOR UPDATE`;
+
+test(
+  "A1-AC05/Q-AC01 (D01): huỷ nghiệm thu tầng — admin siết approve khi R1 còn kẹt khoá floor_approvals ⇒ R1 403, tầng + task không đổi",
+  S,
+  async () => {
+    const f = new SoFixture();
+    try {
+      const c = await dungTangDaDuyet(f);
+      const r1 = await chenGiuaKhoa(
+        KHOA_TANG,
+        [c.approvalId],
+        () => huyTang(f, c.pm, c.projectId, c.approvalId),
+        () => datOverride(f, c.admin, c.projectId, false),
+      );
+      assert.equal(r1.status, 403, `R1 huỷ bằng snapshot stale: ${JSON.stringify(r1.body)}`);
+      assert.deepEqual(await trangThaiTang(c.approvalId, c.taskId), {
+        duyet: true,
+        task: "nghiem_thu",
+      });
+    } finally {
+      await f.don();
+    }
+  },
+);
+
+test(
+  "A1-AC05 (đối chứng): huỷ nghiệm thu tầng — không đổi quyền giữa chừng ⇒ R1 qua cùng điểm chèn vẫn 200, tầng bỏ cờ duyệt",
+  S,
+  async () => {
+    const f = new SoFixture();
+    try {
+      const c = await dungTangDaDuyet(f);
+      const r1 = await chenGiuaKhoa(
+        KHOA_TANG,
+        [c.approvalId],
+        () => huyTang(f, c.pm, c.projectId, c.approvalId),
+        async () => {},
+      );
+      assert.equal(r1.status, 200, JSON.stringify(r1.body));
+      assert.equal((await trangThaiTang(c.approvalId, c.taskId)).duyet, false);
+    } finally {
+      await f.don();
+    }
+  },
+);
+
 // ── Lớp lib: khe "đã tái kiểm → deny commit → ghi commit" được đóng bằng khoá advisory ─────
 
 test(

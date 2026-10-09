@@ -74,6 +74,13 @@ test("webhook: admin không thể gắn webhook vào dự án của org khác", 
         id === 11 && orgId === 1 ? { id } : undefined,
       insertId: async () => ++inserts,
     },
+    // D01: route tái kiểm quyền lúc ghi qua ghiNeuConQuyen — stub biên: luôn còn quyền, chạy thẳng `ghi`.
+    "@/lib/bao-mat/permissions": {
+      ghiNeuConQuyen: async (_kiem: () => boolean, ghi: () => Promise<unknown>) => ({
+        ok: true,
+        value: await ghi(),
+      }),
+    },
     "@/lib/bao-mat/webhooks": harness().hooks,
   });
   const request = (projectId: number | null) => ({

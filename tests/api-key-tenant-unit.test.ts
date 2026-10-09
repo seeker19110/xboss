@@ -20,6 +20,15 @@ mock.module("@/lib/bao-mat/auth", {
     CAN: { manageIntegrations: () => true },
   },
 });
+// D01: route tái kiểm quyền lúc ghi qua ghiNeuConQuyen — stub biên: luôn còn quyền, chạy thẳng `ghi`.
+mock.module("@/lib/bao-mat/permissions", {
+  namedExports: {
+    ghiNeuConQuyen: async (_kiem: () => boolean, ghi: () => Promise<unknown>) => ({
+      ok: true,
+      value: await ghi(),
+    }),
+  },
+});
 mock.module("@/lib/bao-mat/ratelimit", {
   namedExports: { hitRateLimit: async () => false },
 });
