@@ -111,7 +111,10 @@ test("audit: POST login trên DB chưa có user không khởi tạo tài khoản
   const route = load<Route>("app/api/auth/login/route.ts", {
     "next/server": next,
     "@/lib/nen/loi": LOI_STUB,
-    "@/lib/db": { queryOne: async () => undefined },
+    "@/lib/db": {
+      queryOne: async () => undefined,
+      withOrgScope: (_org: unknown, fn: () => Promise<unknown>) => fn(),
+    },
     "@/lib/bao-mat/auth": { ensureDefaultUsers: noSeed },
     "@/lib/bao-mat/ratelimit": {
       loginBlockedSeconds: async () => 0,
@@ -283,7 +286,10 @@ for (const enabled2fa of [false, true]) {
     const route = load<Route>("app/api/auth/login/route.ts", {
       "next/server": next,
       "@/lib/nen/loi": LOI_STUB,
-      "@/lib/db": { queryOne: async () => user },
+      "@/lib/db": {
+        queryOne: async () => user,
+        withOrgScope: (_org: unknown, fn: () => Promise<unknown>) => fn(),
+      },
       "@/lib/bao-mat/auth": {
         ensureDefaultUsers: noSeed,
         verifyPassword: () => true,

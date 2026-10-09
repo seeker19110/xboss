@@ -34,6 +34,8 @@ mock.module("@/lib/bao-mat/ratelimit", {
 });
 mock.module("@/lib/db", {
   namedExports: {
+    // S16: phạm vi tổ chức (RLS 0165) là việc của DB thật — mock chỉ chạy thẳng fn.
+    withOrgScope: (_org: unknown, fn: () => Promise<unknown>) => fn(),
     queryOne: async (sql: string, ...values: unknown[]) => {
       if (sql.includes("FROM api_keys"))
         return { id: 1, projectId, orgId: 10, scopes: ["read"], createdBy: 11 };

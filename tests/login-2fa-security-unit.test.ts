@@ -39,16 +39,20 @@ mock.module("@/lib/bao-mat/auth", {
 mock.module("@/lib/bao-mat/ratelimit", {
   namedExports: { hitRateLimit: async () => false },
 });
+// Transaction giả: giữ "khoá" FOR UPDATE tới hết fn. S16 — route chạy bước 2 trong
+// withOrgScope(org, …, { readOnly: false }) (RLS 0165) nên withOrgScope dùng cùng transaction giả.
+async function giaoDichGia(fn: () => Promise<unknown>) {
+  const current: { release?: () => void } = {};
+  try {
+    return await tx.run(current, fn);
+  } finally {
+    current.release?.();
+  }
+}
 mock.module("@/lib/db", {
   namedExports: {
-    withTransaction: async (fn: () => Promise<unknown>) => {
-      const current: { release?: () => void } = {};
-      try {
-        return await tx.run(current, fn);
-      } finally {
-        current.release?.();
-      }
-    },
+    withTransaction: giaoDichGia,
+    withOrgScope: (_org: unknown, fn: () => Promise<unknown>) => giaoDichGia(fn),
     queryOne: async (sql: string) => {
       if (sql.includes("FOR UPDATE")) {
         const current = tx.getStore();

@@ -16,7 +16,7 @@ function appConnString(): string {
 }
 
 test(
-  "RLS org: bảng suppliers lọc theo GUC app.org_id (đọc + WITH CHECK ghi), GUC rỗng cho qua (giai đoạn chuyển tiếp PR3)",
+  "RLS org: bảng suppliers lọc theo GUC app.org_id (đọc + WITH CHECK ghi), GUC rỗng thấy 0 dòng (0165 khoá cửa)",
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
@@ -74,16 +74,12 @@ test(
         );
       });
 
-      // (2) GUC trống (chưa đặt) — giai đoạn chuyển tiếp PR3: vẫn cho qua (chưa khoá cửa).
+      // (2) GUC trống (chưa đặt) — S16 / migration 0165 đã khoá cửa: KHÔNG thấy dòng nào.
       const allSeen = await appPool.query<{ org_id: number }>(
         `SELECT org_id FROM suppliers WHERE id IN ($1, $2)`,
         [supA, supB],
       );
-      assert.equal(
-        allSeen.rows.length,
-        2,
-        "GUC trống phải cho qua ở giai đoạn chuyển tiếp PR3 (chưa khoá cửa)",
-      );
+      assert.equal(allSeen.rows.length, 0, "GUC trống không được cho qua sau 0165 (khoá cửa)");
 
       // (3) GUC = '*' — ngữ cảnh cross-org hợp lệ: thấy tất.
       await withGuc("*", async (c) => {

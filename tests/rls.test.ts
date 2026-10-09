@@ -456,7 +456,7 @@ test(
       "tender_packages",
       "variation_orders",
     ];
-    // Nhóm bảng theo tổ chức/cấu hình (M51 GĐ0 + M50/M52).
+    // Nhóm bảng theo tổ chức/cấu hình (M51 GĐ0 + M50/M52) — 0080, khoá cửa ở 0165 (S16).
     const TO_CHUC = [
       "alert_rules",
       "api_keys",
@@ -466,7 +466,7 @@ test(
       "custom_field_defs",
       "feature_flags",
       "integrations",
-      // S02e (migration 0161): ngưỡng cảnh báo chi phí theo tổ chức — khuôn 3 nhánh của 0080.
+      // S02e (migration 0161): ngưỡng cảnh báo chi phí theo tổ chức — khuôn của 0080 (0165 khoá).
       "org_cost_settings",
       "projects",
       "role_permissions",
@@ -501,7 +501,8 @@ test(
     // 3 bảng kế hoạch/mặt trận vào trục dự án (M123 PR1, migration 0149): baselines +
     // floor_stage_fronts dùng khuôn 3 nhánh của 0069 (project_id NOT NULL sau backfill);
     // construction_stages có thêm nhánh `project_id IS NULL` = danh mục công tác dùng chung
-    // mọi dự án (7 công tác seed của 0046 giữ nguyên nghĩa — D1 của M123).
+    // mọi dự án (7 công tác seed của 0046 giữ nguyên nghĩa — D1 của M123). 0165 (S16) bỏ nhánh
+    // "GUC rỗng → cho qua" của cả ba (giữ nhánh `project_id IS NULL` của construction_stages).
     const KE_HOACH = ["baselines", "construction_stages", "floor_stage_fronts"];
 
     // Snapshot quyết định IPC bất biến (QUALITY-FINAL-1 S13c, migration 0160): policy theo
