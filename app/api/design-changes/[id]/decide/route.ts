@@ -33,7 +33,10 @@ export async function POST(
       { status: 422 },
     );
 
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → 404, không quyết DC của dự án nào.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy thay đổi thiết kế" }, { status: 404 });
   const result = await decideDesignChange({
     designChangeId: id,
     decision,

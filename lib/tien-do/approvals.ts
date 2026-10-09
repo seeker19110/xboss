@@ -752,15 +752,16 @@ export function validateFlowInput(input: {
   return validateFlowSteps(input.steps);
 }
 
-// Danh sách mọi flow (xuyên dự án — trang admin cần thấy toàn cảnh, xem whitelist
-// "admin/approval-flows" trong tests/project-scope-invariant.test.ts) kèm bước + số
-// request (tổng/đang chờ) để UI cảnh báo trước khi sửa/xoá.
-// projectId != null → chỉ trả flow của dự án đó + flow toàn cục (project_id IS NULL),
-// nhất quán với cách scope theo dự án của M22. projectId = null (DB chưa có dự án/chưa
-// chọn) → không lọc, trả hết (tương thích ngược).
-export async function listApprovalFlows(projectId?: number | null): Promise<ApprovalFlowAdmin[]> {
-  const where = projectId != null ? `WHERE (f.project_id = ? OR f.project_id IS NULL)` : "";
-  const scopeParams = projectId != null ? [projectId] : [];
+// Danh sách flow kèm bước + số request (tổng/đang chờ) để UI cảnh báo trước khi sửa/xoá:
+// flow của dự án đang chọn + flow toàn cục (project_id IS NULL) CỦA TỔ CHỨC người gọi
+// (nhất quán M22 + D01). AUDIT-S16 null-scope: trước đây projectId null = trả hết mọi tổ
+// chức, và flow toàn cục không lọc org — route không có dự án khả kiến tự trả rỗng.
+export async function listApprovalFlows(
+  orgId: number,
+  projectId: number,
+): Promise<ApprovalFlowAdmin[]> {
+  const where = `WHERE f.org_id = ? AND (f.project_id = ? OR f.project_id IS NULL)`;
+  const scopeParams = [orgId, projectId];
   const flows = await query<{
     id: number;
     projectId: number | null;

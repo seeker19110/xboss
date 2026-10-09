@@ -175,8 +175,8 @@ export const MODULES: ModuleDef[] = [
     key: "ops",
     nav: [],
     permKeys: [],
-    swExclude: ["/api/health"],
-    routePrefix: ["/api/health"],
+    swExclude: ["/api/health", "/api/ready"],
+    routePrefix: ["/api/health", "/api/ready"],
   },
   {
     // Audit trail toàn hệ (M43 PR2) — sổ audit_log ghi bằng trigger, chỉ Admin xem.

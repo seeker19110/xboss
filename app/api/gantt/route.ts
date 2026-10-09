@@ -17,9 +17,19 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const systemId = await resolveSystemId(req.nextUrl.searchParams.get("system"));
-  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc.
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → Gantt rỗng đúng shape, không dựng CPM
+  // toàn hệ (trước đây null = không lọc → lộ nhóm việc mọi tổ chức).
   const projectId = await getCurrentProjectId(user);
-  const { nodes, edges, meta } = await getCpmData(systemId, projectId ?? undefined);
+  if (projectId == null)
+    return NextResponse.json({
+      bars: [],
+      deps: [],
+      blocked: [],
+      critical: [],
+      criticalDeps: [],
+      float: {},
+    });
+  const { nodes, edges, meta } = await getCpmData(systemId, projectId);
   const bars = [...meta.values()];
 
   // Nhóm bị chặn: đã tới ngày bắt đầu, chưa xong, mà còn việc trước chưa hoàn thành (progress < 1).

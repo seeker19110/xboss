@@ -128,3 +128,24 @@ export function phanHoiXungDotPhuThuoc(
 ): NextResponse {
   return NextResponse.json({ error: thongDiep, code: "dependency_conflict" }, { status: 409 });
 }
+
+/** Lỗi `DatabaseSchemaNotReadyError` của lib/db (nhận diện qua `code`, tầng 0 không import lib/db). */
+export function laLoiSchemaChuaSan(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { code?: unknown }).code === "XBOSS_SCHEMA_NOT_READY"
+  );
+}
+
+/**
+ * 503 `schema_not_ready` chuẩn (Q-AC07) cho route chạm DB khi schema thiếu/lỗi thời — thay cho
+ * 500 khung Next. Thông điệp cố định: không lộ chuỗi kết nối, tên migration hay trạng thái user.
+ * Mẫu: `try { … } catch (err) { if (laLoiSchemaChuaSan(err)) return phanHoiSchemaChuaSan(); throw err; }`
+ */
+export function phanHoiSchemaChuaSan(): NextResponse {
+  return NextResponse.json(
+    { error: "Hệ thống đang bảo trì cơ sở dữ liệu, thử lại sau", code: "schema_not_ready" },
+    { status: 503, headers: { "Retry-After": "30", "Cache-Control": "private, no-store" } },
+  );
+}

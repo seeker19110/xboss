@@ -3,6 +3,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { moneyInputErrorBody, parseOptionalMoneyInput } from "@/lib/nen/money";
 import { getClaim, settleClaim } from "@/lib/tai-chinh/claims";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -45,13 +46,20 @@ export async function POST(
       ? body.settlementNote.trim()
       : null;
 
-  const result = await settleClaim({
-    claimId: id,
-    amountSettled,
-    daysSettled,
-    settlementNote,
-    settledBy: user.id,
-  });
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực trong cùng transaction với settleClaim (reentrant).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.approve(user.role),
+    () =>
+      settleClaim({
+        claimId: id,
+        amountSettled,
+        daysSettled,
+        settlementNote,
+        settledBy: user.id,
+      }),
+  );
+  if (!kq.ok) return NextResponse.json({ error: "Chỉ Admin/PM được chốt claim" }, { status: 403 });
+  const result = kq.value;
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: 409 });
   return NextResponse.json({ ok: true });
 }

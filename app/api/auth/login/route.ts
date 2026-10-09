@@ -11,6 +11,7 @@ import {
   COOKIE_MAX_AGE,
   type Role,
 } from "@/lib/bao-mat/auth";
+import { laLoiSchemaChuaSan, phanHoiSchemaChuaSan } from "@/lib/nen/loi";
 import {
   loginBlockedSeconds,
   recordLoginFailure,
@@ -27,6 +28,16 @@ function clientIp(req: NextRequest): string {
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    return await dangNhap(req);
+  } catch (err) {
+    // Q-AC07: schema thiếu → 503 JSON; chưa chạm bước đếm sai mật khẩu nên không tính rate-limit.
+    if (laLoiSchemaChuaSan(err)) return phanHoiSchemaChuaSan();
+    throw err;
+  }
+}
+
+async function dangNhap(req: NextRequest) {
   const body: unknown = await req.json().catch(() => null);
   // JSON hợp lệ vẫn có thể là null/mảng/giá trị đơn; không destructure trước khi kiểm kiểu.
   if (!body || typeof body !== "object" || Array.isArray(body))

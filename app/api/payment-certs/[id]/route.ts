@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withProjectScope, withTransaction } from "@/lib/db";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
@@ -176,6 +177,12 @@ export async function PATCH(
         projectId != null ? await khoaHopDongVaDot(id, projectId, user.orgId) : undefined;
       if (!existing)
         throw Object.assign(new Error("Không tìm thấy đợt thanh toán"), { status: 404 });
+      // D01: quyền kiểm đầu route dùng snapshot lúc xác thực — tái kiểm với dữ liệu có hiệu lực
+      // dưới khoá hợp đồng/đợt, trước mọi lần ghi.
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.manageContracts(user.role))))
+        throw Object.assign(new Error("Bạn không có quyền sửa đợt thanh toán (chỉ Admin/PM)"), {
+          status: 403,
+        });
       if (existing.status !== "draft")
         throw Object.assign(new Error("Chỉ sửa được đợt đang ở trạng thái nháp"), { status: 409 });
 

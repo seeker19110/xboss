@@ -390,7 +390,7 @@ test(
 );
 
 test(
-  "listApprovalFlows(projectId): chỉ trả flow của dự án đó + flow toàn cục (project_id NULL); null → trả hết",
+  "listApprovalFlows(orgId, projectId): chỉ trả flow của dự án đó + flow toàn cục (project_id NULL) của tổ chức",
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
@@ -428,16 +428,14 @@ test(
       const id2 = (f2 as { id: number }).id;
       flowIds.push(idG, id1, id2);
 
-      const forP1 = (await listApprovalFlows(p1)).map((f) => f.id);
+      const forP1 = (await listApprovalFlows(1, p1)).map((f) => f.id);
       assert.ok(forP1.includes(id1), "phải thấy flow dự án p1");
       assert.ok(forP1.includes(idG), "phải thấy flow toàn cục");
       assert.ok(!forP1.includes(id2), "KHÔNG được thấy flow dự án p2");
 
-      const all = (await listApprovalFlows(null)).map((f) => f.id);
-      assert.ok(
-        [idG, id1, id2].every((id) => all.includes(id)),
-        "null phải trả hết",
-      );
+      // AUDIT-S16: flow toàn cục chỉ hiện cho đúng tổ chức sở hữu (không còn "null = trả hết").
+      const orgKhac = (await listApprovalFlows(1_000_000_000, p1)).map((f) => f.id);
+      assert.ok(!orgKhac.includes(idG), "tổ chức khác KHÔNG thấy flow toàn cục của org 1");
     } finally {
       for (const id of flowIds) {
         await run(`DELETE FROM approval_requests WHERE flow_id = ?`, id);

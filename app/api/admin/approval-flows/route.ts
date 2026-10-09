@@ -7,19 +7,23 @@ import {
   listApprovalFlows,
 } from "@/lib/tien-do/approvals";
 import { queryOne } from "@/lib/db";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/admin/approval-flows — danh sách mọi flow (xuyên dự án) kèm bước + số
-// request tổng/đang chờ. Admin/PM xem được (CAN.viewApprovalFlows); tạo/sửa/xoá chỉ Admin.
+// GET /api/admin/approval-flows — flow của dự án đang chọn + flow toàn cục của tổ chức, kèm
+// bước + số request tổng/đang chờ. Admin/PM xem được (CAN.viewApprovalFlows); tạo/sửa/xoá
+// chỉ Admin.
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.viewApprovalFlows(user.role))
     return NextResponse.json({ error: "Không có quyền xem cấu hình duyệt" }, { status: 403 });
 
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → rỗng, không trả flow mọi tổ chức.
   const projectId = await getCurrentProjectId(user);
-  const flows = await listApprovalFlows(projectId);
+  if (projectId == null) return NextResponse.json({ flows: [] });
+  const flows = await listApprovalFlows(user.orgId, projectId);
   return NextResponse.json({ flows });
 }
 
@@ -60,13 +64,21 @@ export async function POST(req: NextRequest) {
       }))
     : [];
 
-  const result = await createApprovalFlow({
-    projectId,
-    entityType,
-    name,
-    steps,
-    orgId: user.orgId,
-  });
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageApprovalFlows(user.role),
+    () =>
+      createApprovalFlow({
+        projectId,
+        entityType,
+        name,
+        steps,
+        orgId: user.orgId,
+      }),
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin được cấu hình luồng duyệt" }, { status: 403 });
+  const result = kq.value;
   if (typeof result === "string") {
     const status = result.startsWith("Đã có flow") ? 409 : 422;
     return NextResponse.json({ error: result }, { status });

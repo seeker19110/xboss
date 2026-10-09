@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne, run, withTransaction } from "@/lib/db";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { isValidDateISO } from "@/lib/nen/date";
@@ -84,6 +85,13 @@ export async function POST(
         projectId,
       );
       if (!contract) throw new ContractAddError("Hợp đồng không tồn tại", 422);
+
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực dưới khoá VO → hợp đồng, trước mọi lần ghi.
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.manageContracts(user.role))))
+        throw new ContractAddError(
+          "Bạn không có quyền đưa phát sinh vào phụ lục hợp đồng (chỉ Admin/PM)",
+          403,
+        );
 
       // Legacy schema has no source-VO FK on contract_addenda. The exact generated
       // note is the existing provenance marker; reject a pre-existing link rather

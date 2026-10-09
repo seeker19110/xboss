@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -72,12 +73,19 @@ export async function PATCH(
   }
 
   if (updates.length > 0) {
-    await run(
-      `UPDATE projects SET ${updates.join(", ")} WHERE id = ? AND org_id = ?`,
-      ...values,
-      id,
-      user.orgId,
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageProjects(user.role),
+      () =>
+        run(
+          `UPDATE projects SET ${updates.join(", ")} WHERE id = ? AND org_id = ?`,
+          ...values,
+          id,
+          user.orgId,
+        ),
     );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin mới sửa được dự án" }, { status: 403 });
   }
   return NextResponse.json({ ok: true });
 }

@@ -18,6 +18,7 @@ import {
 } from "@/lib/nen/money-dto";
 import { getEntityApprovalStatus } from "@/lib/tien-do/approvals";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -141,17 +142,25 @@ export async function PATCH(
       return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
   }
 
-  await run(
-    `UPDATE variation_orders SET title = ?, reason = ?, description = ?, system_id = ? WHERE id = ?`,
-    title,
-    reason,
-    description,
-    systemId,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi; 2 UPDATE cùng một transaction.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.viewVariations(user.role),
+    async () => {
+      await run(
+        `UPDATE variation_orders SET title = ?, reason = ?, description = ?, system_id = ? WHERE id = ?`,
+        title,
+        reason,
+        description,
+        systemId,
+        id,
+      );
+      // Đồng bộ hệ xuống mọi dòng KL con (VO đại diện 1 hệ duy nhất).
+      if (systemId !== existing.systemId)
+        await run(`UPDATE boq_items SET system_id = ? WHERE vo_id = ?`, systemId, id);
+    },
   );
-  // Đồng bộ hệ xuống mọi dòng KL con (VO đại diện 1 hệ duy nhất).
-  if (systemId !== existing.systemId)
-    await run(`UPDATE boq_items SET system_id = ? WHERE vo_id = ?`, systemId, id);
+  if (!kq.ok)
+    return NextResponse.json({ error: "Bạn không có quyền sửa phát sinh/VO" }, { status: 403 });
 
   return NextResponse.json({ updated: id });
 }

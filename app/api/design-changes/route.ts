@@ -25,7 +25,9 @@ export async function GET(req: NextRequest) {
   if (statusRaw && !(DESIGN_CHANGE_STATUSES as readonly string[]).includes(statusRaw))
     return NextResponse.json({ error: "Trạng thái không hợp lệ" }, { status: 422 });
 
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → danh sách rỗng, không đọc DC mọi tổ chức.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ items: [] });
   const items = await listDesignChanges({
     projectId,
     status: statusRaw as DesignChangeStatus | undefined,
@@ -47,13 +49,20 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
+  // AUDIT-S16: không có dự án khả kiến → không tạo DC mồ côi (project_id NULL) — cùng mã/thông
+  // điệp với các route tạo anh em ("Chưa có dự án nào để tạo …", 422).
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json(
+      { error: "Chưa có dự án nào để tạo thay đổi thiết kế" },
+      { status: 422 },
+    );
+
   const input = parseDesignChangeBody(body);
   const invalid = validateDesignChangeInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
-  const refErr = await checkDesignChangeRefs(input);
+  const refErr = await checkDesignChangeRefs(input, projectId);
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
-
-  const projectId = await getCurrentProjectId(user);
 
   const { id, code } = await withUniqueRetry(async () => {
     const code = await nextDesignChangeCode();

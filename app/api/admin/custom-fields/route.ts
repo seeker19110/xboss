@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, queryOne, insertId } from "@/lib/db";
 import { CUSTOM_KEY_RE, isCustomEntityType, isCustomFieldType } from "@/lib/ha-tang/custom-fields";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -85,20 +86,28 @@ export async function POST(req: NextRequest) {
 
   try {
     // M54 GĐ1 PR2: định nghĩa trường tuỳ biến thuộc org người tạo (không dựa DEFAULT org_id=1).
-    const id = await insertId(
-      `INSERT INTO custom_field_defs (project_id, entity_type, key, label, type, options, required, sort, active, org_id)
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageCustomFields(user.role),
+      () =>
+        insertId(
+          `INSERT INTO custom_field_defs (project_id, entity_type, key, label, type, options, required, sort, active, org_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      projectId,
-      entityType,
-      key,
-      label,
-      type,
-      options === null ? null : JSON.stringify(options),
-      required,
-      sort,
-      active,
-      user.orgId,
+          projectId,
+          entityType,
+          key,
+          label,
+          type,
+          options === null ? null : JSON.stringify(options),
+          required,
+          sort,
+          active,
+          user.orgId,
+        ),
     );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin được tạo trường tuỳ biến" }, { status: 403 });
+    const id = kq.value;
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
     if ((err as { code?: string }).code === "23505")

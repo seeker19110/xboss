@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, run, withTransaction } from "@/lib/db";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { moneyInputErrorBody, parseOptionalMoneyInput } from "@/lib/nen/money";
@@ -95,6 +96,11 @@ export async function POST(
 
   try {
     const id = await withTransaction(async () => {
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.manageTenders(user.role))))
+        throw Object.assign(new Error("Bạn không có quyền nhập giá chào (chỉ Admin/PM)"), {
+          status: 403,
+        });
       const id = await insertId(
         `INSERT INTO tender_bids (tender_id, supplier_id, lump_sum, note) VALUES (?, ?, ?, ?)`,
         tenderId,
@@ -119,6 +125,8 @@ export async function POST(
         { error: "Nhà thầu này đã có báo giá cho gói thầu — sửa báo giá cũ thay vì thêm mới" },
         { status: 409 },
       );
+    if ((err as { status?: number }).status === 403)
+      return NextResponse.json({ error: (err as Error).message }, { status: 403 });
     throw err;
   }
 }

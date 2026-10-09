@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { awardTender } from "@/lib/tai-chinh/tender";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,13 @@ export async function POST(
     return NextResponse.json({ error: "Không tìm thấy gói thầu" }, { status: 404 });
 
   try {
-    const { contractId } = await awardTender(id, bidId, user.id, projectId);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực trong cùng transaction với awardTender (reentrant).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.approve(user.role),
+      () => awardTender(id, bidId, user.id, projectId),
+    );
+    if (!kq.ok) return NextResponse.json({ error: "Chỉ Admin/PM được trao thầu" }, { status: 403 });
+    const { contractId } = kq.value;
     return NextResponse.json({ awarded: id, contractId });
   } catch (err: unknown) {
     return phanHoiLoiCoStatus(err);

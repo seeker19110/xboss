@@ -4,6 +4,7 @@ import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { parsePayrollBody, validatePayrollInput, type PayrollInput } from "@/lib/tai-chinh/finance";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -92,21 +93,31 @@ export async function PATCH(
     if (!person) return NextResponse.json({ error: "Nhân sự không tồn tại" }, { status: 422 });
   }
 
-  await run(
-    `UPDATE payroll SET period = ?, crew_id = ?, personnel_id = ?, workdays = ?, rate = ?,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageFinance(user.role),
+    () =>
+      run(
+        `UPDATE payroll SET period = ?, crew_id = ?, personnel_id = ?, workdays = ?, rate = ?,
             gross = ?, deductions = ?, net = ?, status = ?
       WHERE id = ?`,
-    input.period,
-    input.crewId,
-    input.personnelId,
-    input.workdays,
-    input.rate,
-    input.gross,
-    input.deductions,
-    input.net,
-    input.status,
-    id,
+        input.period,
+        input.crewId,
+        input.personnelId,
+        input.workdays,
+        input.rate,
+        input.gross,
+        input.deductions,
+        input.net,
+        input.status,
+        id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa kỳ lương (Admin/PM)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ updated: id });
 }
@@ -139,7 +150,16 @@ export async function DELETE(
         { status: 409 },
       );
 
-    await run(`DELETE FROM payroll WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageFinance(user.role),
+      () => run(`DELETE FROM payroll WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá kỳ lương (Admin/PM)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

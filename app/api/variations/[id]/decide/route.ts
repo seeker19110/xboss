@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
@@ -108,7 +109,8 @@ export async function POST(
           return { currentSeq: result.currentSeq, nextRole: result.nextRole };
         }
         // Bước cuối (approved) hoặc reject → áp domain logic bên dưới như cũ.
-      } else if (!CAN.approve(user.role)) {
+      } else if (!(await kiemQuyenTaiLucGhi(() => CAN.approve(user.role)))) {
+        // D01: nhánh không engine tái kiểm với dữ liệu có hiệu lực dưới khoá VO (không dùng snapshot stale).
         throw Object.assign(new Error("Chỉ Admin/PM được duyệt phát sinh"), { status: 403 });
       }
 

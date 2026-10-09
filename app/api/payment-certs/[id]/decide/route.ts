@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { todayISO } from "@/lib/nen/date";
 import { log } from "@/lib/nen/log";
@@ -144,7 +145,10 @@ export async function POST(
             ? { result: "pending", currentSeq: result.currentSeq, nextRole: result.nextRole }
             : { result: decision };
       } else {
-        if (!CAN.approve(user.role)) throw loi(403, "Chỉ Admin/PM được duyệt đợt thanh toán");
+        // D01: tái kiểm với dữ liệu có hiệu lực dưới khoá HĐ → đợt, không dùng snapshot lúc
+        // xác thực (admin có thể vừa siết approve trong lúc request chờ khoá).
+        if (!(await kiemQuyenTaiLucGhi(() => CAN.approve(user.role))))
+          throw loi(403, "Chỉ Admin/PM được duyệt đợt thanh toán");
         buocKetQua = { result: decision };
       }
 

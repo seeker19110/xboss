@@ -13,7 +13,9 @@ export async function GET() {
   if (!CAN.viewClaims(user.role))
     return NextResponse.json({ error: "Bạn không có quyền xem claim" }, { status: 403 });
 
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → gợi ý 0, không cộng số liệu toàn hệ.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ suggestedDays: 0, waitingFloors: 0 });
   const suggestion = await eotEvidenceSuggestion(projectId);
   return NextResponse.json(suggestion);
 }

@@ -36,17 +36,17 @@ Verdict: PASS (đủ mọi lớp yêu cầu) · PARTIAL (tự động xanh, còn
 
 ### A1 — Phạm vi, quyền, phiên
 
-| AC      | Lớp   | Bằng chứng (tests/*.test.ts)                                              | @e5ce67b | @98520f6 | Còn thiếu                                                     |
-| ------- | ----- | ------------------------------------------------------------------------- | -------- | -------- | ------------------------------------------------------------- |
-| A1-AC01 | P/H/B | project-select-org; permissions-org; route-users-cach-ly-org; s02a..e     | PARTIAL  | PARTIAL  | B hai org, M                                                  |
-| A1-AC02 | P/H/M | project-scope-security-unit (khẳng định legacy)                           | GAP      | GAP      | cutover D01, M                                                |
-| A1-AC03 | U/P/H | project-scope-security-unit; s02-import-project-id; p1-6-sheets-scope     | PARTIAL  | PARTIAL  | cookie sai→dự án đầu                                          |
-| A1-AC04 | P     | db-scope-nested (8 ca); db-begin-read-only; rls                           | GAP      | PASS     | —                                                             |
-| A1-AC05 | P/H   | permissions-fail-closed; auth-perms-project; permissions-org              | PARTIAL  | PARTIAL  | Thiếu ca "snapshot stale sau đổi quyền trong lúc await" (U/P) |
-| A1-AC06 | P/H   | rls; org-rls; rls-app-role-route; permissions-org                         | PARTIAL  | PARTIAL  | nhánh "GUC rỗng cho qua"                                      |
-| A1-AC07 | P/H   | auth-session-revoke-http; auth; route-auth; audit-auth-project-regression | PARTIAL  | PASS     | —                                                             |
-| Q-AC01  | U/P/H | permissions-org; permissions-fail-closed; auth-perms-project              | PARTIAL  | PARTIAL  | Cùng ca stale snapshot với A1-AC05                            |
-| Q-AC07  | P/H/O | runtime-app-role-schema; db-runtime-migration-boundary; health            | GAP      | PARTIAL  | readiness riêng, O                                            |
+| AC      | Lớp   | Bằng chứng (tests/*.test.ts)                                              | @e5ce67b | @98520f6 | Còn thiếu                                            |
+| ------- | ----- | ------------------------------------------------------------------------- | -------- | -------- | ---------------------------------------------------- |
+| A1-AC01 | P/H/B | project-select-org; permissions-org; route-users-cach-ly-org; s02a..e     | PARTIAL  | PARTIAL  | B hai org, M                                         |
+| A1-AC02 | P/H/M | project-scope-security-unit (khẳng định legacy)                           | GAP      | PARTIAL  | cờ XBOSS_STRICT_MEMBERSHIP (PR-A), bật sau duyệt gán |
+| A1-AC03 | U/P/H | project-scope-security-unit; s02-import-project-id; p1-6-sheets-scope     | PARTIAL  | PASS     | — (PR-A: 23 route null-scope + rename)               |
+| A1-AC04 | P     | db-scope-nested (8 ca); db-begin-read-only; rls                           | GAP      | PASS     | —                                                    |
+| A1-AC05 | P/H   | permissions-fail-closed; auth-perms-project; permissions-org              | PARTIAL  | PASS     | — (PR-A: s16-stale-snapshot, 72 handler)             |
+| A1-AC06 | P/H   | rls; org-rls; rls-app-role-route; permissions-org                         | PARTIAL  | PARTIAL  | nhánh "GUC rỗng cho qua"                             |
+| A1-AC07 | P/H   | auth-session-revoke-http; auth; route-auth; audit-auth-project-regression | PARTIAL  | PASS     | —                                                    |
+| Q-AC01  | U/P/H | permissions-org; permissions-fail-closed; auth-perms-project              | PARTIAL  | PASS     | — (PR-A: cùng A1-AC05)                               |
+| Q-AC07  | P/H/O | runtime-app-role-schema; db-runtime-migration-boundary; health            | GAP      | PASS     | — (PR-A: /api/ready + 503 login/me); O               |
 
 Ghi chú A1:
 
@@ -64,20 +64,20 @@ Ghi chú A1:
 
 ### A2 — Ngoại tuyến
 
-| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                                           | @e5ce67b | @98520f6 | Còn thiếu                      |
-| ------- | ------- | ---------------------------------------------------------------------- | -------- | -------- | ------------------------------ |
-| A2-AC01 | B/M     | e2e offline-recovery (b); audit-s08-offline-recovery                   | PARTIAL  | PARTIAL  | M Safari/iOS                   |
-| A2-AC02 | B/H/P   | offline-queue-route; audit-s08-sw-allowlist                            | PARTIAL  | PARTIAL  | SSE sau switch, B 2 tab        |
-| A2-AC03 | U/B/P   | offline-queue; offline-queue-route (+3 ca S15)                         | PARTIAL  | PARTIAL  | B dedup/batch thật             |
-| A2-AC04 | P/H/B   | offline-queue-route (20 request đồng thời)                             | PARTIAL  | PARTIAL  | B 2 tab/lease/crash            |
-| A2-AC05 | B       | audit-offline-store-commit (IDB giả); e2e offline-idb-abort (IDB thật) | GAP      | PASS     | —                              |
-| A2-AC06 | U/H/B   | offline-queue; offline-queue-vault; offline-queue-route                | PARTIAL  | PARTIAL  | B hàng đợi qua mạng thật       |
-| A2-AC07 | B/M     | offline-queue-vault; audit-offline-store-commit (IDB giả)              | GAP      | GAP      | B + M Safari/iOS               |
-| A2-AC08 | B/M     | offline-queue-vault (lease); audit-s08-sw-allowlist                    | GAP      | GAP      | SW restart, Background Sync, M |
-| A2-AC09 | H/B/M   | audit-s08-sw-allowlist; offline-vault-route                            | PARTIAL  | PARTIAL  | M Safari/iOS, B hết lease      |
-| A2-AC10 | P/H/B   | offline-queue-route (If-Match/If-None-Match)                           | PARTIAL  | PARTIAL  | B diary conflict thật          |
-| Q-AC02  | P/H/B/M | offline-vault-route                                                    | PARTIAL  | PARTIAL  | B KEK rotation, M              |
-| Q-AC03  | H/B/M   | offline-vault-route                                                    | PARTIAL  | PARTIAL  | B clock rollback, M            |
+| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                                           | @e5ce67b | @98520f6 | Còn thiếu                           |
+| ------- | ------- | ---------------------------------------------------------------------- | -------- | -------- | ----------------------------------- |
+| A2-AC01 | B/M     | e2e offline-recovery (b); audit-s08-offline-recovery                   | PARTIAL  | PARTIAL  | M Safari/iOS                        |
+| A2-AC02 | B/H/P   | offline-queue-route; audit-s08-sw-allowlist                            | PARTIAL  | PARTIAL  | SSE sau switch, B 2 tab             |
+| A2-AC03 | U/B/P   | offline-queue; offline-queue-route (+3 ca S15)                         | PARTIAL  | PARTIAL  | B dedup/batch thật                  |
+| A2-AC04 | P/H/B   | offline-queue-route (20 request đồng thời)                             | PARTIAL  | PARTIAL  | B 2 tab/lease/crash                 |
+| A2-AC05 | B       | audit-offline-store-commit (IDB giả); e2e offline-idb-abort (IDB thật) | GAP      | PASS     | —                                   |
+| A2-AC06 | U/H/B   | offline-queue; offline-queue-vault; offline-queue-route                | PARTIAL  | PARTIAL  | B hàng đợi qua mạng thật            |
+| A2-AC07 | B/M     | offline-queue-vault; audit-offline-store-commit (IDB giả)              | GAP      | PARTIAL  | M Safari/iOS (B xong: offline-deep) |
+| A2-AC08 | B/M     | offline-queue-vault (lease); audit-s08-sw-allowlist                    | GAP      | PARTIAL  | M (B xong: SW restart, mất ACK)     |
+| A2-AC09 | H/B/M   | audit-s08-sw-allowlist; offline-vault-route                            | PARTIAL  | PARTIAL  | M Safari/iOS, B hết lease           |
+| A2-AC10 | P/H/B   | offline-queue-route (If-Match/If-None-Match)                           | PARTIAL  | PARTIAL  | B diary conflict thật               |
+| Q-AC02  | P/H/B/M | offline-vault-route                                                    | PARTIAL  | PARTIAL  | B KEK rotation, M                   |
+| Q-AC03  | H/B/M   | offline-vault-route                                                    | PARTIAL  | PARTIAL  | B clock rollback, M                 |
 
 Ghi chú A2: sau vá chỉ A2-AC03 (nhật ký cùng ngày khác chủ/dự án độc lập, chủ thứ hai bị conflict không đè)
 và A2-AC06 (403/404/422 từ route thật → `rejected` bền vững) được bổ sung lớp P/H; không đổi verdict vì
@@ -97,16 +97,16 @@ lớp B/M vẫn thiếu. Lớp B thật hiện chỉ có `e2e/authed/offline-rec
 
 ### A4 — Báo cáo
 
-| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                                    | @e5ce67b | @98520f6 | Còn thiếu                   |
-| ------- | ------- | --------------------------------------------------------------- | -------- | -------- | --------------------------- |
-| A4-AC01 | P/H     | CR                                                              | PASS     | PASS     | —                           |
-| A4-AC02 | P/H     | CR                                                              | PASS     | PASS     | —                           |
-| A4-AC03 | P/H     | CR (+ ca NaN/±Inf)                                              | PASS     | PASS     | —                           |
-| A4-AC04 | P/H     | CR (snapshot REPEATABLE READ)                                   | PASS     | PASS     | —                           |
-| A4-AC05 | U/P/H/B | PKPI; e2e portfolio-kpi (10%/"Chưa có dữ liệu", không NaN/100%) | GAP      | PASS     | —                           |
-| A4-AC06 | P/H/B   | PKPI (khớp status/visibility); CR (nhãn T1 trùng, 403)          | GAP      | PARTIAL  | B                           |
-| A4-AC07 | P/H     | PKPI (ngày VN, kế thừa ngày KT nhóm)                            | PASS     | PASS     | —                           |
-| A4-AC08 | P/H/M   | bao-cao-a4-ac08; `npm run bench:reports`                        | PARTIAL  | PARTIAL  | baseline ±10%, dữ liệu thật |
+| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                                    | @e5ce67b | @98520f6 | Còn thiếu                                                       |
+| ------- | ------- | --------------------------------------------------------------- | -------- | -------- | --------------------------------------------------------------- |
+| A4-AC01 | P/H     | CR                                                              | PASS     | PASS     | —                                                               |
+| A4-AC02 | P/H     | CR                                                              | PASS     | PASS     | —                                                               |
+| A4-AC03 | P/H     | CR (+ ca NaN/±Inf)                                              | PASS     | PASS     | —                                                               |
+| A4-AC04 | P/H     | CR (snapshot REPEATABLE READ)                                   | PASS     | PASS     | —                                                               |
+| A4-AC05 | U/P/H/B | PKPI; e2e portfolio-kpi (10%/"Chưa có dữ liệu", không NaN/100%) | GAP      | PASS     | —                                                               |
+| A4-AC06 | P/H/B   | PKPI (khớp status/visibility); CR (nhãn T1 trùng, 403)          | GAP      | PARTIAL  | B                                                               |
+| A4-AC07 | P/H     | PKPI (ngày VN, kế thừa ngày KT nhóm)                            | PASS     | PASS     | —                                                               |
+| A4-AC08 | P/H/M   | bao-cao-a4-ac08; `npm run bench:reports`                        | PARTIAL  | PARTIAL  | baseline đã ghi (PR-A, role app); so ±10% lần sau; dữ liệu thật |
 
 Ghi chú A4-AC08: p95 đạt ngưỡng D09 trên fixture tổng hợp (xem
 [AUDIT-A4-AC08-BENCHMARK](AUDIT-A4-AC08-BENCHMARK.md)); so baseline ±10% là NOT_RUN vì chưa có baseline trước
@@ -128,15 +128,15 @@ thay đổi; lần đo dùng role owner (không RLS).
 
 ### A6 — Vận hành, PITR, DR
 
-| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                               | @e5ce67b | @98520f6 | Còn thiếu                     |
-| ------- | ------- | ---------------------------------------------------------- | -------- | -------- | ----------------------------- |
-| A6-AC01 | O/P/H   | pitr-drill; dr-recovery-verify (fixture)                   | PARTIAL  | PARTIAL  | O restore thật                |
-| A6-AC02 | O       | dr-recovery-verify; audit-recovery-files; pitr-archive     | PARTIAL  | PARTIAL  | O trên backup thật, key thật  |
-| A6-AC03 | U/O     | dr-recovery-verify; pitr-drill                             | PASS     | PASS     | —                             |
-| A6-AC04 | P/O     | dr-recovery-verify (+6 ca app-role-rls); audit-dr-readonly | PARTIAL  | PARTIAL  | O bản restore thật            |
-| A6-AC05 | O/M     | pitr-drill; pitr-archive                                   | PARTIAL  | PARTIAL  | RPO/RTO thật, M runbook       |
-| A6-AC06 | O       | pitr-drill; restore-check                                  | PARTIAL  | PARTIAL  | retention/cleanup, O          |
-| Q-AC08  | O/P/H/M | pitr-archive; pitr-drill                                   | PARTIAL  | PARTIAL  | PITR thật, canary, S3 version |
+| AC      | Lớp     | Bằng chứng (tests/*.test.ts)                               | @e5ce67b | @98520f6 | Còn thiếu                           |
+| ------- | ------- | ---------------------------------------------------------- | -------- | -------- | ----------------------------------- |
+| A6-AC01 | O/P/H   | pitr-drill; dr-recovery-verify (fixture)                   | PARTIAL  | PARTIAL  | O restore thật                      |
+| A6-AC02 | O       | dr-recovery-verify; audit-recovery-files; pitr-archive     | PARTIAL  | PARTIAL  | O trên backup thật, key thật        |
+| A6-AC03 | U/O     | dr-recovery-verify; pitr-drill                             | PASS     | PASS     | —                                   |
+| A6-AC04 | P/O     | dr-recovery-verify (+6 ca app-role-rls); audit-dr-readonly | PARTIAL  | PARTIAL  | O bản restore thật                  |
+| A6-AC05 | O/M     | pitr-drill; pitr-archive                                   | PARTIAL  | PARTIAL  | RPO/RTO thật, M runbook             |
+| A6-AC06 | O       | pitr-drill; restore-check                                  | PARTIAL  | PASS     | — (PR-A: M130 retention-cleanup); O |
+| Q-AC08  | O/P/H/M | pitr-archive; pitr-drill                                   | PARTIAL  | PARTIAL  | PITR thật, canary, S3 version       |
 
 ### Q-AC còn lại (nằm trong trụ A3/A4)
 
@@ -218,6 +218,21 @@ Không mục nào dưới đây được tự quyết hoặc code trong S15.
   người có quyền cập nhật.
 - **(k) UAT lớp M** (7 vai trò trên thiết bị, số lớn, IPC/PDF thật, hợp đồng thật) và đánh giá độc lập của
   reviewer: chưa ghi, không được tick thay.
+
+### Cập nhật sau S15 (PR-A, 2026-10-09)
+
+- **(a)** → cutover theo cờ `XBOSS_STRICT_MEMBERSHIP` + script dry-run + runbook
+  `AUDIT-S16-MEMBERSHIP-CUTOVER.md` (mặc định TẮT, bật sau khi chủ dự án duyệt danh sách gán); phần
+  "cookie sai → dự án đầu"/`projectId == null` đóng ở `AUDIT-S16-NULL-SCOPE.md` (23 route + rename).
+- **(b)** → đã code trên nhánh `s16-rls-strict` (migration 0165, `AUDIT-S16-RLS-STRICT.md`), đi PR-B riêng
+  qua staging.
+- **(c)** → đặc tả `M128-chung-tu-dieu-chinh-ipc.md` (Approved, thi hành sau M129).
+- **(d)** → **xong** (M130, `scripts/retention-cleanup.ts`, `docs/ops/backup.md`).
+- **(e)** → đặc tả `M129-ipc-da-chi-tach-cam-ket-thuc-chi.md` (Approved).
+- **(f)** → **xong** (`/api/ready`, login/me 503 `schema_not_ready`).
+- **(i)** → **xong**: `bench/a4-ac08-baseline.json` ghi khi máy rảnh, role `xboss_app`; lần đo sau so ±10%.
+- A1-AC05/Q-AC01: ca stale snapshot đã có, mở rộng 72 handler (`AUDIT-S16-QUYEN-LUC-GHI.md`).
+- A2-AC07/AC08: lớp B xong (`e2e/authed/offline-deep.spec.ts`), còn M Safari/iOS.
 
 ## 7. Checklist S16 (production do người vận hành được cấp quyền)
 

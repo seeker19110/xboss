@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { deleteApprovalFlow, updateApprovalFlow } from "@/lib/tien-do/approvals";
 import { queryOne } from "@/lib/db";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 // S02: flow phải thuộc tổ chức người gọi — id của org khác coi như không tồn tại (404).
 async function flowCuaToChuc(id: number, orgId: number): Promise<boolean> {
@@ -48,7 +49,14 @@ export async function PATCH(
 
   if (!(await flowCuaToChuc(id, user.orgId)))
     return NextResponse.json({ error: "Không tìm thấy flow" }, { status: 404 });
-  const result = await updateApprovalFlow(id, patch);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageApprovalFlows(user.role),
+    () => updateApprovalFlow(id, patch),
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin được cấu hình luồng duyệt" }, { status: 403 });
+  const result = kq.value;
   if (typeof result === "string") {
     const status = result === "Không tìm thấy flow" ? 404 : 409;
     return NextResponse.json({ error: result }, { status });
@@ -74,7 +82,14 @@ export async function DELETE(
 
     if (!(await flowCuaToChuc(id, user.orgId)))
       return NextResponse.json({ error: "Không tìm thấy flow" }, { status: 404 });
-    const result = await deleteApprovalFlow(id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageApprovalFlows(user.role),
+      () => deleteApprovalFlow(id),
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin được cấu hình luồng duyệt" }, { status: 403 });
+    const result = kq.value;
     if (typeof result === "string") {
       const status = result === "Không tìm thấy flow" ? 404 : 409;
       return NextResponse.json({ error: result }, { status });

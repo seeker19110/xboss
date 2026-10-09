@@ -478,7 +478,8 @@ export async function syncAndListNotifications(
   // Mốc quan trắc (lún/chuyển vị/nghiêng) có kỳ đo gần nhất vượt ngưỡng báo động →
   // cảnh báo Admin/PM/kỹ sư (M26). Tự dọn khi kỳ đo mới về normal/warn.
   if (user.role === "admin" || user.role === "pm" || user.role === "engineer") {
-    const alarming = await alarmingPoints();
+    // AUDIT-S16: lọc dự án — trước đây gọi không tham số = mốc quan trắc MỌI tổ chức.
+    const alarming = await alarmingPoints(projectId ?? undefined);
     if (alarming.length > 0) {
       const values = alarming.map(() => `(?, ?, 'monitoring_alarm', ?)`).join(", ");
       const params = alarming.flatMap((p) => [
@@ -757,7 +758,11 @@ export async function syncAndListNotifications(
   // không phải "sắp hết hạn giấy tờ" như legal_expiry/contract_expiry.
   {
     const isPrivileged = user.role === "admin" || user.role === "pm";
-    const overduePunches = await overduePunch(isPrivileged ? undefined : user.id);
+    // AUDIT-S16: lọc dự án — trước đây thiếu tham số dự án = punch quá hạn MỌI tổ chức.
+    const overduePunches = await overduePunch(
+      isPrivileged ? undefined : user.id,
+      projectId ?? undefined,
+    );
     if (overduePunches.length > 0) {
       const values = overduePunches.map(() => `(?, ?, 'punch_overdue', ?)`).join(", ");
       const params = overduePunches.flatMap((p) => [
@@ -1016,7 +1021,8 @@ export async function syncAndListNotifications(
 
     // Chỉ tiêu quan trắc vượt ngưỡng ở kỳ gần nhất (mỗi tổ hợp category/indicator/location)
     // → cảnh báo Admin/PM/kỹ sư (M25).
-    const exceeded = await exceededMonitoring();
+    // AUDIT-S16: lọc dự án — trước đây gọi không tham số = quan trắc MỌI tổ chức.
+    const exceeded = await exceededMonitoring(projectId ?? undefined);
     if (exceeded.length > 0) {
       const values = exceeded.map(() => `(?, ?, 'env_monitoring_over', ?)`).join(", ");
       const params = exceeded.flatMap((m) => [

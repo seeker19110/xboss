@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { listProjects, listOrganizations } from "@/lib/ha-tang/projects";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -45,14 +46,21 @@ export async function POST(req: NextRequest) {
   )
     return NextResponse.json({ error: `Mã dự án "${code}" đã tồn tại` }, { status: 409 });
 
-  const id = await insertId(
-    `INSERT INTO projects (name, code, investor, contractor, color, org_id) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
-    name,
-    code,
-    investor,
-    contractor,
-    color,
-    user.orgId,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageProjects(user.role),
+    () =>
+      insertId(
+        `INSERT INTO projects (name, code, investor, contractor, color, org_id) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+        name,
+        code,
+        investor,
+        contractor,
+        color,
+        user.orgId,
+      ),
   );
+  if (!kq.ok) return NextResponse.json({ error: "Chỉ Admin mới tạo được dự án" }, { status: 403 });
+  const id = kq.value;
   return NextResponse.json({ id }, { status: 201 });
 }

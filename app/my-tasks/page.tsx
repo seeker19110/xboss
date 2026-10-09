@@ -30,6 +30,8 @@ import { PAYMENT_VIEW_ROLES, type Role } from "@/lib/nen/roles";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
+import ChuaGanDuAn from "@/app/components/ChuaGanDuAn";
+import { useChuaGanDuAn } from "@/app/lib/duAnKhaKien";
 import { ErrorState } from "@/app/components/ErrorState";
 import { taiJson } from "@/app/lib/taiDuLieu";
 import { DELAY_REASON_LABEL } from "@/lib/tien-do/delay";
@@ -404,6 +406,7 @@ export default function MyTasksPage() {
   const [taskFilter, setTaskFilter] = useState<"all" | "active" | "delayed" | "done">("all");
   const [copied, setCopied] = useState<number | null>(null);
   const [myRole, setMyRole] = useState<string | null>(null);
+  const chuaGanDuAn = useChuaGanDuAn();
 
   function copyTaskLink(t: MyTask) {
     const slug = t.sheetSlug ?? slugFromCode(t.sheetType);
@@ -470,6 +473,7 @@ export default function MyTasksPage() {
   }
 
   if (loadingTasks) return <PageSkeleton />;
+  if (chuaGanDuAn) return <ChuaGanDuAn role={myRole} />;
   if (loiTasks) return <ErrorState message={loiTasks} onRetry={() => void taiTasks()} />;
 
   const s = taskData?.summary;

@@ -16,6 +16,13 @@ export async function GET(_req: Request, { params: paramsP }: { params: Promise<
     return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
   }
 
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → 404 trước mọi truy vấn nghiệp vụ (trước đây
+  // null vẫn đọc được upload legacy project_id NULL).
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) {
+    return NextResponse.json({ error: "Không tìm thấy phiên bản upload này" }, { status: 404 });
+  }
+
   const upload = await queryOne<{
     file_name: string;
     original_name: string | null;
@@ -29,7 +36,6 @@ export async function GET(_req: Request, { params: paramsP }: { params: Promise<
     return NextResponse.json({ error: "Không tìm thấy phiên bản upload này" }, { status: 404 });
   }
 
-  const projectId = await getCurrentProjectId(user);
   if (upload.project_id != null && upload.project_id !== projectId) {
     return NextResponse.json(
       { error: "Bạn không có quyền truy cập dự án của file này" },

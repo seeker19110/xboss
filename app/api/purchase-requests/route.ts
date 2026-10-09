@@ -6,6 +6,7 @@ import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { nextSeqCode, withUniqueRetry } from "@/lib/ha-tang/seqcode";
 import { parsePoQuantity } from "@/lib/tai-chinh/procurement";
 import { quantityInputErrorBody } from "@/lib/nen/money";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -101,21 +102,30 @@ export async function POST(req: NextRequest) {
 
   // Sinh mã PR: PR-YYYYMM-NNN — retry nếu đụng mã do tạo đồng thời.
   const ym = todayISO().slice(0, 7).replace("-", "");
-  const { id, prCode } = await withUniqueRetry(async () => {
-    const prCode = await nextSeqCode("purchase_requests", "pr_code", `PR-${ym}-`);
-    const id = await insertId(
-      `INSERT INTO purchase_requests (pr_code, material_id, qty_requested, qty_requested_exact,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await withUniqueRetry(() =>
+    ghiNeuConQuyen(
+      () => CAN.editProgress(user.role),
+      async () => {
+        const prCode = await nextSeqCode("purchase_requests", "pr_code", `PR-${ym}-`);
+        const id = await insertId(
+          `INSERT INTO purchase_requests (pr_code, material_id, qty_requested, qty_requested_exact,
          qty_requested_provenance, note, requested_by, project_id)
        VALUES (?, ?, ?, ?::numeric, 'exact_input_v1', ?, ?, ?)`,
-      prCode,
-      materialId,
-      qtyRequested,
-      qtyExact,
-      body.note ? String(body.note).trim() : null,
-      user.id,
-      projectId,
-    );
-    return { id, prCode };
-  });
+          prCode,
+          materialId,
+          qtyRequested,
+          qtyExact,
+          body.note ? String(body.note).trim() : null,
+          user.id,
+          projectId,
+        );
+        return { id, prCode };
+      },
+    ),
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Không có quyền tạo yêu cầu mua vật tư" }, { status: 403 });
+  const { id, prCode } = kq.value;
   return NextResponse.json({ id, prCode }, { status: 201 });
 }

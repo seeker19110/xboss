@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getCurrentUser, COOKIE, parseToken } from "@/lib/bao-mat/auth";
+import { laLoiSchemaChuaSan, phanHoiSchemaChuaSan } from "@/lib/nen/loi";
 import { dauRangBuocPhien } from "@/lib/bao-mat/session-token";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,13 @@ export const dynamic = "force-dynamic";
 const noStoreHeaders = { "Cache-Control": "private, no-store" };
 
 export async function GET() {
-  const user = await getCurrentUser();
+  let user;
+  try {
+    user = await getCurrentUser();
+  } catch (err) {
+    if (laLoiSchemaChuaSan(err)) return phanHoiSchemaChuaSan();
+    throw err;
+  }
   if (!user) return NextResponse.json({ user: null }, { status: 401, headers: noStoreHeaders });
 
   // M56 PR2 (đóng nợ kỹ thuật ghi ở PROGRESS.md): /api/auth/me nằm TRONG whitelist

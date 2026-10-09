@@ -10,6 +10,7 @@ import {
   type AdvanceInput,
   type AdvanceStatus,
 } from "@/lib/tai-chinh/finance";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -104,20 +105,31 @@ export async function PATCH(
     //   - atomic: 2 lượt hoàn ứng đồng thời không thể cùng vượt số tạm ứng (trước đây
     //     đọc settled_amount ở JS rồi ghi đè → lượt sau có thể vượt hoặc ghi đè lượt trước).
     // Luật status giữ đúng deriveAdvanceStatus (lib/tai-chinh/finance.ts).
-    const updated = await queryOne<{ settledAmount: number; status: AdvanceStatus }>(
-      `UPDATE advances
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kqS = await ghiNeuConQuyen(
+      () => CAN.manageFinance(user.role),
+      () =>
+        queryOne<{ settledAmount: number; status: AdvanceStatus }>(
+          `UPDATE advances
           SET settled_amount = settled_amount + ?::numeric,
               status = CASE WHEN settled_amount + ?::numeric >= amount THEN 'settled'
                             ELSE 'partially_settled' END
         WHERE id = ? AND project_id = ? AND status <> 'settled'
           AND settled_amount + ?::numeric <= amount
         RETURNING settled_amount AS "settledAmount", status`,
-      settleAmount,
-      settleAmount,
-      id,
-      projectId,
-      settleAmount,
+          settleAmount,
+          settleAmount,
+          id,
+          projectId,
+          settleAmount,
+        ),
     );
+    if (!kqS.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền sửa tạm ứng (Admin/PM)" },
+        { status: 403 },
+      );
+    const updated = kqS.value;
     if (!updated) {
       // Không ghi được: đọc lại để báo đúng lý do (đã hoàn tất hay vượt số còn lại).
       const now = await loadExisting(id, projectId);
@@ -151,25 +163,36 @@ export async function PATCH(
   // Số tiền mới không được nhỏ hơn số đã hoàn; status suy lại theo số tiền mới (vd tạm ứng
   // đã hoàn hết mà tăng số tiền thì trở lại "hoàn một phần"). So sánh/suy trong SQL để không
   // so tiền trên float JS (M45) và atomic với lượt hoàn ứng chạy song song.
-  const updated = await queryOne<{ id: number }>(
-    `UPDATE advances SET code = ?, advance_date = ?, amount = ?::numeric, recipient = ?,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kqE = await ghiNeuConQuyen(
+    () => CAN.manageFinance(user.role),
+    () =>
+      queryOne<{ id: number }>(
+        `UPDATE advances SET code = ?, advance_date = ?, amount = ?::numeric, recipient = ?,
             reason = ?, proposal_id = ?,
             status = CASE WHEN settled_amount >= ?::numeric THEN 'settled'
                           WHEN settled_amount > 0 THEN 'partially_settled'
                           ELSE 'open' END
       WHERE id = ? AND project_id = ? AND settled_amount <= ?::numeric
       RETURNING id`,
-    input.code,
-    input.advanceDate,
-    input.amount,
-    input.recipient,
-    input.reason,
-    input.proposalId,
-    input.amount,
-    id,
-    projectId,
-    input.amount,
+        input.code,
+        input.advanceDate,
+        input.amount,
+        input.recipient,
+        input.reason,
+        input.proposalId,
+        input.amount,
+        id,
+        projectId,
+        input.amount,
+      ),
   );
+  if (!kqE.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa tạm ứng (Admin/PM)" },
+      { status: 403 },
+    );
+  const updated = kqE.value;
   if (!updated)
     return NextResponse.json(
       { error: "Số tiền tạm ứng không được nhỏ hơn số đã hoàn ứng" },
@@ -207,7 +230,16 @@ export async function DELETE(
         { status: 409 },
       );
 
-    await run(`DELETE FROM advances WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageFinance(user.role),
+      () => run(`DELETE FROM advances WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá tạm ứng (Admin/PM)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

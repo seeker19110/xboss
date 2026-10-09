@@ -38,6 +38,12 @@ export async function POST(
     return NextResponse.json({ error: "Tham số kind không hợp lệ" }, { status: 400 });
   }
 
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → 404 trước khi đọc file — trước đây null =
+  // không lọc, upload ghi ngày/tiến độ vào task MỌI dự án/tổ chức trùng BOQCODE.
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
+
   // Kiểm tra kích thước sớm qua header
   if (isContentTooLarge(req.headers.get("content-length"), MAX_EXCEL_BYTES)) {
     return NextResponse.json({ error: "File quá lớn (tối đa 20MB)" }, { status: 413 });
@@ -62,7 +68,6 @@ export async function POST(
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const projectId = await getCurrentProjectId(user);
 
   try {
     let result;

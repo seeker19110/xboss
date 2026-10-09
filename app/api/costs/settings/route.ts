@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCostSettings, updateCostSettings } from "@/lib/tai-chinh/cost";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,12 @@ export async function PATCH(req: NextRequest) {
       { status: 422 },
     );
 
-  await updateCostSettings(user.orgId, { warnPct, overPct });
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    () => updateCostSettings(user.orgId, { warnPct, overPct }),
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin/PM được sửa ngưỡng cảnh báo" }, { status: 403 });
   return NextResponse.json({ ok: true });
 }

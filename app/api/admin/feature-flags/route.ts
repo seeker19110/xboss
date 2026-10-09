@@ -4,6 +4,7 @@ import { listProjects } from "@/lib/ha-tang/projects";
 import { MODULES } from "@/lib/nen/modules";
 import { getModuleFlags, setFlag } from "@/lib/ha-tang/feature-flags";
 import { queryOne } from "@/lib/db";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,12 @@ export async function PATCH(req: NextRequest) {
   );
   if (!project) return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
 
-  await setFlag(moduleKey, projectId, enabled, user.id, user.orgId);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageFeatureFlags(user.role),
+    () => setFlag(moduleKey, projectId, enabled, user.id, user.orgId),
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin được cấu hình tính năng" }, { status: 403 });
   return NextResponse.json({ moduleKey, projectId, enabled });
 }

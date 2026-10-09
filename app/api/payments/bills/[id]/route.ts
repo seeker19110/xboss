@@ -9,6 +9,7 @@ import {
   quantityInputErrorBody,
   type MoneyInput,
 } from "@/lib/nen/money";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -106,16 +107,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if (!sets.length) return NextResponse.json({ error: "Không có gì để sửa" }, { status: 400 });
 
-  const updated = await withProjectScope(
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await withProjectScope(
     projectId,
     () =>
-      query<{ id: number }>(
-        `UPDATE payment_bills SET ${sets.join(", ")} WHERE ${BILL_SCOPE} RETURNING id`,
-        ...args,
-        ...billScopeParams(id, projectId, user.orgId),
+      ghiNeuConQuyen(
+        () => CAN.editStructure(user.role),
+        () =>
+          query<{ id: number }>(
+            `UPDATE payment_bills SET ${sets.join(", ")} WHERE ${BILL_SCOPE} RETURNING id`,
+            ...args,
+            ...billScopeParams(id, projectId, user.orgId),
+          ),
       ),
     { readOnly: false },
   );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin/PM được sửa bill thanh toán" }, { status: 403 });
+  const updated = kq.value;
   if (updated.length === 0) return notFound();
   return NextResponse.json({ ok: true }, { headers: PRIVATE_NO_STORE });
 }
@@ -135,17 +144,25 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (projectId == null) return notFound();
 
   // S13c: bill còn được hoá đơn (invoices.payment_bill_id) tham chiếu → 23503 → 409, không 500.
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
   let deleted: { id: number }[];
   try {
-    deleted = await withProjectScope(
+    const kq = await withProjectScope(
       projectId,
       () =>
-        query<{ id: number }>(
-          `DELETE FROM payment_bills WHERE ${BILL_SCOPE} RETURNING id`,
-          ...billScopeParams(id, projectId, user.orgId),
+        ghiNeuConQuyen(
+          () => CAN.editStructure(user.role),
+          () =>
+            query<{ id: number }>(
+              `DELETE FROM payment_bills WHERE ${BILL_SCOPE} RETURNING id`,
+              ...billScopeParams(id, projectId, user.orgId),
+            ),
         ),
       { readOnly: false },
     );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin/PM được xoá bill thanh toán" }, { status: 403 });
+    deleted = kq.value;
   } catch (err) {
     if ((err as { code?: string }).code !== "23503") throw err;
     return NextResponse.json(

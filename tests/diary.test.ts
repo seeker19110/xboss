@@ -86,7 +86,7 @@ test(
       date,
     );
 
-    const prefill = await buildDiaryPrefill(date);
+    const prefill = await buildDiaryPrefill(date, projectId);
     assert.match(
       prefill.workDone,
       /Điện & Điện nhẹ \(ELV\) T5: cập nhật 2 hạng mục \(D1,01 → D1,02\)/,

@@ -10,6 +10,7 @@ import {
   validateCashTransactionInput,
   type CashTransactionInput,
 } from "@/lib/tai-chinh/finance";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -95,26 +96,36 @@ export async function PATCH(
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
   // A1-AC03: kiểm cha SAU khi merge với giá trị đang lưu, cùng transaction với UPDATE.
-  const parentErr = await withTransaction(async () => {
-    const err = await checkCashTransactionParents(input, projectId!, user.orgId);
-    if (err) return err;
-    await run(
-      `UPDATE cash_transactions SET tx_date = ?, direction = ?, category = ?, amount = ?,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageFinance(user.role),
+    async () => {
+      const err = await checkCashTransactionParents(input, projectId!, user.orgId);
+      if (err) return err;
+      await run(
+        `UPDATE cash_transactions SET tx_date = ?, direction = ?, category = ?, amount = ?,
               is_petty_cash = ?, contract_id = ?, supplier_id = ?, voucher_code = ?, description = ?
         WHERE id = ?`,
-      input.txDate,
-      input.direction,
-      input.category,
-      input.amount,
-      input.isPettyCash,
-      input.contractId,
-      input.supplierId,
-      input.voucherCode,
-      input.description,
-      id,
+        input.txDate,
+        input.direction,
+        input.category,
+        input.amount,
+        input.isPettyCash,
+        input.contractId,
+        input.supplierId,
+        input.voucherCode,
+        input.description,
+        id,
+      );
+      return null;
+    },
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa dòng tiền (Admin/PM)" },
+      { status: 403 },
     );
-    return null;
-  });
+  const parentErr = kq.value;
   if (parentErr) return NextResponse.json({ error: parentErr }, { status: 422 });
 
   return NextResponse.json({ updated: id });
@@ -142,7 +153,16 @@ export async function DELETE(
     const existing = await loadExisting(id, projectId);
     if (!existing) return NextResponse.json({ error: "Không tìm thấy giao dịch" }, { status: 404 });
 
-    await run(`DELETE FROM cash_transactions WHERE id = ?`, id);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageFinance(user.role),
+      () => run(`DELETE FROM cash_transactions WHERE id = ?`, id),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá dòng tiền (Admin/PM)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

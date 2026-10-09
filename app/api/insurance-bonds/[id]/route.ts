@@ -16,6 +16,7 @@ import {
   validateInsuranceInput,
   type InsuranceInput,
 } from "@/lib/tai-chinh/insurance";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -251,10 +252,17 @@ export async function DELETE(
     return NextResponse.json({ error: "Không tìm thấy bảo hiểm/bảo lãnh" }, { status: 404 });
 
   // Soft-delete (M45 PR4): giữ row + file để khôi phục qua POST .../restore.
-  await run(
-    `UPDATE insurance_bonds SET deleted_at = now() WHERE id = ? AND deleted_at IS NULL`,
-    id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageContracts(user.role),
+    () =>
+      run(`UPDATE insurance_bonds SET deleted_at = now() WHERE id = ? AND deleted_at IS NULL`, id),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền xoá bảo hiểm/bảo lãnh (chỉ Admin/PM)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ deleted: id });
 }

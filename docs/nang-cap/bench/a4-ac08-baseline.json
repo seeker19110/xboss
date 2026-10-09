@@ -1,0 +1,36 @@
+{
+  "config": {
+    "roleApp": true,
+    "cpus": 4,
+    "cpuModel": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "postgres": "PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+    "projects": 5,
+    "tasks": 10000,
+    "dims": 30000,
+    "boqItems": 10000,
+    "payments": 1015,
+    "poItems": 5000,
+    "concurrency": 20,
+    "warmup": 5,
+    "k": 30,
+    "poolMax": 10
+  },
+  "p95": {
+    "costs?groupBy=system": {
+      "tuanTu": 39.559841000000006,
+      "dongThoi": 217.09322900000006
+    },
+    "costs?groupBy=floor": {
+      "tuanTu": 37.89699400000018,
+      "dongThoi": 174.6875070000001
+    },
+    "portfolio/kpi": {
+      "tuanTu": 20.45456599999943,
+      "dongThoi": 104.82180599999992
+    },
+    "dashboard": {
+      "tuanTu": 56.36842500000057,
+      "dongThoi": 463.5902100000003
+    }
+  }
+}

@@ -26,7 +26,10 @@ export async function GET(
     return NextResponse.json({ error: "Tham số kind không hợp lệ" }, { status: 400 });
   }
 
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → 404, không xuất task toàn hệ.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
   let wb;
   if (kind === "ke_hoach") {
     wb = await buildPlanTemplate(systemId, projectId);

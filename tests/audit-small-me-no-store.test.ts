@@ -58,6 +58,14 @@ const next = {
 
 const BINDING = "b".repeat(32);
 
+// Route login/me import `@/lib/nen/loi` (503 schema_not_ready, S16); ca này không dựng tình huống
+// schema thiếu nên chỉ cần stub "không phải lỗi schema".
+const LOI_STUB = {
+  laLoiSchemaChuaSan: () => false,
+  phanHoiSchemaChuaSan: () => {
+    throw new Error("không dùng trong ca này");
+  },
+};
 for (const state of ["anonymous", "valid", "must-setup-2fa", "missing-token", "invalid-token"]) {
   test(`auth/me: no-store và giữ hợp đồng response (${state})`, async () => {
     const actor = { id: randomInt(100, 10000), role: "pm", orgId: randomInt(100, 10000) };
@@ -65,6 +73,7 @@ for (const state of ["anonymous", "valid", "must-setup-2fa", "missing-token", "i
     let parses = 0;
     const route = load<{ GET(): Promise<Reply> }>("app/api/auth/me/route.ts", {
       "next/server": next,
+      "@/lib/nen/loi": LOI_STUB,
       "next/headers": {
         cookies: async () => {
           cookieReads++;

@@ -11,6 +11,7 @@ import {
   validateInsuranceInput,
   type InsuranceKind,
 } from "@/lib/tai-chinh/insurance";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -82,23 +83,33 @@ export async function POST(req: NextRequest) {
   const refErr = await checkInsuranceContractRef(input.contractId, projectId);
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
 
-  const id = await insertId(
-    `INSERT INTO insurance_bonds (project_id, contract_id, kind, title, provider, code, value,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageContracts(user.role),
+    () =>
+      insertId(
+        `INSERT INTO insurance_bonds (project_id, contract_id, kind, title, provider, code, value,
                                    issued_date, expiry_date, status, note, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.contractId,
-    input.kind,
-    input.title,
-    input.provider,
-    input.code,
-    input.value,
-    input.issuedDate,
-    input.expiryDate,
-    input.status,
-    input.note,
-    user.id,
+        projectId,
+        input.contractId,
+        input.kind,
+        input.title,
+        input.provider,
+        input.code,
+        input.value,
+        input.issuedDate,
+        input.expiryDate,
+        input.status,
+        input.note,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo bảo hiểm/bảo lãnh (chỉ Admin/PM)" },
+      { status: 403 },
+    );
 
-  return NextResponse.json({ id }, { status: 201 });
+  return NextResponse.json({ id: kq.value }, { status: 201 });
 }

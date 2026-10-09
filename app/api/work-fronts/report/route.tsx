@@ -101,8 +101,10 @@ export async function GET() {
   if (projectId == null) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
 
   const items = await stageMissingList(projectId);
+  // AUDIT-S16 (A1-AC03): tên dự án ĐANG CHỌN, không "dự án đầu tiên của DB" (có thể khác org).
   const project = (await queryOne<{ name: string }>(
-    `SELECT name FROM projects ORDER BY id LIMIT 1`,
+    `SELECT name FROM projects WHERE id = ?`,
+    projectId,
   )) ?? { name: "XBoss" };
   const today = todayISO();
 

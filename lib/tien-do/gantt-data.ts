@@ -27,9 +27,11 @@ const d2n = (s: string) => new Date(s + "T00:00:00Z").getTime();
 // Dựng CpmNode[]/CpmEdge[] cho `computeCpm` + map thông tin đầy đủ từng nhóm (meta) —
 // lọc theo hệ nếu có `systemId` (null = toàn dự án). `meta` giữ đúng thứ tự sort gốc
 // (st.id, wp.start_date, wp.id) nên `[...meta.values()]` dùng lại được như mảng `bars` cũ.
+// `projectId` BẮT BUỘC (AUDIT-S16 null-scope): trước đây undefined = không lọc → route trả
+// Gantt/CPM mọi tổ chức cho người chưa được gán dự án. Route tự trả rỗng khi không có dự án.
 export async function getCpmData(
   systemId: number | null,
-  projectId?: number,
+  projectId: number,
 ): Promise<{
   nodes: CpmNode[];
   edges: DepRow[];
@@ -37,33 +39,39 @@ export async function getCpmData(
 }> {
   const systemFilter = systemId !== null ? "AND st.system_id = ?" : "";
   const systemParams = systemId !== null ? [systemId] : [];
-  // Lọc theo dự án để tránh rò rỉ chéo dự án (M22+); undefined = không lọc.
-  const projectFilter = projectId != null ? "AND tw.project_id = ?" : "";
-  const projectParams = projectId != null ? [projectId] : [];
-
   const bars = await query<PackageMeta>(
     `SELECT wp.id, wp.code, wp.name, wp.floor_label AS "floorLabel",
             wp.start_date AS "startDate", wp.end_date AS "endDate",
             wp.progress, wp.status, st.code AS "sheetType", st.slug AS "sheetSlug"
        FROM work_packages wp
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-       LEFT JOIN towers tw ON st.tower_id = tw.id
+       JOIN towers tw ON st.tower_id = tw.id
       WHERE wp.start_date IS NOT NULL AND wp.end_date IS NOT NULL
         ${systemFilter}
-        ${projectFilter}
+        AND tw.project_id = ?
       ORDER BY st.id, wp.start_date, wp.id`,
     ...systemParams,
-    ...projectParams,
+    projectId,
   );
 
   // Phụ thuộc không lọc theo hệ (giữ nguyên hành vi gốc — việc trước có thể thuộc hệ
   // khác, vẫn cần biết để hiển thị "bị chặn"); `computeCpm` tự bỏ qua cạnh trỏ tới nút
-  // không có trong `nodes` (xem lib/cpm.ts).
+  // không có trong `nodes` (xem lib/cpm.ts). Nhưng LUÔN trong dự án: cả việc trước lẫn việc
+  // sau phải thuộc dự án đang chọn — trước đây trả MỌI cạnh toàn hệ (kèm mã nhóm việc tổ chức
+  // khác).
   const edges = await query<DepRow>(
     `SELECT d.id, d.predecessor_id AS "predecessorId", d.successor_id AS "successorId",
             p.code AS "predCode", p.progress AS "predProgress"
        FROM package_dependencies d
-       JOIN work_packages p ON d.predecessor_id = p.id`,
+       JOIN work_packages p ON d.predecessor_id = p.id
+       JOIN sheet_types pst ON pst.id = p.sheet_type_id
+       JOIN towers ptw ON ptw.id = pst.tower_id
+       JOIN work_packages s ON d.successor_id = s.id
+       JOIN sheet_types sst ON sst.id = s.sheet_type_id
+       JOIN towers stw ON stw.id = sst.tower_id
+      WHERE ptw.project_id = ? AND stw.project_id = ?`,
+    projectId,
+    projectId,
   );
 
   const meta = new Map<number, PackageMeta>(bars.map((b) => [b.id, b]));

@@ -166,7 +166,7 @@ if (HAS_TEST_DB) {
     });
 
     test("parseTrackingUpload cập nhật đúng dimensions & recompute", async () => {
-      const { sheetCode, workPackageId } = await setupSystemFixture();
+      const { sheetCode, workPackageId, projectId } = await setupSystemFixture();
       // systemId lấy lại qua work_package → sheet_type để đảm bảo khớp đúng fixture vừa tạo
       const st = await queryOne<{ id: number; system_id: number }>(
         `SELECT st.id, st.system_id FROM sheet_types st
@@ -223,7 +223,7 @@ if (HAS_TEST_DB) {
 
       const buffer = (await wb.xlsx.writeBuffer()) as any;
 
-      const res = await parseTrackingUpload(st!.system_id, null, buffer, "M64_Test_Admin");
+      const res = await parseTrackingUpload(st!.system_id, projectId, buffer, "M64_Test_Admin");
       assert.equal(res.matched, 1);
       assert.equal(res.unmatched, 0);
 

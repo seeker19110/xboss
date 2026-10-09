@@ -4,6 +4,7 @@
 import { cookies } from "next/headers";
 import { query, queryOne, todayISO } from "@/lib/db";
 import { patchRequestContext, getRequestContext } from "@/lib/nen/request-context";
+import { strictMembershipEnabled } from "@/lib/nen/env";
 import type { Role } from "@/lib/nen/roles";
 
 export const PROJECT_COOKIE = "xboss_project";
@@ -20,10 +21,11 @@ function parseProjectId(value: unknown): number | null {
 }
 
 /** Admin thấy mọi dự án cùng tổ chức; vai trò khác theo `user_projects` trong tổ chức của
- *  mình. Bảng `user_projects` rỗng toàn hệ thống = thấy mọi dự án CÙNG TỔ CHỨC (tương thích
- *  ngược mô hình 1 dự án — chỉ khoá khi bắt đầu cấu hình gán). Cutover "membership rỗng không
- *  mở quyền" của D01 làm riêng, sau membership dry-run (A1-FR03) và sau khi mọi route coi
- *  dự án null là "không lọc" đã được chuyển (S02). Actor thiếu org bị từ chối ngay. */
+ *  mình. Cờ `XBOSS_STRICT_MEMBERSHIP` TẮT (mặc định): bảng `user_projects` rỗng toàn hệ thống =
+ *  thấy mọi dự án CÙNG TỔ CHỨC (tương thích ngược mô hình 1 dự án — chỉ khoá khi bắt đầu cấu
+ *  hình gán). Cờ BẬT (cutover D01/A1-AC02, AUDIT-S16): non-admin chỉ thấy dự án được gán, bảng
+ *  rỗng không mở gì; admin cùng org vẫn thấy hết để gán lại (recovery). Bật theo runbook
+ *  docs/nang-cap/AUDIT-S16-MEMBERSHIP-CUTOVER.md. Actor thiếu org bị từ chối ngay. */
 export async function visibleProjectIds(user: ProjectActor): Promise<number[]> {
   if (parseProjectId(user.orgId) == null) return [];
   const duAnCungOrg = async () => {
@@ -35,8 +37,10 @@ export async function visibleProjectIds(user: ProjectActor): Promise<number[]> {
   };
   if (user.role === "admin") return duAnCungOrg();
 
-  const [{ n }] = await query<{ n: number }>(`SELECT COUNT(*) AS n FROM user_projects`);
-  if (Number(n) === 0) return duAnCungOrg();
+  if (!strictMembershipEnabled()) {
+    const [{ n }] = await query<{ n: number }>(`SELECT COUNT(*) AS n FROM user_projects`);
+    if (Number(n) === 0) return duAnCungOrg();
+  }
 
   const rows = await query<{ projectId: number }>(
     `SELECT up.project_id AS "projectId" FROM user_projects up
@@ -52,7 +56,10 @@ export async function visibleProjectIds(user: ProjectActor): Promise<number[]> {
  *  dự án user thấy) → dùng; else dự án đầu user thấy (mặc định, đã giới hạn trong tổ chức).
  *  Không có dự án nào → null. Client gửi id lạ/không thấy được → bỏ, không tin.
  *  Giữ mặc định "dự án đầu" có chủ đích: nhiều route còn coi null là "không lọc dự án", nên
- *  trả null cho cookie sai/thiếu sẽ mở dữ liệu toàn hệ (audit PR #544). */
+ *  trả null cho cookie sai/thiếu sẽ mở dữ liệu toàn hệ (audit PR #544). Cờ
+ *  XBOSS_STRICT_MEMBERSHIP KHÔNG đổi hàm này: AUDIT-S16 rà lại và vẫn còn route coi null =
+ *  không lọc (danh sách trong docs/nang-cap/AUDIT-S16-MEMBERSHIP-CUTOVER.md §3) — phải chuyển
+ *  hết sang fail-closed trước khi cookie sai được phép thành null. */
 export function resolveProjectId(
   visible: number[],
   rawCookieValue: string | undefined,

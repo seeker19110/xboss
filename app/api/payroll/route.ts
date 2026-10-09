@@ -5,6 +5,7 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { parsePayrollBody, validatePayrollInput, type PayrollInput } from "@/lib/tai-chinh/finance";
 import { payrollFromAttendance } from "@/lib/dich-vu/luong";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -105,22 +106,32 @@ export async function POST(req: NextRequest) {
     if (!person) return NextResponse.json({ error: "Nhân sự không tồn tại" }, { status: 422 });
   }
 
-  const id = await insertId(
-    `INSERT INTO payroll (project_id, period, crew_id, personnel_id, workdays, rate, gross,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageFinance(user.role),
+    () =>
+      insertId(
+        `INSERT INTO payroll (project_id, period, crew_id, personnel_id, workdays, rate, gross,
                            deductions, net, status, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    projectId,
-    input.period,
-    input.crewId,
-    input.personnelId,
-    input.workdays,
-    input.rate,
-    input.gross,
-    input.deductions,
-    input.net,
-    input.status,
-    user.id,
+        projectId,
+        input.period,
+        input.crewId,
+        input.personnelId,
+        input.workdays,
+        input.rate,
+        input.gross,
+        input.deductions,
+        input.net,
+        input.status,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo kỳ lương (Admin/PM)" },
+      { status: 403 },
+    );
 
-  return NextResponse.json({ id }, { status: 201 });
+  return NextResponse.json({ id: kq.value }, { status: 201 });
 }

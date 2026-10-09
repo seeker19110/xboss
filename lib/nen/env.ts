@@ -12,6 +12,10 @@
 import { z } from "zod";
 import { ROLES } from "@/lib/nen/roles";
 
+// Cờ bật/tắt dạng chuỗi — chỉ nhận đúng 4 giá trị, gõ sai thì getServerEnv() throw (fail-fast,
+// lộ ngay trên staging) thay vì âm thầm coi như tắt một cờ bảo mật.
+const coBatTat = z.enum(["0", "1", "true", "false"]);
+
 // Bắt buộc = DATABASE_URL (app không chạy nếu thiếu). Các biến tích hợp (SMTP/Telegram/
 // VAPID/Google) là TUỲ CHỌN — module liên quan tự no-op/throw on-demand khi thiếu.
 // XBOSS_SECRET để optional ở đây; quy tắc "bắt buộc trong production" do lib/auth giữ
@@ -33,6 +37,11 @@ const serverSchema = z
     // Production không đặt — KEK test bị từ chối (vault offline misconfigured, fail-closed).
     XBOSS_E2E: z.string().optional(),
     CRON_SECRET: z.string().min(1).optional(),
+    // Cutover membership D01/A1-AC02 (AUDIT-S16): "1"/"true" → non-admin chỉ thấy dự án được gán
+    // trong `user_projects`, kể cả khi bảng rỗng toàn hệ (tắt nhánh tương thích ngược "bảng rỗng =
+    // thấy mọi dự án cùng org"). Mặc định TẮT. Bật theo runbook
+    // docs/nang-cap/AUDIT-S16-MEMBERSHIP-CUTOVER.md (dry-run → gán → staging → production).
+    XBOSS_STRICT_MEMBERSHIP: coBatTat.optional(),
     APP_URL: z.string().min(1).optional(),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
@@ -165,4 +174,21 @@ export function getServerEnv(): ServerEnv {
 /** Chỉ dùng trong test để xoá cache giữa các ca. */
 export function __resetServerEnvCache(): void {
   cached = undefined;
+}
+
+/**
+ * Cờ `XBOSS_STRICT_MEMBERSHIP` (cutover membership — xem schema ở trên). Đọc `process.env` MỖI lần
+ * gọi, chỉ validate đúng biến này: không phụ thuộc DATABASE_URL (test thuần mock lib/db vẫn gọi
+ * được) và không cần reset cache khi test đổi cờ. Giá trị sai → throw như getServerEnv().
+ */
+export function strictMembershipEnabled(
+  source: Record<string, string | undefined> = process.env,
+): boolean {
+  const raw = source.XBOSS_STRICT_MEMBERSHIP;
+  const parsed = coBatTat.optional().safeParse(raw === "" ? undefined : raw);
+  if (!parsed.success)
+    throw new Error(
+      `Biến môi trường không hợp lệ:\n  - XBOSS_STRICT_MEMBERSHIP: chỉ nhận 0/1/true/false`,
+    );
+  return parsed.data === "1" || parsed.data === "true";
 }

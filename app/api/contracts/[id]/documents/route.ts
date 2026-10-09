@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/nen/storage";
+import { storageDelete, storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -10,6 +10,7 @@ import {
   parseUploadedFile,
 } from "@/lib/nen/photos";
 import { extractPdfText } from "@/lib/nen/pdf-extract";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -92,19 +93,32 @@ export async function POST(
   // được (scan ảnh, hỏng, quá giới hạn trang/thời gian), không chặn upload.
   const extractedText = ext === ".pdf" ? await extractPdfText(fileBuf) : null;
 
-  const id = await insertId(
-    `INSERT INTO contract_documents (contract_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by, sha256, extracted_text)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi DB; bị thu hồi ⇒ dọn file vừa lưu.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageContracts(user.role),
+    () =>
+      insertId(
+        `INSERT INTO contract_documents (contract_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by, sha256, extracted_text)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    contractId,
-    fileName,
-    file.name || null,
-    file.type,
-    file.size,
-    caption,
-    user.id,
-    sha256,
-    extractedText,
+        contractId,
+        fileName,
+        file.name || null,
+        file.type,
+        file.size,
+        caption,
+        user.id,
+        sha256,
+        extractedText,
+      ),
   );
+  if (!kq.ok) {
+    await storageDelete(user.orgId, fileName).catch(() => {});
+    return NextResponse.json(
+      { error: "Bạn không có quyền upload file hợp đồng (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  }
+  const id = kq.value;
 
   return NextResponse.json({ id, contractId, caption, sizeBytes: file.size }, { status: 201 });
 }

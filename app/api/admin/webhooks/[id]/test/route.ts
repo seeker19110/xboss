@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { queryOne, run } from "@/lib/db";
 import { deliverDueWebhooks, type WebhookPayload } from "@/lib/bao-mat/webhooks";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -34,11 +35,18 @@ export async function POST(
     projectId: wh.projectId,
     data: { message: `Kiểm tra webhook #${id} bởi ${user.name}` },
   };
-  await run(
-    `INSERT INTO webhook_deliveries (webhook_id, event, payload) VALUES (?, 'ping', ?::jsonb)`,
-    id,
-    JSON.stringify(payload),
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale). Chỉ phần ghi DB (xếp hàng ping) nằm trong transaction; gửi HTTP đi sau, ngoài transaction.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageIntegrations(user.role),
+    () =>
+      run(
+        `INSERT INTO webhook_deliveries (webhook_id, event, payload) VALUES (?, 'ping', ?::jsonb)`,
+        id,
+        JSON.stringify(payload),
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin được quản lý webhook" }, { status: 403 });
 
   // Gửi ngay các delivery đến hạn (gồm cả ping vừa chèn). deliverDueWebhooks bọc lỗi từng cái,
   // trả tổng {sent, failed} — Admin thấy ping có đi được không.

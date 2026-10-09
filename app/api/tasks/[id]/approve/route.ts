@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { deriveStatus, recomputePackage } from "@/lib/tien-do/recompute";
@@ -93,7 +94,9 @@ export async function POST(
         `SELECT id FROM approval_requests WHERE entity_type = 'task_acceptance' AND entity_id = ? AND status = 'pending'`,
         id,
       );
-      if (!liveRequest && !CAN.approve(user.role))
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trong transaction ghi (dưới khoá task),
+      // không dùng snapshot nạp lúc xác thực — admin có thể vừa siết approve trong lúc chờ khoá.
+      if (!liveRequest && !(await kiemQuyenTaiLucGhi(() => CAN.approve(user.role))))
         throw Object.assign(new Error("Chỉ Admin/PM được duyệt nghiệm thu"), { status: 403 });
       if (task.status === "nghiem_thu")
         throw Object.assign(new Error("Task đã được nghiệm thu rồi"), { status: 409 });
@@ -257,6 +260,9 @@ export async function DELETE(
         id,
       );
       if (!task) throw Object.assign(new Error("Không tìm thấy task"), { status: 404 });
+      // D01: quyền kiểm đầu route có thể đã stale khi tới đây — tái kiểm trong transaction ghi.
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.approve(user.role))))
+        throw Object.assign(new Error("Chỉ Admin/PM được huỷ nghiệm thu"), { status: 403 });
       if (task.status !== "nghiem_thu")
         throw Object.assign(new Error("Task chưa ở trạng thái nghiệm thu"), { status: 409 });
 

@@ -59,7 +59,11 @@ export async function GET(
       ).map((r) => r.photoId)
     : [];
 
-  const prefill = await buildDiaryPrefill(date, projectId ?? undefined);
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → prefill rỗng, không gộp hoạt động toàn hệ.
+  const prefill =
+    projectId != null
+      ? await buildDiaryPrefill(date, projectId)
+      : { workDone: "", updatedBy: [], photos: [] };
 
   const etag = diary ? etagNhatKy(diary) : null;
   return NextResponse.json(

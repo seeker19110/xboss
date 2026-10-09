@@ -10,6 +10,8 @@
 // trước; khác đi nghĩa là actor đã đổi (kể cả vào qua SSO/OIDC không qua preflight của trang đăng
 // nhập) → tab hiện tại dọn cache SW riêng tư + phát đổi ngữ cảnh cho các tab khác.
 
+import { xoaCacheDuAnKhaKien } from "@/app/lib/duAnKhaKien";
+
 const KENH = "xboss-context";
 const KHOA_EPOCH = "xboss_ctx_epoch";
 const KHOA_BINDING = "xboss_ctx_binding";
@@ -34,6 +36,7 @@ const epochCuaToi = new Set<string>();
 
 /** Phát "ngữ cảnh đã đổi" tới mọi tab khác. Gọi TRƯỚC khi reload/điều hướng ở tab hiện tại. */
 export function phatDoiNguCanh(r: LyDoDoiNguCanh): void {
+  xoaCacheDuAnKhaKien(); // danh sách dự án của ngữ cảnh cũ không còn đúng cho tab này
   const e =
     globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   epochCuaToi.add(e);

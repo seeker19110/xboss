@@ -3,6 +3,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { listAlertRules, upsertAlertRule } from "@/lib/van-hanh/alerts";
 import { queryOne } from "@/lib/db";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -46,14 +47,22 @@ export async function POST(req: NextRequest) {
     if (!project) return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
   }
 
-  const result = await upsertAlertRule({
-    projectId,
-    metric,
-    threshold,
-    active,
-    userId: user.id,
-    orgId: user.orgId,
-  });
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageAlertRules(user.role),
+    () =>
+      upsertAlertRule({
+        projectId,
+        metric,
+        threshold,
+        active,
+        userId: user.id,
+        orgId: user.orgId,
+      }),
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin được cấu hình ngưỡng cảnh báo" }, { status: 403 });
+  const result = kq.value;
   if (typeof result === "string") return NextResponse.json({ error: result }, { status: 422 });
   return NextResponse.json({ id: result.id }, { status: 201 });
 }

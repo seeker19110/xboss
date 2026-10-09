@@ -9,6 +9,7 @@ import {
   userWorkloads,
 } from "@/lib/tien-do/assignments";
 import { sheetTypeProjectId, packageProjectId, taskProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -143,9 +144,17 @@ export async function POST(req: NextRequest) {
   if (targetProjectId !== projectId)
     return NextResponse.json({ error: "Đối tượng không tồn tại" }, { status: 404 });
 
-  if (level === "sheet") await assignSheetManager(id, userId, me.id);
-  else if (level === "package") await assignPackage(id, userId, me.id);
-  else await assignTask(id, userId, me.id);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.assign(me.role),
+    async () => {
+      if (level === "sheet") await assignSheetManager(id, userId, me.id);
+      else if (level === "package") await assignPackage(id, userId, me.id);
+      else await assignTask(id, userId, me.id);
+    },
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin/PM mới được phân công" }, { status: 403 });
 
   return NextResponse.json({ ok: true });
 }

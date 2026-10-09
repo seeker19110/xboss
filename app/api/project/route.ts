@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, isAdminOrPm } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { strictMembershipEnabled } from "@/lib/nen/env";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +12,25 @@ export const dynamic = "force-dynamic";
 // quyền xem + org). Không phiên / chưa chọn dự án → giữ fallback công khai "dự án đầu tiên"
 // (trang /login gọi route này khi chưa đăng nhập). Không nhận `?projectId=` để endpoint public
 // không thành chỗ dò tên dự án theo id.
+// Cờ XBOSS_STRICT_MEMBERSHIP bật (AUDIT-S16): user ĐÃ đăng nhập mà không thấy dự án nào → trả
+// rỗng, không rơi về "dự án đầu tiên" của DB (có thể thuộc tổ chức khác). Cờ tắt: giữ hành vi cũ.
 export async function GET() {
   try {
     const user = await getCurrentUser();
     const projectId = user ? await getCurrentProjectId(user) : null;
+    if (user && projectId == null && strictMembershipEnabled())
+      return NextResponse.json(
+        {
+          name: null,
+          code: null,
+          tower: null,
+          investor: null,
+          contractor: null,
+          logo: null,
+          project: { heatmapTitle: null },
+        },
+        { headers: { "Cache-Control": "private, no-store" } },
+      );
     type DongDuAn = {
       name: string;
       code: string | null;

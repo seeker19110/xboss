@@ -5,6 +5,7 @@ import { khoaNhatKyCuaAnhTask } from "@/lib/hien-truong/diary";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { SLUG_RE } from "@/lib/nen/sheets";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -122,12 +123,22 @@ export async function PATCH(
   if (!sets.length) return NextResponse.json({ error: "Không có gì để cập nhật" }, { status: 400 });
 
   // Phòng thủ nhiều lớp: thêm điều kiện tower thuộc dự án đang chọn vào câu UPDATE.
-  await run(
-    `UPDATE sheet_types SET ${sets.join(", ")} WHERE id = ? AND tower_id IN (SELECT id FROM towers WHERE project_id = ?)`,
-    ...vals,
-    id,
-    projectId,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    () =>
+      run(
+        `UPDATE sheet_types SET ${sets.join(", ")} WHERE id = ? AND tower_id IN (SELECT id FROM towers WHERE project_id = ?)`,
+        ...vals,
+        id,
+        projectId,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa sheet (chỉ Admin/PM)" },
+      { status: 403 },
+    );
   const updated = await queryOne<Sheet>(
     `SELECT id, code, name, responsible, slug, manager_id AS "managerId" FROM sheet_types WHERE id = ?`,
     id,
@@ -172,42 +183,47 @@ export async function DELETE(
     // Bọc transaction: xoá nhiều bảng phụ thuộc, lỗi giữa chừng phải rollback
     // toàn bộ để không để lại dữ liệu mồ côi (orphan).
     const taskIdsSql = `SELECT t.id FROM tasks t JOIN work_packages wp ON t.package_id = wp.id WHERE wp.sheet_type_id = ?`;
-    await withTransaction(async () => {
-      // Khoá nhật ký gắn ảnh của các task sắp xoá TRƯỚC mọi DELETE (thứ tự "nhật ký → ảnh", S06).
-      const taskIds = (await query<{ id: number }>(taskIdsSql, id)).map((t) => t.id);
-      await khoaNhatKyCuaAnhTask(taskIds);
-      for (const tbl of [
-        "progress_dimensions",
-        "task_history",
-        "task_photos",
-        "task_comments",
-        "task_documents",
-        "baseline_tasks",
-      ]) {
-        await run(`DELETE FROM ${tbl} WHERE task_id IN (${taskIdsSql})`, id);
-      }
-      await run(`DELETE FROM notifications WHERE task_id IN (${taskIdsSql})`, id);
-      await run(
-        `DELETE FROM notifications WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`,
-        id,
-      );
-      await run(
-        `DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`,
-        id,
-      );
-      await run(`DELETE FROM materials WHERE sheet_type_id = ?`, id);
-      await run(
-        `DELETE FROM tasks WHERE package_id IN (SELECT id FROM work_packages WHERE sheet_type_id = ?)`,
-        id,
-      );
-      await run(`DELETE FROM work_packages WHERE sheet_type_id = ?`, id);
-      // Phòng thủ nhiều lớp: chỉ xoá nếu tower vẫn thuộc dự án đang chọn lúc kiểm ở trên.
-      await run(
-        `DELETE FROM sheet_types WHERE id = ? AND tower_id IN (SELECT id FROM towers WHERE project_id = ?)`,
-        id,
-        projectId,
-      );
-    });
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.editStructure(user.role),
+      async () => {
+        // Khoá nhật ký gắn ảnh của các task sắp xoá TRƯỚC mọi DELETE (thứ tự "nhật ký → ảnh", S06).
+        const taskIds = (await query<{ id: number }>(taskIdsSql, id)).map((t) => t.id);
+        await khoaNhatKyCuaAnhTask(taskIds);
+        for (const tbl of [
+          "progress_dimensions",
+          "task_history",
+          "task_photos",
+          "task_comments",
+          "task_documents",
+          "baseline_tasks",
+        ]) {
+          await run(`DELETE FROM ${tbl} WHERE task_id IN (${taskIdsSql})`, id);
+        }
+        await run(`DELETE FROM notifications WHERE task_id IN (${taskIdsSql})`, id);
+        await run(
+          `DELETE FROM notifications WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`,
+          id,
+        );
+        await run(
+          `DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`,
+          id,
+        );
+        await run(`DELETE FROM materials WHERE sheet_type_id = ?`, id);
+        await run(
+          `DELETE FROM tasks WHERE package_id IN (SELECT id FROM work_packages WHERE sheet_type_id = ?)`,
+          id,
+        );
+        await run(`DELETE FROM work_packages WHERE sheet_type_id = ?`, id);
+        // Phòng thủ nhiều lớp: chỉ xoá nếu tower vẫn thuộc dự án đang chọn lúc kiểm ở trên.
+        await run(
+          `DELETE FROM sheet_types WHERE id = ? AND tower_id IN (SELECT id FROM towers WHERE project_id = ?)`,
+          id,
+          projectId,
+        );
+      },
+    );
+    if (!kq.ok) return NextResponse.json({ error: "Chỉ Admin/PM được xoá sheet" }, { status: 403 });
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

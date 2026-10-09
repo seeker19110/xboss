@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { recomputePackage } from "@/lib/tien-do/recompute";
@@ -94,7 +95,11 @@ export async function POST(req: NextRequest) {
   // sheetTypeId của dự án khác vẫn nghiệm thu được cả tầng dự án đó. Sửa: bắt buộc sheet type
   // phải thuộc đúng dự án hiện hành (qua towers.project_id), không thì 404 như tài nguyên
   // không tồn tại (không lộ thông tin sheet đó thuộc dự án khác).
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → 404 trước mọi truy vấn nghiệp vụ — trước
+  // đây tháp legacy project_id NULL khớp null === null nên nghiệm thu được tầng không thuộc ai.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy loại sheet này" }, { status: 404 });
   const blocked = await assertModuleEnabled("field", projectId);
   if (blocked) return blocked;
 
@@ -140,6 +145,11 @@ export async function POST(req: NextRequest) {
 
       if (tasks.length === 0)
         throw Object.assign(new Error("Không tìm thấy task nào trong tầng này"), { status: 404 });
+
+      // D01: CAN.approve đầu route dùng snapshot lúc xác thực — tái kiểm với dữ liệu có hiệu lực
+      // dưới khoá tầng/task, trước mọi lần ghi (admin có thể vừa siết quyền trong lúc chờ khoá).
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.approve(user.role))))
+        throw Object.assign(new Error("Chỉ Admin/PM được duyệt nghiệm thu"), { status: 403 });
 
       const notDone = tasks.filter((t) => (t.progress_percent ?? 0) < 1);
       if (notDone.length > 0)

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,16 @@ export async function DELETE(
         : undefined;
     if (!addendum) return NextResponse.json({ error: "Không tìm thấy phụ lục" }, { status: 404 });
 
-    await run(`DELETE FROM contract_addenda WHERE id = ?`, aid);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageContracts(user.role),
+      () => run(`DELETE FROM contract_addenda WHERE id = ?`, aid),
+    );
+    if (!kq.ok)
+      return NextResponse.json(
+        { error: "Bạn không có quyền xoá phụ lục (chỉ Admin/PM)" },
+        { status: 403 },
+      );
     return NextResponse.json({ deleted: aid });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

@@ -93,7 +93,9 @@ export async function PATCH(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const revProject = await getRevisionDrawingProject(id);
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → 404; null === null (bản vẽ legacy
+  // project_id NULL) không được coi là "cùng dự án".
+  const revProject = projectId != null ? await getRevisionDrawingProject(id) : undefined;
   if (!revProject || revProject.projectId !== projectId)
     return NextResponse.json({ error: "Không tìm thấy revision" }, { status: 404 });
 

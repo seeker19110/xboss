@@ -8,8 +8,8 @@ import { Client, Pool } from "pg";
 // Q-AC07 (GAP-7): runtime chạy bằng app role THẬT (`xboss_app`, không quyền DDL) trên một DB
 // CHƯA migrate ⇒ health/login/me báo lỗi đúng mã, KHÔNG tự migrate, KHÔNG chạy DDL/ghi gì.
 // - /api/health → 503 { status: "degraded", errorCode: "schema_not_ready" }.
-// - /api/auth/login, /api/auth/me → handler ném DatabaseSchemaNotReadyError
-//   (code XBOSS_SCHEMA_NOT_READY; Next trả 500) — không 200/401 giả.
+// - /api/auth/login, /api/auth/me → 503 JSON { code: "schema_not_ready" } (s16-readiness) —
+//   không 200/401 giả, không 500 khung Next.
 // - Sau cùng: DB vẫn trống (không schema_migrations, không bảng nào), mọi câu SQL runtime gửi đi
 //   chỉ là SELECT, và app role không có quyền CREATE trên schema public.
 // DB trống: `<tên DB test>_empty` — tạo nếu chưa có (KHÔNG drop; CI là container dùng một lần).
@@ -118,21 +118,17 @@ test(
       assert.equal(hb.errorCode, "schema_not_ready");
       assert.equal(hb.db, false);
 
-      await assert.rejects(
-        () =>
-          login(
-            jreq("/api/auth/login", { email: "q-ac07@test.local", password: "khong-quan-trong" }),
-          ),
-        (err: { code?: string; name?: string }) =>
-          err?.code === "XBOSS_SCHEMA_NOT_READY" && err?.name === "DatabaseSchemaNotReadyError",
+      const l = await login(
+        jreq("/api/auth/login", { email: "q-ac07@test.local", password: "khong-quan-trong" }),
       );
+      assert.equal(l.status, 503);
+      assert.equal(((await l.json()) as { code?: string }).code, "schema_not_ready");
 
       // Cookie ký thật để /me buộc phải chạm DB (thiếu cookie thì 401 ngay, không kiểm được gì).
       dangNhap({ id: 987_654, passwordHash: "q-ac07-hash" });
-      await assert.rejects(
-        () => me(),
-        (err: { code?: string }) => err?.code === "XBOSS_SCHEMA_NOT_READY",
-      );
+      const m = await me();
+      assert.equal(m.status, 503);
+      assert.equal(((await m.json()) as { code?: string }).code, "schema_not_ready");
     } finally {
       dangXuat();
       g.__xbossPool = ownerPool;

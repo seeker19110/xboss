@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, withProjectScope, withTransaction } from "@/lib/db";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { moneyInputErrorBody } from "@/lib/nen/money";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -83,6 +84,8 @@ export async function POST(req: NextRequest) {
   // A1-AC03: hợp đồng/VO cùng dự án — kiểm + ghi trong 1 transaction (cha khoá FOR SHARE).
   const result = await withUniqueRetry(() =>
     withTransaction(async () => {
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.manageClaims(user.role)))) return { denied: true };
       const refErr = await checkClaimRefs(input, projectId);
       if (refErr) return { error: refErr };
       const code = await nextClaimCode();
@@ -105,6 +108,11 @@ export async function POST(req: NextRequest) {
       return { id, code };
     }),
   );
+  if ("denied" in result)
+    return NextResponse.json(
+      { error: "Bạn không có quyền ghi nhận claim (Admin/PM/Kỹ sư)" },
+      { status: 403 },
+    );
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: 422 });
   return NextResponse.json({ id: result.id, code: result.code }, { status: 201 });
 }

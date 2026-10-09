@@ -22,7 +22,9 @@ export async function GET(req: NextRequest) {
   if (sourceRaw && !DOCUMENT_SOURCES.includes(sourceRaw as DocumentSource))
     return NextResponse.json({ error: "Loại nguồn không hợp lệ" }, { status: 422 });
 
+  // AUDIT-S16 (A1-AC03): không có dự án khả kiến → rỗng, không liệt kê tài liệu toàn hệ.
   const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ documents: [] });
   const documents = await listAllDocuments(user, projectId, {
     system: sp.get("system")?.trim() || undefined,
     floor: sp.get("floor")?.trim() || undefined,
