@@ -30,6 +30,7 @@ import { query, run, withTransaction } from "@/lib/db";
 import { SHEET_MAP, classifyRow, toISO } from "@/lib/tien-do/import";
 import { recomputeTask, recomputePackage } from "@/lib/tien-do/recompute";
 import { addDaysISO } from "@/lib/nen/date";
+import { trongToChuc } from "@/lib/ha-tang/to-chuc";
 
 const DATA_START = 5; // phải khớp lib/import.ts
 
@@ -254,7 +255,9 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((err) => {
+// S16 (RLS 0165): script dữ liệu đơn tổ chức — chạy trong ngữ cảnh tổ chức mặc định 1 (DEFAULT
+// của projects/users.org_id) để bảng theo tổ chức không trả rỗng khi chạy bằng role ứng dụng.
+trongToChuc(1, main).catch((err) => {
   console.error("❌ Backfill lỗi:", err);
   process.exit(1);
 });

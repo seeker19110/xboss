@@ -1,4 +1,4 @@
-import { query, queryOne, run, insertId } from "@/lib/db";
+import { query, queryOne, run, insertId, withOrgScope } from "@/lib/db";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
 import {
   getSheetClient,
@@ -139,9 +139,13 @@ export async function resolveCronSyncScope(): Promise<MaterialSyncScope> {
       503,
     );
   if (binding.kind === "invalid") throw new MaterialSyncScopeError(SHEET_PROJECT_INVALID, 503);
-  const project = await queryOne<{ orgId: number | null }>(
-    `SELECT org_id AS "orgId" FROM projects WHERE id = ?`,
-    binding.projectId,
+  // S16 (RLS 0165): cron chỉ-secret chưa có tổ chức — suy org từ dự án do SERVER cấu hình
+  // (GOOGLE_SHEET_PROJECT_ID, không phải đầu vào client) bằng 1 câu tra trong phạm vi '*'.
+  const project = await withOrgScope("*", () =>
+    queryOne<{ orgId: number | null }>(
+      `SELECT org_id AS "orgId" FROM projects WHERE id = ?`,
+      binding.projectId,
+    ),
   );
   if (!project || project.orgId == null)
     throw new MaterialSyncScopeError(

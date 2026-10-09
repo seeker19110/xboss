@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne } from "@/lib/db";
+import { queryOne, withOrgScope } from "@/lib/db";
 import {
   verifyPassword,
   makeToken,
@@ -60,18 +60,23 @@ async function dangNhap(req: NextRequest) {
     );
   }
 
-  const u = await queryOne<{
-    id: number;
-    name: string;
-    email: string;
-    role: string;
-    password_hash: string;
-    totp_enabled_at: string | null;
-    session_version: number;
-    org_id: number;
-  }>(
-    `SELECT id, name, email, role, password_hash, totp_enabled_at, session_version, org_id FROM users WHERE email = ?`,
-    emailNorm,
+  // S16 (RLS 0165): chưa biết tổ chức trước khi xác thực, email là khoá duy nhất TOÀN HỆ
+  // (users_email_key) → tra trong phạm vi '*' do server đặt, chỉ đúng 1 câu này. Mọi truy vấn
+  // sau khi mật khẩu đúng chạy trong phạm vi org của chính tài khoản.
+  const u = await withOrgScope("*", () =>
+    queryOne<{
+      id: number;
+      name: string;
+      email: string;
+      role: string;
+      password_hash: string;
+      totp_enabled_at: string | null;
+      session_version: number;
+      org_id: number;
+    }>(
+      `SELECT id, name, email, role, password_hash, totp_enabled_at, session_version, org_id FROM users WHERE email = ?`,
+      emailNorm,
+    ),
   );
   if (!u || !verifyPassword(password, u.password_hash)) {
     await recordLoginFailure(ip, emailNorm);
@@ -91,7 +96,7 @@ async function dangNhap(req: NextRequest) {
   // M56 PR2: nhúng cờ mustSetup2fa vào token — vai trò bị bắt buộc 2FA nhưng chưa bật thì
   // proxy.ts chặn mọi API ngoài /api/auth/* cho tới khi user bật 2FA. Tính TẠI ĐÂY (lúc phát
   // token) — admin bật yêu cầu sau khi user đã có phiên chỉ ảnh hưởng từ lần đăng nhập kế tiếp.
-  const required = await requiredRoles(u.org_id);
+  const required = await withOrgScope(u.org_id, () => requiredRoles(u.org_id));
   const mustSetup2fa = computeMustSetup2fa(u.role as Role, u.totp_enabled_at, required);
   const res = NextResponse.json({ user: { id: u.id, name: u.name, email: u.email, role: u.role } });
   res.cookies.set(

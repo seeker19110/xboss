@@ -10,6 +10,7 @@ import {
 } from "@/lib/vat-tu/material-sync";
 import { LoiCauHinhGoogleSheets } from "@/lib/vat-tu/google-sheets";
 import { log } from "@/lib/nen/log";
+import { trongToChuc } from "@/lib/ha-tang/to-chuc";
 
 export const dynamic = "force-dynamic";
 
@@ -40,11 +41,15 @@ export async function GET(req: NextRequest) {
     } else {
       scope = await resolveCronSyncScope();
     }
-    const blocked = await assertModuleEnabled("materials", scope.projectId);
-    if (blocked) return blocked;
-
-    const summary = await runMaterialSync(scope);
-    return NextResponse.json({ ok: true, projectId: scope.projectId, summary });
+    const dongBo = async () => {
+      const blocked = await assertModuleEnabled("materials", scope.projectId);
+      if (blocked) return blocked;
+      const summary = await runMaterialSync(scope);
+      return NextResponse.json({ ok: true, projectId: scope.projectId, summary });
+    };
+    // Chỉ-secret: chạy trong ngữ cảnh tổ chức của dự án đã cấu hình (S16, RLS 0165); phiên
+    // Admin/PM đã có ngữ cảnh tổ chức của chính user.
+    return user && bySession ? await dongBo() : await trongToChuc(scope.orgId, dongBo);
   } catch (e) {
     if (e instanceof MaterialSyncScopeError) {
       log.warn("GET /api/cron/sync-sheets từ chối phạm vi", {

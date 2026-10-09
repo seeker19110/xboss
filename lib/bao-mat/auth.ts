@@ -1,6 +1,6 @@
 import { scryptSync, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withOrgScope } from "@/lib/db";
 import { patchRequestContext, getRequestContext } from "@/lib/nen/request-context";
 import {
   ROLES,
@@ -100,9 +100,13 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!token) return null;
   const parsed = parseToken(token);
   if (!parsed) return null;
-  const u = await queryOne<User & { password_hash: string; session_version: number }>(
-    `SELECT id, name, email, role, org_id AS "orgId", password_hash, session_version FROM users WHERE id = ?`,
-    parsed.uid,
+  // S16 (RLS 0165): tra user trong phạm vi tổ chức ghi trong token đã ký — không cần '*'. User
+  // đã chuyển sang org khác thì dòng vô hình ở đây → null, cùng kết quả với kiểm orgId bên dưới.
+  const u = await withOrgScope(parsed.orgId, () =>
+    queryOne<User & { password_hash: string; session_version: number }>(
+      `SELECT id, name, email, role, org_id AS "orgId", password_hash, session_version FROM users WHERE id = ?`,
+      parsed.uid,
+    ),
   );
   if (!u) return null;
   // Fragment không khớp → mật khẩu đã đổi, phiên cũ không còn hợp lệ.
@@ -193,16 +197,23 @@ export async function ensureDefaultUsers(): Promise<void> {
   if (defaultUsersEnsured) return;
 
   const adminPw = process.env.XBOSS_ADMIN_PASSWORD || "admin123";
-  for (const u of DEFAULTS) {
-    const pw = u.role === "admin" ? adminPw : u.pw;
-    await run(
-      `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO NOTHING`,
-      u.name,
-      u.email,
-      hashPassword(pw),
-      u.role,
-    );
-  }
+  // Tài khoản demo thuộc tổ chức mặc định (users.org_id DEFAULT 1) — ghi trong phạm vi org 1 (RLS 0165).
+  await withOrgScope(
+    1,
+    async () => {
+      for (const u of DEFAULTS) {
+        const pw = u.role === "admin" ? adminPw : u.pw;
+        await run(
+          `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO NOTHING`,
+          u.name,
+          u.email,
+          hashPassword(pw),
+          u.role,
+        );
+      }
+    },
+    { readOnly: false },
+  );
   defaultUsersEnsured = true;
 }
 

@@ -74,6 +74,7 @@ function fixture(opts: { user?: TestUser; wait?: number; setup2fa?: boolean } = 
     "next/server": next,
     "@/lib/nen/loi": LOI_STUB,
     "@/lib/db": {
+      withOrgScope: (_org: unknown, fn: () => Promise<unknown>) => fn(),
       queryOne: async (_sql: string, email: unknown) => {
         events.push(`query:${email}`);
         return opts.user;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { query, insertId } from "@/lib/db";
+import { query, insertId, withOrgScope } from "@/lib/db";
 import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
 import { sendTelegram } from "@/lib/tien-do/report";
 import { runHealthChecks, type HealthCheckReport } from "@/lib/van-hanh/healthcheck";
@@ -31,13 +31,14 @@ export async function GET(req: NextRequest) {
     );
 
   try {
-    return await handleHealthCheck();
+    return await handleHealthCheck(bySecret);
   } finally {
     await releaseSyncLock(LOCK_NAME);
   }
 }
 
-async function handleHealthCheck(): Promise<NextResponse> {
+// `bySecret`: gọi bằng CRON_SECRET (chưa có actor) → được tra admin mọi tổ chức với phạm vi '*'.
+async function handleHealthCheck(bySecret: boolean): Promise<NextResponse> {
   const report = await runHealthChecks();
 
   let emailSent = false;
@@ -56,7 +57,13 @@ async function handleHealthCheck(): Promise<NextResponse> {
         .map((s) => s.trim())
         .filter(Boolean);
       if (to.length === 0) {
-        const rows = await query<{ email: string }>(`SELECT email FROM users WHERE role = 'admin'`);
+        // Cảnh báo sức khoẻ là của CẢ HỆ THỐNG: cron bằng CRON_SECRET (chưa có actor) gửi mọi
+        // Admin với phạm vi '*' do server đặt; Admin/PM bấm tay bằng phiên thì request đã thuộc
+        // một tổ chức → chỉ Admin của tổ chức đó (withOrgScope từ chối nâng lên '*' — D01, S16).
+        const sqlAdmin = `SELECT email FROM users WHERE role = 'admin'`;
+        const rows = bySecret
+          ? await withOrgScope("*", () => query<{ email: string }>(sqlAdmin))
+          : await query<{ email: string }>(sqlAdmin);
         to = rows.map((r) => r.email);
       }
       if (to.length > 0) {

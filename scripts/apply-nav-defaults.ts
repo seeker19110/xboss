@@ -1,6 +1,7 @@
 import "./env";
 import { queryOne } from "@/lib/db";
 import { setNavEnabled, isKnownNodeKey } from "@/lib/ha-tang/nav-settings";
+import { trongToChuc } from "@/lib/ha-tang/to-chuc";
 
 // Tắt mặc định (toàn hệ thống, project_id NULL) các mục AppShell chưa cần thiết cho
 // trọng tâm "quản lý thi công tại công trường" — theo quyết định 2026-07 (chat với PM):
@@ -47,7 +48,9 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((e) => {
+// S16 (RLS 0165): script dữ liệu đơn tổ chức — chạy trong ngữ cảnh tổ chức mặc định 1 (DEFAULT
+// của projects/users.org_id) để bảng theo tổ chức không trả rỗng khi chạy bằng role ứng dụng.
+trongToChuc(1, main).catch((e) => {
   console.error(e);
   process.exit(1);
 });

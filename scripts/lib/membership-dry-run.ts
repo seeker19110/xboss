@@ -11,7 +11,7 @@
 // Membership trỏ dự án KHÁC org không tính (giống visibleProjectIds).
 //
 // Không đọc password_hash/totp_* — chỉ id, email, vai trò.
-import { query, withTransaction } from "@/lib/db";
+import { query, withOrgScope } from "@/lib/db";
 
 export type DryRunUser = {
   id: number;
@@ -44,7 +44,11 @@ export type DryRunKetQua = {
 };
 
 export async function thuThapMembershipDryRun(): Promise<DryRunKetQua> {
-  return withTransaction(
+  // Phạm vi tổ chức '*' TƯỜNG MINH: sau 0165 (RLS nghiêm ngặt, FORCE) `users`/`projects`/
+  // `user_projects` không có nhánh "GUC rỗng cho qua" — chạy không phạm vi sẽ thấy 0 dòng và báo
+  // nhầm "không ai mất quyền". Vẫn READ ONLY.
+  return withOrgScope(
+    "*",
     async () => {
       const [{ n }] = await query<{ n: number }>(`SELECT COUNT(*)::int AS n FROM user_projects`);
       const bangRong = Number(n) === 0;

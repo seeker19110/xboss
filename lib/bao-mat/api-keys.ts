@@ -3,7 +3,7 @@
 // Xem docs/nang-cap/M49-api-mo-sso.md mục PR1.
 import { createHash, randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withOrgScope } from "@/lib/db";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 import { patchRequestContext } from "@/lib/nen/request-context";
 import { parsePositiveId } from "@/lib/nen/ids";
@@ -50,24 +50,34 @@ export async function verifyApiKey(authHeader: string | null): Promise<ApiKeyAut
   const m = /^Bearer\s+(xbk_[0-9a-fA-F]+)$/.exec(authHeader.trim());
   if (!m) return null;
   const hash = hashApiKey(m[1]);
-  const row = await queryOne<{
-    id: number;
-    projectId: number | null;
-    orgId: number;
-    scopes: string[];
-    createdBy: number;
-  }>(
-    `SELECT id, project_id AS "projectId", org_id AS "orgId", scopes, created_by AS "createdBy"
+  // S16 (RLS 0165): key chưa cho biết tổ chức → tra theo key_hash (UNIQUE toàn hệ, là sha256 của
+  // bí mật 256-bit nên không dò được) trong phạm vi '*' do server đặt; ghi last_used_at và mọi
+  // truy vấn sau đó chạy trong phạm vi org của chính key.
+  const row = await withOrgScope("*", () =>
+    queryOne<{
+      id: number;
+      projectId: number | null;
+      orgId: number;
+      scopes: string[];
+      createdBy: number;
+    }>(
+      `SELECT id, project_id AS "projectId", org_id AS "orgId", scopes, created_by AS "createdBy"
        FROM api_keys
       WHERE key_hash = ? AND revoked_at IS NULL
         AND (expires_at IS NULL OR expires_at > now())`,
-    hash,
+      hash,
+    ),
   );
   if (!row) return null;
-  await run(
-    `UPDATE api_keys SET last_used_at = now()
+  await withOrgScope(
+    row.orgId,
+    () =>
+      run(
+        `UPDATE api_keys SET last_used_at = now()
       WHERE id = ? AND (last_used_at IS NULL OR last_used_at < now() - INTERVAL '60 seconds')`,
-    row.id,
+        row.id,
+      ),
+    { readOnly: false },
   );
   return {
     keyId: row.id,
@@ -118,10 +128,8 @@ export async function requireApiKey(
 
   // Key toàn cục chỉ có phạm vi trong tổ chức sở hữu key. Kiểm cả key gắn sẵn
   // dự án để chặn cấu hình cũ sai tenant hoặc dự án đã chuyển tổ chức.
-  const project = await queryOne(
-    `SELECT 1 FROM projects WHERE id = ? AND org_id = ?`,
-    projectId,
-    auth.orgId,
+  const project = await withOrgScope(auth.orgId, () =>
+    queryOne(`SELECT 1 FROM projects WHERE id = ? AND org_id = ?`, projectId, auth.orgId),
   );
   if (!project) return NextResponse.json({ error: "Dự án không tồn tại" }, { status: 404 });
 

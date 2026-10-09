@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
 import { deliverDueWebhooks } from "@/lib/bao-mat/webhooks";
 import { log } from "@/lib/nen/log";
+import { theoTungToChuc } from "@/lib/ha-tang/to-chuc";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +20,14 @@ export async function GET(req: NextRequest) {
     );
 
   try {
-    const result = await deliverDueWebhooks();
-    return NextResponse.json(result);
+    // Chỉ-secret: hàng đợi gửi lần lượt TỪNG tổ chức (S16, RLS 0165 — mỗi vòng chỉ thấy webhook
+    // của một org); phiên Admin/PM chỉ gửi webhook của tổ chức người gọi.
+    if (!bySecret) return NextResponse.json(await deliverDueWebhooks());
+    const tung = await theoTungToChuc(() => deliverDueWebhooks());
+    return NextResponse.json({
+      sent: tung.reduce((n, r) => n + r.sent, 0),
+      failed: tung.reduce((n, r) => n + r.failed, 0),
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Lỗi gửi webhook";
     log.error("GET /api/cron/deliver-webhooks lỗi", {

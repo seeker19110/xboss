@@ -43,7 +43,7 @@ Verdict: PASS (đủ mọi lớp yêu cầu) · PARTIAL (tự động xanh, còn
 | A1-AC03 | U/P/H | project-scope-security-unit; s02-import-project-id; p1-6-sheets-scope     | PARTIAL  | PASS     | — (PR-A: 23 route null-scope + rename)               |
 | A1-AC04 | P     | db-scope-nested (8 ca); db-begin-read-only; rls                           | GAP      | PASS     | —                                                    |
 | A1-AC05 | P/H   | permissions-fail-closed; auth-perms-project; permissions-org              | PARTIAL  | PASS     | — (PR-A: s16-stale-snapshot, 72 handler)             |
-| A1-AC06 | P/H   | rls; org-rls; rls-app-role-route; permissions-org                         | PARTIAL  | PARTIAL  | nhánh "GUC rỗng cho qua"                             |
+| A1-AC06 | P/H   | rls; org-rls; rls-app-role-route; permissions-org                         | PARTIAL  | PASS     | — (PR-B: 0165, s16-rls-strict); staging trước prod   |
 | A1-AC07 | P/H   | auth-session-revoke-http; auth; route-auth; audit-auth-project-regression | PARTIAL  | PASS     | —                                                    |
 | Q-AC01  | U/P/H | permissions-org; permissions-fail-closed; auth-perms-project              | PARTIAL  | PASS     | — (PR-A: cùng A1-AC05)                               |
 | Q-AC07  | P/H/O | runtime-app-role-schema; db-runtime-migration-boundary; health            | GAP      | PASS     | — (PR-A: /api/ready + 503 login/me); O               |
@@ -224,8 +224,8 @@ Không mục nào dưới đây được tự quyết hoặc code trong S15.
 - **(a)** → cutover theo cờ `XBOSS_STRICT_MEMBERSHIP` + script dry-run + runbook
   `AUDIT-S16-MEMBERSHIP-CUTOVER.md` (mặc định TẮT, bật sau khi chủ dự án duyệt danh sách gán); phần
   "cookie sai → dự án đầu"/`projectId == null` đóng ở `AUDIT-S16-NULL-SCOPE.md` (23 route + rename).
-- **(b)** → đã code trên nhánh `s16-rls-strict` (migration 0165, `AUDIT-S16-RLS-STRICT.md`), đi PR-B riêng
-  qua staging.
+- **(b)** → **xong (PR-B)**: migration 0165 + `withOrgScope`/cron theo từng org (`AUDIT-S16-RLS-STRICT.md`);
+  **bắt buộc staging trước production**, Metabase view cần GUC/BYPASSRLS (chủ dự án quyết).
 - **(c)** → đặc tả `M128-chung-tu-dieu-chinh-ipc.md` (Approved, thi hành sau M129).
 - **(d)** → **xong** (M130, `scripts/retention-cleanup.ts`, `docs/ops/backup.md`).
 - **(e)** → đặc tả `M129-ipc-da-chi-tach-cam-ket-thuc-chi.md` (Approved).

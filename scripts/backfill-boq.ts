@@ -2,7 +2,7 @@
 // Nếu mã sinh ra bị trùng (hiếm) thì thêm hậu tố -2, -3...
 // Chạy: npx tsx scripts/backfill-boq.ts
 import "./env";
-import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { query, queryOne, run, withOrgScope } from "@/lib/db";
 import { makeBoq } from "@/lib/khoi-luong/boq";
 
 type Row = { id: number; code: string; sheetCode: string; orgId: number | null };
@@ -28,41 +28,47 @@ async function unique(base: string, orgId: number): Promise<string> {
 async function main() {
   // Cả script trong MỘT transaction: mã do `unique()` chọn chỉ đúng khi không có ai ghi xen
   // giữa lúc chọn và lúc UPDATE, và một lần chạy hỏng phải không để lại nửa vời.
-  const { wps, tasks } = await withTransaction(async () => {
-    const wps = await query<Row>(
-      `SELECT wp.id, wp.code, st.code AS "sheetCode", p.org_id AS "orgId"
+  // S16 (RLS 0165): backfill TOÀN HỆ (mã BOQ tra theo org của từng dòng) — phạm vi '*' do chính
+  // script đặt, không phải đường request.
+  const { wps, tasks } = await withOrgScope(
+    "*",
+    async () => {
+      const wps = await query<Row>(
+        `SELECT wp.id, wp.code, st.code AS "sheetCode", p.org_id AS "orgId"
          FROM work_packages wp
          JOIN sheet_types st ON wp.sheet_type_id = st.id
          JOIN towers tw ON tw.id = st.tower_id
          JOIN projects p ON p.id = tw.project_id
         WHERE wp.boq_code IS NULL ORDER BY wp.id`,
-    );
-    for (const w of wps) {
-      await run(
-        `UPDATE work_packages SET boq_code = ? WHERE id = ?`,
-        await unique(makeBoq(w.sheetCode, w.code), w.orgId ?? 1),
-        w.id,
       );
-    }
+      for (const w of wps) {
+        await run(
+          `UPDATE work_packages SET boq_code = ? WHERE id = ?`,
+          await unique(makeBoq(w.sheetCode, w.code), w.orgId ?? 1),
+          w.id,
+        );
+      }
 
-    const tasks = await query<Row>(
-      `SELECT t.id, t.code, st.code AS "sheetCode", p.org_id AS "orgId"
+      const tasks = await query<Row>(
+        `SELECT t.id, t.code, st.code AS "sheetCode", p.org_id AS "orgId"
          FROM tasks t
          JOIN work_packages wp ON t.package_id = wp.id
          JOIN sheet_types st ON wp.sheet_type_id = st.id
          JOIN towers tw ON tw.id = st.tower_id
          JOIN projects p ON p.id = tw.project_id
         WHERE t.boq_code IS NULL ORDER BY t.id`,
-    );
-    for (const t of tasks) {
-      await run(
-        `UPDATE tasks SET boq_code = ? WHERE id = ?`,
-        await unique(makeBoq(t.sheetCode, t.code), t.orgId ?? 1),
-        t.id,
       );
-    }
-    return { wps, tasks };
-  });
+      for (const t of tasks) {
+        await run(
+          `UPDATE tasks SET boq_code = ? WHERE id = ?`,
+          await unique(makeBoq(t.sheetCode, t.code), t.orgId ?? 1),
+          t.id,
+        );
+      }
+      return { wps, tasks };
+    },
+    { readOnly: false },
+  );
 
   console.log(`✅ Nhóm: gán BOQ cho ${wps.length} hàng.`);
   console.log(`✅ Task: gán BOQ cho ${tasks.length} hàng.`);
