@@ -1,5 +1,14 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — Dọn nợ nhỏ: seed mẫu xoá bảng offline, S00 nhận resolver Strict, bỏ `payrollTotals`
+
+- `scripts/seed-sample.ts`: TRUNCATE thêm `offline_vault_keys`, `audit_operation_receipts` (CASCADE kéo
+  theo bảng con) — trước đây `DELETE FROM projects` vấp FK khi DB đã có khoá vault/receipt offline (nợ S08).
+  Chạy seed 2 lần liên tiếp trên DB đã migrate tới 0170: xanh.
+- `scripts/audit-route-inventory.ts`: thêm `getCurrentProjectIdStrict` vào `RESOLVER_CORE` (regex
+  `RESOLVER_OTHER` chỉ bắt tên kết thúc `ProjectId`) — `materials/sync` POST, `import/excel` hết `NOT_MAPPED`.
+- Bỏ `payrollTotals`/`PayrollTotals` trong `lib/tai-chinh/finance.ts` (không còn caller từ S10).
+
 ## 2026-10-09 — Tái kiểm quyền lúc ghi cho route BOQ và định mức (S16 §4 mục BOQ)
 
 - Áp `ghiNeuConQuyen`/`kiemQuyenTaiLucGhi` cho 8 handler ghi dưới `app/api/boq/**` và

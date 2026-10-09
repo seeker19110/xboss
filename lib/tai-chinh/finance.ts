@@ -382,26 +382,6 @@ export function parsePayrollBody(body: Record<string, unknown>): PayrollInput {
   };
 }
 
-export type PayrollTotals = { workdays: number; gross: number; deductions: number; net: number };
-
-// Tổng hợp các kỳ lương đã ghi (bảng payroll) theo kỳ — dùng cho báo cáo tổng lương;
-// nhập/tính từ attendance (M24) là việc của API PR3, hàm này chỉ gộp số đã có.
-export async function payrollTotals(period: string, projectId?: number): Promise<PayrollTotals> {
-  const conds = ["period = ?"];
-  const args: unknown[] = [period];
-  if (projectId != null) {
-    conds.push("project_id = ?");
-    args.push(projectId);
-  }
-  const row = await queryOne<PayrollTotals>(
-    `SELECT COALESCE(SUM(workdays), 0) AS workdays, COALESCE(SUM(gross), 0) AS gross,
-            COALESCE(SUM(deductions), 0) AS deductions, COALESCE(SUM(net), 0) AS net
-       FROM payroll WHERE ${conds.join(" AND ")}`,
-    ...args,
-  );
-  return row ?? { workdays: 0, gross: 0, deductions: 0, net: 0 };
-}
-
 export type PayrollSuggestion = { personnelId: number; personnelName: string; workdays: number };
 
 // payrollFromAttendance() đã chuyển sang lib/dich-vu/luong.ts (ADR-0008): nó phối hợp

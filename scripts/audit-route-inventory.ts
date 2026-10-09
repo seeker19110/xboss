@@ -68,6 +68,7 @@ const CHECK_PROJECT = new Set([
 ]);
 const RESOLVER_CORE = new Set([
   "getCurrentProjectId",
+  "getCurrentProjectIdStrict",
   "chotProjectIdChoDoc",
   "chotProjectIdChoGhi",
 ]);
