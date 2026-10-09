@@ -31,7 +31,8 @@ type CostRow = {
 };
 type Alert = { key: string; label: string; level: Exclude<MucCanhBao, "none">; pct: number | null };
 type Settings = { warnPct: number; overPct: number };
-type Totals = { budget: Tien; committed: Tien; actual: Tien };
+/** `approvedUnpaid` (M129): IPC đã duyệt nhưng chưa chi — cùng kiểu wire với `actual`. */
+type Totals = { budget: Tien; committed: Tien; actual: Tien; approvedUnpaid?: Tien };
 type DemNguon = { boqItems: number; poItems: number; floorContracts: number; payments: number };
 type Data = {
   rows: CostRow[];
@@ -153,7 +154,7 @@ export default function CostsPage() {
 
       <main className="max-w-5xl mx-auto px-3 sm:px-6 py-6 pb-24 space-y-6">
         {/* KPI Bento Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="bento-card p-4 flex flex-col justify-between">
             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
               Tổng ngân sách dự án
@@ -209,6 +210,21 @@ export default function CostsPage() {
               />
             </div>
           </div>
+
+          {data.projectTotals.approvedUnpaid !== undefined && (
+            <div className="bento-card p-4 flex flex-col justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Đã duyệt chưa chi
+              </span>
+              <p
+                className="text-2xl font-bold font-mono tabular-nums text-amber-300 mt-2"
+                title={tienDayDu(data.projectTotals.approvedUnpaid)}
+              >
+                {tienRutGon(data.projectTotals.approvedUnpaid)}
+              </p>
+              <p className="text-[11px] text-zinc-500 mt-1">IPC đã duyệt, chưa đánh dấu đã chi</p>
+            </div>
+          )}
         </div>
 
         {/* Báo cáo chưa đủ điều kiện đối soát: nguồn lệch phạm vi KHÔNG được cộng vào tổng */}

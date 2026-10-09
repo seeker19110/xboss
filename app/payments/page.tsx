@@ -18,6 +18,7 @@ import {
   Printer,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import { Chip } from "@/app/components/ui";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { useEditMode } from "@/app/components/useEditMode";
@@ -739,7 +740,13 @@ function BillsSection({
       .catch(() => setFloors([]));
   }, [person, bills]); // reload khi bills thay đổi
 
-  const billRows = bills.filter((b) => b.type === "bill");
+  const [locChi, setLocChi] = useState<"all" | "committed" | "paid">("all");
+  const billRows = bills.filter(
+    (b) =>
+      b.type === "bill" &&
+      (locChi === "all" ||
+        (locChi === "committed" ? b.payStatus === "committed" : b.payStatus !== "committed")),
+  );
   const itemRows = bills.filter((b) => b.type === "item");
   const advRows = bills.filter((b) => b.type === "advance");
   const sumBills = tongTien(billRows, (b) => b.amount);
@@ -942,6 +949,35 @@ function BillsSection({
             </div>
           )}
 
+          {/* ── Lọc theo trạng thái chi (M129) ── */}
+          <div
+            className="flex flex-wrap items-center gap-2 px-4 pb-2"
+            role="group"
+            aria-label="Lọc theo trạng thái chi"
+          >
+            {(
+              [
+                ["all", "Tất cả"],
+                ["committed", "Chưa chi"],
+                ["paid", "Đã chi"],
+              ] as const
+            ).map(([k, nhan]) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={locChi === k}
+                onClick={() => setLocChi(k)}
+                className={`min-h-10 px-3 rounded-lg border text-xs transition ${
+                  locChi === k
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-300"
+                    : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                }`}
+              >
+                {nhan}
+              </button>
+            ))}
+          </div>
+
           {/* ── Bảng chính ── */}
           <div className="overflow-x-auto">
             <table className="w-full text-[11px] min-w-[820px] border-collapse">
@@ -956,7 +992,7 @@ function BillsSection({
                   <th className="px-1 py-1.5 w-14 text-center">KL</th>
                   <th className="px-2 py-1.5 w-24 text-right">Nhân công</th>
                   <th className="px-2 py-1.5 w-28 text-right">Thành tiền</th>
-                  <th className="px-2 py-1.5 w-28">Lũy kế</th>
+                  <th className="px-2 py-1.5 w-28">Lũy kế / Trạng thái chi</th>
                   {canEdit && <th className="w-7" />}
                 </tr>
               </thead>
@@ -1077,6 +1113,16 @@ function BillsSection({
                                 <ChevronRight className="w-3 h-3" />
                               )}
                             </button>
+                          )}
+                          {b.payStatus === "committed" && (
+                            <Chip tone="warning" className="mt-1">
+                              Chưa chi
+                            </Chip>
+                          )}
+                          {b.payStatus === "paid" && (
+                            <Chip tone="success" className="mt-1">
+                              Đã chi{b.paidAt ? ` ${formatDateDMY(b.paidAt)}` : ""}
+                            </Chip>
                           )}
                         </td>
                         {canEdit && (

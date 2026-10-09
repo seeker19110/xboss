@@ -47,6 +47,9 @@ export type Bill = {
   createdBy: number | null;
   createdByName: string | null;
   createdAt: string;
+  /** M129: trạng thái chi của phiếu — undefined = API cũ/phiếu không có trạng thái. */
+  payStatus?: "committed" | "paid" | "void";
+  paidAt?: string | null;
 };
 export type FloorData = {
   sheetTypeId: number;

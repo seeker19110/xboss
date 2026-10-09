@@ -1,5 +1,10 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — M129 UI (đang làm): IPC đã duyệt → "chưa chi"/"Đã chi"
+
+Phần UI của M129 (`docs/nang-cap/M129-*.md` §2.4), backend làm ở nhánh khác: badge + hộp "Đánh dấu đã chi"
+trong `CertDocument`, cột/bộ lọc trạng thái chi ở `/payments`, KPI "Đã duyệt chưa chi" ở `/costs`, ca e2e.
+
 ## 2026-10-09 — PR-B 6(b): RLS nghiêm ngặt 18 bảng tổ chức/dự án (migration 0165, QUA STAGING)
 
 Đóng mục 6(b) của `AUDIT-S15-RELEASE-CANDIDATE.md` (A1-AC06): bỏ nhánh "GUC rỗng → cho qua" khỏi 15
