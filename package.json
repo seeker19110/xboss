@@ -27,6 +27,7 @@
     "audit:route-scope": "tsx scripts/audit-route-inventory.ts --format md --out docs/nang-cap/AUDIT-2026-09-25/S00-SCOPE-INVENTORY.md",
     "audit:verify-chain": "tsx scripts/verify-audit-chain.ts",
     "audit:verify-dr": "tsx scripts/verify-dr-restore.ts",
+    "retention:cleanup": "tsx scripts/retention-cleanup.ts",
     "changelog": "node scripts/gen-changelog.mjs",
     "prepare": "husky || true",
     "test:mutation": "node scripts/mutation-check.mjs",

@@ -441,8 +441,42 @@ sao hoặc role có `pg_monitor`), thiếu thì `drill-isolation` là `NOT_RUN`.
 **Mã thoát:** `0` mọi mục PASS · `1` có FAIL (hoặc tham số sai) · `2` không FAIL nhưng còn `NOT_RUN`.
 `--evidence-out` không ghi đè (giữ evidence lần thất bại). Thất bại → **giữ** `run-*` (gồm
 `postgres.log`, data) làm bằng chứng; PASS → tự xoá `run-*` của lần đó (thêm `--keep` để giữ). Thư mục
-giữ lại chứa dữ liệu thật: xem xong evidence thì người vận hành tự `rm -rf /srv/pitr-drill/run-*`.
+giữ lại chứa dữ liệu thật: xem xong evidence thì dọn theo mục
+[Retention evidence & diễn tập](#retention-evidence--diễn-tập) bên dưới (không `rm -rf` thủ công).
 Công cụ không bao giờ ghi/xoá trong kho archive/base backup.
+
+### Retention evidence & diễn tập
+
+Chính sách giữ tối thiểu (A6-AC06, D08 cửa sổ 35 ngày; spec M130):
+
+| Loại                                         | Giữ tối thiểu                                                 | Ai dọn                              | Công cụ                        |
+| -------------------------------------------- | ------------------------------------------------------------- | ----------------------------------- | ------------------------------ |
+| Artifact dump/uploads (set backup)           | local 35 ngày, remote 90 ngày, luôn giữ set COMPLETE gần nhất | `backup.sh` (đã có)                 | `scripts/ops/backup.sh`        |
+| Base backup + WAL (PITR)                     | theo phụ thuộc ≥35 ngày (A6-FR02) — script dưới KHÔNG đụng    | người vận hành, `pg_archivecleanup` | (mô tả ở trên)                 |
+| Evidence JSON PASS                           | 35 ngày                                                       | người vận hành có quyền ghi thư mục | `scripts/retention-cleanup.ts` |
+| Evidence JSON FAIL / NOT_RUN / JSON hỏng     | **365 ngày** (bằng chứng sự cố)                               | như trên                            | như trên                       |
+| Thư mục diễn tập `run-*` (PASS, có `--keep`) | 7 ngày                                                        | như trên                            | như trên                       |
+| Thư mục diễn tập `run-*` (FAIL / không rõ)   | 35 ngày (dọn sớm: `--apply --force-run <run-id>`)             | như trên                            | như trên                       |
+
+Quy trình (dry-run → đọc → áp dụng):
+
+```bash
+# 1. Dry-run mặc định: chỉ liệt kê tệp/thư mục, tuổi, lý do giữ/xoá, dung lượng giải phóng
+npm run retention:cleanup -- --evidence-dir logs --drill-dir /srv/pitr-drill
+# 2. Đọc danh sách (thêm --json nếu cần máy đọc), rồi mới xoá thật
+npm run retention:cleanup -- --evidence-dir logs --drill-dir /srv/pitr-drill --apply
+# Dọn sớm một run FAIL đã đọc xong evidence
+npm run retention:cleanup -- --evidence-dir logs --drill-dir /srv/pitr-drill --apply --force-run run-<id>
+```
+
+Ngưỡng chỉnh bằng `--evidence-pass-days/--evidence-fail-days/--drill-pass-days/--drill-fail-days`.
+PASS/FAIL của evidence đọc từ `completeDrVerified`/`completePitrVerified` (không parse được = FAIL).
+Thư mục `run-*` không có tệp kết quả riêng, nên PASS chỉ khi có evidence JSON trong `--evidence-dir` mang
+`drillRunDir` trỏ tới nó với `completePitrVerified: true`; còn lại coi là FAIL (giữ 35 ngày).
+An toàn: chỉ xoá tệp `.json` trong `--evidence-dir` và thư mục `^run-[0-9A-Za-z_-]+$` trong `--drill-dir`;
+symlink bị bỏ qua; từ chối (exit 2) nếu thư mục là `/`, `$HOME`, `BACKUP_DIR` hoặc `/srv/xboss-wal` (hoặc
+nằm trong chúng). Script **không** đụng archive WAL/base backup/artifact của `backup.sh`, không chạm DB và
+không có cron trong repo — người vận hành tự chạy sau khi đọc dry-run.
 
 **Biên bản diễn tập (bắt buộc cho A6-AC05/Q-AC08):** release SHA, recoverySetId, đường dẫn evidence
 JSON, người chạy/người xác nhận, workload (`workload` trong JSON: dung lượng base backup, số đoạn WAL
