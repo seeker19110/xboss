@@ -386,7 +386,7 @@ export default function AppHeader({
                   <span className="text-xs font-semibold text-zinc-200 group-hover:text-white truncate max-w-[120px]">
                     {me.name}
                   </span>
-                  <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">
+                  <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider">
                     {ROLE_LABELS[me.role as Role] ?? me.role}
                   </span>
                 </div>
