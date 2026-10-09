@@ -5,7 +5,7 @@ import { Plus, Receipt } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import MaskedValue from "@/app/components/MaskedValue";
 import { mSumTien, mTongTichTien } from "@/app/lib/masked";
-import { mulRatio } from "@/lib/nen/money";
+import { MONEY_FORMAT_DECIMAL_V1, mulRatio } from "@/lib/nen/money";
 import { HEADER_TIEN_V1 } from "@/lib/nen/money-dto";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -66,7 +66,9 @@ function PaymentCertsInner() {
       .then(([meData, c]) => {
         if (!meData) return;
         setMe(meData);
-        const list: Contract[] = c?.contracts ?? [];
+        // Tiền phải là chuỗi v1 (tính bigint) — server không nhận header thì không dùng số liệu,
+        // tránh trang sập khi parse number như chuỗi canonical.
+        const list: Contract[] = c?.moneyFormat === MONEY_FORMAT_DECIMAL_V1 ? c.contracts : [];
         setContracts(list);
         if (preselectContractId && list.some((x) => x.id === preselectContractId))
           setContractId(preselectContractId);
@@ -79,7 +81,7 @@ function PaymentCertsInner() {
   const loadCerts = useCallback((cid: number) => {
     return fetch(`/api/payment-certs?contractId=${cid}`, { headers: HEADER_TIEN_V1 })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setCerts(j?.certs ?? []));
+      .then((j) => setCerts(j?.moneyFormat === MONEY_FORMAT_DECIMAL_V1 ? j.certs : []));
   }, []);
 
   useEffect(() => {

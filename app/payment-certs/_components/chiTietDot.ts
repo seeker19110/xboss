@@ -94,7 +94,8 @@ export function fmtVNDDong(dong: bigint): string {
 /**
  * Khối lượng người dùng đang gõ → chuỗi scale 3 ĐÚNG số server sẽ ghi: client gửi
  * `Number(raw) || 0` (xem saveItems), PG làm tròn vào qty_period NUMERIC(15,3). Không hữu hạn
- * (vd "1e400") → "0.000" — server sẽ từ chối khi lưu, tạm tính không hiện "•••" như bị che.
+ * (vd "1e400") → "0.000": JSON.stringify(Infinity) = null, server đọc Number(null) = 0 và lưu 0 —
+ * tạm tính khớp đúng số đó, không hiện "•••" như bị che.
  */
 export function khoiLuongNhapScale3(raw: string): string {
   const n = Number(raw) || 0;
