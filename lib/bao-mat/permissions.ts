@@ -120,6 +120,9 @@ export async function invalidatePermissionCache(orgId: number): Promise<void> {
 // Khoá advisory theo org tuần tự hoá "tái kiểm quyền lúc ghi" (khoá chia sẻ) với ghi override
 // (khoá độc quyền) — cả hai chỉ sống trong transaction (pg_advisory_xact_*).
 const khoaQuyenOrg = (orgId: number) => `role_permissions:${orgId}`;
+// Khoá độc quyền của setPermissionOverride chờ tối đa chừng này sau các transaction ghi đang giữ
+// khoá chia sẻ; quá hạn ⇒ lỗi 409 `permission_lock_busy` (admin thử lại) thay vì treo request.
+export const KHOA_QUYEN_LOCK_TIMEOUT_MS = 5000;
 
 // D01 (A1-AC05) — tái kiểm quyền NGAY TRƯỚC GHI ở đường nghiệm thu/tài chính. Snapshot nạp lúc
 // xác thực có thể đã stale khi admin đổi override trong lúc request còn await (khoá dòng, I/O…).
@@ -129,6 +132,11 @@ const khoaQuyenOrg = (orgId: number) => `role_permissions:${orgId}`;
 // setPermissionOverride phải chờ các lần ghi đã qua kiểm, không còn khe "kiểm xong → deny commit →
 // ghi commit". Lỗi DB khi đọc lại ⇒ throw (caller ROLLBACK) và snapshot ở trạng thái đang nạp ⇒
 // CAN false; không bao giờ rơi về mặc định allow. Sau lời gọi, snapshot của request là bản mới.
+// Giới hạn (chủ đích, ngoài D01): chỉ đọc lại `role_permissions` (override), KHÔNG đọc lại
+// `users.role` — admin hạ vai trò giữa chừng thì request đang bay vẫn đi hết; phiên đó hết hiệu
+// lực ở request kế tiếp qua `session_version`. Ràng buộc với caller: gọi SAU khi đã khoá dòng
+// (FOR UPDATE) và giữ phần ghi còn lại ngắn, vì setPermissionOverride chờ khoá này tối đa
+// KHOA_QUYEN_LOCK_TIMEOUT_MS rồi báo bận.
 export async function kiemQuyenTaiLucGhi(kiem: () => boolean): Promise<boolean> {
   if (!kiem()) return false;
   const ctx = getRequestContext();
@@ -188,7 +196,18 @@ export async function setPermissionOverride(
   clearPermissionSnapshot();
   await withTransaction(async () => {
     // Chờ các transaction ghi đã tái kiểm quyền (khoá chia sẻ) COMMIT xong — xem kiemQuyenTaiLucGhi.
-    await run(`SELECT pg_advisory_xact_lock(hashtextextended(?, 0))`, khoaQuyenOrg(orgId));
+    // SET LOCAL chỉ sống trong transaction này (không ảnh hưởng kết nối trả về pool).
+    await run(`SET LOCAL lock_timeout = ${KHOA_QUYEN_LOCK_TIMEOUT_MS}`);
+    try {
+      await run(`SELECT pg_advisory_xact_lock(hashtextextended(?, 0))`, khoaQuyenOrg(orgId));
+    } catch (err) {
+      if ((err as { code?: unknown }).code === "55P03")
+        throw Object.assign(
+          new Error("Hệ thống đang ghi nghiệm thu/duyệt — thử cấu hình quyền lại sau vài giây"),
+          { status: 409, code: "permission_lock_busy" },
+        );
+      throw err;
+    }
     await assertProjectOrg(orgId, projectId);
     if (allowed === null) {
       await run(

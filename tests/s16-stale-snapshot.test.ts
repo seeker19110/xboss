@@ -456,3 +456,53 @@ test(
     }
   },
 );
+
+test(
+  "A1-AC05 (D01): khoá quyền bị giao dịch ghi giữ quá lock_timeout ⇒ PATCH override 409 permission_lock_busy, không treo; nhả khoá ⇒ 200",
+  S,
+  async () => {
+    const { getPool } = await import("@/lib/db");
+    const { KHOA_QUYEN_LOCK_TIMEOUT_MS } = await import("@/lib/bao-mat/permissions");
+    const { PATCH } = await import("@/app/api/admin/role-permissions/route");
+    const f = new SoFixture();
+    const c = await getPool().connect();
+    try {
+      const admin = await f.user("admin");
+      const projectId = await f.duAn("S16LOCK");
+      // Mô phỏng transaction ghi đã tái kiểm quyền nhưng COMMIT rất chậm: giữ khoá chia sẻ của org 1.
+      await c.query("BEGIN");
+      await c.query(`SELECT pg_advisory_xact_lock_shared(hashtextextended($1, 0))`, [
+        "role_permissions:1",
+      ]);
+      await f.vao(admin, projectId);
+      const goiPatch = () =>
+        goi(
+          requestRieng(() =>
+            PATCH(
+              jreq(
+                `/api/admin/role-permissions`,
+                { role: "pm", permKey: "approve", allowed: false, projectId },
+                "PATCH",
+              ),
+            ),
+          ),
+        );
+      const t0 = Date.now();
+      const ban = await goiPatch();
+      assert.equal(ban.status, 409, JSON.stringify(ban.body));
+      assert.equal(ban.body?.code, "permission_lock_busy");
+      const mat = Date.now() - t0;
+      assert.ok(
+        mat >= KHOA_QUYEN_LOCK_TIMEOUT_MS * 0.8 && mat < KHOA_QUYEN_LOCK_TIMEOUT_MS * 3,
+        `thời gian chờ ${mat}ms lệch lock_timeout ${KHOA_QUYEN_LOCK_TIMEOUT_MS}ms`,
+      );
+      await c.query("COMMIT");
+      const ok = await goiPatch();
+      assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    } finally {
+      await c.query("ROLLBACK").catch(() => {});
+      c.release();
+      await f.don();
+    }
+  },
+);

@@ -12,6 +12,7 @@ import {
 } from "@/lib/bao-mat/auth";
 import { queryOne, query } from "@/lib/db";
 import { listPermissionOverrides, setPermissionOverride } from "@/lib/bao-mat/permissions";
+import { phanHoiLoiCoStatus } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -108,13 +109,18 @@ export async function PATCH(req: NextRequest) {
   if (projectId !== null && !(await projectExists(projectId, user.orgId)))
     return NextResponse.json({ error: "Dự án không tồn tại" }, { status: 422 });
 
-  await setPermissionOverride(
-    role as Role,
-    permKey as PermKey,
-    allowed,
-    user.id,
-    user.orgId,
-    projectId,
-  );
+  try {
+    await setPermissionOverride(
+      role as Role,
+      permKey as PermKey,
+      allowed,
+      user.id,
+      user.orgId,
+      projectId,
+    );
+  } catch (err) {
+    // 409 `permission_lock_busy` khi khoá quyền của org đang bị giao dịch ghi giữ quá lâu.
+    return phanHoiLoiCoStatus(err, "Không cấu hình được quyền");
+  }
   return NextResponse.json({ ok: true });
 }
