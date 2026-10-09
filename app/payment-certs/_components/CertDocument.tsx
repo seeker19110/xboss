@@ -516,11 +516,14 @@ export function useCertDocument({
 function NutDanhDauDaChi({
   billId,
   maDot,
+  ngayDuyet,
   busy,
   onXong,
 }: {
   billId: number;
   maDot: string;
+  /** Ngày duyệt đợt (DATE 'YYYY-MM-DD') — làm `min` của ô ngày chi; server vẫn chặn 422. */
+  ngayDuyet: string | null;
   busy: boolean;
   onXong: () => void | Promise<void>;
 }) {
@@ -540,6 +543,7 @@ function NutDanhDauDaChi({
         <DanhDauDaChiDialog
           billId={billId}
           maDot={maDot}
+          ngayDuyet={ngayDuyet}
           onDong={() => setMo(false)}
           onXong={onXong}
         />
@@ -610,6 +614,7 @@ function CertActions({ ctrl }: { ctrl: CertDocumentCtrl }) {
         <NutDanhDauDaChi
           billId={cert.bill.id}
           maDot={cert.code}
+          ngayDuyet={cert.decidedAt}
           busy={busy}
           onXong={ctrl.refresh}
         />
