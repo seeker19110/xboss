@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, insertId, withTransaction, todayISO } from "@/lib/db";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { toSlug, SLUG_RE } from "@/lib/nen/sheets";
 import { visibleProjectIds, getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -10,6 +11,9 @@ export const dynamic = "force-dynamic";
 const MAX_REORDER_IDS = 200;
 
 // Danh sách sheet type + KPI tổng hợp — chỉ sheet của dự án đang chọn (P1-6).
+// Dấu hiệu nội bộ: quyền bị thu hồi giữa lúc xác thực và lúc ghi (D01) → route trả 403.
+const KHONG_CON_QUYEN = "KHONG_CON_QUYEN";
+
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -133,6 +137,9 @@ export async function POST(req: NextRequest) {
   let copied: number;
   try {
     const result = await withTransaction(async () => {
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.editStructure(user.role))))
+        throw new Error(KHONG_CON_QUYEN);
       const newId = await insertId(
         `INSERT INTO sheet_types (tower_id, code, name, responsible, slug, system_id) VALUES (?, ?, ?, ?, ?, ?)`,
         tower.id,
@@ -237,6 +244,11 @@ export async function POST(req: NextRequest) {
     sheetId = result.id;
     copied = result.copied;
   } catch (err) {
+    if ((err as Error).message === KHONG_CON_QUYEN)
+      return NextResponse.json(
+        { error: "Bạn không có quyền tạo sheet (chỉ Admin/PM)" },
+        { status: 403 },
+      );
     if ((err as { code?: string }).code === "23505")
       return NextResponse.json({ error: `Đường dẫn hoặc mã sheet đã được dùng` }, { status: 409 });
     throw err;
@@ -281,6 +293,9 @@ export async function PUT(req: NextRequest) {
   const NGOAI_SCOPE = "SHEET_NGOAI_SCOPE";
   try {
     await withTransaction(async () => {
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.editStructure(user.role))))
+        throw new Error(KHONG_CON_QUYEN);
       const { changes } = await run(
         `UPDATE sheet_types st SET sort_order = v.ord
            FROM unnest(?::int[]) WITH ORDINALITY AS v(id, ord), towers tw, projects p
@@ -293,6 +308,8 @@ export async function PUT(req: NextRequest) {
       if (changes !== ids.length) throw new Error(NGOAI_SCOPE);
     });
   } catch (err) {
+    if ((err as Error).message === KHONG_CON_QUYEN)
+      return NextResponse.json({ error: "Chỉ Admin/PM được sắp xếp thứ tự" }, { status: 403 });
     if ((err as Error).message === NGOAI_SCOPE)
       return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
     throw err;

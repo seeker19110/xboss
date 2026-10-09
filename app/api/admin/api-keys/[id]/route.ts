@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { queryOne, run } from "@/lib/db";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,12 @@ export async function DELETE(
   );
   if (!key) return NextResponse.json({ error: "Không tìm thấy API key" }, { status: 404 });
 
-  await run(`UPDATE api_keys SET revoked_at = now() WHERE id = ? AND revoked_at IS NULL`, id);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageIntegrations(user.role),
+    () => run(`UPDATE api_keys SET revoked_at = now() WHERE id = ? AND revoked_at IS NULL`, id),
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin được quản lý API key" }, { status: 403 });
   return NextResponse.json({ revoked: id });
 }

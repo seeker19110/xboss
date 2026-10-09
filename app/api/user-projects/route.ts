@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -84,16 +85,22 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Dự án không tồn tại" }, { status: 422 });
   }
 
-  await withTransaction(async () => {
-    await run(`DELETE FROM user_projects WHERE user_id = ?`, userId);
-    for (const projectId of projectIds) {
-      await run(
-        `INSERT INTO user_projects (user_id, project_id) VALUES (?, ?) ON CONFLICT DO NOTHING`,
-        userId,
-        projectId,
-      );
-    }
-  });
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.assign(user.role),
+    async () => {
+      await run(`DELETE FROM user_projects WHERE user_id = ?`, userId);
+      for (const projectId of projectIds) {
+        await run(
+          `INSERT INTO user_projects (user_id, project_id) VALUES (?, ?) ON CONFLICT DO NOTHING`,
+          userId,
+          projectId,
+        );
+      }
+    },
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin/PM mới gán được dự án" }, { status: 403 });
 
   return NextResponse.json({ ok: true });
 }

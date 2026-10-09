@@ -3,6 +3,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { query, queryOne } from "@/lib/db";
 import { getAdapter } from "@/lib/ha-tang/integrations/core";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -126,18 +127,26 @@ export async function POST(req: NextRequest) {
   // khác nhau nên không kích hoạt DO UPDATE (chèn mới); tích hợp thật luôn có project_id
   // (cron chỉ quét hàng project_id IS NOT NULL) nên không ảnh hưởng luồng dùng thực.
   // M54 GĐ1 PR2: tích hợp thuộc org người tạo (không dựa DEFAULT org_id=1).
-  const rows = await query<{ id: number }>(
-    `INSERT INTO integrations (provider, project_id, config, active, org_id) VALUES (?, ?, ?, ?, ?)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageIntegrations(user.role),
+    () =>
+      query<{ id: number }>(
+        `INSERT INTO integrations (provider, project_id, config, active, org_id) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT (provider, project_id)
      DO UPDATE SET config = EXCLUDED.config, active = EXCLUDED.active
        WHERE integrations.org_id = EXCLUDED.org_id
      RETURNING id`,
-    provider,
-    projectId,
-    JSON.stringify(config),
-    active,
-    user.orgId,
+        provider,
+        projectId,
+        JSON.stringify(config),
+        active,
+        user.orgId,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin được cấu hình tích hợp" }, { status: 403 });
+  const rows = kq.value;
   // Trùng (provider, project_id) với tích hợp của tổ chức khác → không ghi đè, không lộ.
   if (rows.length === 0)
     return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });

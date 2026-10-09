@@ -3,6 +3,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, queryOne, insertId } from "@/lib/db";
 import { generateApiKey, hashApiKey } from "@/lib/bao-mat/api-keys";
 import { parsePositiveId } from "@/lib/nen/ids";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -70,16 +71,24 @@ export async function POST(req: NextRequest) {
 
   const raw = generateApiKey();
   // M54 GĐ1 PR2: API key thuộc org người tạo (không dựa DEFAULT org_id=1).
-  const id = await insertId(
-    `INSERT INTO api_keys (name, key_hash, project_id, scopes, created_by, org_id)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageIntegrations(user.role),
+    () =>
+      insertId(
+        `INSERT INTO api_keys (name, key_hash, project_id, scopes, created_by, org_id)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    name,
-    hashApiKey(raw),
-    projectId,
-    scopes,
-    user.id,
-    user.orgId,
+        name,
+        hashApiKey(raw),
+        projectId,
+        scopes,
+        user.id,
+        user.orgId,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin được quản lý API key" }, { status: 403 });
+  const id = kq.value;
 
   // key thô chỉ trả 1 lần — client phải lưu lại ngay, hệ thống không lưu bản thô.
   return NextResponse.json(

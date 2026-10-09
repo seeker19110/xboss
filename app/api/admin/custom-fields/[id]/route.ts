@@ -8,6 +8,7 @@ import {
   type CustomEntityType,
   type CustomFieldType,
 } from "@/lib/ha-tang/custom-fields";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +103,14 @@ export async function PATCH(
     return NextResponse.json({ error: "Không có trường để cập nhật" }, { status: 400 });
 
   vals.push(id, user.orgId);
-  await run(`UPDATE custom_field_defs SET ${sets.join(", ")} WHERE id = ? AND org_id = ?`, ...vals);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageCustomFields(user.role),
+    () =>
+      run(`UPDATE custom_field_defs SET ${sets.join(", ")} WHERE id = ? AND org_id = ?`, ...vals),
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin được sửa trường tuỳ biến" }, { status: 403 });
   return NextResponse.json({ updated: id });
 }
 
@@ -123,11 +131,14 @@ export async function DELETE(
     if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
     // M54 GĐ1 PR2 (đồng bộ GET): cô lập tenant — chỉ xoá định nghĩa thuộc org người gọi.
-    const r = await run(
-      `DELETE FROM custom_field_defs WHERE id = ? AND org_id = ?`,
-      id,
-      user.orgId,
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageCustomFields(user.role),
+      () => run(`DELETE FROM custom_field_defs WHERE id = ? AND org_id = ?`, id, user.orgId),
     );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin được xoá trường tuỳ biến" }, { status: 403 });
+    const r = kq.value;
     if (r.changes === 0)
       return NextResponse.json({ error: "Không tìm thấy định nghĩa" }, { status: 404 });
     return NextResponse.json({ deleted: id });

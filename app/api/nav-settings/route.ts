@@ -5,6 +5,7 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getNavSettings, setNavEnabled, isKnownNodeKey } from "@/lib/ha-tang/nav-settings";
 import { flattenDashboards } from "@/app/lib/dashboardTree";
 import { sendPushToUsers } from "@/lib/van-hanh/push";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,13 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Chưa có dự án nào để áp override" }, { status: 422 });
   }
 
-  const { changed, wasEnabled } = await setNavEnabled(nodeKey, enabled, targetProjectId, user.id);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageNav(user.role),
+    () => setNavEnabled(nodeKey, enabled, targetProjectId, user.id),
+  );
+  if (!kq.ok) return NextResponse.json({ error: "Không có quyền" }, { status: 403 });
+  const { changed, wasEnabled } = kq.value;
 
   if (scope === "global" && user.role === "admin" && changed && enabled && !wasEnabled) {
     const found = flattenDashboards().find(({ dashboard }) => dashboard.id === nodeKey);

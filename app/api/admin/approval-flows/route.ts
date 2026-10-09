@@ -7,6 +7,7 @@ import {
   listApprovalFlows,
 } from "@/lib/tien-do/approvals";
 import { queryOne } from "@/lib/db";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -60,13 +61,21 @@ export async function POST(req: NextRequest) {
       }))
     : [];
 
-  const result = await createApprovalFlow({
-    projectId,
-    entityType,
-    name,
-    steps,
-    orgId: user.orgId,
-  });
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageApprovalFlows(user.role),
+    () =>
+      createApprovalFlow({
+        projectId,
+        entityType,
+        name,
+        steps,
+        orgId: user.orgId,
+      }),
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin được cấu hình luồng duyệt" }, { status: 403 });
+  const result = kq.value;
   if (typeof result === "string") {
     const status = result.startsWith("Đã có flow") ? 409 : 422;
     return NextResponse.json({ error: result }, { status });

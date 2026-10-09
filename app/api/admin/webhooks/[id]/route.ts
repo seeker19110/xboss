@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { queryOne, run } from "@/lib/db";
 import { WEBHOOK_EVENTS, validateWebhookUrl } from "@/lib/bao-mat/webhooks";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +70,13 @@ export async function PATCH(
   if (!existing) return NextResponse.json({ error: "Không tìm thấy webhook" }, { status: 404 });
 
   vals.push(id, user.orgId);
-  await run(`UPDATE webhooks SET ${sets.join(", ")} WHERE id = ? AND org_id = ?`, ...vals);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageIntegrations(user.role),
+    () => run(`UPDATE webhooks SET ${sets.join(", ")} WHERE id = ? AND org_id = ?`, ...vals),
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin được quản lý webhook" }, { status: 403 });
   return NextResponse.json({ id });
 }
 
@@ -96,7 +103,13 @@ export async function DELETE(
     );
     if (!existing) return NextResponse.json({ error: "Không tìm thấy webhook" }, { status: 404 });
 
-    await run(`DELETE FROM webhooks WHERE id = ? AND org_id = ?`, id, user.orgId);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.manageIntegrations(user.role),
+      () => run(`DELETE FROM webhooks WHERE id = ? AND org_id = ?`, id, user.orgId),
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin được quản lý webhook" }, { status: 403 });
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();
