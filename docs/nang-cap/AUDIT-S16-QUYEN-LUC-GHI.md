@@ -83,7 +83,7 @@ Ba route nghiệm thu đã áp ở `2820ebe` ngoài bảng này: `tasks/[id]/app
 | `contracts`                      | POST   | manageContracts       | chưa     | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
 | `costs/settings`                 | PATCH  | editStructure         | chưa     | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
 | `insurance-bonds/[id]/restore`   | POST   | (none)                | chưa     | **KHÔNG ÁP** — vai trò cứng `role === "admin"` — không đi qua override CAN, không có snapshot stale                                                                       |
-| `insurance-bonds/[id]`           | PATCH  | manageContracts       | chưa     | **HOÃN** — xoá file cũ/ghi file lên storage TRƯỚC câu UPDATE (multipart) — cần sắp lại thứ tự ghi trước khi bọc được; chưa đổi để không đụng hành vi file                 |
+| `insurance-bonds/[id]`           | PATCH  | manageContracts       | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen; lưu file mới → ghi DB → xoá file cũ (bị từ chối: dọn file mới)                                                                                |
 | `insurance-bonds/[id]`           | DELETE | manageContracts       | chưa     | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
 | `insurance-bonds`                | POST   | manageContracts       | chưa     | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
 | `integrations/[provider]/sync`   | POST   | viewIntegrations      | chưa     | **KHÔNG ÁP** — gate là `viewIntegrations` (quyền xem) và `runSync` gọi dịch vụ ngoài/khoá `sync_locks` riêng — không nằm trong một transaction ghi                        |
@@ -131,7 +131,7 @@ Ba route nghiệm thu đã áp ở `2820ebe` ngoài bảng này: `tasks/[id]/app
 | `suppliers/[id]`                 | DELETE | (none)                | chưa     | **KHÔNG ÁP** — vai trò cứng cục bộ (`canManage`/`canRate`/admin) — không override CAN                                                                                     |
 | `suppliers`                      | POST   | (none)                | chưa     | **KHÔNG ÁP** — vai trò cứng cục bộ (`canManage`/`canRate`/admin) — không override CAN                                                                                     |
 | `tenders/[id]/award`             | POST   | approve               | chưa     | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
-| `tenders/[id]/bids/[bidId]/file` | POST   | manageTenders         | chưa     | **HOÃN** — xoá file cũ + storagePut TRƯỚC UPDATE — như insurance-bonds PATCH                                                                                              |
+| `tenders/[id]/bids/[bidId]/file` | POST   | manageTenders         | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen; lưu file mới → ghi DB → xoá file cũ (bị từ chối: dọn file mới)                                                                                |
 | `tenders/[id]/bids/[bidId]`      | PATCH  | manageTenders         | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
 | `tenders/[id]/bids/[bidId]`      | DELETE | manageTenders         | chưa     | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
 | `tenders/[id]/bids`              | POST   | manageTenders         | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi/ghiNeuConQuyen                                                                                                                             |
@@ -167,6 +167,7 @@ Ba route nghiệm thu đã áp ở `2820ebe` ngoài bảng này: `tasks/[id]/app
 ## 4. Còn mở
 
 - Miền khối lượng/BOQ (`boq*`, `boq-norms*`) ngoài phạm vi đợt này (HOÃN) — `lib/khoi-luong/boq.ts` là vùng rủi ro cao.
-- `insurance-bonds/:id` PATCH và `tenders/:id/bids/:bidId/file` POST (xoá file cũ trước khi cập nhật DB): cần sắp lại
-  thứ tự (ghi DB → xoá file cũ) trước khi bọc; để việc riêng.
+- ~~`insurance-bonds/:id` PATCH và `tenders/:id/bids/:bidId/file` POST~~ — **ĐÃ ÁP** (2026-10-09): lưu file mới →
+  ghi DB trong `ghiNeuConQuyen` → mới xoá file cũ (best-effort, lỗi chỉ log); bị từ chối/ghi lỗi thì dọn file mới.
+  Ca test `tests/s16-quyen-luc-ghi-file.test.ts`. Route file báo giá không có DELETE.
 - Các route ghi ngoài hai nhóm (tiến độ, vật tư, HSE, nhật ký…) chưa kiểm kê trong đợt này.

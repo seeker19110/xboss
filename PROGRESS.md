@@ -1,5 +1,15 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — S16 §4: tái kiểm quyền lúc ghi cho bảo lãnh kèm file + file báo giá thầu
+
+Đóng 2 mục HOÃN trong `docs/nang-cap/AUDIT-S16-QUYEN-LUC-GHI.md` §4:
+
+- `PATCH /api/insurance-bonds/:id` và `POST /api/tenders/:id/bids/:bidId/file`: lưu file mới → ghi DB
+  trong `ghiNeuConQuyen` (tái kiểm `manageContracts`/`manageTenders`) → mới xoá file cũ (best-effort,
+  lỗi chỉ log). Bị thu hồi quyền lúc ghi ⇒ 403 + dọn file mới, DB và file cũ giữ nguyên (trước: xoá
+  file cũ TRƯỚC câu UPDATE, không tái kiểm).
+- Test `tests/s16-quyen-luc-ghi-file.test.ts` (đỏ trên code cũ, xanh sau sửa).
+
 ## 2026-10-09 — M131 phần 2: khôi phục vault khi mất proof (Admin duyệt) + trang Thiết bị offline
 
 - Đóng "Cần quyết (3)" S05/S07 theo `docs/nang-cap/M131-vault-offline-bao-tri-va-khoi-phuc.md` §3.

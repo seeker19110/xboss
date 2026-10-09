@@ -17,6 +17,7 @@ import {
   type InsuranceInput,
 } from "@/lib/tai-chinh/insurance";
 import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 
@@ -83,8 +84,8 @@ export async function GET(
 }
 
 // PATCH /api/insurance-bonds/:id — sửa (Admin/PM). Nhận JSON (chỉ sửa field) hoặc
-// multipart/form-data (field dạng text + phần 'file' tuỳ chọn để thêm/thay chứng thư —
-// xoá file cũ trên đĩa nếu có).
+// multipart/form-data (field dạng text + phần 'file' tuỳ chọn để thêm/thay chứng thư).
+// Thứ tự (S16): lưu file mới → ghi DB (tái kiểm quyền lúc ghi) → mới xoá file cũ.
 export async function PATCH(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -163,7 +164,7 @@ export async function PATCH(
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
 
   let fileCols: {
-    fileName: string | null;
+    fileName: string;
     originalName: string | null;
     mimeType: string | null;
     sizeBytes: number | null;
@@ -172,8 +173,6 @@ export async function PATCH(
     const checked = await checkUploadedFile(file, { accept: "document", maxBytes: MAX_DOC_BYTES });
     if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: checked.status });
     const fileBuf = checked.buf;
-
-    if (existing.fileName) await storageDelete(user.orgId, existing.fileName);
 
     const fileName = newInsuranceDocFileName(id, file.type);
     await storagePut(user.orgId, fileName, fileBuf);
@@ -185,44 +184,74 @@ export async function PATCH(
     };
   }
 
-  if (fileCols) {
-    await run(
-      `UPDATE insurance_bonds SET contract_id = ?, kind = ?, title = ?, provider = ?, code = ?,
-              value = ?, issued_date = ?, expiry_date = ?, status = ?, note = ?,
-              file_name = ?, original_name = ?, mime_type = ?, size_bytes = ?
-        WHERE id = ?`,
-      input.contractId,
-      input.kind,
-      input.title,
-      input.provider,
-      input.code,
-      input.value,
-      input.issuedDate,
-      input.expiryDate,
-      input.status,
-      input.note,
-      fileCols.fileName,
-      fileCols.originalName,
-      fileCols.mimeType,
-      fileCols.sizeBytes,
-      id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const capNhat = async () => {
+    if (fileCols) {
+      await run(
+        `UPDATE insurance_bonds SET contract_id = ?, kind = ?, title = ?, provider = ?, code = ?,
+                  value = ?, issued_date = ?, expiry_date = ?, status = ?, note = ?,
+                  file_name = ?, original_name = ?, mime_type = ?, size_bytes = ?
+            WHERE id = ?`,
+        input.contractId,
+        input.kind,
+        input.title,
+        input.provider,
+        input.code,
+        input.value,
+        input.issuedDate,
+        input.expiryDate,
+        input.status,
+        input.note,
+        fileCols.fileName,
+        fileCols.originalName,
+        fileCols.mimeType,
+        fileCols.sizeBytes,
+        id,
+      );
+    } else {
+      await run(
+        `UPDATE insurance_bonds SET contract_id = ?, kind = ?, title = ?, provider = ?, code = ?,
+                  value = ?, issued_date = ?, expiry_date = ?, status = ?, note = ?
+            WHERE id = ?`,
+        input.contractId,
+        input.kind,
+        input.title,
+        input.provider,
+        input.code,
+        input.value,
+        input.issuedDate,
+        input.expiryDate,
+        input.status,
+        input.note,
+        id,
+      );
+    }
+  };
+  const kq = await ghiNeuConQuyen(() => CAN.manageContracts(user.role), capNhat).catch(
+    async (e: unknown) => {
+      // Ghi DB lỗi ⇒ dọn file mới vừa lưu (DB vẫn trỏ file cũ) rồi ném tiếp.
+      if (fileCols) await storageDelete(user.orgId, fileCols.fileName);
+      throw e;
+    },
+  );
+  if (!kq.ok) {
+    // Bị thu hồi quyền lúc ghi ⇒ không ghi DB; dọn file mới, giữ nguyên file cũ.
+    if (fileCols) await storageDelete(user.orgId, fileCols.fileName);
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa bảo hiểm/bảo lãnh (chỉ Admin/PM)" },
+      { status: 403 },
     );
-  } else {
-    await run(
-      `UPDATE insurance_bonds SET contract_id = ?, kind = ?, title = ?, provider = ?, code = ?,
-              value = ?, issued_date = ?, expiry_date = ?, status = ?, note = ?
-        WHERE id = ?`,
-      input.contractId,
-      input.kind,
-      input.title,
-      input.provider,
-      input.code,
-      input.value,
-      input.issuedDate,
-      input.expiryDate,
-      input.status,
-      input.note,
-      id,
+  }
+
+  // DB đã trỏ file mới ⇒ xoá file cũ (best-effort, lỗi chỉ ghi log, không làm hỏng request).
+  if (fileCols && existing.fileName) {
+    const fileCu = existing.fileName;
+    await storageDelete(user.orgId, fileCu).catch((e: unknown) =>
+      log.warn("Không xoá được file chứng thư cũ", {
+        route: "insurance-bonds.patch",
+        fileName: fileCu,
+        error: e instanceof Error ? e.message : String(e),
+      }),
     );
   }
 
