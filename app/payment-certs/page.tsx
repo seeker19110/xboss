@@ -247,7 +247,7 @@ function PaymentCertsInner() {
               </div>
             )}
 
-            <div className="grid lg:grid-cols-[320px_1fr] gap-4 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 items-start">
               {/* Cột trái — danh sách đợt; ẩn dưới lg khi đang mở một chứng từ. */}
               <div className={selected ? "hidden lg:block" : "block"}>
                 {certs.length === 0 ? (
@@ -296,7 +296,7 @@ function PaymentCertsInner() {
               </div>
 
               {/* Cột phải — chứng từ đang mở. */}
-              <div className={selected ? "block" : "hidden lg:block"}>
+              <div className={selected ? "block min-w-0" : "hidden lg:block min-w-0"}>
                 {selected ? (
                   <CertDocument
                     ctrl={ctrl}

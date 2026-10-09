@@ -107,6 +107,9 @@ export function Modal({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // Đánh dấu "đã xử lý": listener Esc ở window của trang phía sau (vd CertDocument) kiểm
+        // e.defaultPrevented thay vì dò [role=dialog] — Modal đóng đồng bộ nên DOM đã mất dialog.
+        e.preventDefault();
         onCloseRef.current();
         return;
       }

@@ -118,9 +118,8 @@ async function moDot(page: Page, d: Dot, doiCanhBao = false) {
 }
 
 /**
- * Bấm nút bằng bàn phím (focus + Enter) thay cho chuột: chứng từ IPC trên mobile đang tràn ngang
- * (layout viewport 738px > 393px, xem test.fixme cuối file) nên toạ độ chuột của Playwright lệch
- * khỏi nút nằm trên thanh đáy cố định. Kích hoạt bằng phím vẫn là thao tác người dùng thật.
+ * Bấm nút bằng bàn phím (focus + Enter) thay cho chuột: nút nằm trên thanh đáy cố định (mobile) —
+ * kích hoạt bằng phím ổn định hơn toạ độ chuột và vẫn là thao tác người dùng thật.
  */
 async function bam(nut: Locator) {
   await nut.focus();
@@ -155,7 +154,7 @@ async function daDuocDuyet(page: Page) {
   await expect(tieuDeDot(page)).toContainText("Được duyệt", { timeout: 20_000 });
 }
 
-/** Theme tối (darkblue) — theme sáng mặc định đang có lỗi tương phản ở khối cảnh báo, xem test.fixme cuối file. */
+/** Theme tối (darkblue) (theme sáng được kiểm riêng ở test A5-AC04 cuối file). */
 async function theme(page: Page, ten: "light" | "darkblue") {
   await page.addInitScript((t) => localStorage.setItem("xboss_theme", t), ten);
 }
@@ -330,7 +329,7 @@ test.describe("IPC vượt khối lượng hợp đồng — cảnh báo + xác 
     await page.keyboard.press("Escape");
     await expect(dlg).toHaveCount(0);
     expect(soDecide).toBe(0);
-    // Đợt vẫn chưa duyệt (mở lại chứng từ vì Esc đang đóng luôn cả chứng từ — xem test.fixme cuối file).
+    // Đợt vẫn chưa duyệt.
     await moDot(page, d2, true);
     await chuaDuocDuyet(page);
     await nutDuyet(page).focus();
@@ -431,16 +430,8 @@ test.describe("Số tiền exact trên màn IPC (A3-AC05, lớp B)", () => {
   });
 });
 
-test.describe("Lỗi đã biết (báo phiên chính, KHÔNG sửa trong đợt e2e)", () => {
-  // Khối cảnh báo vượt HĐ dùng text-rose-200 / bg-rose-950/20 nhưng theme SÁNG (mặc định) chỉ
-  // override --color-rose-300 (app/globals.css) → chữ #ffccd3 trên nền #f6f7f9, tương phản 1,32:1
-  // (< 4,5:1), cảnh báo gần như không đọc được ở theme sáng — vi phạm A5-AC04 "cảnh báo dễ thấy".
-  // Gỡ fixme khi sửa token (ADR-0010: sửa ở globals.css, không đổi class từng trang).
-  // Esc trên hộp xác nhận đóng hộp NHƯNG đồng thời đóng luôn chứng từ phía sau: Modal đóng đồng bộ
-  // (React flush microtask giữa hai listener keydown) nên handler Esc của CertDocument không còn
-  // thấy [role="dialog"] ở app/payment-certs/_components/CertDocument.tsx (useEffect keydown).
-  // Hệ quả: focus không về nút "Duyệt", người duyệt mất vị trí. Gỡ fixme khi sửa.
-  test.fixme("A5-AC09: Esc trên hộp xác nhận chỉ đóng hộp, giữ chứng từ + trả focus về nút Duyệt", async ({
+test.describe("Hồi quy UI đã sửa (tương phản theme sáng, Esc hộp xác nhận, tràn ngang mobile)", () => {
+  test("A5-AC09: Esc trên hộp xác nhận chỉ đóng hộp, giữ chứng từ + trả focus về nút Duyệt", async ({
     page,
   }) => {
     await theme(page, "darkblue");
@@ -455,7 +446,7 @@ test.describe("Lỗi đã biết (báo phiên chính, KHÔNG sửa trong đợt 
     await expect(nutDuyet(page)).toBeFocused();
   });
 
-  test.fixme("A5-AC04: cảnh báo vượt HĐ đủ tương phản ở theme sáng (axe)", async ({ page }) => {
+  test("A5-AC04: cảnh báo vượt HĐ đủ tương phản ở theme sáng (axe)", async ({ page }) => {
     await theme(page, "light");
     const co = await dungToChucCoLap(["pm"]);
     const d2 = await dungDotVuot(page, co);
@@ -465,10 +456,9 @@ test.describe("Lỗi đã biết (báo phiên chính, KHÔNG sửa trong đợt 
     expect(nang, JSON.stringify(nang, null, 2)).toEqual([]);
   });
 
-  // Trên mobile (Pixel 5, 393px) chứng từ IPC làm trang rộng 738px: khối chính không co theo màn
-  // hình (có thể do bảng dòng KL thiếu min-w-0/overflow-x-auto) → trình duyệt thu nhỏ trang, thanh
-  // đáy cố định (nút Duyệt) lệch toạ độ. Gỡ fixme khi sửa layout.
-  test.fixme("A5-AC09: chứng từ IPC không tràn ngang trên mobile", async ({ page, isMobile }) => {
+  // Mobile (Pixel 5, 393px): lưới 2 cột của trang thiếu grid-cols-1 + min-w-0 nên cột ngầm `auto`
+  // nở theo bảng dòng KL (min-w 720px) → trang rộng 738px, thanh đáy cố định lệch.
+  test("A5-AC09: chứng từ IPC không tràn ngang trên mobile", async ({ page, isMobile }) => {
     test.skip(!isMobile, "chỉ áp dụng cho viewport mobile");
     await theme(page, "darkblue");
     const co = await dungToChucCoLap(["pm"]);
@@ -478,6 +468,17 @@ test.describe("Lỗi đã biết (báo phiên chính, KHÔNG sửa trong đợt 
       cuon: document.documentElement.scrollWidth,
       hienThi: document.documentElement.clientWidth,
     }));
-    expect(rong.cuon).toBeLessThanOrEqual(rong.hienThi + 1);
+    // Khi vỡ: liệt kê phần tử vượt mép phải để chỉ đúng chỗ tràn.
+    const tran = await page.evaluate(() => {
+      const w = document.documentElement.clientWidth;
+      return Array.from(document.body.querySelectorAll("*"))
+        .filter((el) => el.getBoundingClientRect().right > w + 1 && !el.closest(".app-bottombar"))
+        .slice(0, 8)
+        .map(
+          (el) =>
+            `${el.tagName}.${String(el.className).slice(0, 80)} right=${Math.round(el.getBoundingClientRect().right)}`,
+        );
+    });
+    expect(rong.cuon, JSON.stringify(tran, null, 1)).toBeLessThanOrEqual(rong.hienThi + 1);
   });
 });
