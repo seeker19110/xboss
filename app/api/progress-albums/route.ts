@@ -3,6 +3,7 @@ import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { listAlbums, parseAlbumBody, validateAlbumInput } from "@/lib/ky-thuat/tech";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -39,15 +40,26 @@ export async function POST(req: NextRequest) {
   const invalid = validateAlbumInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  const id = await insertId(
-    `INSERT INTO progress_albums (project_id, milestone_label, captured_date, note, created_by)
-     VALUES (?, ?, ?, ?, ?)`,
-    projectId,
-    input.milestoneLabel,
-    input.capturedDate,
-    input.note,
-    user.id,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageTech(user.role),
+    () =>
+      insertId(
+        `INSERT INTO progress_albums (project_id, milestone_label, captured_date, note, created_by)
+         VALUES (?, ?, ?, ?, ?)`,
+        projectId,
+        input.milestoneLabel,
+        input.capturedDate,
+        input.note,
+        user.id,
+      ),
   );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền tạo album (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  const id = kq.value;
 
   return NextResponse.json({ id }, { status: 201 });
 }

@@ -233,6 +233,85 @@ Ca test: `tests/s16-quyen-luc-ghi-hien-truong.test.ts` — mỗi file route đã
 | `waste-logs/[id]`             | PATCH  | manageEnv               | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
 | `waste-logs/[id]`             | DELETE | manageEnv               | chưa                     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                            |
 
+### 2.x Miền tiến độ / cấu trúc (2026-10-09)
+
+Phạm vi: `tasks`, `workpackages`, `dimensions`, `sheets`, `towers`, `projects`, `project`, `systems`, `baselines`,
+`import`, `packages`, `package-dependencies`, `construction-stages`, `floor-stage-fronts`,
+`floor-stage-front-documents`, `floor-approvals`, `work-fronts`, `work-front-documents`, `progress-albums`,
+`photos`, `comments`, `saved-reports`, `raci`, `presence`, `ui-texts`, `user-projects`, `documents`. Route đã có
+trong bảng trên (`sheets*`, `projects*`, `saved-reports*`, `ui-texts`, `user-projects`, `tasks/[id]/approve`,
+`floor-approvals/[id]` DELETE) không lặp lại. Chỉ sửa tầng route — `lib/**` (kể cả `lib/tien-do/recompute.ts`)
+không đổi; lời gọi recompute nằm trong cùng callback ghi. `canTouchTask`/`canTouchPackage`/`canTouchFloor` chỉ
+so `role === "subcon"` + người được giao (không đi qua CAN) nên không tự nó là cổng override; route có thêm
+`CAN.<x>` thì tái kiểm đúng `CAN.<x>` đó. Route "người upload/tác giả HOẶC `CAN.<x>`" tái kiểm nguyên điều kiện
+đó. Route có file: storage put trước, ghi DB trong tái kiểm, bị từ chối ⇒ xoá file vừa lưu; file cũ chỉ xoá
+sau COMMIT (bbnt/drawing trước đây xoá file cũ TRƯỚC câu UPDATE — đã đổi thứ tự).
+
+| Route (`app/api/…`)                        | Method | CAN                                  | tx trước | Quyết định                                                                                                                                        |
+| ------------------------------------------ | ------ | ------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `baselines/[id]`                           | DELETE | editStructure                        | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi trong `withProjectScope` (sau SELECT, trước DELETE)                                                                |
+| `baselines`                                | POST   | editStructure                        | có       | **ĐÃ ÁP** — ghiNeuConQuyen thay `withTransaction` trong `withProjectScope`                                                                        |
+| `comments/[id]`                            | DELETE | editStructure (hoặc tác giả)         | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen(tác giả ∨ editStructure)                                                                                               |
+| `construction-stages/[id]`                 | PATCH  | editStructure                        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen quanh `updateStage` (withProjectScope lồng)                                                                            |
+| `construction-stages`                      | POST   | editStructure                        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen quanh `createStage`                                                                                                    |
+| `dimensions/[id]`                          | PATCH  | editProgress (+ canTouchTask)        | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi sau `FOR UPDATE tasks`, trước `ghiDauVetTick`/recompute                                                            |
+| `dimensions/batch`                         | PATCH  | editProgress (+ canTouchTask)        | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi sau `FOR UPDATE tasks`, trước ghi                                                                                  |
+| `dimensions/rename`                        | POST   | editStructure                        | có       | **ĐÃ ÁP** — ghiNeuConQuyen thay `withTransaction`                                                                                                 |
+| `documents/[id]`                           | DELETE | editStructure (hoặc người upload)    | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen(người upload ∨ editStructure); file xoá sau COMMIT                                                                     |
+| `floor-approvals/[id]/documents`           | POST   | editProgress (+ canTouchFloor)       | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen cho cả nhánh link lẫn nhánh file (bị từ chối ⇒ xoá file vừa lưu)                                                       |
+| `floor-approvals`                          | POST   | editProgress (+ canTouchFloor)       | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen quanh `INSERT … ON CONFLICT`                                                                                           |
+| `floor-stage-front-documents/[id]`         | DELETE | manageWorkFronts (hoặc người upload) | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen(người upload ∨ manageWorkFronts); file xoá sau COMMIT                                                                  |
+| `floor-stage-fronts/[id]/documents`        | POST   | manageWorkFronts                     | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen; bị từ chối ⇒ xoá file vừa lưu                                                                                         |
+| `floor-stage-fronts`                       | PUT    | manageWorkFronts                     | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen quanh `upsertFloorStageFront`                                                                                          |
+| `import/excel`                             | POST   | import                               | chưa     | **HOÃN** — `importWorkbook` ghi nhiều câu KHÔNG có transaction; bọc vào một transaction đổi ngữ nghĩa import (atomic, khoá dài) — cần quyết riêng |
+| `package-dependencies/[id]`                | DELETE | editStructure                        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                                        |
+| `packages/[id]/dependencies`               | POST   | editStructure                        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                                        |
+| `photos/[id]`                              | DELETE | editStructure (hoặc người upload)    | có       | **ĐÃ ÁP** — ghiNeuConQuyen(người upload ∨ editStructure) thay `withTransaction`; file xoá sau COMMIT                                              |
+| `presence`                                 | POST   | (none)                               | chưa     | **KHÔNG ÁP** — heartbeat của chính phiên người dùng, không kiểm CAN                                                                               |
+| `progress-albums/[id]/photos`              | POST   | manageTech                           | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen; bị từ chối ⇒ xoá file vừa lưu                                                                                         |
+| `progress-albums/[id]`                     | PATCH  | manageTech                           | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                                        |
+| `progress-albums/[id]`                     | DELETE | manageTech                           | có       | **ĐÃ ÁP** — ghiNeuConQuyen thay `withTransaction`; file xoá sau COMMIT                                                                            |
+| `progress-albums`                          | POST   | manageTech                           | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                                        |
+| `project`                                  | PATCH  | (none)                               | chưa     | **KHÔNG ÁP** — `isAdminOrPm` (vai trò cứng) — không override CAN                                                                                  |
+| `project/select`                           | POST   | (none)                               | chưa     | **KHÔNG ÁP** — chọn dự án của chính phiên (cookie), không ghi DB, không kiểm CAN                                                                  |
+| `raci`                                     | PUT    | manageHr                             | có       | **ĐÃ ÁP** — ghiNeuConQuyen thay `withTransaction`                                                                                                 |
+| `systems/[code]/upload`                    | POST   | (none)                               | chưa     | **KHÔNG ÁP** — vai trò cứng `role !== "admin"` — không override CAN                                                                               |
+| `tasks/[id]/comments`                      | POST   | (none — canTouchTask)                | chưa     | **KHÔNG ÁP** — chỉ `canTouchTask` (subcon + người được giao, không qua CAN) — không có snapshot override                                          |
+| `tasks/[id]/copy`                          | POST   | editStructure                        | có       | **ĐÃ ÁP** — ghiNeuConQuyen thay `withTransaction`                                                                                                 |
+| `tasks/[id]/delay-reason`                  | POST   | editProgress (+ canTouchTask)        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                                        |
+| `tasks/[id]/documents`                     | POST   | editProgress (+ canTouchTask)        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen; bị từ chối ⇒ xoá file vừa lưu                                                                                         |
+| `tasks/[id]/move`                          | PATCH  | editStructure                        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen (2 câu hoán đổi cùng transaction)                                                                                      |
+| `tasks/[id]/photos`                        | POST   | editProgress (+ canTouchTask)        | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi sau khoá receipt, trước INSERT (bị từ chối ⇒ `donFileStaging`); nhánh ảnh trùng có receipt cũng tái kiểm           |
+| `tasks/[id]/progress`                      | PATCH  | editProgress (+ canTouchTask)        | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi sau `FOR UPDATE tasks`, trước UPDATE/recompute                                                                     |
+| `tasks/[id]`                               | PATCH  | editStructure                        | có       | **ĐÃ ÁP** — ghiNeuConQuyen quanh `assignTask` + kiemQuyenTaiLucGhi sau `FOR UPDATE tasks`                                                         |
+| `tasks/[id]`                               | DELETE | editStructure                        | có       | **ĐÃ ÁP** — ghiNeuConQuyen thay `withTransaction`; file xoá sau COMMIT                                                                            |
+| `tasks/batch`                              | PATCH  | editStructure                        | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi đầu `withTransaction` (giữ khoá tới COMMIT cả lô)                                                                  |
+| `towers/[id]`                              | PATCH  | editStructure                        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                                        |
+| `towers/[id]`                              | DELETE | editStructure                        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                                        |
+| `towers`                                   | POST   | editStructure                        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen                                                                                                                        |
+| `work-front-documents/[id]`                | DELETE | manageWorkFronts (hoặc người upload) | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen(người upload ∨ manageWorkFronts); file xoá sau COMMIT                                                                  |
+| `work-fronts/[id]/documents`               | POST   | manageWorkFronts                     | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen; bị từ chối ⇒ xoá file vừa lưu                                                                                         |
+| `work-fronts/[id]`                         | PATCH  | manageWorkFronts                     | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen quanh `updateWorkFrontStatus` (cờ `role === "admin"` chỉ cho nhảy ngược, không phải cổng)                              |
+| `workpackages/[id]/bbnt`                   | POST   | editProgress (+ canTouchPackage)     | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen; bị từ chối ⇒ xoá file vừa lưu; file cũ chỉ xoá sau COMMIT                                                             |
+| `workpackages/[id]/bbnt`                   | DELETE | editProgress (+ canTouchPackage)     | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen; file xoá sau COMMIT                                                                                                   |
+| `workpackages/[id]/copy`                   | POST   | editStructure                        | có       | **ĐÃ ÁP** — ghiNeuConQuyen thay `withTransaction`                                                                                                 |
+| `workpackages/[id]/dimensions/column/move` | PATCH  | editStructure                        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen (cả vòng UPDATE một transaction)                                                                                       |
+| `workpackages/[id]/dimensions/column`      | POST   | editStructure                        | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi sau `FOR UPDATE tasks`, trước ghi/recompute                                                                        |
+| `workpackages/[id]/dimensions/column`      | PATCH  | editStructure                        | có       | **ĐÃ ÁP** — kiemQuyenTaiLucGhi sau `FOR UPDATE tasks`, trước ghi/recompute                                                                        |
+| `workpackages/[id]/dimensions/column`      | DELETE | editStructure                        | có       | **ĐÃ ÁP** — ghiNeuConQuyen quanh vòng DELETE + recompute (trước đây DELETE ngoài transaction)                                                     |
+| `workpackages/[id]/drawing`                | POST   | editProgress (+ canTouchPackage)     | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen; bị từ chối ⇒ xoá file vừa lưu; file cũ chỉ xoá sau COMMIT                                                             |
+| `workpackages/[id]/drawing`                | DELETE | editProgress (+ canTouchPackage)     | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen; file xoá sau COMMIT                                                                                                   |
+| `workpackages/[id]/move`                   | PATCH  | editStructure                        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen (2 câu hoán đổi cùng transaction)                                                                                      |
+| `workpackages/[id]`                        | PATCH  | editStructure                        | có       | **ĐÃ ÁP** — ghiNeuConQuyen thay `withTransaction`                                                                                                 |
+| `workpackages/[id]`                        | DELETE | editStructure                        | có       | **ĐÃ ÁP** — ghiNeuConQuyen thay `withTransaction`; file xoá sau COMMIT                                                                            |
+| `workpackages/[id]/tasks`                  | POST   | editStructure                        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen quanh dời thứ tự + INSERT + recomputePackage                                                                           |
+| `workpackages`                             | POST   | editStructure                        | chưa     | **ĐÃ ÁP** — ghiNeuConQuyen quanh dời thứ tự + INSERT                                                                                              |
+
+Kiểm chứng: `tests/s16-quyen-luc-ghi-tien-do.test.ts` — 43 ca "thu hồi giữa chừng ⇒ 403, DB không đổi (và file vừa
+lưu đã dọn)" (mỗi file route đã áp ít nhất một handler) + 7 ca đối chứng. Kết nối riêng giữ khoá advisory độc
+quyền của org (khoá của `setPermissionOverride`), route kẹt ở bước tái kiểm, ghi override deny theo dự án rồi
+COMMIT. Trên code cũ: 43 ca deny ĐỎ (`200 !== 403` ×25, `201 !== 403` ×18), 7 đối chứng xanh; sau khi áp 50/50 xanh.
+
 ## 3. Kiểm chứng
 
 - `tests/s16-quyen-ghi-mo-rong.test.ts` — 4 route đại diện, mỗi route 1 ca "allow→deny giữa chừng" và 1 ca đối
@@ -257,3 +336,5 @@ Ca test: `tests/s16-quyen-luc-ghi-hien-truong.test.ts` — mỗi file route đã
 - Các route ghi ngoài hai nhóm (tiến độ, vật tư, HSE, nhật ký…) chưa kiểm kê trong đợt này.
 - Miền hiện trường / hồ sơ (HSE, nhật ký, nhân sự/chấm công, họp, công văn, bàn giao, bảo hành, hồ sơ…): ĐÃ
   kiểm kê và đóng (§2.z, 2026-10-09). Còn lại chưa kiểm kê: tiến độ, vật tư và các miền ngoài danh sách §2.z.
+- Miền tiến độ / cấu trúc: ĐÃ kiểm kê + áp (§2.x, 2026-10-09); còn HOÃN `import/excel` POST (importWorkbook không
+  transaction).

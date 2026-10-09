@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, run, withTransaction } from "@/lib/db";
+import { query, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -76,20 +77,29 @@ export async function PUT(req: NextRequest) {
     rows.push({ roleLabel, personnelId, raci });
   }
 
-  await withTransaction(async () => {
-    await run(`DELETE FROM raci_matrix WHERE project_id = ? AND scope = ?`, projectId, scope);
-    for (const r of rows) {
-      await run(
-        `INSERT INTO raci_matrix (project_id, scope, role_label, personnel_id, raci)
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay đầu transaction ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.manageHr(user.role),
+    async () => {
+      await run(`DELETE FROM raci_matrix WHERE project_id = ? AND scope = ?`, projectId, scope);
+      for (const r of rows) {
+        await run(
+          `INSERT INTO raci_matrix (project_id, scope, role_label, personnel_id, raci)
          VALUES (?, ?, ?, ?, ?)`,
-        projectId,
-        scope,
-        r.roleLabel,
-        r.personnelId,
-        r.raci,
-      );
-    }
-  });
+          projectId,
+          scope,
+          r.roleLabel,
+          r.personnelId,
+          r.raci,
+        );
+      }
+    },
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa ma trận RACI (chỉ Admin/PM)" },
+      { status: 403 },
+    );
 
   return NextResponse.json({ ok: true });
 }

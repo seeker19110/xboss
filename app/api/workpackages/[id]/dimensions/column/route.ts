@@ -5,8 +5,12 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { recomputeTask, recomputePackage } from "@/lib/tien-do/recompute";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
 import { packageProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen, kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
+
+// D01: mã nội bộ báo "không còn quyền lúc ghi" ra khỏi transaction (route trả 403 thông điệp cũ).
+const KHONG_CON_QUYEN = "D01: không còn quyền lúc ghi";
 
 // Bất biến nghiệm thu (cùng luật L1/L2 audit 2026-09-22): thêm ô chưa tick vào task đã
 // nghiệm thu kéo % xuống dưới 100% trong khi status vẫn nghiem_thu (deriveStatus giữ) và xoá
@@ -105,6 +109,8 @@ export async function POST(
   const loi = await withTransaction(async () => {
     const chan = await taskNghiemThuTrongDanhSach(targetTasks.map((t) => t.id));
     if (chan) return chan;
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay sau khi khoá task, trước lần ghi đầu.
+    if (!(await kiemQuyenTaiLucGhi(() => CAN.editStructure(user.role)))) return KHONG_CON_QUYEN;
 
     if (afterLabel) {
       // Shift các cột sau vị trí chèn.
@@ -134,6 +140,8 @@ export async function POST(
     await recomputePackage(pkgId);
     return null;
   });
+  if (loi === KHONG_CON_QUYEN)
+    return NextResponse.json({ error: "Chỉ Admin/PM mới thêm được cột" }, { status: 403 });
   if (loi) return NextResponse.json({ error: loi }, { status: 409 });
 
   return NextResponse.json(
@@ -188,23 +196,36 @@ export async function DELETE(
       affectedPkgIds = [pkgId];
     }
 
-    let totalDeleted = 0;
-    for (const pid of affectedPkgIds) {
-      const { changes } = await run(
-        `DELETE FROM progress_dimensions WHERE dimension_label = ?
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (xoá + tính lại cùng transaction).
+    const kq = await ghiNeuConQuyen(
+      () => CAN.editStructure(user.role),
+      async () => {
+        let totalDeleted = 0;
+        for (const pid of affectedPkgIds) {
+          const { changes } = await run(
+            `DELETE FROM progress_dimensions WHERE dimension_label = ?
          AND task_id IN (SELECT id FROM tasks WHERE package_id = ?)`,
-        label,
-        pid,
-      );
-      totalDeleted += changes;
+            label,
+            pid,
+          );
+          totalDeleted += changes;
 
-      // Tính lại % cho mọi task + nhóm bị ảnh hưởng (trong transaction — xem chú thích ở POST).
-      const tasks = await query<{ id: number }>(`SELECT id FROM tasks WHERE package_id = ?`, pid);
-      await withTransaction(async () => {
-        for (const t of tasks) await recomputeTask(t.id, user.name);
-        await recomputePackage(pid);
-      });
-    }
+          // Tính lại % cho mọi task + nhóm bị ảnh hưởng (trong transaction — xem chú thích ở POST).
+          const tasks = await query<{ id: number }>(
+            `SELECT id FROM tasks WHERE package_id = ?`,
+            pid,
+          );
+          await withTransaction(async () => {
+            for (const t of tasks) await recomputeTask(t.id, user.name);
+            await recomputePackage(pid);
+          });
+        }
+        return totalDeleted;
+      },
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được cột" }, { status: 403 });
+    const totalDeleted = kq.value;
 
     return NextResponse.json({ deleted: totalDeleted, groups: affectedPkgIds.length });
   } catch (err) {
@@ -284,6 +305,8 @@ export async function PATCH(
     // Cột copy cũng là ô mới chưa tick — cùng luật chặn task đã nghiệm thu như POST.
     const chan = await taskNghiemThuTrongDanhSach(targetTasks.map((t) => t.id));
     if (chan) return chan;
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay sau khi khoá task, trước lần ghi đầu.
+    if (!(await kiemQuyenTaiLucGhi(() => CAN.editStructure(user.role)))) return KHONG_CON_QUYEN;
 
     await run(
       `UPDATE progress_dimensions SET sort_order = sort_order + 1
@@ -306,6 +329,8 @@ export async function PATCH(
     await recomputePackage(pkgId);
     return null;
   });
+  if (loi === KHONG_CON_QUYEN)
+    return NextResponse.json({ error: "Chỉ Admin/PM mới copy được cột" }, { status: 403 });
   if (loi) return NextResponse.json({ error: loi }, { status: 409 });
 
   return NextResponse.json(

@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  query,
-  queryOne,
-  run,
-  insertId,
-  todayISO,
-  withProjectScope,
-  withTransaction,
-} from "@/lib/db";
+import { query, queryOne, run, insertId, todayISO, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -72,32 +65,39 @@ export async function POST(req: NextRequest) {
 
   // readOnly: false — đây là đường GHI (INSERT baselines + baseline_tasks) trong cùng
   // transaction có GUC.
-  const id = await withProjectScope(
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay đầu transaction ghi.
+  const kq = await withProjectScope(
     projectId,
     () =>
-      withTransaction(async () => {
-        const baselineId = await insertId(
-          `INSERT INTO baselines (name, note, created_by, project_id) VALUES (?, ?, ?, ?)`,
-          name,
-          note,
-          user.id,
-          projectId,
-        );
-        await run(
-          `INSERT INTO baseline_tasks (baseline_id, task_id, start_date, end_date, progress_percent)
+      ghiNeuConQuyen(
+        () => CAN.editStructure(user.role),
+        async () => {
+          const baselineId = await insertId(
+            `INSERT INTO baselines (name, note, created_by, project_id) VALUES (?, ?, ?, ?)`,
+            name,
+            note,
+            user.id,
+            projectId,
+          );
+          await run(
+            `INSERT INTO baseline_tasks (baseline_id, task_id, start_date, end_date, progress_percent)
        SELECT ?, t.id, t.start_date, t.end_date, t.progress_percent
          FROM tasks t
          JOIN work_packages wp ON wp.id = t.package_id
          JOIN sheet_types st ON st.id = wp.sheet_type_id
          JOIN towers tw ON tw.id = st.tower_id
         WHERE tw.project_id = ?`,
-          baselineId,
-          projectId,
-        );
-        return baselineId;
-      }),
+            baselineId,
+            projectId,
+          );
+          return baselineId;
+        },
+      ),
     { readOnly: false },
   );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin/PM được chốt baseline" }, { status: 403 });
+  const id = kq.value;
 
   return NextResponse.json({ id, name, taskCount: Number(taskCount.n) }, { status: 201 });
 }

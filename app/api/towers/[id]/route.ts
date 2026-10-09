@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -32,12 +33,18 @@ export async function PATCH(
   const { name } = await req.json().catch(() => ({}));
   if (!name?.trim()) return NextResponse.json({ error: "Thiếu tên tháp" }, { status: 400 });
 
-  await run(
-    `UPDATE towers SET name = ? WHERE id = ? AND project_id = ANY(?)`,
-    name.trim(),
-    id,
-    visible,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    () =>
+      run(
+        `UPDATE towers SET name = ? WHERE id = ? AND project_id = ANY(?)`,
+        name.trim(),
+        id,
+        visible,
+      ),
   );
+  if (!kq.ok) return NextResponse.json({ error: "Chỉ Admin/PM" }, { status: 403 });
   const tower = await queryOne(`SELECT id, name FROM towers WHERE id = ?`, id);
   return NextResponse.json({ tower });
 }
@@ -73,7 +80,12 @@ export async function DELETE(
     if ((hasSheets?.n ?? 0) > 0)
       return NextResponse.json({ error: "Tháp còn sheet — xoá hết sheet trước" }, { status: 409 });
 
-    await run(`DELETE FROM towers WHERE id = ? AND project_id = ANY(?)`, id, visible);
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.editStructure(user.role),
+      () => run(`DELETE FROM towers WHERE id = ? AND project_id = ANY(?)`, id, visible),
+    );
+    if (!kq.ok) return NextResponse.json({ error: "Chỉ Admin/PM" }, { status: 403 });
     return NextResponse.json({ deleted: id });
   } catch (err) {
     if (laLoiKhoaNgoai(err)) return phanHoiXungDotPhuThuoc();

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { listStages, createStage } from "@/lib/tien-do/constructionStages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,16 @@ export async function POST(req: NextRequest) {
       { status: 422 },
     );
 
-  const id = await createStage(projectId, name, durationDays);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    () => createStage(projectId, name, durationDays),
+  );
+  if (!kq.ok)
+    return NextResponse.json(
+      { error: "Bạn không có quyền thêm công tác (chỉ Admin/PM)" },
+      { status: 403 },
+    );
+  const id = kq.value;
   return NextResponse.json({ id }, { status: 201 });
 }

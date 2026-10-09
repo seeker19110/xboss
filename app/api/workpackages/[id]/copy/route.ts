@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, insertId, run, withTransaction } from "@/lib/db";
+import { query, queryOne, insertId, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
 import { sheetTypeProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -96,58 +97,65 @@ export async function POST(
   // trùng mã đồng thời (check-rồi-insert ở trên không đủ chống TOCTOU).
   let newPkgId: number;
   try {
-    newPkgId = await withTransaction(async () => {
-      await run(
-        `UPDATE work_packages SET sort_order = sort_order + 1 WHERE sheet_type_id = ? AND sort_order >= ?`,
-        src.sheet_type_id,
-        sortOrder,
-      );
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay đầu transaction ghi.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.editStructure(user.role),
+      async () => {
+        await run(
+          `UPDATE work_packages SET sort_order = sort_order + 1 WHERE sheet_type_id = ? AND sort_order >= ?`,
+          src.sheet_type_id,
+          sortOrder,
+        );
 
-      // BOQ không copy (phải duy nhất toàn hệ thống).
-      const pkgId = await insertId(
-        `INSERT INTO work_packages (sheet_type_id, code, name, floor_label, drawing_url, sort_order, status, progress, assigned_to, assigned_manual)
+        // BOQ không copy (phải duy nhất toàn hệ thống).
+        const pkgId = await insertId(
+          `INSERT INTO work_packages (sheet_type_id, code, name, floor_label, drawing_url, sort_order, status, progress, assigned_to, assigned_manual)
          VALUES (?, ?, ?, ?, ?, ?, 'chuan_bi', 0, ?, ?)`,
-        src.sheet_type_id,
-        newCode,
-        newName,
-        newFloor,
-        src.drawing_url,
-        sortOrder,
-        src.assigned_to,
-        src.assigned_manual,
-      );
+          src.sheet_type_id,
+          newCode,
+          newName,
+          newFloor,
+          src.drawing_url,
+          sortOrder,
+          src.assigned_to,
+          src.assigned_manual,
+        );
 
-      for (const t of srcTasks) {
-        const newTaskId = await insertId(
-          `INSERT INTO tasks (package_id, code, name, start_date, end_date, assigned_to, assigned_manual,
+        for (const t of srcTasks) {
+          const newTaskId = await insertId(
+            `INSERT INTO tasks (package_id, code, name, start_date, end_date, assigned_to, assigned_manual,
                               drawing_url, sort_order, status, progress_percent)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'chuan_bi', 0)`,
-          pkgId,
-          t.code,
-          t.name,
-          t.start_date,
-          t.end_date,
-          t.assigned_to,
-          t.assigned_manual,
-          t.drawing_url,
-          t.sort_order,
-        );
-
-        const dims = await query<{ dimension_label: string; sort_order: number }>(
-          `SELECT dimension_label, sort_order FROM progress_dimensions WHERE task_id = ? ORDER BY sort_order`,
-          t.id,
-        );
-        for (const d of dims) {
-          await insertId(
-            `INSERT INTO progress_dimensions (task_id, dimension_label, installed, sort_order) VALUES (?, ?, 0, ?)`,
-            newTaskId,
-            d.dimension_label,
-            d.sort_order,
+            pkgId,
+            t.code,
+            t.name,
+            t.start_date,
+            t.end_date,
+            t.assigned_to,
+            t.assigned_manual,
+            t.drawing_url,
+            t.sort_order,
           );
+
+          const dims = await query<{ dimension_label: string; sort_order: number }>(
+            `SELECT dimension_label, sort_order FROM progress_dimensions WHERE task_id = ? ORDER BY sort_order`,
+            t.id,
+          );
+          for (const d of dims) {
+            await insertId(
+              `INSERT INTO progress_dimensions (task_id, dimension_label, installed, sort_order) VALUES (?, ?, 0, ?)`,
+              newTaskId,
+              d.dimension_label,
+              d.sort_order,
+            );
+          }
         }
-      }
-      return pkgId;
-    });
+        return pkgId;
+      },
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin/PM mới copy được nhóm" }, { status: 403 });
+    newPkgId = kq.value;
   } catch (err) {
     if ((err as { code?: string }).code === "23505")
       return NextResponse.json(

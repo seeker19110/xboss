@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -38,11 +39,15 @@ export async function DELETE(
           projectId,
         );
         if (!b) return false;
+        // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (trong transaction phạm vi dự án).
+        if (!(await kiemQuyenTaiLucGhi(() => CAN.editStructure(user.role)))) return "khong_quyen";
         await run(`DELETE FROM baselines WHERE id = ?`, id);
         return true;
       },
       { readOnly: false },
     );
+    if (deleted === "khong_quyen")
+      return NextResponse.json({ error: "Chỉ Admin/PM được xoá baseline" }, { status: 403 });
     if (!deleted) return NextResponse.json({ error: "Không tìm thấy baseline" }, { status: 404 });
     return NextResponse.json({ deleted: id });
   } catch (err) {

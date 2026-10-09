@@ -3,6 +3,7 @@ import { query, queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
 import { packageProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -65,20 +66,28 @@ export async function PATCH(
 
   // Lấy tất cả task trong package để cập nhật sort_order đồng loạt.
   const tasks = await query<{ id: number }>(`SELECT id FROM tasks WHERE package_id = ?`, pkgId);
-  for (const t of tasks) {
-    await run(
-      `UPDATE progress_dimensions SET sort_order = ? WHERE task_id = ? AND dimension_label = ?`,
-      neighbor.sort_order,
-      t.id,
-      label,
-    );
-    await run(
-      `UPDATE progress_dimensions SET sort_order = ? WHERE task_id = ? AND dimension_label = ?`,
-      cur.sort_order,
-      t.id,
-      neighbor.dimension_label,
-    );
-  }
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    async () => {
+      for (const t of tasks) {
+        await run(
+          `UPDATE progress_dimensions SET sort_order = ? WHERE task_id = ? AND dimension_label = ?`,
+          neighbor.sort_order,
+          t.id,
+          label,
+        );
+        await run(
+          `UPDATE progress_dimensions SET sort_order = ? WHERE task_id = ? AND dimension_label = ?`,
+          cur.sort_order,
+          t.id,
+          neighbor.dimension_label,
+        );
+      }
+    },
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin/PM mới di chuyển được" }, { status: 403 });
 
   return NextResponse.json({ ok: true });
 }

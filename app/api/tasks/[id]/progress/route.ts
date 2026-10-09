@@ -12,6 +12,7 @@ import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { handoverBlocked, methodStatementBlocked } from "@/lib/ky-thuat/qaqc";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
 import type { StatusSlug } from "@/lib/tien-do/status";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +74,9 @@ export async function PATCH(
       id,
     );
     if (!task) return { error: "Không tìm thấy task", httpStatus: 404 } as const;
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay sau khi khoá dòng, trước lần ghi đầu.
+    if (!(await kiemQuyenTaiLucGhi(() => CAN.editProgress(user.role))))
+      return { error: "Không có quyền cập nhật tiến độ", httpStatus: 403 } as const;
 
     // Bất biến nghiệm thu (L1, audit 2026-09-22): task đã nghiệm thu thì không được hạ %
     // (nghiem_thu ⇒ progress = 1) cũng không được đổi trạng thái qua route này — cả hai chỉ

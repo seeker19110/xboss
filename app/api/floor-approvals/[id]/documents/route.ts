@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/nen/storage";
+import { storageDelete, storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchFloor } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { sheetTypeProjectId } from "@/lib/tien-do/workpackages";
 import { newFloorDocFileName, MAX_DOC_BYTES, sha256Hex, parseUploadedFile } from "@/lib/nen/photos";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -91,15 +92,23 @@ export async function POST(
         { status: 400 },
       );
     const caption = String(body?.caption ?? "").trim() || null;
-    const id = await insertId(
-      `INSERT INTO task_documents (floor_approval_id, link_url, original_name, caption, uploaded_by, file_name)
-       VALUES (?, ?, ?, ?, ?, '')`,
-      approvalId,
-      url,
-      caption ?? url,
-      caption,
-      user.id,
+    // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+    const kqLink = await ghiNeuConQuyen(
+      () => CAN.editProgress(user.role),
+      () =>
+        insertId(
+          `INSERT INTO task_documents (floor_approval_id, link_url, original_name, caption, uploaded_by, file_name)
+           VALUES (?, ?, ?, ?, ?, '')`,
+          approvalId,
+          url,
+          caption ?? url,
+          caption,
+          user.id,
+        ),
     );
+    if (!kqLink.ok)
+      return NextResponse.json({ error: "Không có quyền upload tài liệu" }, { status: 403 });
+    const id = kqLink.value;
     return NextResponse.json({ id, approvalId, linkUrl: url }, { status: 201 });
   }
 
@@ -117,18 +126,28 @@ export async function POST(
   await storagePut(user.orgId, fileName, fileBuf);
   const sha256 = sha256Hex(fileBuf);
 
-  const id = await insertId(
-    `INSERT INTO task_documents (floor_approval_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by, sha256)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    approvalId,
-    fileName,
-    file.name || null,
-    file.type,
-    file.size,
-    caption,
-    user.id,
-    sha256,
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editProgress(user.role),
+    () =>
+      insertId(
+        `INSERT INTO task_documents (floor_approval_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by, sha256)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        approvalId,
+        fileName,
+        file.name || null,
+        file.type,
+        file.size,
+        caption,
+        user.id,
+        sha256,
+      ),
   );
+  if (!kq.ok) {
+    await storageDelete(user.orgId, fileName).catch(() => {});
+    return NextResponse.json({ error: "Không có quyền upload tài liệu" }, { status: 403 });
+  }
+  const id = kq.value;
 
   return NextResponse.json({ id, approvalId, caption, sizeBytes: file.size }, { status: 201 });
 }

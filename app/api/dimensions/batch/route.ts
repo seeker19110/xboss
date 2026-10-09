@@ -15,6 +15,7 @@ import {
   type PhamViBienNhan,
 } from "@/lib/bao-mat/offline-receipt";
 import { chotNguCanhHangDoi, traLoiOfflineHoacNem } from "@/lib/bao-mat/offline-http";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -154,6 +155,9 @@ export async function PATCH(req: NextRequest) {
         ...taskIds,
       );
       if (!installed && locked.some((t) => t.status === "nghiem_thu")) return NGHIEM_THU_409;
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay sau khi khoá dòng, trước lần ghi đầu.
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.editProgress(user.role))))
+        return { error: "Không có quyền cập nhật tiến độ", httpStatus: 403 } as const;
 
       // Dữ liệu sự kiện (M120 FR2) — cùng lib dùng chung với PATCH đơn. Không truyền `note`:
       // ghi chú là việc của từng ô, gán chung cả vùng chọn sẽ ra dữ liệu vô nghĩa (ghi chú cũ

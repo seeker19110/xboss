@@ -6,6 +6,7 @@ import { inheritedAssigneeFor } from "@/lib/tien-do/assignments";
 import { recomputePackage } from "@/lib/tien-do/recompute";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
 import { packageProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -53,47 +54,58 @@ export async function POST(
       );
   }
 
-  const afterId = body.afterId ? Number(body.afterId) : null;
-  let sortOrder: number;
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (dời thứ tự + chèn + tính lại).
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    async () => {
+      const afterId = body.afterId ? Number(body.afterId) : null;
+      let sortOrder: number;
 
-  if (afterId) {
-    const after = await queryOne<{ sort_order: number }>(
-      `SELECT sort_order FROM tasks WHERE id = ? AND package_id = ?`,
-      afterId,
-      pkgId,
-    );
-    if (!after) return NextResponse.json({ error: "afterId không hợp lệ" }, { status: 400 });
-    sortOrder = after.sort_order + 1;
-    await run(
-      `UPDATE tasks SET sort_order = sort_order + 1 WHERE package_id = ? AND sort_order >= ?`,
-      pkgId,
-      sortOrder,
-    );
-  } else {
-    const maxRow = await queryOne<{ m: number | null }>(
-      `SELECT MAX(sort_order) AS m FROM tasks WHERE package_id = ?`,
-      pkgId,
-    );
-    sortOrder = (maxRow?.m ?? 0) + 1;
-  }
+      if (afterId) {
+        const after = await queryOne<{ sort_order: number }>(
+          `SELECT sort_order FROM tasks WHERE id = ? AND package_id = ?`,
+          afterId,
+          pkgId,
+        );
+        if (!after) return { loi: "afterId không hợp lệ" } as const;
+        sortOrder = after.sort_order + 1;
+        await run(
+          `UPDATE tasks SET sort_order = sort_order + 1 WHERE package_id = ? AND sort_order >= ?`,
+          pkgId,
+          sortOrder,
+        );
+      } else {
+        const maxRow = await queryOne<{ m: number | null }>(
+          `SELECT MAX(sort_order) AS m FROM tasks WHERE package_id = ?`,
+          pkgId,
+        );
+        sortOrder = (maxRow?.m ?? 0) + 1;
+      }
 
-  // Task mới kế thừa người phụ trách nhóm (gán thủ công sau sẽ thoát kế thừa).
-  const inherited = await inheritedAssigneeFor(pkgId);
+      // Task mới kế thừa người phụ trách nhóm (gán thủ công sau sẽ thoát kế thừa).
+      const inherited = await inheritedAssigneeFor(pkgId);
 
-  const id = await insertId(
-    `INSERT INTO tasks (package_id, code, name, boq_code, sort_order, status, progress_percent, assigned_to)
-     VALUES (?, ?, ?, ?, ?, 'chuan_bi', 0, ?)`,
-    pkgId,
-    code,
-    name,
-    boqCode,
-    sortOrder,
-    inherited,
+      const newId = await insertId(
+        `INSERT INTO tasks (package_id, code, name, boq_code, sort_order, status, progress_percent, assigned_to)
+         VALUES (?, ?, ?, ?, ?, 'chuan_bi', 0, ?)`,
+        pkgId,
+        code,
+        name,
+        boqCode,
+        sortOrder,
+        inherited,
+      );
+
+      // Task mới 0% làm tăng mẫu số của nhóm — tính lại % nhóm, nếu không work_packages.progress
+      // giữ nguyên giá trị cũ (cao hơn thực tế) cho tới lần recompute tiếp theo.
+      await recomputePackage(pkgId);
+      return { id: newId } as const;
+    },
   );
-
-  // Task mới 0% làm tăng mẫu số của nhóm — tính lại % nhóm, nếu không work_packages.progress
-  // giữ nguyên giá trị cũ (cao hơn thực tế) cho tới lần recompute tiếp theo.
-  await recomputePackage(pkgId);
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin/PM mới thêm được task" }, { status: 403 });
+  if ("loi" in kq.value) return NextResponse.json({ error: kq.value.loi }, { status: 400 });
+  const id = kq.value.id;
 
   return NextResponse.json({ id }, { status: 201 });
 }

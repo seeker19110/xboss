@@ -4,6 +4,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
+import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -53,8 +54,16 @@ export async function PATCH(
 
   if (!neighbor) return NextResponse.json({ ok: false, message: "Đã ở đầu/cuối danh sách" });
 
-  await run(`UPDATE tasks SET sort_order = ? WHERE id = ?`, neighbor.sort_order, id);
-  await run(`UPDATE tasks SET sort_order = ? WHERE id = ?`, cur.sort_order, neighbor.id);
+  // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi.
+  const kq = await ghiNeuConQuyen(
+    () => CAN.editStructure(user.role),
+    async () => {
+      await run(`UPDATE tasks SET sort_order = ? WHERE id = ?`, neighbor.sort_order, id);
+      await run(`UPDATE tasks SET sort_order = ? WHERE id = ?`, cur.sort_order, neighbor.id);
+    },
+  );
+  if (!kq.ok)
+    return NextResponse.json({ error: "Chỉ Admin/PM mới di chuyển được" }, { status: 403 });
 
   return NextResponse.json({ ok: true });
 }

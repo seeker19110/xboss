@@ -1,5 +1,15 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — S16 D01: tái kiểm quyền lúc ghi cho route miền tiến độ / cấu trúc
+
+- Kiểm kê + áp `ghiNeuConQuyen`/`kiemQuyenTaiLucGhi` cho route ghi gác bằng `CAN.<x>` của tasks,
+  workpackages, dimensions, towers, baselines, phụ thuộc nhóm, công tác, mặt bằng, nghiệm thu tầng
+  (nộp hồ sơ), album, ảnh/bình luận/tài liệu, RACI — bảng §2.x `docs/nang-cap/AUDIT-S16-QUYEN-LUC-GHI.md`.
+  Chỉ sửa tầng route, không đổi `lib/**`. bbnt/drawing: file cũ giờ chỉ xoá sau COMMIT.
+- Còn HOÃN `import/excel` POST (`importWorkbook` không transaction).
+- Test `tests/s16-quyen-luc-ghi-tien-do.test.ts`: 43 ca thu hồi giữa chừng ⇒ 403 + DB không đổi (đỏ trên
+  code cũ) + 7 ca đối chứng.
+
 ## 2026-10-09 — S16 D01: tái kiểm quyền lúc ghi cho route miền hiện trường / hồ sơ
 
 - Kiểm kê toàn bộ route GHI miền hiện trường/hồ sơ (HSE, nhật ký, tổ đội/nhân sự/chấm công, huy

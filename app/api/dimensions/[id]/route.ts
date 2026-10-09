@@ -15,6 +15,7 @@ import {
   type PhamViBienNhan,
 } from "@/lib/bao-mat/offline-receipt";
 import { chotNguCanhHangDoi, traLoiOfflineHoacNem } from "@/lib/bao-mat/offline-http";
+import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -141,6 +142,9 @@ export async function PATCH(
         dim.task_id,
       );
       if (!installed && locked?.status === "nghiem_thu") return NGHIEM_THU_409;
+      // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay sau khi khoá dòng, trước lần ghi đầu.
+      if (!(await kiemQuyenTaiLucGhi(() => CAN.editProgress(user.role))))
+        return { error: "Không có quyền cập nhật tiến độ", httpStatus: 403 } as const;
 
       // Dữ liệu sự kiện theo ô (M120 FR1) — luật ai/lúc nào/ghi chú nằm trong lib dùng chung,
       // route chỉ là ranh giới HTTP (ADR-0008). `installedAt`/`installedBy` client gửi bị bỏ qua.
