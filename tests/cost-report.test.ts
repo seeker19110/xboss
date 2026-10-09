@@ -467,6 +467,9 @@ test(
       let waiting = 0;
       for (let i = 0; i < 600 && waiting === 0; i++) {
         await new Promise((r) => setTimeout(r, 50));
+        // locker đang giữ transaction mở: PostgreSQL cache snapshot thống kê theo transaction,
+        // nên phải xoá snapshot trước mỗi lần poll, nếu không pg_stat_activity luôn ra 0.
+        await locker.query("SELECT pg_stat_clear_snapshot()");
         const r = await locker.query<{ n: string }>(
           `SELECT COUNT(*) AS n FROM pg_stat_activity
           WHERE datname = current_database() AND wait_event_type = 'Lock'

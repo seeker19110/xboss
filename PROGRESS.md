@@ -1,5 +1,14 @@
 # PROGRESS — XBoss
 
+## 2026-10-09 — Sửa test chập chờn `cost-report` A4-AC04 (snapshot `pg_stat_activity`)
+
+- **Nguyên nhân:** ca "thanh toán + BOQ chèn đồng thời không cho hai snapshot trong một báo cáo" poll
+  `pg_stat_activity` bằng chính kết nối `locker` đang giữ transaction mở. PostgreSQL cache snapshot
+  trạng thái backend theo transaction, nên nếu lần poll đầu chạy trước khi báo cáo kịp chờ khoá thì mọi lần
+  sau vẫn ra 0 → hết 600 vòng → đỏ (`statement timeout`). Tái hiện trên main: 3/6 lần chạy đơn đỏ.
+- **Sửa:** gọi `pg_stat_clear_snapshot()` trước mỗi lần poll (`tests/cost-report.test.ts`). Sau sửa: 8/8 lần
+  chạy đơn xanh, cả file 12/12. Chỉ đổi test, không đổi code chạy thật.
+
 ## 2026-10-09 — M128: chứng từ điều chỉnh/huỷ hiệu lực IPC đã duyệt (migration 0168)
 
 Đóng mục 6(c) của `AUDIT-S15-RELEASE-CANDIDATE.md` (A5-AC07, D07 "huỷ upstream phải qua adjustment") theo
