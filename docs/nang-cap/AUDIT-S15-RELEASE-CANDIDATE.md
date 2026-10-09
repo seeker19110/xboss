@@ -301,7 +301,7 @@ tuyệt đối (spec authed chạy song song trên cùng DB). CI xác nhận l�
 | A3-AC05 | `e2e/authed/payment-certs-canh-bao.spec.ts` | PARTIAL      | "100.50"/"9999999999999.99" exact; M NOT_RUN     |
 | A2-AC05 | `e2e/authed/offline-idb-abort.spec.ts`      | PASS         | IDB thật abort → không báo "đã lưu", giữ form    |
 
-Lỗi UI thật lộ ra khi viết e2e (có `test.fixme` tương ứng trong spec IPC, đang sửa trong cùng PR):
+Lỗi UI thật lộ ra khi viết e2e (đã sửa trong cùng PR, `test.fixme` đã gỡ, e2e xanh desktop+mobile):
 tương phản khối cảnh báo vượt HĐ ở theme sáng (`text-rose-200` không có token override — sửa ở
 `globals.css` theo ADR-0010); Esc trên hộp xác nhận đóng luôn chứng từ và mất focus; chứng từ IPC tràn
 ngang trên mobile 393px. Ngoài ra `ProjectCard` dự án rỗng hiện "0% tiến độ" (COALESCE 0) — chỉ ghi nhận.
