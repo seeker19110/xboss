@@ -83,24 +83,29 @@ async function main() {
 
   // Xoá dữ liệu nghiệp vụ gắn dự án trước khi xoá `projects`. Danh sách bảng lấy từ catalog (mọi
   // FK trỏ vào projects KHÔNG ON DELETE CASCADE) thay vì liệt kê tay — liệt kê tay luôn thiếu bảng
-  // mới (vd tech_links) và seed chạy lại trên DB có dữ liệu sẽ lỗi FK. TRUNCATE CASCADE tự xoá bảng
-  // con không mang project_id (payment_certs, po_items…). Bảng FK ON DELETE CASCADE (cấu hình theo
-  // dự án: nav_settings, alert_rules, approval_flows…) tự dọn khi xoá projects, dòng toàn cục giữ.
-  // `integrations` là cấu hình: chỉ xoá dòng gắn dự án, giữ dòng toàn cục.
-  const GIU_DONG_TOAN_CUC = ["integrations"];
-  const bangDuAn = await query<{ t: string }>(
-    `SELECT DISTINCT c.conrelid::regclass::text AS t
+  // mới (vd tech_links) và seed chạy lại trên DB có dữ liệu sẽ lỗi FK. Bảng đang có dòng TOÀN CỤC
+  // (cột dự án NULL — vd mẫu `construction_stages` do migration seed, `integrations`) chỉ xoá dòng
+  // gắn dự án; bảng còn lại TRUNCATE CASCADE (kéo theo bảng con không mang project_id như
+  // payment_certs, po_items…). Bảng FK ON DELETE CASCADE (nav_settings, alert_rules…) tự dọn khi xoá
+  // projects, dòng toàn cục giữ nguyên.
+  const fkDuAn = await query<{ t: string; col: string }>(
+    `SELECT c.conrelid::regclass::text AS t, a.attname AS col
        FROM pg_constraint c
+       JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
       WHERE c.contype = 'f' AND c.confrelid = 'projects'::regclass AND c.confdeltype <> 'c'
       ORDER BY 1`,
   );
-  for (const t of GIU_DONG_TOAN_CUC) {
-    if (bangDuAn.some((b) => b.t === t)) {
-      await run(`DELETE FROM ${t} WHERE project_id IS NOT NULL`);
-    }
+  const giuToanCuc: { t: string; col: string }[] = [];
+  const canTruncate: string[] = [];
+  for (const fk of fkDuAn) {
+    const coToanCuc = await queryOne<{ co: boolean }>(
+      `SELECT EXISTS (SELECT 1 FROM ${fk.t} WHERE ${fk.col} IS NULL) AS co`,
+    );
+    if (coToanCuc?.co) giuToanCuc.push(fk);
+    else if (!canTruncate.includes(fk.t)) canTruncate.push(fk.t);
   }
-  const canTruncate = bangDuAn.map((b) => b.t).filter((t) => !GIU_DONG_TOAN_CUC.includes(t));
   if (canTruncate.length > 0) await run(`TRUNCATE TABLE ${canTruncate.join(", ")} CASCADE`);
+  for (const { t, col } of giuToanCuc) await run(`DELETE FROM ${t} WHERE ${col} IS NOT NULL`);
 
   // Reset (theo thứ tự FK).
   for (const t of [
