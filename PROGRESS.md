@@ -1,5 +1,22 @@
 # PROGRESS — XBoss
 
+## 2026-10-11 — Đo lại 54 AC (S15) trên main `7f587bc` (PR #631)
+
+- `npm test -- --release-gate` trên PostgreSQL 16 cục bộ + Node 24, hai lượt: **373 file · 5031 pass · 0 fail ·
+  1 skip (allowlist)** khi đặt biến smoke restore như CI (lượt không đặt: 3 ca `restore-check-postgres` đỏ
+  chủ đích). Hai lượt khớp từng file. Lớp B + mutation lấy từ CI push main cùng SHA (11/11 job xanh).
+- Verdict @7f587bc: **26 PASS · 28 PARTIAL · 0 GAP · 0 FAIL** — không AC nào hạ/nâng; PARTIAL còn lớp M/O
+  hoặc ca B cụ thể. Ghi ở `docs/nang-cap/AUDIT-S15-RELEASE-CANDIDATE.md` §9 (+ hàng mới §3; đính chính
+  `PCD` = `payment-certs-money-dto`). Chưa đo: bench ±10% (khác máy), mutation cục bộ, lớp M/O.
+
+## 2026-10-11 — Rà lại sổ nợ & cập nhật lộ trình hoàn thiện (chỉ tài liệu, PR #631)
+
+- `docs/ops/lo-trinh-hoan-thien-2026-10-07.md` thêm §0 (trạng thái 2026-10-11 trên main `7f587bc`): bước
+  S01–S16 đã đổi trạng thái, sổ nợ N01–N12, danh sách nợ còn mở (vận hành/môi trường, lớp M/O, nợ code nhỏ,
+  hoãn có chủ đích). §1–§5 giữ nguyên làm lịch sử.
+- Đối chiếu tĩnh `PROGRESS.md` + `AUDIT-S15-RELEASE-CANDIDATE.md` §6; không chạy test/DB/deploy, không đóng
+  khoản nợ nào. Số liệu 54 AC (S15) vẫn là bản đo tại `5a36ff2`, chưa đo lại.
+
 ## 2026-10-09 — `seed-sample` chạy lại được trên DB đã có dữ liệu
 
 - `scripts/seed-sample.ts`: danh sách bảng xoá trước `projects` lấy từ catalog (mọi FK trỏ vào

@@ -1,5 +1,60 @@
 # Rà nợ & lộ trình hoàn thiện XBoss — 2026-10-07
 
+> **Đã được cập nhật bởi §0 bên dưới (2026-10-11).** Các §1–§5 là ảnh chụp ngày 07/10, giữ nguyên làm
+> lịch sử; trạng thái hiện hành của các bước S00–S16 và nợ còn mở nằm ở §0.
+
+## 0. Cập nhật 2026-10-11 (main `7f587bc`, đối chiếu tĩnh `PROGRESS.md` + `AUDIT-S15-RELEASE-CANDIDATE.md` §6)
+
+Không chạy test/DB/deploy trong lượt rà này. Không còn PR mở; issue mở: #572 (sổ nợ), #570 (credential migrator VPS).
+Migration mới nhất: `0170_offline_vault_bao_tri.sql`.
+
+### 0.1 Bước PLAN đã đổi trạng thái so với §3
+
+| Bước    | Nội dung                             | Trạng thái 2026-10-11                                                                                                    |
+| ------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| S01     | Resolver/cache quyền                 | Xong (kèm `kiemQuyenTaiLucGhi`/`ghiNeuConQuyen`, 72 handler + các đợt miền: `AUDIT-S16-QUYEN-LUC-GHI.md`)                |
+| S02     | Chuyển caller null-scope             | Xong phần route (`AUDIT-S16-NULL-SCOPE.md`); còn ~100 hàm `lib` có nhánh null nhưng mọi route gọi đã chặn                |
+| S03     | RLS / tách migrate                   | Xong: migration 0165 RLS nghiêm ngặt 18 bảng + `withOrgScope` (**cần staging**, còn đo overhead 3 lượt khứ hồi/câu lệnh) |
+| S05–S08 | Offline vault/receipt/queue/recovery | Xong về code: 0170 + M131 (rewrap KEK, retire khoá, khôi phục khi mất proof); Safari/iOS thật vẫn NOT_RUN                |
+| S09–S13 | Tiền exact, báo cáo, chuỗi           | Xong về code: IPC duyệt tuần tự, M128 (điều chỉnh), M129 (đã duyệt ≠ đã chi), rate-limit chuỗi tiền                      |
+| S14     | PITR/manifest/verifier               | Manifest + verifier + smoke có; **PITR VPS chưa bật** (RPO thực ~24 giờ, RPO 5 phút/RTO 60 phút NOT_RUN)                 |
+| S15     | Final audit                          | CODE_COMPLETE có điều kiện / WAITING_RELEASE; đo lại tại `7f587bc` (S15 §9): 26 PASS · 28 PARTIAL · 0 GAP · 0 FAIL       |
+| S16     | Production                           | Vẫn chặn bởi N05                                                                                                         |
+
+### 0.2 Sổ nợ N01–N12 (#572)
+
+| Mã      | Trạng thái 2026-10-11                                                               | Ai mở khoá              |
+| ------- | ----------------------------------------------------------------------------------- | ----------------------- |
+| N02/N04 | Đạt/đã xong (xem §2)                                                                | Chỉ ghi nhận trong #572 |
+| N05     | BLOCKED_ENV — chưa xác nhận lại sau 07/10                                           | Người vận hành VPS      |
+| N06     | Code xong (S00–S03, S02a–c); còn staging 0165/0169 + quyết định Metabase            | Vận hành + chủ dự án    |
+| N07     | Code xong (S05–S08); còn Safari/iOS thật, đối soát legacy v1 theo thiết bị (D03)    | Thiết bị thật           |
+| N08     | Code xong (S09–S13); còn backfill tiền staging → production và cutover reader exact | Vận hành                |
+| N09     | Một phần: manifest/verifier/retention (M130) có; PITR/WAL/key availability NOT_RUN  | Môi trường              |
+| N11     | 54 AC đã đo lại tại `7f587bc` (0 FAIL); còn UAT lớp M + review độc lập              | Reviewer độc lập        |
+| N12     | Chờ N05, N11                                                                        | Vận hành + owner        |
+
+### 0.3 Nợ còn mở
+
+- **Vận hành/môi trường:** N05; staging cho 0165/0166/0167/0169; bật `XBOSS_STRICT_MEMBERSHIP` sau `membership:dry-run`
+  - duyệt danh sách gán; bật PITR VPS; `.env.example` thêm `XBOSS_STRICT_MEMBERSHIP=0`, `XBOSS_OFFLINE_KEK`,
+    `GOOGLE_SHEET_PROJECT_ID` (file bị khoá với agent).
+- **Chưa chạy cục bộ:** e2e `thiet-bi-offline-admin.spec.ts` (M131) — chờ CI.
+- **Lớp M/O:** Safari/iOS thật; UAT 7 vai trò/hợp đồng/IPC-PDF thật; review độc lập (N03/N11).
+- **Code nhỏ đã ghi nhận, chưa làm:** `POST /api/proposals` còn `Number(amount)`; `POST /api/proposals/:id/decide`
+  chưa bọc transaction đầy đủ; `DELETE /api/users/:id` với người từng duyệt IPC (cần quyết chính sách);
+  `?baseline=` EVM/S-curve không kiểm `baselines.project_id`; `mv_cost_by_month.committed` là float8;
+  `cost_settings` toàn hệ (cần đặc tả schema); báo cáo ngày/tuần cron mang tên dự án đầu; link
+  `/tracking/<slug>` trong thông báo không mang dự án; SoD đánh dấu chi chỉ so người quyết bước cuối; job dọn
+  staging mồ côi (S08); trang engineering/mepf-process còn `fixme` a11y.
+- **Hoãn có chủ đích:** M60 (major deps), M49 PR3 SSO OIDC (flag tắt), plugin AutoCAD M99–M121 (chờ verify
+  tay AutoCAD 2026).
+
+### 0.4 Quyết định §5 — trạng thái
+
+(2) Offline vào v1.0: đã làm xong về code (không còn lý do hoãn đợt 4). (3) Đợt 1 bắt đầu từ tài chính/nghiệm
+thu: đã làm. (1) Ai làm N05 và (4) quy ước review người cho PR vùng §8: **chưa có quyết định ghi lại**.
+
 Theo yêu cầu chủ dự án "hoàn thiện dự án" → chọn phương án **rà nợ & đề xuất lộ trình, chưa code**.
 Tài liệu này chỉ tổng hợp từ nguồn có sẵn, **không** đóng khoản nợ nào và không thay sổ nợ gốc.
 
