@@ -1,6 +1,6 @@
 # PROGRESS — XBoss
 
-## 2026-10-11 — Rà lại sổ nợ & cập nhật lộ trình hoàn thiện (chỉ tài liệu)
+## 2026-10-11 — Rà lại sổ nợ & cập nhật lộ trình hoàn thiện (chỉ tài liệu, PR #631)
 
 - `docs/ops/lo-trinh-hoan-thien-2026-10-07.md` thêm §0 (trạng thái 2026-10-11 trên main `7f587bc`): bước
   S01–S16 đã đổi trạng thái, sổ nợ N01–N12, danh sách nợ còn mở (vận hành/môi trường, lớp M/O, nợ code nhỏ,
