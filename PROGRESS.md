@@ -1,5 +1,13 @@
 # PROGRESS — XBoss
 
+## 2026-10-11 — Rà lại sổ nợ & cập nhật lộ trình hoàn thiện (chỉ tài liệu)
+
+- `docs/ops/lo-trinh-hoan-thien-2026-10-07.md` thêm §0 (trạng thái 2026-10-11 trên main `7f587bc`): bước
+  S01–S16 đã đổi trạng thái, sổ nợ N01–N12, danh sách nợ còn mở (vận hành/môi trường, lớp M/O, nợ code nhỏ,
+  hoãn có chủ đích). §1–§5 giữ nguyên làm lịch sử.
+- Đối chiếu tĩnh `PROGRESS.md` + `AUDIT-S15-RELEASE-CANDIDATE.md` §6; không chạy test/DB/deploy, không đóng
+  khoản nợ nào. Số liệu 54 AC (S15) vẫn là bản đo tại `5a36ff2`, chưa đo lại.
+
 ## 2026-10-09 — `seed-sample` chạy lại được trên DB đã có dữ liệu
 
 - `scripts/seed-sample.ts`: danh sách bảng xoá trước `projects` lấy từ catalog (mọi FK trỏ vào
