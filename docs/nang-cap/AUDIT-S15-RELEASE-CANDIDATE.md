@@ -157,6 +157,7 @@ bảng RLS, mất FORCE RLS, thiếu role đều FAIL) nhưng lớp O trên bả
 | @e5ce67b (đo)           | 13   | 28      | 13  | 0    | 54   |
 | @98520f6 (sau vá P/H)   | 16   | 31      | 7   | 0    | 54   |
 | @5a36ff2 (sau vá lớp B) | 19   | 32      | 3   | 0    | 54   |
+| @7f587bc (đo lại, §9)   | 26   | 28      | 0   | 0    | 54   |
 
 - Chuyển GAP → PASS (2): A1-AC04, Q-AC06. Chuyển PARTIAL → PASS (1): A1-AC07 (A1-AC05/Q-AC01 giữ PARTIAL: thiếu ca stale snapshot).
 - Chuyển GAP → PARTIAL (4): Q-AC07, A4-AC06, Q-AC04, A5-AC08.
@@ -326,3 +327,60 @@ tương phản khối cảnh báo vượt HĐ ở theme sáng (`text-rose-200` k
 `-900/-950` của ~180 chip, override toàn cục làm CI e2e đỏ 4 shard — ADR-0010); Esc trên hộp xác nhận
 đóng luôn chứng từ và mất focus; chứng từ IPC tràn ngang trên mobile 393px (lưới + select hợp đồng
 `min-w-[260px]` không co). Ngoài ra `ProjectCard` dự án rỗng hiện "0% tiến độ" (COALESCE 0) — chỉ ghi nhận.
+
+## 9. Đo lại trên main `7f587bc` (2026-10-11)
+
+Đo lại toàn bộ lớp U/P/H trên main `7f587bc` (sau #615–#630: PR-A/PR-B, M128, M129, M130, M131, tái
+kiểm quyền lúc ghi mọi miền, IPC duyệt tuần tự, tạm tính exact). Không đổi code/test.
+
+**Môi trường:** PostgreSQL 16.15 cục bộ (cluster disposable, role `ci` superuser như CI), Node 24.21.0
+(cùng major với CI — tránh hiện tượng `mock.module` của Node 22 ở Q-AC07), `npm ci` đúng lockfile.
+
+| Lượt | Lệnh                                                                                                           | Kết quả                                                       |
+| ---- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 1    | `TEST_DATABASE_URL=… npm test -- --release-gate`                                                               | 373 file · 5028 pass · 3 fail · 1 skip (allowlist)            |
+| 2    | như trên + `GITHUB_ACTIONS=true`, `RESTORE_TEST_MARKER` (marker 32 hex), `RESTORE_TEST_SERVER_IP` (như job CI) | 373 file · **5031 pass · 0 fail** · 1 skip (allowlist), 309 s |
+
+- 3 ca đỏ lượt 1 đều ở `restore-check-postgres`: smoke restore cố ý chỉ chạy khi có marker disposable
+  của CI (khẳng định `GITHUB_ACTIONS === "true"`). Lượt 2 đặt đúng biến như CI → 3/3 xanh. Không phải lỗi.
+- Ca skip duy nhất: `health.test.ts` (`skip: HAS_TEST_DB`, có lý do trong `scripts/test-skip-allowlist.json`).
+- Hai lượt liên tiếp cùng kết quả trên mọi file bằng chứng — không thấy ca chập chờn.
+- **Lớp B + mutation:** CI push main `7f587bc` ([run 38006167893](https://github.com/seeker19110/xboss/actions/runs/38006167893))
+  11/11 job xanh: static, test (Postgres) + **mutation** + ERD, coverage, build, e2e 1–4/4 (Chromium desktop +
+  mobile). Spec lớp B dẫn trong bảng (`offline-recovery`, `offline-idb-abort`, `offline-deep`,
+  `payment-certs-canh-bao`, `portfolio-kpi`, `thiet-bi-offline-admin`) nằm trong các shard đó. Không chạy
+  Playwright cục bộ.
+
+**Số ca của file bằng chứng (lượt 2, mọi file 0 fail):** A1 — `audit-auth-project-regression` 27,
+`s16-null-scope` 18, `auth`/`route-auth` 15/15, `route-users-cach-ly-org` 14, `s16-rls-strict` 12,
+`s16-stale-snapshot` 10, `db-scope-nested` 9, `project-scope-security-unit` 9, `s16-quyen-ghi-mo-rong` 8,
+`s16-readiness` 6, `s16-app-role-duong-phu` 5; A2 — `offline-vault-route` 20, `offline-recovery-route` 13,
+`offline-queue-route` 7, `offline-vault-bao-tri` 4; A3/A4/Q — `money-exact-golden` 17,
+`payment-certs-money-dto` 17, `cost-report` 12, `po-qty-exact` 10, `s15-vo-exact` 6, `portfolio-kpi` 6,
+`bao-cao-a4-ac08` 4; A5 — `m128-dieu-chinh-ipc` 28, `s13a-chuoi-ipc-thanh-toan` 18,
+`s13a-chuoi-tien-do-nghiem-thu` 13, `s13c-ipc-quyet-dinh` 11, `m129-ipc-da-chi` 11, `s13e-de-xuat-vo-quyet-dinh` 9;
+A6 — `dr-recovery-verify` 24, `audit-dr-readonly` 14, `restore-check-postgres` 3. File không chạm DB
+(`offline-queue*`, `audit-s08-*`, `audit-offline-store-commit`, `pitr-drill`, `pitr-archive`,
+`audit-recovery-files`, `restore-check`, `retention-cleanup`, `s10c-*`…) chạy gộp 1 tiến trình: 764/764.
+
+**Đính chính bảng §2:** viết tắt `PCD` là `payment-certs-money-dto` (không có file `payment-certs-dto`).
+
+### 9.1 Verdict @7f587bc
+
+Luật giữ nguyên §1: AC còn lớp M/O yêu cầu thì tối đa PARTIAL; không nâng verdict khi chưa đọc bằng
+chứng lớp B tương ứng.
+
+- **Không AC nào bị hạ:** mọi bằng chứng tự động ở cột verdict cuối của §2 (cột `@98520f6`, đã được các PR
+  sau cập nhật) còn xanh trên `7f587bc`.
+- **Không AC nào được nâng:** 28 AC PARTIAL đều còn lớp M (UAT thiết bị, Safari/iOS thật, hợp đồng/IPC-PDF
+  thật), lớp O (restore/PITR/production) hoặc một ca B cụ thể chưa có (A1-AC01 B hai org; A2-AC02/03/04/06/10
+  B 2 tab/lease/dedup/diary conflict; A4-AC06 B; A5-AC03 B approve đồng thời).
+- **Tổng:** 26 PASS · 28 PARTIAL · 0 GAP · 0 FAIL. Hàng `@5a36ff2` ở §3 (19/32/3) là số trước PR-A/PR-B/
+  M128/M129 — 3 GAP cũ (A1-AC02, A2-AC07, A2-AC08) đã thành PARTIAL (cờ cutover; lớp B `offline-deep`).
+
+### 9.2 Chưa đo trong lượt này
+
+- `npm run bench:reports -- --baseline` (A4-AC08 ±10%): cần cùng cấu hình `roleApp/cpus/tasks/concurrency`
+  với `bench/a4-ac08-baseline.json`; máy đo khác → NOT_RUN.
+- `npm run test:mutation` cục bộ: không chạy, dựa vào bước mutation xanh của CI push main cùng SHA.
+- Lớp M/O: như §6/§7 — vẫn WAITING_RELEASE, không ký `RELEASE_VERIFIED`.

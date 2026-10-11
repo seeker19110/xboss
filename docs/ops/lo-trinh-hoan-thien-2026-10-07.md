@@ -18,7 +18,7 @@ Migration mới nhất: `0170_offline_vault_bao_tri.sql`.
 | S05–S08 | Offline vault/receipt/queue/recovery | Xong về code: 0170 + M131 (rewrap KEK, retire khoá, khôi phục khi mất proof); Safari/iOS thật vẫn NOT_RUN                |
 | S09–S13 | Tiền exact, báo cáo, chuỗi           | Xong về code: IPC duyệt tuần tự, M128 (điều chỉnh), M129 (đã duyệt ≠ đã chi), rate-limit chuỗi tiền                      |
 | S14     | PITR/manifest/verifier               | Manifest + verifier + smoke có; **PITR VPS chưa bật** (RPO thực ~24 giờ, RPO 5 phút/RTO 60 phút NOT_RUN)                 |
-| S15     | Final audit                          | CODE_COMPLETE có điều kiện / WAITING_RELEASE; bảng 54 AC đo tại `5a36ff2`, **chưa đo lại** trên SHA hiện tại             |
+| S15     | Final audit                          | CODE_COMPLETE có điều kiện / WAITING_RELEASE; đo lại tại `7f587bc` (S15 §9): 26 PASS · 28 PARTIAL · 0 GAP · 0 FAIL       |
 | S16     | Production                           | Vẫn chặn bởi N05                                                                                                         |
 
 ### 0.2 Sổ nợ N01–N12 (#572)
@@ -31,7 +31,7 @@ Migration mới nhất: `0170_offline_vault_bao_tri.sql`.
 | N07     | Code xong (S05–S08); còn Safari/iOS thật, đối soát legacy v1 theo thiết bị (D03)    | Thiết bị thật           |
 | N08     | Code xong (S09–S13); còn backfill tiền staging → production và cutover reader exact | Vận hành                |
 | N09     | Một phần: manifest/verifier/retention (M130) có; PITR/WAL/key availability NOT_RUN  | Môi trường              |
-| N11     | Chờ đo lại 54 AC trên SHA hiện tại + UAT lớp M + review độc lập                     | Reviewer độc lập        |
+| N11     | 54 AC đã đo lại tại `7f587bc` (0 FAIL); còn UAT lớp M + review độc lập              | Reviewer độc lập        |
 | N12     | Chờ N05, N11                                                                        | Vận hành + owner        |
 
 ### 0.3 Nợ còn mở
