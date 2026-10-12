@@ -1,6 +1,6 @@
 # /auto-complete 2026-10-12-hoan-thien-no-code — Hoàn thiện phần nợ làm được bằng code
 
-- Trạng thái: Active
+- Trạng thái: Waiting — W-003 (F-009 SoD đánh dấu chi) chờ chủ repo chọn chính sách; mọi việc khác đã merge
 - Bắt đầu: 2026-10-12 · base `origin/main` `74bdce6` (+ PR #634 đang chờ CI — chứa chính lệnh này)
 - Phạm vi: các khoản nợ **code** trong `docs/ops/lo-trinh-hoan-thien-2026-10-07.md` §0.3 ("Code nhỏ đã ghi
   nhận") + phát hiện mới trong lúc rà, đối chiếu lại với code thật trên main trước khi sửa · **KHÔNG làm:**
@@ -43,10 +43,10 @@ Phát hiện mới: **F-012** `app/api/suppliers/[id]/ratings/route.ts` dùng `c
 | W-002 | F-008 link thông báo/push mang dự án, đổi dự án trước khi mở (M132)           | M   | tự làm  | W-000     | #635 · `6c57616` | Xong — mọi check xanh, merge squash                |
 | W-003 | F-009 SoD đánh dấu chi: chặn mọi người đã duyệt + người lập (M133)            | M   | tự làm  | W-002     |                  | **Chờ chủ repo** — chính sách SoD (xem Quyết định) |
 | W-004 | F-003 vô hiệu hoá tài khoản thay xoá (M134, migration + auth §8)              | M   | tự làm  | W-002     | #636 · `99782d0` | Xong — chủ repo merge squash (head `a59901a`)      |
-| W-005 | F-012 ratings qua `CAN` + F-011 gỡ fixme `/schedule`                          | S   | tự làm  | W-004     |                  | Gộp PR cùng W-007 + W-008                          |
+| W-005 | F-012 ratings qua `CAN` + F-011 gỡ fixme `/schedule`                          | S   | tự làm  | W-004     | #637 · `c61edc6` | Xong — mọi check xanh, merge squash                |
 | W-006 | F-010 job dọn staging ảnh mồ côi theo lịch                                    | M   | —       | —         | —                | Chấp nhận rủi ro (xem Quyết định) — nợ `PROGRESS`  |
-| W-007 | Đồng bộ lộ trình §0.3 + `PROGRESS.md` + nợ chấp nhận (F-007, F-013)           | S   | tự làm  | W-005     |                  | Gộp vào PR W-005                                   |
-| W-008 | Pha 4 — sửa Thấp từ audit hội tụ (khoá FK, mở khoá, `?project=` trùng cookie) | S   | tự làm  | W-004     |                  | Code + test xong; gộp PR cùng W-005                |
+| W-007 | Đồng bộ lộ trình §0.3 + `PROGRESS.md` + nợ chấp nhận (F-007, F-013)           | S   | tự làm  | W-005     | #637 · `c61edc6` | Xong — gộp PR W-005                                |
+| W-008 | Pha 4 — sửa Thấp từ audit hội tụ (khoá FK, mở khoá, `?project=` trùng cookie) | S   | tự làm  | W-004     | #637 · `c61edc6` | Xong — gộp PR W-005, review 0 chặn                 |
 
 ## Quyết định và bằng chứng
 
@@ -124,9 +124,24 @@ Phát hiện mới: **F-012** `app/api/suppliers/[id]/ratings/route.ts` dùng `c
 - F-013 (UNIQUE `attendance`) → hoãn, ghi nợ · loại "thêm UNIQUE ngay" (dữ liệu production có thể đã trùng →
   migration hỏng hoặc phải xoá/gộp dữ liệu thật = không tự quyết) · bậc 1.
 
+## Kết quả hoàn thiện (Definition of Complete)
+
+1. §0.3 đủ kết cục: 6 mục đã xong trước (bằng chứng ở bảng trên); F-003 → #636 + #637; F-008 → #635; F-011/F-012
+   → #637; F-010, F-007, F-013 chấp nhận/hoãn có lý do trong `PROGRESS.md`; F-009 **chờ chủ repo** (W-003).
+2. 0 Cao/0 Trung còn mở (audit hội tụ Pha 4); CI `main` `c61edc6` xanh (CI, CodeQL, Lighthouse, Secret scan,
+   Scorecard).
+3. `npm audit --omit=dev` = 0 lỗ hổng. Clone sạch (`scratchpad/clone-sach-1` @ `c61edc6`): `npm ci` OK,
+   `npm run build` OK, `npm test -- --release-gate` trên DB Postgres 16 mới: 5029 ca pass, 1 skip có chủ đích,
+   3 file đỏ đều cần biến `RESTORE_TEST_*`/role migrate riêng chỉ CI đặt (DR/restore/migration-boundary — CI xanh);
+   18/18 cổng tĩnh xanh. README/DEPLOY không thiếu bước nào cho luồng trên.
+4. Lộ trình §0.3 + `PROGRESS.md` khớp code.
+
+**Đề xuất phát hành: GO có điều kiện** cho code trên `main` `c61edc6`. Migration mới của lượt chỉ có 0171
+(`ADD COLUMN` thuần — đi thẳng production được). Điều kiện là các mục sẵn có từ trước, không thuộc lượt này:
+0165/0166 phải chạy qua staging trước production (`PROGRESS.md`), deploy do chủ repo thực hiện. Đây chỉ là đề xuất,
+lượt này không deploy.
+
 ## Bàn giao / bước tiếp theo
 
-- Nhánh dựng lại từ `origin/main` `99782d0` + `afc4642` (W-008 a/b) + working tree (W-005, W-007, W-008 c). Review W-008
-  xong (0 chặn) → `git add` → `npm run audit:route-scope` → gate `--test --build` → commit → push → mở PR →
-  xanh thì merge. Sau đó bàn giao clone sạch (`scratchpad/clone-sach-1`: `git pull`, `npm ci`, build, gate
-  `--test`) + GO/NO-GO; trạng thái cuối `Waiting — W-003 chờ chủ repo`.
+- Chờ chủ repo trả lời W-003: đánh dấu IPC "đã chi" có chặn **mọi** người đã duyệt (và người lập) không, hay giữ
+  luật M129 "chỉ so người quyết bước cuối"? Có câu trả lời → gọi lại `/auto-complete` để làm W-003 (M133).

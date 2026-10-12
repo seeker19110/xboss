@@ -1,5 +1,15 @@
 # PROGRESS — XBoss
 
+## 2026-10-12 — Kết thúc lượt `/auto-complete` hoàn thiện nợ code (#635, #636, #637)
+
+- Đã merge: M132 link thông báo mang dự án (#635), M134 vô hiệu hoá tài khoản (#636), audit hội tụ + quyền
+  `evaluateSuppliers` + gỡ fixme axe cuối (#637). CI `main` `c61edc6` xanh; `npm audit --omit=dev` = 0.
+- Clone sạch @ `c61edc6`: `npm ci` + build OK; `npm test -- --release-gate` trên DB mới 5029 pass, chỉ 3 file
+  DR/restore/migration-boundary đỏ do thiếu biến chỉ CI có.
+- **Còn chờ chủ repo:** W-003 (F-009) chính sách SoD khi đánh dấu IPC "đã chi" — hồ sơ
+  `docs/nang-cap/auto/2026-10-12-hoan-thien-no-code.md`. Đề xuất phát hành: GO có điều kiện (0165/0166 qua staging
+  như đã ghi).
+
 ## 2026-10-12 — Audit hội tụ lượt `/auto-complete`: sửa 3 mục Thấp, ghi nhận phần còn lại
 
 - **Đã sửa:**
