@@ -1,5 +1,48 @@
 # PROGRESS — XBoss
 
+## 2026-10-12 — Audit hội tụ lượt `/auto-complete`: sửa 3 mục Thấp, ghi nhận phần còn lại
+
+- **Đã sửa:**
+  - M134: khoá dòng Admin đổi `FOR UPDATE` → `FOR NO KEY UPDATE` (hết treo/deadlock với khoá FK);
+  - M134: mở khoá tăng `session_version`;
+  - M132: link `?project=` trùng cookie vẫn kiểm dự án còn xem được (`kiemDuAnConXem` → `GET /api/projects`),
+    vì cookie có thể trỏ dự án user đã bị gỡ.
+- **Chấp nhận (Thấp):**
+  - SSE `/api/events` của phiên vừa bị khoá/thu hồi chỉ xác thực lúc mở stream — chỉ lộ watermark phiên bản
+    sheet, cùng lớp với thu hồi phiên sẵn có;
+  - link ngoài `?project=` đổi dự án không hỏi — đúng thiết kế M132, server vẫn kiểm quyền;
+  - nút "Đánh giá" ở `/subcontractors` ẩn/hiện theo vai trò cứng (API là ranh giới);
+  - thiếu test route cho nhánh từ chối của `oidc/callback` (đã có test `upsertSsoUser`).
+  - thiếu test DB cho link push của `assignTask` (link dựng qua `linkTracking`, đã có unit test); test M132 đổi
+    email cố định sang hậu tố theo lần chạy (lần chạy dở không làm lần sau đụng unique).
+
+## 2026-10-12 — W-005: đánh giá NCC/NTP qua `CAN.evaluateSuppliers`, gỡ fixme axe cuối `/schedule`
+
+- **Vấn đề (F-012, F-011):** `POST /api/suppliers/:id/ratings` (`canRate`) và
+  `POST /api/subcontractors/:supplierId/evaluations` (`canEvaluate`) kiểm vai trò bằng hàm cục bộ ngoài map `CAN` →
+  không thấy/không chỉnh được ở ma trận `/admin/permissions`, lệch quy ước "quyền qua `CAN`". Lưới quét axe còn
+  đúng 1 `test.fixme` (`/schedule`, nghi đua animate progress bar).
+- **Sửa:** khoá quyền `evaluateSuppliers` (mặc định Admin/PM/Kỹ sư — giữ nguyên hành vi; là quyền ghi nên nằm
+  trong `LOCKED_PERMS`, ma trận không mở được cho vai trò khác) + nhãn "Đánh giá NCC / NTP"; hai route dùng
+  `CAN.evaluateSuppliers`. `/schedule` chuyển sang `OK_ROUTES`: progress bar đã là `transition-[width]`, đo lại
+  cục bộ 81/81 xanh (cả spec, desktop + mobile, 2 worker song song, lặp 2 lần) — lưới quét không còn fixme.
+- **Test:** `tests/permissions.test.ts` ca ma trận mặc định `evaluateSuppliers` (đỏ trên code cũ: khoá chưa có);
+  route test sẵn có (`route-hien-truong-2`, `route-tai-chinh-3b`) xanh.
+
+## 2026-10-12 — Nợ kỹ thuật chấp nhận có chủ đích (lượt `/auto-complete`, lộ trình §0.3)
+
+- **F-010 — job dọn staging ảnh mồ côi theo lịch:** không làm. `photo_upload_staging` bật FORCE RLS theo
+  `(user_id, org_id)` (0164), nên quét toàn hệ phải nới policy hoặc cho cron mạo danh từng user. Cả hai là đổi mô hình
+  bảo mật ADR-0005/D04. Ảnh hưởng chỉ là dung lượng đĩa: file mồ côi không có dòng `task_photos`, nên không route nào
+  phục vụ nó. Hiện file đã được dọn khi chính user đó upload lại (`doiSoatAnhMoCoi`). Xét lại nếu đo thấy dung
+  lượng staging tăng.
+- **F-007 — `REPORT_EMAIL_TO`/`TELEGRAM_CHAT_ID` nhận báo cáo của mọi org:** chấp nhận khi triển khai còn một
+  tổ chức. Tách theo org cần cấu hình production mới (không tự quyết).
+- **F-013 — `attendance` thiếu UNIQUE chấm gộp/từng người:** hoãn. Dữ liệu production có thể đã trùng, nên
+  migration có thể hỏng hoặc phải gộp/xoá dữ liệu thật. Cần đo trên staging trước.
+- **F-009 — SoD đánh dấu chi chỉ so người quyết bước cuối:** **chờ chủ repo**. Mở rộng tới mọi người duyệt
+  và người lập IPC có thể khoá luồng chi của đội nhỏ (chỉ Admin/PM được đánh dấu chi).
+
 ## 2026-10-12 — M134: vô hiệu hoá tài khoản (thay cho xoá khi còn dữ liệu kiểm toán)
 
 - **Vấn đề (F-003, lộ trình §0.3 mục 3):** user còn dữ liệu kiểm toán (duyệt IPC, phiếu chi…) xoá trả 409
@@ -15,8 +58,12 @@
   nhận báo cáo, cảnh báo health-check, khôi phục offline bỏ qua user bị khoá. Hàm thuần `taiKhoanBiKhoa` ở
   `lib/nen/trang-thai-tai-khoan.ts`. `/users`: nút vô hiệu
   hoá/kích hoạt lại và nhãn "Đã vô hiệu hoá"; 409 khi xoá gợi ý vô hiệu hoá.
-- **Test:** `tests/m134-vo-hieu-hoa-tai-khoan.test.ts` 13 ca qua route thật (AC1 đỏ trên code cũ: token còn hợp lệ
-  nhưng `disabled_at` khác NULL vẫn được nhận; ca đồng thời "tự hạ cấp + khoá Admin kia" đỏ khi bỏ `FOR UPDATE`).
+- **Sau audit hội tụ:** khoá dòng Admin đổi `FOR UPDATE` → `FOR NO KEY UPDATE` (mức cũ xung đột khoá KEY SHARE của
+  FK — transaction khác đang ghi dòng tham chiếu Admin làm guard treo tới statement_timeout/deadlock, đã tái hiện);
+  mở khoá cũng tăng `session_version` (cookie lỡ đúc trong lúc khoá không sống lại).
+- **Test:** `tests/m134-vo-hieu-hoa-tai-khoan.test.ts` 16 ca qua route thật (AC1 đỏ trên code cũ: token còn hợp lệ
+  nhưng `disabled_at` khác NULL vẫn được nhận; ca đồng thời "tự hạ cấp + khoá Admin kia" đỏ khi bỏ khoá dòng; ca "khoá FK đang mở" và "mở khoá đúc lại token" đỏ trên bản trước; người nhận báo cáo bỏ
+  user bị khoá).
 - **Không làm (non-goal):** ẩn user bị khoá khỏi danh sách chọn người; thu hồi API key do user tạo.
 - Đặc tả `docs/nang-cap/M134-vo-hieu-hoa-tai-khoan.md` (tự duyệt trong lượt `/auto-complete`, ADR-0015).
 

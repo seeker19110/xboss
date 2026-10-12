@@ -82,6 +82,9 @@ sheet của A** ở đúng tầng đó, người dùng có thể tick nhầm d�
 - AC4c Cổng chạy lại khi `?project=` đổi do điều hướng client-side cùng slug (`router.push` từ chuông); phiên
   hết hạn (401) → `redirectToLogin`, `2fa_required` → trang bật 2FA; lỗi khác → màn lỗi có "Thử lại" +
   "Về trang chủ" (bổ sung sau review).
+- AC4d `?project=` TRÙNG cookie vẫn kiểm dự án còn trong danh sách xem được (`GET /api/projects`) — cookie có
+  thể trỏ dự án user đã bị gỡ, server khi đó rơi về dự án khác; không còn → màn lỗi, không dựng lưới (bổ sung
+  sau audit hội tụ 2026-10-12).
 - AC5 `npm run gate -- --test --build` xanh; e2e hiện có của tracking/notifications không đỏ.
 
 ## 9. Kiến trúc và điểm chạm code

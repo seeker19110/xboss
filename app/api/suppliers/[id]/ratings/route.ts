@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { isUniqueViolation } from "@/lib/ha-tang/seqcode";
 
 export const dynamic = "force-dynamic";
-
-const canRate = (r?: Role) => r === "admin" || r === "pm" || r === "engineer";
 
 function star(v: unknown): number | null {
   const n = Number(v);
@@ -21,7 +19,7 @@ export async function POST(
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!canRate(user.role))
+  if (!CAN.evaluateSuppliers(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM/Kỹ sư được đánh giá NCC" }, { status: 403 });
 
   const supplierId = parseInt(params.id);

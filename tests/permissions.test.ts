@@ -76,6 +76,19 @@ test("ma trận mặc định: chỉ Admin và PM có quyền approve nghiệm t
   assert.equal(CAN.approve(undefined), false);
 });
 
+test("ma trận mặc định: evaluateSuppliers giữ đúng Admin/PM/Kỹ sư như check cục bộ cũ (W-005)", async () => {
+  const { permDefaultsMatrix, LOCKED_PERMS } = await import("@/lib/bao-mat/auth");
+  const m = permDefaultsMatrix().evaluateSuppliers;
+  for (const role of ["admin", "pm", "engineer"] as const) assert.equal(m[role], true);
+  for (const role of ["subcon", "viewer", "bch", "cdt"] as const) assert.equal(m[role], false);
+  // Quyền ghi → khoá: ma trận /admin/permissions không mở được cho vai trò chỉ-xem/subcon.
+  assert.ok(LOCKED_PERMS.includes("evaluateSuppliers"));
+  // Ma trận chỉ SIẾT được (tắt cho kỹ sư), không MỞ thêm (bật cho subcon) — "không vượt mặc định".
+  const { validatePermOverride } = await import("@/lib/bao-mat/auth");
+  assert.equal(validatePermOverride("engineer", "evaluateSuppliers", false), null);
+  assert.equal(typeof validatePermOverride("subcon", "evaluateSuppliers", true), "string");
+});
+
 // ── Lớp tích hợp: cache + CAN + audit (cần Postgres) ─────────────────────────────
 test(
   "override: default → siết pm.approve → xoá về default; mở viewer.viewPayments; audit ghi",

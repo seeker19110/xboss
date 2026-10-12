@@ -67,11 +67,13 @@ vào được (bỏ qua mật khẩu).
 - FR1 `PATCH /api/users/:id` nhận `disabled: boolean` (Admin `CAN.manageUsers`, cùng org). `true`: chặn chính mình
   (400), chặn khi target là admin hoạt động cuối cùng của org (400); trong transaction `FOR UPDATE` đặt
   `disabled_at = now()`, `session_version = session_version + 1`, xoá `push_subscriptions` của user. `false`: đặt
-  `disabled_at = NULL`. Idempotent: lặp lại cùng giá trị không đổi `disabled_at` gốc, không tăng thêm phiên.
+  `disabled_at = NULL` + `session_version + 1` (cookie lỡ đúc trong lúc khoá không sống lại). Idempotent: lặp lại cùng giá trị không đổi `disabled_at` gốc, không tăng thêm phiên.
 - FR2 `getCurrentUser` trả `null` khi `disabled_at IS NOT NULL`.
 - FR3 Login mật khẩu, login 2FA bước 2, SSO: user bị khoá → 403 `{ error, code: "account_disabled" }`, không phát
   cookie phiên. Login mật khẩu chỉ trả 403 **sau** khi mật khẩu đúng (sai mật khẩu vẫn 401 chung + ghi rate-limit).
-- FR4 Đếm "Admin cuối cùng" (hạ cấp, xoá, vô hiệu hoá) chỉ tính `role='admin' AND disabled_at IS NULL`.
+- FR4 Đếm "Admin cuối cùng" (hạ cấp, xoá, vô hiệu hoá, đồng bộ role SSO) chỉ tính `role='admin' AND disabled_at
+IS NULL` của đúng org, khoá dòng `FOR NO KEY UPDATE` trong cùng transaction với lần ghi (không `FOR UPDATE` —
+  xung đột khoá FK của transaction khác).
 - NFR: không thêm round-trip DB ở `getCurrentUser` (thêm cột vào SELECT có sẵn).
 
 ## 8. Acceptance criteria

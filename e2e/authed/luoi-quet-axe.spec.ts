@@ -32,8 +32,9 @@ import AxeBuilder from "@axe-core/playwright";
 // (#14171d/#232833), span kế thừa màu ĐÚNG — không tái hiện được #f1f5f9 khi soi thủ công
 // nhiều lần. Nghi lỗi THOÁNG QUA lúc hydrate/chuyển trạng thái loading→loaded của
 // ProjectSwitcher (axe chụp đúng khoảnh khắc đó) — không phải 1 chỗ đổi class là xong, cần
-// điều tra thời điểm re-render riêng. KHÔNG "gọn" như badge trên nên GIỮ NGUYÊN fixme,
+// điều tra thời điểm re-render riêng. KHÔNG "gọn" như badge trên nên khi đó GIỮ fixme,
 // không tự sửa (đúng luật "đụng nhiều nơi/không chắc nguyên nhân thì dừng lại và báo").
+// (2026-10-12: không còn trang nào để fixme — trang cuối /schedule đã đo lại xanh, xem OK_ROUTES.)
 //
 // Còn lại: input/select thiếu <label> (rule "label"/"select-name") và icon-button thiếu
 // accessible name (rule "button-name") rải rác ở nhiều trang autocomplete/form — lỗi lẻ
@@ -99,6 +100,9 @@ const OK_ROUTES: Route[] = [
   { path: "/engineering/cashflow", name: "Dòng tiền động" },
   { path: "/engineering/esign", name: "Chữ ký điện tử (esign)" },
   { path: "/mepf-process", name: "Quy trình MEPF" },
+  // 2026-10-12: fixme cuối cùng — progress bar đã đổi `transition-all` → `transition-[width]`;
+  // đo lại 81/81 xanh (cả spec, desktop + mobile, 2 worker song song, lặp 2 lần) → assert thật.
+  { path: "/schedule", name: "Lịch trình (schedule)" },
 ];
 
 test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)", () => {
@@ -106,32 +110,6 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
     test(`${route.name} (${route.path}) không có vi phạm a11y nghiêm trọng (axe)`, async ({
       page,
     }) => {
-      await scanRoute(page, route.path);
-    });
-  }
-
-  // ── 41 trang ĐỎ — fixme kèm vi phạm cụ thể đo được (đo bằng script node đứng ngoài
-  // Playwright test runner + axe-core, cùng logic waitForContentReady, cổng 55504,
-  // 24-08-2026). Số node có thể lệch ±vài đơn vị giữa các lần chạy vì một số phần tử theo
-  // enable trạng thái, nhưng RULE ID thì lặp lại nhất quán. Giữ nguyên thân test thật (không
-  // xoá) — chỉ cần bỏ dòng `test.fixme(...)` đầu thân khi trang được sửa xong. ──
-
-  const RED_ROUTES: { path: string; name: string; violations: string }[] = [
-    {
-      path: "/schedule",
-      name: "Lịch trình (schedule)",
-      violations:
-        "color-contrast — quan sát ĐỎ nhất quán khi chạy qua Playwright test runner song song (2 worker, 52 node vi phạm), nhưng KHÔNG tái hiện khi quét cô lập bằng script node đơn (0 vi phạm, thử lại 3 lần) hay ở project mobile. Nghi ngờ đua dữ liệu/thời điểm animate progress bar (transition-all duration-500, dòng ~240 app/schedule/page.tsx) khi nhiều worker chạy song song — CHƯA xác định được nguyên nhân gốc chắc chắn, để fixme thay vì assert có thể flaky đỏ oan trong CI.",
-    },
-  ];
-
-  for (const route of RED_ROUTES) {
-    test(`${route.name} (${route.path}) không có vi phạm a11y nghiêm trọng (axe)`, async ({
-      page,
-    }) => {
-      // Đỏ thật, đã đo (xem `violations`) — a11y ~41 trang là việc riêng ngoài phạm vi W4.
-      // Thân test GIỮ NGUYÊN (không xoá) để spec chạy thật ngay khi bỏ dòng fixme dưới đây.
-      test.fixme(true, route.violations);
       await scanRoute(page, route.path);
     });
   }
