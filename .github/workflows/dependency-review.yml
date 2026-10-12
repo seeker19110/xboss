@@ -1,0 +1,48 @@
+name: Dependency review
+
+# Chặn PR thêm/nâng dependency có lỗ hổng mức high trở lên NGAY trên diff của PR (ADR-0014, lấy từ
+# projects-template @ 59bd1d1). Bổ sung cho bước `npm audit` của ci.yml: audit quét toàn bộ cây hiện
+# có, còn dependency-review chỉ xét gói mà PR này đưa vào — báo đúng PR gây ra, kể cả lockfile.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Action đòi bật Dependency graph (Settings → Code security). Chưa bật thì API compare trả 403, action
+      # báo "Dependency review is not supported" và đỏ ở MỌI PR dù PR không đổi dependency — cổng tự
+      # deadlock. Dò trước bằng đúng API đó, phân loại y như action (src/main.ts @ v5.0.0: 403 → "not
+      # supported", 404 → sai ref): 403 → cảnh báo rõ + bỏ qua; còn lại (200, 404, 5xx) → action chạy
+      # và tự chặn/tự báo, không lỗi nào khác bị nuốt.
+      - name: Kiểm tra Dependency graph đã bật
+        id: probe
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          out="$(gh api "repos/$REPO/dependency-graph/compare/$BASE_SHA...$HEAD_SHA" 2>&1 >/dev/null)" || true
+          echo "Phản hồi dò: ${out:-<200 OK>}"
+          if grep -q "(HTTP 403)" <<<"$out"; then
+            echo "::warning title=Dependency review bị bỏ qua::Repo chưa bật Dependency graph — bật ở https://github.com/$REPO/settings/security_analysis để cổng này chặn thật."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.probe.outputs.enabled == 'true'
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        if: steps.probe.outputs.enabled == 'true'
+        with:
+          fail-on-severity: high

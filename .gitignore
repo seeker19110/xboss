@@ -46,9 +46,13 @@ xboss.db
 xboss.db-shm
 xboss.db-wal
 
-# Bộ khung tạm — staging để tự merge, không commit (xem docs/framework/AP-DUNG-vao-du-an-co-san.md)
+# Bộ khung tạm — staging để tự merge, không commit (xem docs/framework/XBOSS.md)
 _framework-dropins/
 *.framework-new
+*.framework-conflict
+*.framework-base
+# Checkpoint trước khi nén ngữ cảnh (hook precompact-checkpoint.sh) — trạng thái cục bộ của phiên
+.claude/.compact-checkpoint
 
 # Tarball backup nặng — không commit
 xboss.tar.gz

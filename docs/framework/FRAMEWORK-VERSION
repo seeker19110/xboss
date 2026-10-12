@@ -1,0 +1,72 @@
+# FRAMEWORK-VERSION — dấu bản khung đã copy (sinh tự động bởi copy-framework.sh — đừng sửa tay)
+version: 0.1.0
+commit-nguon: 59bd1d1
+ngay-copy: 2026-10-12
+# Nâng bản: clone repo khung mới nhất rồi chạy  bash copy-framework.sh <đích> --upgrade  (giữ chỉnh sửa cục bộ; xem CHANGELOG.md từ 59bd1d1..HEAD)
+# manifest: <git hash-object> <file> — file đích có hash KHÁC dòng này = đã sửa tay (--upgrade sẽ merge/để cạnh, không ghi đè)
+manifest: 4d4fadd5db1f947e748dcb8c6f43ccd18db14460 .claude/commands/adr.md
+manifest: 5184017479078487a40b34c67e9e9e209c475309 .claude/commands/audit-full.md
+manifest: 42f221980edf5a5c60be3acacb86e2efeb4c7957 .claude/commands/audit-optimize.md
+manifest: 4a287f6ab19f7e332694896d2a8d27b86047317f .claude/commands/auto-complete.md
+manifest: 7568069324358eaf3d88b2955802d389c44f9d76 .claude/commands/auto.md
+manifest: 51bbd712224bd39c4f0fe6fd03a40b7df29d6149 .claude/commands/bootstrap.md
+manifest: d33635af5fbbcccc1486bd3ac87f558bc64bd739 .claude/commands/completion.md
+manifest: f5d665b953310f22fec587e75274ee137a5673ea .claude/commands/consult.md
+manifest: 40c0e9ae8e6464a36c540955aed4a8503f9cad20 .claude/commands/contract.md
+manifest: ed2d1d626b782877377bb4b23af680517aff3305 .claude/commands/debug.md
+manifest: 631f0292f19b2ecf6332a2cdbbb8b84ec5d05822 .claude/commands/deps-upgrade.md
+manifest: 38c6faed6c33cf89e0a32876ec326e113136135a .claude/commands/gate.md
+manifest: b3fddeeddc3a95736e637c9afb072d1025db4af9 .claude/commands/grill.md
+manifest: 567ceeb12b61e4b8d9da1b561bade32873250bfa .claude/commands/incident.md
+manifest: 66abb0b2c91ff257e63be6731703d24680c30fd8 .claude/commands/maintain.md
+manifest: 6bf6017f156c98979f0f6c4d4e2a9650724e3161 .claude/commands/review.md
+manifest: 6b5a6d09d339673fff85a2fe26b321b0d4964117 .claude/commands/ui-ux.md
+manifest: f0ed008dc18ccbab956ac84411a0c7c100b5741b docs/framework/01-process-and-standards.md
+manifest: c473b53070de0e0d3f0e3fb5678a17625f1e802d docs/framework/02-ai-rules-and-project-template.md
+manifest: a61c8ac59c52807083265e7b6ebf9a5027b42a84 docs/framework/03-tech-selection-and-proactive-advice.md
+manifest: 3b6a2df6243e9e7355ada477e1ff081ff2978548 docs/framework/README.md
+manifest: 9cc1c8d7990677821e20a6cbb90b46dd3610e02b docs/framework/adopt-from-outside.md
+manifest: 31d1b3e7b2aa8c447b43c364ad11665a4c48e883 docs/framework/case-study-greenfield-dry-run.md
+manifest: 111c540d60666e8e3197e4c09723486beb4c3d4f docs/framework/existing-project-adoption.md
+manifest: bf9f2f3ed3afb168021c649ae9017772da7b5ef9 docs/framework/industry-standards.md
+manifest: 1c17471aef6a78a157491666fda639fd06df381e docs/framework/models-and-automation.md
+manifest: f225e96a2e1e211cd421faf89fa52e597aaae37f docs/framework/new-project-runbook-part-d-guardrails.md
+manifest: 66e8382e9b7cfe0f68ba9845862db64faeff1dd3 docs/framework/new-project-runbook-part-e-checklist.md
+manifest: fa544cfcb5aea7a5ceaf67ee8581140054f12640 docs/framework/new-project-runbook.md
+manifest: 6c2b52c8d155b5ae7525c729782a71f67193a43a docs/framework/orchestration-3-tier.md
+manifest: 0efe4f4005525240e9815f0333d8a2ccf5d68f54 docs/framework/pr-flow.md
+manifest: 5024e6ab679a3d49c55ce70f96e26f86b375be94 docs/framework/project-completion.md
+manifest: 30cfb1b010643cc579d289f640cdff294f5518e3 docs/framework/quality-gates-by-profile.md
+manifest: 8cb9aaaf71bfc2ab388cf6d36100027ef63a8d9c docs/framework/quality-supplements-advanced.md
+manifest: 985c35217f7df9a403a9871d8d4b2408d03f1d33 docs/framework/quality-supplements-group1.md
+manifest: cb9878460f6bcf099343cad7364a0921690b539c docs/framework/quality-supplements-group2.md
+manifest: b6e90a69bb548d08c339e87b37368ab75d8e9580 docs/framework/quality-supplements-theme.md
+manifest: 2cb061849e1a55c3ad47cb8621bd23ca742666ff docs/framework/quality-supplements.md
+manifest: 4e67291fed43dd14c0ff655f8ac9c5b8657f17a0 docs/framework/quickstart.md
+manifest: f6af7819c0303ca7b9ada5869d749c535e543ac2 docs/framework/spec-driven-openspec.md
+manifest: d43b197a7532d89287e6e903f92d0c16ea5f2fa7 docs/framework/standard-delivery.md
+manifest: 1f5129abae9cf0a1183c3cb1275356c7f22b1d5a docs/framework/strict-gate-contract.md
+manifest: 31e93e3cbb84541e482c801a21f5774aadcce9f4 docs/framework/templates/AI-EVAL.template.md
+manifest: 3756d77e1313b14ca7b453074f6ae4218132fcb4 docs/framework/templates/CODEMAP.template.md
+manifest: 99d25aa0798adea42d065ad059055e3ac20224b2 docs/framework/templates/COMPLETION-PLAN.template.md
+manifest: 53af03ee015b1676d5e57a4b4611cb25c1594bce docs/framework/templates/CONVENTIONS.template.md
+manifest: 90dbf5ec4a749e29164020bac24fe477286b87e6 docs/framework/templates/DATA-GOVERNANCE.template.md
+manifest: 525389672833916cbe1430c4cc22f47f4beed23d docs/framework/templates/FEATURE-MAP.template.md
+manifest: 2fb219d701f460c4b8623e5daa9d7af92f5e3d7f docs/framework/templates/FEATURE-SPEC.template.md
+manifest: f5d8e2d4a217b9d7f6cc06be32db53d337d44283 docs/framework/templates/GOAL.template.md
+manifest: 4bd01232501e8b58acd45129a628456c76757c74 docs/framework/templates/GOLDEN-TEST.template.md
+manifest: 9ab01e4db3ca327fc49d3967c296df150dd01b06 docs/framework/templates/GOVERNANCE.template.md
+manifest: a4c2929b8caf55e8e11c6d3781d4c697f9d43f1c docs/framework/templates/PLAN.template.md
+manifest: c63321c2b6ba4a0a14e6d7c3cc6839a4e3be283a docs/framework/templates/SUPPORT.template.md
+manifest: e0d0c7ec47146b8877e3c95eadf825846c8d3c4c docs/framework/templates/THREAT-MODEL.template.md
+manifest: 5524c1e63002b51653ab9a41cc6a71ed442e5acf docs/framework/templates/TRAPS.template.md
+manifest: 50934676d088623d9eb835cac9abdd3149338858 docs/framework/templates/WORK.template.md
+manifest: 5bd41622b6f06f71924f71e01f000cf3c5a77bf6 docs/framework/templates/ci-target.yml
+manifest: ed8c161c928257a592a6cc6965f65d05f876f17f docs/framework/ui-ux-intelligence-provider.md
+manifest: 966ed372ca8110a202e4a5b60f0ce8b4af502062 docs/ops/code-optimization-audit-prompt.md
+manifest: 45e0ab7c4f0654d527109f91baab0575cd001e2e docs/ops/comprehensive-audit-prompt.md
+manifest: 01aae05b88afba9736e598de30ea5a119f269f15 docs/ops/incident-response.md
+manifest: 232c8970099a60402c50990a1816701c60613597 docs/ops/release-readiness.md
+manifest: 9cf4612e277443149e9d356164a5bfe92ff80899 docs/ops/repository-settings.md
+manifest: 07ac7683b12640ced2eabc3298af355319b42b95 docs/ops/supply-chain.md
+manifest: 9b07800e0d5a65f485b8e47230810fde1ad07fb5 docs/ops/threat-model-maintain-cron.md

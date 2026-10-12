@@ -1,0 +1,243 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # Job chạy cổng thật của dự án. Required check trên ruleset vẫn là `gate` (job tổng hợp bên dưới) + `metadata`.
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.x'
+      # Cài dependency TRƯỚC cổng: gate chạy lệnh thật của dự án (vd `npm test` → vitest trong devDependencies);
+      # runner sạch không có node_modules thì cổng đỏ ở bước đầu (phát hiện S-05 khi chạy khung trên dự án đích,
+      # 2026-10-09; TRAPS mục 57). Mỗi bước chỉ chạy khi có lockfile/manifest của stack đó (`hashFiles`) — template
+      # dùng được cho mọi stack mà không phải sửa tay; stack không có ở đây → cổng BLOCKED sẽ nói rõ, không đoán.
+      - name: Install Node dependencies (npm lockfile)
+        if: hashFiles('package-lock.json') != ''
+        run: npm ci
+      - name: Set up pnpm (pnpm lockfile)
+        if: hashFiles('pnpm-lock.yaml') != ''
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - name: Install Node dependencies (pnpm lockfile)
+        if: hashFiles('pnpm-lock.yaml') != ''
+        run: pnpm install --frozen-lockfile
+      - name: Install Node dependencies (yarn lockfile)
+        if: hashFiles('yarn.lock') != ''
+        run: corepack enable && yarn install --immutable
+      - name: Set up Bun (bun lockfile)
+        if: hashFiles('bun.lock', 'bun.lockb') != ''
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: Install dependencies (bun lockfile)
+        if: hashFiles('bun.lock', 'bun.lockb') != ''
+        run: bun install --frozen-lockfile
+      - name: Install Python dependencies (requirements.txt)
+        if: hashFiles('requirements.txt') != ''
+        run: python -m pip install -r requirements.txt
+      - name: Set up uv (uv lockfile)
+        if: hashFiles('uv.lock') != ''
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - name: Install Python dependencies (uv lockfile)
+        if: hashFiles('uv.lock') != ''
+        run: uv sync --frozen
+      - name: Install Python dependencies (poetry lockfile)
+        if: hashFiles('poetry.lock') != ''
+        run: pipx install poetry && poetry install --no-interaction
+      - name: Set up Go (go.mod)
+        if: hashFiles('go.mod') != ''
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+      - name: Set up Rust (Cargo.toml)
+        if: hashFiles('Cargo.toml') != ''
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1 (stable)
+      - name: Set up Java (pom.xml / build.gradle)
+        if: hashFiles('pom.xml', 'build.gradle', 'build.gradle.kts') != ''
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up .NET (csproj / sln / global.json)
+        if: hashFiles('**/*.csproj', '**/*.sln', 'global.json') != ''
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      - name: Restore .NET dependencies
+        if: hashFiles('**/*.csproj', '**/*.sln', 'global.json') != ''
+        run: dotnet restore
+      - name: Set up Ruby (Gemfile.lock)
+        if: hashFiles('Gemfile.lock') != ''
+        uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          bundler-cache: true
+      - name: Set up PHP (composer.lock)
+        if: hashFiles('composer.lock') != ''
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+      - name: Install PHP dependencies (composer.lock)
+        if: hashFiles('composer.lock') != ''
+        run: composer install --no-interaction --prefer-dist
+      - name: Set up Dart (pubspec.lock)
+        if: hashFiles('pubspec.lock') != ''
+        uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
+      - name: Install Dart dependencies (pubspec.lock)
+        if: hashFiles('pubspec.lock') != ''
+        run: dart pub get
+      - name: Set up Elixir/OTP from .tool-versions (mix.lock)
+        if: hashFiles('mix.lock') != '' && hashFiles('.tool-versions') != ''
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          version-type: strict
+          version-file: .tool-versions
+      - name: Set up Elixir/OTP default versions (mix.lock, no .tool-versions)
+        if: hashFiles('mix.lock') != '' && hashFiles('.tool-versions') == ''
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          elixir-version: '1.17'
+          otp-version: '27'
+      - name: Install Elixir dependencies (mix.lock)
+        if: hashFiles('mix.lock') != ''
+        run: mix deps.get
+      - name: Set up Deno (deno.json)
+        if: hashFiles('deno.json', 'deno.jsonc') != ''
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+      - name: Set up Swift (Package.swift)
+        if: hashFiles('Package.swift') != ''
+        uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a # v2.4.0
+      - name: Check target commands and installed runtimes
+        run: bash scripts/dev-task.sh doctor
+      - name: Run reviewed build, typecheck, lint and test commands
+        run: bash scripts/dev-task.sh gate
+      # Spec-Anchored (đối chiếu SDD 2026-10-10): spec Approved trong docs/specs/ phải còn trỏ tới file touchpoint và bằng
+      # chứng AC có thật (contract C-1..C-4 do scripts/spec-compiler.sh sinh). Engine đã phát sang đích từ 2026-09-13 nhưng
+      # không job nào gọi → chết im lặng (TRAPS mục 11/25). Chưa có spec: compile in thông báo, không có test → bỏ qua.
+      - name: Spec contracts (docs/specs Approved → C-1..C-4)
+        run: bash scripts/spec-compiler.sh --compile-all && { ! ls tests/contracts/test_contract_*.py >/dev/null 2>&1 || python3 -m unittest discover -s tests/contracts; }
+
+  # Bảo vệ nhánh + setting repo phải CÓ HIỆU LỰC THẬT, không chỉ là lời hứa trong docs/ops/repository-settings.md
+  # (cùng khuôn job `protection-guard` của repo khung; audit 2026-10-09 F-A4/F-A9). Cần `.github/rulesets/main.json` ở đích
+  # (copy-framework đưa vào _framework-dropins/ → merge rồi import một lần: Settings → Rules → Rulesets → Import a ruleset).
+  protection-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Bảo vệ nhánh đã có hiệu lực chưa
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          rules=$(curl -sS --fail \
+            -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/rules/branches/$BRANCH")
+          echo "$rules" > "$RUNNER_TEMP/live-rules.json"
+          has_rule()  { jq -e --arg t "$1" 'map(select(.type == $t)) | length > 0' <<<"$rules" >/dev/null; }
+          has_check() { jq -e --arg c "$1" '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context] | index($c) != null' <<<"$rules" >/dev/null; }
+          fail=0
+          for t in pull_request required_status_checks deletion non_fast_forward; do
+            has_rule "$t" || { echo "::error::Thiếu rule '$t' trên $BRANCH"; fail=1; }
+          done
+          for c in $(jq -r '.rules[] | select(.type == "required_status_checks")
+                            | .parameters.required_status_checks[].context' .github/rulesets/main.json); do
+            has_check "$c" || { echo "::error::Status check '$c' chưa được bắt buộc trên $BRANCH"; fail=1; }
+          done
+          want_strict=$(jq -r '[.rules[] | select(.type == "required_status_checks")
+            | .parameters.strict_required_status_checks_policy] | unique | join(",")' .github/rulesets/main.json)
+          live_strict=$(jq -r '[.[] | select(.type == "required_status_checks")
+            | .parameters.strict_required_status_checks_policy] | unique | join(",")' <<<"$rules")
+          if [ "$want_strict" != "$live_strict" ]; then
+            echo "::error::strict_required_status_checks_policy trên $BRANCH là '$live_strict', file khai '$want_strict'. Import lại .github/rulesets/main.json."
+            fail=1
+          fi
+          if [ "$fail" = 1 ]; then
+            echo "::error::Bảo vệ nhánh CHƯA có hiệu lực. Import .github/rulesets/main.json: Settings → Rules → Rulesets → New ruleset → Import a ruleset. Chi tiết: docs/ops/repository-settings.md."
+            exit 1
+          fi
+          echo "OK — $BRANCH đang được bảo vệ; required status checks và strict policy khớp file."
+
+      - name: File và ruleset thật phải khớp (đối chiếu hai chiều)
+        run: |
+          set -euo pipefail
+          live=$(jq -r '[.[].type] | sort | unique | .[]' "$RUNNER_TEMP/live-rules.json")
+          want=$(jq -r '[.rules[].type] | sort | unique | .[]' .github/rulesets/main.json)
+          fail=0
+          for t in $want; do
+            grep -qx "$t" <<<"$live" || {
+              echo "::error::Rule '$t' có trong .github/rulesets/main.json nhưng KHÔNG áp trên nhánh mặc định."
+              echo "::error::Bảo vệ đang YẾU HƠN thứ repo khai. Bật lại trong Settings → Rules → Rulesets, hoặc bỏ khỏi file nếu đã cố ý không dùng."
+              fail=1; }
+          done
+          for t in $live; do
+            grep -qx "$t" <<<"$want" || {
+              echo "::warning::Rule '$t' đang áp trên nhánh mặc định nhưng KHÔNG có trong .github/rulesets/main.json."
+              echo "::warning::Không yếu đi, nhưng lần import lại từ file sẽ XOÁ MẤT nó. Thêm vào file cho khớp."; }
+          done
+          [ "$fail" = 0 ] || exit 1
+
+      - name: Setting repo cần cho PR flow (auto-merge, tự xoá nhánh)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          repo=$(curl -sS --fail -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO")
+          # Hai trường này chỉ trả về khi token có quyền đọc setting; null → không kết luận được, nói rõ thay vì đỏ oan.
+          if jq -e '.allow_auto_merge == null or .delete_branch_on_merge == null' <<<"$repo" >/dev/null; then
+            echo "::warning::Không đọc được allow_auto_merge/delete_branch_on_merge bằng GITHUB_TOKEN — tự kiểm tay: Settings → General → Pull Requests (docs/ops/repository-settings.md)."
+            exit 0
+          fi
+          jq -e '.allow_auto_merge == true and .delete_branch_on_merge == true' <<<"$repo" >/dev/null || {
+            echo "::error::Settings → General → Pull Requests → bật \"Allow auto-merge\" và \"Automatically delete head branches\" (docs/ops/repository-settings.md) — PR flow tự merge/tự dọn nhánh của khung cần cả hai."
+            exit 1
+          }
+          echo "OK — allow_auto_merge và delete_branch_on_merge đã bật."
+
+  # Job TỔNG HỢP: ruleset chỉ cần khoá MỘT tên `gate` (cùng ADR-0003 của repo khung). `if: always()` là bắt buộc —
+  # không có nó, `gate` bị SKIP khi một job cha đỏ, và GitHub coi required check "skipped" là ĐẠT (hỏng im lặng).
+  gate:
+    if: always()
+    needs: [checks, protection-guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Kết luận từ mọi job cổng
+        env:
+          # Sổ job ĐƯỢC PHÉP `skipped`, cách nhau bằng khoảng trắng; chỉ job có `if:` mới skip được và phải có lý do ở đây.
+          SKIP_ALLOWED: ""
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS_JSON"
+          bad=0
+          while IFS=$'\t' read -r jid result; do
+            case "$result" in
+              success) ;;
+              skipped)
+                case " $SKIP_ALLOWED " in
+                  *" $jid "*) echo "bỏ qua hợp lệ: $jid (có trong SKIP_ALLOWED)" ;;
+                  *) echo "::error::Job '$jid' bị BỎ QUA nhưng không có trong SKIP_ALLOWED — nếu đó là chủ ý thì thêm tên + lý do vào sổ, còn không thì \`if:\` của nó đang loại nhầm."; bad=1 ;;
+                esac
+                ;;
+              *) echo "::error::Job '$jid' kết thúc '$result'."; bad=1 ;;
+            esac
+          done < <(printf '%s' "$NEEDS_JSON" | jq -r 'to_entries[] | [.key, .value.result] | @tsv')
+          if [ "$bad" -eq 1 ]; then
+            echo "::error::Có job cổng KHÔNG thành công — xem danh sách trên. Không được merge."
+            exit 1
+          fi
+          echo "Tất cả job cổng đạt."

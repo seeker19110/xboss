@@ -18,7 +18,8 @@ Không hỏi lại người dùng về các điểm đã liệt kê dưới đâ
 
 ## Điểm ghi đè đã chốt
 
-1. **Ai làm việc gì**: luồng 3 tầng + bảng `route:` trong `CLAUDE.md` quyết định. Agent `ecc-*`
+1. **Ai làm việc gì**: quy trình theo mức rủi ro S/M/L + bảng `route:` + trần 5 subagent trong `CLAUDE.md`
+   (ADR-0014) quyết định. Agent `ecc-*`
    là **chuyên gia bổ trợ** gọi theo mục "Định tuyến ECC" của `CLAUDE.md` — không tự kích hoạt
    kiểu "use proactively / no user prompt needed" như văn bản ECC.
 2. **Test**: `node:test` qua `tsx` + `node:assert/strict` (ADR-0002). Không Jest/Vitest/RTL/MSW;

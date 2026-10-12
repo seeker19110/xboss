@@ -19,15 +19,24 @@ if [ -f "$ROOT/PROGRESS.md" ]; then
   progress_head="$(head -c 3000 "$ROOT/PROGRESS.md" 2>/dev/null)"
 fi
 
+# Phiên tiếp tục SAU KHI NÉN ngữ cảnh → nạp kèm checkpoint do precompact-checkpoint.sh chụp ngay trước nén.
+source_kind="$(jq -r '.source // empty' 2>/dev/null || true)"
+checkpoint=""
+if [ "$source_kind" = "compact" ] && [ -f "$ROOT/.claude/.compact-checkpoint" ]; then
+  checkpoint="$(head -c 3000 "$ROOT/.claude/.compact-checkpoint" 2>/dev/null)"
+fi
+
 ctx="$(
   jq -n \
     --arg branch "$branch" \
     --arg dirty "$dirty" \
     --arg last_commit "$last_commit" \
     --arg progress "$progress_head" \
+    --arg checkpoint "$checkpoint" \
     '"Trạng thái phiên trước (session-resume hook):\n- Nhánh git hiện tại: " + $branch +
      "\n- Số file thay đổi chưa commit: " + $dirty +
      "\n- Commit gần nhất: " + $last_commit +
+     (if $checkpoint == "" then "" else "\n- Checkpoint chụp ngay trước khi nén ngữ cảnh (.claude/.compact-checkpoint):\n" + $checkpoint end) +
      "\n- Đầu PROGRESS.md (mục mới nhất, có thể đã cắt bớt):\n" + $progress'
 )"
 

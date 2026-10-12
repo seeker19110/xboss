@@ -1,0 +1,45 @@
+name: CodeQL
+
+# SAST cho mã TypeScript/JavaScript của XBoss + chính các workflow Actions (ADR-0014, lấy từ
+# projects-template @ 59bd1d1). Repo public → code scanning miễn phí; kết quả lên tab Security →
+# Code scanning. Bộ query `security-extended`: chỉ lỗi bảo mật (bỏ bộ "quality" để không ngập cảnh
+# báo phong cách trên codebase lớn). Ngôn ngữ cố định (XBoss chỉ có TS/JS) thay cho bước dò qua API
+# của bản khung — bớt một job và một điểm có thể đỏ vì API.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * 1" # thứ Hai hằng tuần — bắt query mới của CodeQL trên mã cũ
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write # tải SARIF lên tab Security → Code scanning
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+      - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          category: "/language:${{ matrix.language }}"

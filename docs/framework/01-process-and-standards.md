@@ -1,16 +1,24 @@
 # KHUNG 1 — Quy trình & Tiêu chuẩn phát triển phần mềm
 
-> **File khung chung (master), tái sử dụng cho MỌI dự án.**
+> **File khung chung (master), tái sử dụng cho MỌI dự án — MỌI loại dự án.**
 > Đây là "cuốn sổ tay" định nghĩa: làm gì, theo trình tự nào, và đạt tiêu chuẩn gì ở mỗi giai đoạn.
 > Cặp đôi với **KHUNG 2** (luật AI + mẫu định nghĩa dự án). Từ hai khung này + yêu cầu một dự án cụ thể, ta sinh ra `PROJECT.md` và `CLAUDE.md` riêng cho dự án đó.
+
+> **Đọc trước — quy trình phổ quát, cổng theo hồ sơ:** 9 giai đoạn + cổng dưới đây áp cho **mọi loại dự án**
+> (web, mobile, desktop, backend/API, site tĩnh, CLI/thư viện, data/ML, game, blockchain, monorepo). Một số tiêu
+> chuẩn viết theo **hồ sơ Web app (mặc định)** — như **theme Dark blue + Light, Core Web Vitals/Lighthouse, RLS
+> Supabase, E2E Playwright trình duyệt, SEO/OG, PWA**. Với hồ sơ khác, **thay bằng cổng tương đương** của loại đó
+> (vd backend: contract API + p95 latency + integration test; CLI/thư viện: SemVer + golden test; data/ML: tái lập
+> + đánh giá mô hình). Bảng hồ sơ & cổng tương đương: **KHUNG-3 PHẦN A0 + PHẦN C**. **Dự án có sẵn (brownfield):**
+> chỉ tư vấn & nâng cấp trên stack hiện có — xem `existing-project-adoption.md`.
 
 ---
 
 ## Cách dùng khung này
 
 1. Khi bắt đầu một dự án mới, đọc khung này để nắm trình tự và tiêu chuẩn.
-2. Điền **Mẫu định nghĩa dự án** trong KHUNG 2 → tạo ra `PROJECT.md` của dự án.
-3. Tinh chỉnh `CLAUDE.md` cho dự án (dựa trên mẫu trong KHUNG 2 / file CLAUDE.md mẫu).
+2. Điền mẫu `PROJECT.md` ở gốc repo (quy trình ở KHUNG 2 Phần C) → ra `PROJECT.md` của dự án.
+3. Tinh chỉnh `CLAUDE.md` cho dự án (dựa trên `CLAUDE.md` mẫu của repo; quy trình ở KHUNG 2 Phần C).
 4. Đi qua từng giai đoạn dưới đây. **Không bỏ giai đoạn.** Mỗi giai đoạn có một "cổng" (gate) phải đạt mới được sang giai đoạn sau.
 
 ---
@@ -29,17 +37,17 @@
 
 ## Tổng quan 9 giai đoạn
 
-| GĐ  | Tên                    | Thời gian (solo) | Cổng để qua                                       |
-| --- | ---------------------- | ---------------- | ------------------------------------------------- |
-| 0   | Ý tưởng & Xác thực     | 3–7 ngày         | Có bằng chứng nhu cầu thật                        |
-| 1   | Lập kế hoạch & Phạm vi | 2–4 ngày         | MVP + tiêu chí chấp nhận + DoD rõ ràng            |
-| 2   | Thiết kế               | 3–7 ngày         | Schema CSDL + kiến trúc + API contract được duyệt |
-| 3   | Thiết lập môi trường   | 1–2 ngày         | Hàng rào tự động hoạt động, deploy thử OK         |
-| 4   | Phát triển             | 60–70% thời gian | Tính năng đạt tiêu chí chấp nhận                  |
-| 5   | Kiểm thử               | Đan xen GĐ 4     | Test xanh, qua các loại kiểm thử bắt buộc         |
-| 6   | Triển khai             | 1–2 ngày         | Cổng CI/CD đạt, backup & rollback sẵn sàng        |
-| 7   | Ra mắt                 | ~1 tuần          | Checklist pháp lý/SEO/onboarding đủ               |
-| 8   | Sau ra mắt             | Liên tục         | Quy trình giám sát & cải tiến vận hành            |
+| GĐ | Tên | Thời gian (solo) | Cổng để qua |
+|----|-----|------------------|-------------|
+| 0 | Ý tưởng & Xác thực | 3–7 ngày | Có bằng chứng nhu cầu thật |
+| 1 | Lập kế hoạch & Phạm vi | 2–4 ngày | MVP + tiêu chí chấp nhận + DoD rõ ràng |
+| 2 | Thiết kế | 3–7 ngày | Schema CSDL + kiến trúc + API contract được duyệt |
+| 3 | Thiết lập môi trường | 1–2 ngày | Hàng rào tự động hoạt động, deploy thử OK |
+| 4 | Phát triển | 60–70% thời gian | Tính năng đạt tiêu chí chấp nhận |
+| 5 | Kiểm thử | Đan xen GĐ 4 | Test xanh, qua các loại kiểm thử bắt buộc |
+| 6 | Triển khai | 1–2 ngày | Cổng CI/CD đạt, backup & rollback sẵn sàng |
+| 7 | Ra mắt | ~1 tuần | Checklist pháp lý/SEO/onboarding đủ |
+| 8 | Sau ra mắt | Liên tục | Quy trình giám sát & cải tiến vận hành |
 
 ---
 
@@ -48,7 +56,6 @@
 **Mục tiêu:** Chắc chắn vấn đề có thật và có người cần, trước khi viết dòng code nào.
 
 **Việc cần làm:**
-
 - [ ] Phát biểu vấn đề trong 1–2 câu rõ ràng (ai, khi nào, đau ở đâu).
 - [ ] Xác định người dùng mục tiêu cụ thể (không "mọi người").
 - [ ] Phân tích đối thủ có dẫn chứng: họ thiếu gì, mình khác ở đâu.
@@ -67,17 +74,15 @@
 **Mục tiêu:** Định nghĩa MVP nhỏ nhất nhưng đủ dùng.
 
 **Việc cần làm:**
-
 - [ ] Liệt kê mọi tính năng, rồi phân loại **MoSCoW** (Must / Should / Could / Won't).
 - [ ] Viết **tiêu chí chấp nhận** đo được cho từng tính năng Must (thế nào là "đúng").
-- [ ] Viết user story: _"Là [ai], tôi muốn [làm gì] để [mục đích gì]."_
+- [ ] Viết user story: *"Là [ai], tôi muốn [làm gì] để [mục đích gì]."*
 - [ ] Vẽ luồng người dùng chính (user flow).
 - [ ] Liệt kê **yêu cầu phi chức năng**: tốc độ mục tiêu, mức bảo mật, accessibility, thiết bị hỗ trợ.
 - [ ] Chốt tech stack **theo KHUNG 3** (nghiên cứu, cân bằng phổ biến ↔ năng lực, **phiên bản ổn định đã xác minh**, ghi ADR).
 - [ ] **Đóng băng phạm vi MVP** — ý tưởng mới đi vào danh sách chờ.
 
 **Định nghĩa "Done" (DoD) — một tính năng chỉ XONG khi:**
-
 - Chạy đúng tiêu chí chấp nhận.
 - Qua lint, format, type-check, build.
 - Có test cho logic quan trọng và test xanh.
@@ -87,7 +92,14 @@
 - Đã tự review diff một lượt.
 - Đã merge vào nhánh chính và deploy thử OK.
 
-**Cổng:** Mọi tính năng MVP có tiêu chí chấp nhận; DoD được chốt.
+**Định nghĩa "Ready" (DoR) — đối trọng của DoD: một task chỉ BẮT ĐẦU khi** (chi tiết: `quality-supplements.md` Nhóm 1 mục 7):
+- Có tiêu chí chấp nhận rõ ràng, đo được.
+- Không còn câu hỏi mở quan trọng nào.
+- Đã xác định các phần phụ thuộc (cần gì xong trước).
+- Thiết kế/luồng đủ rõ để bắt tay (hoặc đã có wireframe nếu là UI).
+- Phạm vi đủ nhỏ để gói gọn trong một PR.
+
+**Cổng:** Mọi tính năng MVP có tiêu chí chấp nhận; DoD + DoR được chốt.
 
 **Đầu ra:** Danh sách MVP ưu tiên + tiêu chí chấp nhận + DoD + lịch trình.
 
@@ -98,7 +110,6 @@
 **Mục tiêu:** Hình dung sản phẩm trước khi xây.
 
 **Cơ sở dữ liệu (khó sửa nhất — làm kỹ):**
-
 - [ ] Chuẩn hóa hợp lý; phi chuẩn hóa có chủ đích nếu cần tốc độ.
 - [ ] Ràng buộc đầy đủ: `NOT NULL`, `UNIQUE`, kiểu chặt, khóa ngoại + hành vi `ON DELETE`.
 - [ ] Index cho cột hay lọc/sắp xếp/join.
@@ -106,16 +117,14 @@
 - [ ] Thời gian dùng UTC; tiền tệ tránh số thực (float).
 
 **Kiến trúc & API:**
-
 - [ ] "Hợp đồng API" rõ: đầu vào, đầu ra, mã lỗi cho mỗi endpoint.
 - [ ] Phân định rạch ròi client vs server; logic nhạy cảm luôn ở server.
 - [ ] Mô hình mối đe dọa đơn giản: ai tấn công ở đâu (lạm dụng input, vượt quyền, lộ dữ liệu).
 
 **Giao diện:**
-
 - [ ] Design tokens nhất quán (màu, khoảng cách, font) — không "màu tùy hứng".
-- [ ] **Theme: nền Dark blue mặc định + chế độ Light** (xem `BO-SUNG-chat-luong.md` PHẦN 3).
-- [ ] Mobile-first; responsive (checklist cụ thể: `docs/audit.md` §5 — UI/UX & Accessibility).
+- [ ] **Theme: nền Dark blue mặc định + chế độ Light** (xem `quality-supplements.md` PHẦN 3).
+- [ ] Mobile-first; responsive (checklist cụ thể: `quality-supplements.md` Nhóm 2 mục 1).
 - [ ] Tương phản màu đạt WCAG AA **ở cả hai chế độ nền**.
 
 **Cổng:** Schema + kiến trúc + API contract được phản biện và duyệt.
@@ -129,7 +138,6 @@
 **Mục tiêu:** Dựng sẵn "hàng rào tự động" TRƯỚC khi viết code nghiệp vụ. (Cấu hình cụ thể: xem file hướng dẫn pre-commit + CI.)
 
 **Bắt buộc:**
-
 - [ ] TypeScript `strict` toàn phần.
 - [ ] ESLint (nghiêm) + Prettier.
 - [ ] **Pre-commit hooks** (Husky + lint-staged): chặn commit nếu lint/format/type-check fail.
@@ -151,21 +159,23 @@
 
 **Trình tự:** CSDL → xác thực người dùng → tính năng lõi (theo ưu tiên) → giao diện → xử lý lỗi/biên.
 
-**Tiêu chuẩn code:**
+> **Tùy chọn — thay đổi vừa/lớn (không gói trong một PR nhỏ, kéo dài nhiều phiên):** dùng lớp spec
+> cấp từng thay đổi (proposal → spec → design → tasks lưu trong Git) trước khi code — xem
+> `spec-driven-openspec.md`. Cổng commit/merge của khung vẫn bắt buộc như thường.
 
+**Tiêu chuẩn code:**
 - [ ] Không bỏ qua cảnh báo nào của linter/type-checker.
 - [ ] Mọi đầu vào người dùng/API được validate (ví dụ Zod) trước khi dùng.
 - [ ] Mọi thao tác có thể fail đều có nhánh xử lý lỗi.
 - [ ] Không "số/chuỗi ma thuật"; hàm nhỏ làm một việc; tên tự giải thích; không lặp logic.
+- [ ] Trước khi đóng một mảng lớn: rà **checklist tối ưu mã nguồn** — gỡ dead code, giảm trùng lặp/độ phức tạp, tỉa dependency, thu nhỏ bundle (Nhóm 2 mục 9). Refactor không đổi hành vi, đi PR riêng.
 
 **Bảo mật khi code:**
-
 - [ ] Truy vấn tham số hóa (chống SQL injection).
 - [ ] Escape dữ liệu hiển thị ra HTML (chống XSS).
 - [ ] Kiểm tra quyền phía server cho mọi thao tác nhạy cảm.
 
 **Git:**
-
 - [ ] Mỗi tính năng/sửa lỗi một nhánh riêng.
 - [ ] Commit nhỏ; dùng **conventional commits** (`feat`, `fix`, `refactor`, `docs`...).
 - [ ] Mọi merge vào nhánh chính qua PR (kể cả làm một mình — để tự review).
@@ -183,7 +193,6 @@
 **Kim tự tháp kiểm thử:** nhiều unit test → ít hơn integration test → ít e2e cho luồng quan trọng nhất. Ưu tiên phủ **đường đi quan trọng + trường hợp biên**, không chạy theo con số phần trăm máy móc.
 
 **Loại kiểm thử bắt buộc:**
-
 - [ ] Trường hợp biên: ô trống, dữ liệu cực dài, số âm, ký tự lạ, nhấn nút liên tục, mất mạng giữa chừng.
 - [ ] Bảo mật cơ bản: thử truy cập dữ liệu người khác, thử vượt kiểm tra phía client.
 - [ ] Accessibility: điều hướng bằng bàn phím, trình đọc màn hình, tương phản; **tự động** bằng `jsx-a11y` + axe (Nhóm 2 mục 3).
@@ -203,13 +212,11 @@
 **Mục tiêu:** Đưa lên production an toàn.
 
 **Cổng chất lượng CI/CD (phải đạt trước khi lên production):**
-
 - [ ] Toàn bộ test xanh (gồm **E2E Playwright**), build OK, không lỗi type/lint.
 - [ ] **Lighthouse CI xanh** — ngân sách hiệu năng (Performance/A11y/Best-Practices/SEO ≥ 90; CWV trong ngưỡng) là **cổng tự động** trên PR (xem `lighthouserc.json` + Nhóm 2 mục 2).
 - [ ] Audit bảo mật: không còn lỗ hổng nghiêm trọng.
 
 **Vận hành:**
-
 - [ ] Migration CSDL có phiên bản, chạy được và **rollback được**.
 - [ ] Row Level Security đã bật và đã test trước khi mở cho người ngoài.
 - [ ] Giám sát + theo dõi lỗi (Sentry) + cảnh báo đã hoạt động.
@@ -228,7 +235,6 @@
 **Mục tiêu:** Đưa sản phẩm đến người dùng thật và bắt đầu thu phản hồi.
 
 **Checklist trước khi công khai:**
-
 - [ ] Pháp lý: privacy policy + terms (đặc biệt nếu thu thập dữ liệu).
 - [ ] SEO cơ bản: meta, title, Open Graph, sitemap, robots.txt.
 - [ ] Analytics đã cài.
@@ -250,11 +256,11 @@
 **Mục tiêu:** Cải tiến liên tục dựa trên dữ liệu thật.
 
 **Vận hành liên tục:**
-
 - [ ] Quy trình xử lý sự cố (incident response) rõ ràng.
 - [ ] Giám sát liên tục: lỗi, tốc độ, thời gian phản hồi.
 - [ ] Cập nhật phụ thuộc đều đặn (Dependabot) — vá bảo mật kịp thời.
 - [ ] Theo dõi nợ kỹ thuật: ghi lại chỗ "làm tạm" để quay lại dọn.
+- [ ] **Tối ưu mã nguồn định kỳ:** rà & hạ dần dead code, trùng lặp/độ phức tạp, dependency thừa, bundle (Nhóm 2 mục 9) — "đụng đâu dọn đó", refactor không đổi hành vi, có test bảo vệ.
 - [ ] Mọi cải tiến lại đi qua đúng quy trình: kế hoạch → code → test → cổng chất lượng → ra mắt.
 
 **Đầu ra:** Một sản phẩm sống, cải tiến không ngừng.

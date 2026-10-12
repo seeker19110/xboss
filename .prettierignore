@@ -4,6 +4,9 @@ out
 build
 coverage
 _framework-dropins
+# Tài liệu khung vendor nguyên văn từ seeker19110/projects-template (ADR-0014): giữ đúng byte để
+# copy-framework.sh --upgrade so hash với docs/framework/FRAMEWORK-VERSION và merge 3 chiều sạch.
+docs/framework/
 package-lock.json
 data/uploads
 *.tar.gz
