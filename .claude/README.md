@@ -12,14 +12,14 @@ Nguồn sự thật về CÁCH DÙNG là `CLAUDE.md` (quy trình theo mức rủ
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | `agents/`   | `coordinator`, `complex-implementer`, `spec-executor`, `standard-worker`, `mechanical-worker`, `reviewer`, `maintainer`, `audit-{bao-mat,logic,ui}`, `version-check` | 24 × `ecc-*` (chuyên gia bổ trợ)                                       |
 | `skills/`   | `gate`, `hoc`, `ecc`                                                                                                                                       | 56 × `ecc-*`                                                           |
-| `commands/` | `review`, `maintain`, `debug`, `incident`, `deps-upgrade`, `grill`, `contract` (5 lệnh sau lấy từ khung, ADR-0014)                                            | 19 × `ecc-*`                                                           |
+| `commands/` | `review`, `maintain`, `debug`, `incident`, `deps-upgrade`, `grill`, `contract` (5 lệnh sau lấy từ khung, ADR-0014), `auto-complete` (port từ khung, ADR-0015)                                            | 19 × `ecc-*`                                                           |
 | `rules/`    | `00-uu-tien-ecc.md` (XBoss thắng khi mâu thuẫn), `xboss/*` (theo `paths`)                                                                                  | `ecc/{common,typescript,web,react}`                                    |
-| `hooks/`    | `session-resume`, `block-dangerous-git`, `pre-commit-gate`, `pre-push-gate`, `protect-config`, `risk-zone-gate` (+ `risk-zones.txt`), `stop-static-checks`, `precompact-checkpoint` | không vendor mã hook ECC — hành vi được viết lại ở cột trái            |
+| `hooks/`    | `session-resume`, `block-dangerous-git`, `pre-commit-gate`, `pre-push-gate`, `protect-config`, `risk-zone-gate` (+ `risk-zones.txt`), `stop-static-checks`, `precompact-checkpoint`, `auto-complete-guard` | không vendor mã hook ECC — hành vi được viết lại ở cột trái            |
 | `ecc/`      | —                                                                                                                                                          | `manifest.json` (nguồn sự thật), `lock.json` (sha256), `LICENSE` (MIT) |
 
 - File `ecc-*` và `rules/ecc/**` **không sửa tay** (hook `protect-config.sh` chặn, `tests/ecc-vendor.test.ts` so sha256) — sửa manifest rồi `npm run ecc:vendor -- --src <checkout ECC>`, xem skill `/ecc`.
 - Hook có test tại `tests/claude-hooks.test.ts`; bỏ qua có chủ đích bằng biến env trong `.claude/settings.local.json` (`XBOSS_ALLOW_PROTECTED_EDIT`, `XBOSS_SKIP_RISK_GATE`, `SKIP_PREPUSH_GATE`, `SKIP_STOP_CHECKS`, `SKIP_PRECOMMIT_GATE`, `ALLOW_DANGEROUS_GIT`).
-- `.gitignore` chỉ bỏ qua phần cục bộ (`.claude/worktrees/`, `.claude/settings.local.json`); prettier bỏ qua cả `.claude/` (ADR-0012) — lớp vendor được khoá bằng sha256 thay vì format.
+- `.gitignore` chỉ bỏ qua phần cục bộ (`.claude/worktrees/`, `.claude/settings.local.json`, trạng thái phiên `.claude/.compact-checkpoint`/`.auto-complete-loop`/`.gate-red-streak`); prettier bỏ qua cả `.claude/` (ADR-0012) — lớp vendor được khoá bằng sha256 thay vì format.
 
 ## 1. Ý tưởng
 

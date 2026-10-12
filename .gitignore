@@ -53,6 +53,9 @@ _framework-dropins/
 *.framework-base
 # Checkpoint trước khi nén ngữ cảnh (hook precompact-checkpoint.sh) — trạng thái cục bộ của phiên
 .claude/.compact-checkpoint
+# Vòng /auto-complete (ADR-0015): marker bật vòng + chuỗi đỏ của pre-commit-gate — trạng thái cục bộ của phiên
+.claude/.auto-complete-loop
+.claude/.gate-red-streak
 
 # Tarball backup nặng — không commit
 xboss.tar.gz

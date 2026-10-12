@@ -21,6 +21,7 @@ merge 3 chiều, không định dạng lại (đã loại khỏi prettier) và c
 | `scripts/dev-task.sh gate`                                         | `npm run gate` (+ `-- --test --build`), skill `/gate`                            |
 | `docs/work/<id>/working.md`, `new-work.sh`, `docs/goals/`          | `PROGRESS.md` + `PLAN.md` + `docs/nang-cap/`                                     |
 | `/audit-full`, `/completion`, `/audit-optimize`                    | `/review`, agent `audit-*`, `docs/audit.md`, lộ trình `docs/ops/lo-trinh-*`      |
+| `/auto-complete` (`/auto` + `/completion`), `docs/work/<id>/working.md` của lượt | `/auto-complete` bản XBoss — hồ sơ `docs/nang-cap/auto/<ngày>-<slug>.md` (ADR-0015) |
 | `vitest`, `ci-workflow-policy.test.ts`                             | `node:test` qua `tsx` (ADR-0002)                                                 |
 | `subagent-dispatch.sh --tier`                                      | Bảng `route:` trong `CLAUDE.md`                                                  |
 
@@ -34,6 +35,7 @@ merge 3 chiều, không định dạng lại (đã loại khỏi prettier) và c
 | Hook `precompact-checkpoint` (PreCompact) + `session-resume` nạp lại sau nén | Bỏ phần telemetry; test ở `tests/claude-hooks.test.ts`                                        |
 | Lệnh `/debug`, `/incident`, `/deps-upgrade`, `/grill`, `/contract`         | Thêm ghi chú tham chiếu; `/contract` viết lại bước 2/4 theo `docs/nang-cap` + migration append-only |
 | Agent `version-check` (Haiku, chỉ tra phiên bản từ nguồn sống)             | Bỏ tham chiếu `KHUNG-3`                                                                          |
+| Lệnh `/auto-complete` + hook Stop `auto-complete-guard` (2026-10-12, sau #632) | **Port**, không nguyên văn (ADR-0015): nối chuỗi `/auto` + `/completion` trên artifact XBoss; hồ sơ `docs/nang-cap/auto/`; guard đọc đường dẫn hồ sơ từ marker, dừng ở `Done` thay cho rename `done.md`; `pre-commit-gate` ghi `.gate-red-streak`. Tự quyết toàn bộ (kể cả đặc tả M/L) theo lựa chọn của chủ repo |
 
 Lần lấy trước (2026-09-21): hook `block-dangerous-git`/`pre-commit-gate`/`session-resume`, `TRAPS.md`,
 `CODEMAP.md`, `/review`, `/maintain`, agent `maintainer`, `scripts/maintenance-sweep.sh` — đã tuỳ biến
@@ -43,9 +45,9 @@ sâu, `--upgrade` để bản khung mới cạnh bên (`.framework-new`) chứ k
 
 | Thành phần khung                                                                                  | Lý do                                                                                    |
 | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `/auto`, `/auto-complete`, `/completion`, `/audit-full`, `/audit-optimize`, `/bootstrap`, `/consult`, `/ui-ux`, `/adr`, `/gate` | Dựa vào `dev-task.sh`, `docs/work/`, hook `auto-complete-guard` hay mẫu greenfield; `/gate` trùng skill `gate` của XBoss; `/adr` trùng `ecc-architecture-decision-records` |
+| `/auto`, `/completion` (chuỗi đã gộp vào `/auto-complete` bản XBoss), `/audit-full`, `/audit-optimize`, `/bootstrap`, `/consult`, `/ui-ux`, `/adr`, `/gate` | Dựa vào `dev-task.sh`, `docs/work/` hay mẫu greenfield; `/gate` trùng skill `gate` của XBoss; `/adr` trùng `ecc-architecture-decision-records` |
 | Agent `lookup`, `security-reviewer`, `tester`                                                     | Trùng `ecc-code-explorer`, `audit-bao-mat`/`ecc-security-reviewer`, `ecc-pr-test-analyzer`/`ecc-e2e-runner` |
-| Hook `auto-format`, `usage-guard`, `telemetry-record`, `ui-intelligence`, `session-guide`, `auto-complete-guard` | husky + lint-staged đã format; XBoss không đo telemetry/quota; `session-guide` chỉ nhắc model |
+| Hook `auto-format`, `usage-guard`, `telemetry-record`, `ui-intelligence`, `session-guide` | husky + lint-staged đã format; XBoss không đo telemetry/quota; `session-guide` chỉ nhắc model |
 | `scripts/dev-task.sh`, `new-work.sh`, engine Python (`spec-compiler`, `arch-health-radar`, `subagent-dispatch`, `telemetry-log`, `delivery-handoff`), bộ test shell | XBoss đã có `npm run gate` + 17 cổng CI TS; thêm Python vào chuỗi công cụ không đáng |
 | `.mcp.json`, `GEMINI.md`, `AGENTS.md` mới, `.clinerules`, `.windsurfrules`, `.cursor/`, `.codex/`, `copilot-instructions.md` | XBoss chỉ dùng Claude Code (phiên cloud) |
 | `docs/ops/*` mới (`repository-settings`, `supply-chain`, `release-readiness`, prompt audit, `threat-model-maintain-cron`) | Mô tả job/cron của chính repo khung; `docs/ops/` của XBoss là vận hành production thật |
