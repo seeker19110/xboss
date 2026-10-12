@@ -6,9 +6,9 @@
   `evaluateSuppliers` + gỡ fixme axe cuối (#637). CI `main` `c61edc6` xanh; `npm audit --omit=dev` = 0.
 - Clone sạch @ `c61edc6`: `npm ci` + build OK; `npm test -- --release-gate` trên DB mới 5029 pass, chỉ 3 file
   DR/restore/migration-boundary đỏ do thiếu biến chỉ CI có.
-- **Còn chờ chủ repo:** W-003 (F-009) chính sách SoD khi đánh dấu IPC "đã chi" — hồ sơ
-  `docs/nang-cap/auto/2026-10-12-hoan-thien-no-code.md`. Đề xuất phát hành: GO có điều kiện (0165/0166 qua staging
-  như đã ghi).
+- W-003 (F-009) đóng: chủ repo chọn **giữ luật M129** (SoD đánh dấu chi chỉ so người quyết bước cuối) —
+  hồ sơ `docs/nang-cap/auto/2026-10-12-hoan-thien-no-code.md` (`Done`). Đề xuất phát hành: GO có điều kiện
+  (0165/0166 qua staging như đã ghi).
 
 ## 2026-10-12 — Audit hội tụ lượt `/auto-complete`: sửa 3 mục Thấp, ghi nhận phần còn lại
 
@@ -50,8 +50,9 @@
   tổ chức. Tách theo org cần cấu hình production mới (không tự quyết).
 - **F-013 — `attendance` thiếu UNIQUE chấm gộp/từng người:** hoãn. Dữ liệu production có thể đã trùng, nên
   migration có thể hỏng hoặc phải gộp/xoá dữ liệu thật. Cần đo trên staging trước.
-- **F-009 — SoD đánh dấu chi chỉ so người quyết bước cuối:** **chờ chủ repo**. Mở rộng tới mọi người duyệt
-  và người lập IPC có thể khoá luồng chi của đội nhỏ (chỉ Admin/PM được đánh dấu chi).
+- **F-009 — SoD đánh dấu chi chỉ so người quyết bước cuối:** **chấp nhận** — chủ repo chọn giữ luật M129
+  (2026-10-12). Mở rộng tới mọi người duyệt và người lập IPC có thể khoá luồng chi của đội nhỏ (chỉ Admin/PM được
+  đánh dấu chi). Xét lại nếu đội có đủ người để tách lập/duyệt/chi.
 
 ## 2026-10-12 — M134: vô hiệu hoá tài khoản (thay cho xoá khi còn dữ liệu kiểm toán)
 
