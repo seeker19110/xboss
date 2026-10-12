@@ -19,7 +19,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # Action đòi bật Dependency graph (Settings → Code security). Chưa bật thì API compare trả 404, action
+      # báo "Dependency review is not supported" và đỏ ở MỌI PR dù PR không đổi dependency — cổng tự
+      # deadlock. Dò trước bằng đúng API đó: 404/"dependency graph" → cảnh báo rõ + bỏ qua; bật rồi → action
+      # chạy và chặn thật. Lỗi API khác (mạng, 403, 5xx) KHÔNG bị nuốt: để action tự chạy và tự báo.
+      - name: Kiểm tra Dependency graph đã bật
+        id: probe
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          out="$(gh api "repos/$REPO/dependency-graph/compare/$BASE_SHA...$HEAD_SHA" 2>&1 >/dev/null)" || true
+          if grep -qiE "HTTP 404|dependency graph|not supported" <<<"$out"; then
+            echo "::warning title=Dependency review bị bỏ qua::Repo chưa bật Dependency graph — bật ở https://github.com/$REPO/settings/security_analysis để cổng này chặn thật."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.probe.outputs.enabled == 'true'
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        if: steps.probe.outputs.enabled == 'true'
         with:
           fail-on-severity: high
