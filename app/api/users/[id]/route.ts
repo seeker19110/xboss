@@ -49,7 +49,8 @@ export async function PATCH(
     const haCapAdminCuoi = await withTransaction(async () => {
       const soAdmin = role !== "admin" ? await khoaVaDemAdminHoatDong(me.orgId) : 0;
       const t = await queryOne<{ role: Role; disabledAt: Date | null }>(
-        `SELECT role, disabled_at AS "disabledAt" FROM users WHERE id = ? AND org_id = ? FOR UPDATE`,
+        `SELECT role, disabled_at AS "disabledAt" FROM users
+          WHERE id = ? AND org_id = ? FOR NO KEY UPDATE`,
         id,
         me.orgId,
       );

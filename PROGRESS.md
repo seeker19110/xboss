@@ -15,8 +15,12 @@
   nhận báo cáo, cảnh báo health-check, khôi phục offline bỏ qua user bị khoá. Hàm thuần `taiKhoanBiKhoa` ở
   `lib/nen/trang-thai-tai-khoan.ts`. `/users`: nút vô hiệu
   hoá/kích hoạt lại và nhãn "Đã vô hiệu hoá"; 409 khi xoá gợi ý vô hiệu hoá.
-- **Test:** `tests/m134-vo-hieu-hoa-tai-khoan.test.ts` 13 ca qua route thật (AC1 đỏ trên code cũ: token còn hợp lệ
-  nhưng `disabled_at` khác NULL vẫn được nhận; ca đồng thời "tự hạ cấp + khoá Admin kia" đỏ khi bỏ `FOR UPDATE`).
+- **Sau audit hội tụ:** khoá dòng Admin đổi `FOR UPDATE` → `FOR NO KEY UPDATE` (mức cũ xung đột khoá KEY SHARE của
+  FK — transaction khác đang ghi dòng tham chiếu Admin làm guard treo tới statement_timeout/deadlock, đã tái hiện);
+  mở khoá cũng tăng `session_version` (cookie lỡ đúc trong lúc khoá không sống lại).
+- **Test:** `tests/m134-vo-hieu-hoa-tai-khoan.test.ts` 16 ca qua route thật (AC1 đỏ trên code cũ: token còn hợp lệ
+  nhưng `disabled_at` khác NULL vẫn được nhận; ca đồng thời "tự hạ cấp + khoá Admin kia" đỏ khi bỏ khoá dòng; ca "khoá FK đang mở" và "mở khoá đúc lại token" đỏ trên bản trước; người nhận báo cáo bỏ
+  user bị khoá).
 - **Không làm (non-goal):** ẩn user bị khoá khỏi danh sách chọn người; thu hồi API key do user tạo.
 - Đặc tả `docs/nang-cap/M134-vo-hieu-hoa-tai-khoan.md` (tự duyệt trong lượt `/auto-complete`, ADR-0015).
 

@@ -6,12 +6,14 @@ import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import { generate } from "otplib";
+import { Client } from "pg";
 import { insertId, queryOne, run } from "@/lib/db";
 import { getCurrentUser, hashPassword, makeTotpPendingToken, COOKIE } from "@/lib/bao-mat/auth";
 import { taiKhoanBiKhoa } from "@/lib/nen/trang-thai-tai-khoan";
 import { encryptTotpSecret, generateNewTotpSecret } from "@/lib/bao-mat/totp";
 import { upsertSsoUser } from "@/lib/bao-mat/oidc";
 import { datKhoaTaiKhoan } from "@/lib/bao-mat/tai-khoan";
+import { reportRecipients } from "@/lib/tien-do/report";
 import { PATCH, DELETE } from "@/app/api/users/[id]/route";
 import { POST as LOGIN } from "@/app/api/auth/login/route";
 import { POST as LOGIN_2FA } from "@/app/api/auth/login/2fa/route";
@@ -22,6 +24,7 @@ const pfx = `m134-${Date.now().toString(36)}`;
 let seq = 0;
 const orgs: number[] = [];
 const users: number[] = [];
+const projects: number[] = [];
 
 type U = { id: number; passwordHash: string; orgId: number; email: string };
 
@@ -82,6 +85,10 @@ function login(email: string, password: string) {
 after(async () => {
   if (!HAS_TEST_DB) return;
   dangXuat();
+  for (const id of projects) {
+    await run(`DELETE FROM user_projects WHERE project_id = ?`, id);
+    await run(`DELETE FROM projects WHERE id = ?`, id);
+  }
   for (const id of users) {
     await run(`DELETE FROM push_subscriptions WHERE user_id = ?`, id);
     await run(`DELETE FROM totp_recovery_codes WHERE user_id = ?`, id);
@@ -336,3 +343,74 @@ test(
     assert.equal(await soAdminHoatDong(org), 1);
   },
 );
+
+test(
+  "FR1: mở khoá tăng session_version — token đúc trong lúc bị khoá không sống lại",
+  S,
+  async () => {
+    const org = await taoOrg();
+    const admin = await taoUser(org, "admin");
+    const u = await taoUser(org, "engineer");
+    assert.equal((await patch(admin, u.id, { disabled: true })).status, 200);
+    // Token mang session_version SAU khi khoá (vd route đổi mật khẩu đã qua getCurrentUser trước lúc
+    // khoá rồi đọc lại phiên bản mới để đúc cookie).
+    const phienTrongLucKhoa = await phienCua(u);
+    assert.equal((await patch(admin, u.id, { disabled: false })).status, 200);
+    dangNhap(phienTrongLucKhoa);
+    assert.equal(await requestRieng(() => getCurrentUser()), null);
+  },
+);
+
+test(
+  "FR4: khoá tài khoản không bị treo khi transaction khác đang tham chiếu FK tới Admin",
+  S,
+  async () => {
+    const org = await taoOrg();
+    const admin = await taoUser(org, "admin");
+    const admin2 = await taoUser(org, "admin");
+    const u = await taoUser(org, "engineer");
+    // Phiên khác đang ghi dòng tham chiếu Admin2 (FK giữ khoá KEY SHARE trên dòng users đó) và chưa commit.
+    const khac = new Client({ connectionString: process.env.DATABASE_URL });
+    await khac.connect();
+    try {
+      await khac.query("BEGIN");
+      await khac.query(
+        `INSERT INTO notifications (user_id, type, message) VALUES ($1, 'comment', 'm134 khoá FK')`,
+        [admin2.id],
+      );
+      let hen: NodeJS.Timeout | undefined;
+      const quaHan = new Promise<"treo">((ok) => {
+        hen = setTimeout(() => ok("treo"), 5000);
+      });
+      const kq = await Promise.race([patch(admin, u.id, { disabled: true }), quaHan]);
+      clearTimeout(hen);
+      assert.notEqual(kq, "treo", "khoá tài khoản bị treo sau khoá FK của transaction khác");
+      assert.equal((kq as Response).status, 200);
+    } finally {
+      await khac.query("ROLLBACK").catch(() => undefined);
+      await khac.end();
+    }
+  },
+);
+
+test("người nhận báo cáo ngày/tuần bỏ Admin/PM bị vô hiệu hoá", S, async () => {
+  const org = await taoOrg();
+  const admin = await taoUser(org, "admin");
+  const adminKhoa = await taoUser(org, "admin");
+  const pm = await taoUser(org, "pm");
+  const pmKhoa = await taoUser(org, "pm");
+  const duAn = await insertId(
+    `INSERT INTO projects (name, org_id) VALUES (?, ?)`,
+    `${pfx} dự án`,
+    org,
+  );
+  projects.push(duAn);
+  for (const p of [pm, pmKhoa])
+    await run(`INSERT INTO user_projects (user_id, project_id) VALUES (?, ?)`, p.id, duAn);
+  await run(`UPDATE users SET disabled_at = now() WHERE id IN (?, ?)`, adminKhoa.id, pmKhoa.id);
+  const ids = (await reportRecipients(duAn)).map((r) => r.id).sort((a, b) => a - b);
+  assert.deepEqual(
+    ids,
+    [admin.id, pm.id].sort((a, b) => a - b),
+  );
+});
