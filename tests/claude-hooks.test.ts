@@ -51,9 +51,17 @@ function dungRepo(): string {
   return r;
 }
 
-function chay(hook: string, repo: string, input: unknown, env: Record<string, string> = {}) {
+/** `cwd`: hook lấy gốc từ `git rev-parse` của cây đang làm (auto-complete-guard) cần chạy TRONG repo fixture. */
+function chay(
+  hook: string,
+  repo: string,
+  input: unknown,
+  env: Record<string, string> = {},
+  cwd?: string,
+) {
   const tmp = mkdtempSync(join(tmpdir(), "xboss-hook-state-"));
   const res = spawnSync("bash", [join(HOOKS, hook)], {
+    cwd,
     input: JSON.stringify(input),
     encoding: "utf8",
     env: { ...process.env, CLAUDE_PROJECT_DIR: repo, TMPDIR: tmp, ...env },
@@ -85,6 +93,7 @@ test("settings.json đăng ký đủ hook, file tồn tại và chạy được"
     "risk-zone-gate.sh",
     "stop-static-checks.sh",
     "precompact-checkpoint.sh",
+    "auto-complete-guard.sh",
   ]) {
     assert.ok(lenh.includes(`/.claude/hooks/${h}`), `settings.json chưa đăng ký ${h}`);
     const st = statSync(join(HOOKS, h));
@@ -234,6 +243,95 @@ test("precompact-checkpoint chụp trạng thái cây đang làm; session-resume
     chay("session-resume.sh", r, input).json?.hookSpecificOutput?.additionalContext as string;
   assert.match(ngu({ source: "compact" }), /Checkpoint chụp ngay trước khi nén[\s\S]*dang-lam\.ts/);
   assert.doesNotMatch(ngu({ source: "startup" }), /Checkpoint chụp/);
+});
+
+test("auto-complete-guard: không marker → im; hồ sơ Active → block kèm mục Bàn giao; Blocked/Done → cho dừng", () => {
+  const r = dungRepo();
+  const hs = "docs/nang-cap/auto/2026-10-12-thu.md";
+  const stop = (msg: string) =>
+    chay("auto-complete-guard.sh", r, { last_assistant_message: msg }, {}, r);
+  const ghiHoSo = (trangThai: string) =>
+    writeFileSync(
+      join(r, hs),
+      `# thu\n\n- Trạng thái: ${trangThai}\n\n## Bàn giao / bước tiếp theo\n\n- Mở PR cho W-002\n`,
+    );
+  mkdirSync(join(r, "docs/nang-cap/auto"), { recursive: true });
+  ghiHoSo("Active");
+
+  assert.equal(stop("a").json, null, "chưa bật vòng thì không được chặn");
+
+  writeFileSync(join(r, ".claude/.auto-complete-loop"), `${hs}\n`);
+  const chan = stop("a");
+  assert.equal(chan.json?.decision, "block");
+  assert.match(chan.json?.reason, /Mở PR cho W-002/);
+  assert.match(chan.json?.reason, /1\/20/);
+
+  assert.equal(stop("a").json, null, "lời cuối lặp y hệt → không tiến triển → cho dừng");
+  assert.equal(stop("b").json?.decision, "block");
+
+  ghiHoSo("Blocked — chờ chủ repo chọn chính sách");
+  assert.equal(stop("c").json, null);
+  assert.ok(existsSync(join(r, ".claude/.auto-complete-loop")), "Blocked giữ marker để nối lại");
+
+  ghiHoSo("Done");
+  assert.equal(stop("d").json, null);
+  assert.ok(!existsSync(join(r, ".claude/.auto-complete-loop")), "Done thì tắt vòng");
+});
+
+test("auto-complete-guard: chạm trần lượt tiếp tục hoặc chuỗi đỏ cổng commit ≥ 3 → dừng", () => {
+  const r = dungRepo();
+  const hs = "docs/nang-cap/auto/2026-10-12-tran.md";
+  mkdirSync(join(r, "docs/nang-cap/auto"), { recursive: true });
+  writeFileSync(join(r, hs), "- Trạng thái: Active\n");
+  const mark = join(r, ".claude/.auto-complete-loop");
+  const stop = (msg: string) =>
+    chay("auto-complete-guard.sh", r, { last_assistant_message: msg }, {}, r);
+
+  writeFileSync(mark, `${hs}\nn=2\n`);
+  assert.equal(
+    chay(
+      "auto-complete-guard.sh",
+      r,
+      { last_assistant_message: "x" },
+      { AUTO_COMPLETE_MAX_CONTINUES: "2" },
+      r,
+    ).json,
+    null,
+  );
+
+  writeFileSync(mark, `${hs}\n`);
+  writeFileSync(join(r, ".claude/.gate-red-streak"), "sig=1\nn=3\n");
+  const nhac = stop("x");
+  assert.equal(nhac.json?.decision, "block");
+  assert.match(nhac.json?.reason, /Blocked/);
+  assert.equal(stop("y").json, null, "đã nhắc một lần thì cho dừng");
+});
+
+test("pre-commit-gate: cổng đỏ ghi chuỗi đỏ, cùng lỗi thì tăng, xanh thì xoá", () => {
+  const r = dungRepo();
+  mkdirSync(join(r, "node_modules"));
+  const goi = (lint: string) =>
+    writeFileSync(
+      join(r, "package.json"),
+      JSON.stringify({ scripts: { lint, typecheck: "true" } }),
+    );
+  const commit = () =>
+    chay("pre-commit-gate.sh", r, { tool_input: { command: "git commit -m x" } });
+  const streak = () => readFileSync(join(r, ".claude/.gate-red-streak"), "utf8");
+
+  goi("echo loi-A && exit 1");
+  assert.equal(commit().code, 2);
+  assert.match(streak(), /n=1/);
+  assert.equal(commit().code, 2);
+  assert.match(streak(), /n=2/);
+
+  goi("echo loi-B && exit 1");
+  assert.equal(commit().code, 2);
+  assert.match(streak(), /n=1/, "lỗi khác thì đếm lại");
+
+  goi("true");
+  assert.equal(commit().code, 0);
+  assert.ok(!existsSync(join(r, ".claude/.gate-red-streak")));
 });
 
 test("không còn file hook mồ côi (mọi *.sh trong .claude/hooks đều được đăng ký)", () => {

@@ -1,5 +1,21 @@
 # PROGRESS — XBoss
 
+## 2026-10-12 — Lấy `/auto-complete` của khung (bản port XBoss, ADR-0015)
+
+- **Bối cảnh:** #632 loại `/auto`/`/auto-complete`/`/completion` (chạy trên `docs/work/`, `dev-task.sh`, engine Python).
+  Chủ repo chọn trong phiên: **port bản XBoss** + **tự quyết toàn bộ** (kể cả đặc tả M/L) trong lượt lệnh này.
+- **Lệnh** `.claude/commands/auto-complete.md`: kế hoạch → thực thi từng PR tới merge → hoàn thiện
+  (`project-completion.md` Pha 0–4 dịch sang XBoss) → bàn giao từ clone sạch + đề xuất GO/NO-GO. Hồ sơ lượt
+  `docs/nang-cap/auto/<ngày>-<slug>.md` (Trạng thái `Active|Blocked|Waiting|Done`, bảng kế hoạch, nhật ký quyết định
+  một dòng/quyết định, mục "Bàn giao"). Danh sách "không bao giờ tự quyết": deploy/DB thật, xoá dữ liệu thật,
+  secret/quyền, chi phí/`npx` ngoài `package.json`, ngoài phạm vi, viết lại lịch sử, nới cổng, việc cần người/thiết bị
+  thật, cùng lỗi 3 lần.
+- **Hook:** Stop `auto-complete-guard.sh` (marker gitignored `.claude/.auto-complete-loop` → chặn kết lượt khi hồ sơ
+  còn `Active`; trần 20 lượt, lời cuối lặp, chuỗi đỏ ≥ 3); `pre-commit-gate.sh` ghi `.claude/.gate-red-streak` (cùng
+  lỗi thì tăng, xanh thì xoá). `tests/claude-hooks.test.ts` thêm 3 ca (13/13 xanh).
+- **Luật:** `CLAUDE.md` thêm ngoại lệ duy nhất cho LUẬT CỨNG "thiếu đặc tả thì hỏi" (chỉ trong lượt `/auto-complete`);
+  `docs/framework/XBOSS.md`, `.claude/README.md` cập nhật bảng lấy/không lấy.
+
 ## 2026-10-12 — Nợ kỹ thuật: `braces` (GHSA-vfj7-8cjw-p6xm) trong chuỗi lint, chờ bản vá
 
 - **Bối cảnh:** chủ repo đã bật Dependency graph + Dependabot alerts (Settings → Code security). API
