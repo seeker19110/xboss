@@ -4,8 +4,7 @@ import { ChevronDown, Star, LayoutGrid, Search } from "lucide-react";
 import { systemColorClasses } from "@/lib/nen/systemColors";
 import type { ProjectListItem } from "@/lib/ha-tang/projects";
 import { phanTramTienDo } from "@/lib/nen/phan-tram";
-import { phatDoiNguCanh } from "@/app/lib/contextEpoch";
-import { clearServiceWorkerCache } from "@/app/lib/serviceWorkerCache";
+import { chuyenDuAn, duAnDangChon } from "@/app/lib/chuyenDuAn";
 import { showToast } from "@/app/components/Toast";
 import { fetchDuAnKhaKien } from "@/app/lib/duAnKhaKien";
 
@@ -29,7 +28,7 @@ function loadPinned(): number[] {
 
 // Trigger đỉnh sidebar (chấm màu + tên + chevron) + panel chọn dự án — theo
 // docs/ke-hoach-appshell-full-ia-2026-07.md §4.1b. Nguồn dữ liệu GET /api/projects
-// (đã tôn trọng user_projects — M22). Chọn dự án = POST /api/project/select (cookie)
+// (đã tôn trọng user_projects — M22). Chọn dự án = `chuyenDuAn` (app/lib/chuyenDuAn.ts)
 // rồi reload để mọi phần server-scoped (API) đọc lại đúng dự án mới.
 export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
   const [projects, setProjects] = useState<ProjectListItem[] | null>(null);
@@ -52,8 +51,7 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
   }, []);
 
   useEffect(() => {
-    const match = document.cookie.match(/(?:^|; )xboss_project=([^;]+)/);
-    setCurrentCookie(match ? Number(match[1]) : null);
+    setCurrentCookie(duAnDangChon());
   }, [projects]);
 
   useEffect(() => {
@@ -102,28 +100,10 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
     }
     setBusy(true);
     try {
-      const res = await fetch("/api/project/select", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: id }),
-      });
-      if (res.ok) {
-        try {
-          localStorage.setItem("xboss_project", String(id));
-        } catch {
-          /* private mode */
-        }
-        // S05: cookie dự án dùng chung mọi tab — báo các tab khác khoá ngữ cảnh cũ trước khi tải lại.
-        phatDoiNguCanh("switch");
-        // S08: bỏ cache đọc API của dự án cũ trong SW (chờ ACK tối đa 3s; lỗi vẫn an toàn vì cache
-        // gắn nhãn phiên vault của tab — tải lại là phiên mới).
-        await clearServiceWorkerCache().catch(() => undefined);
-        window.location.reload();
-      } else {
-        showToast("Không chuyển được dự án — vui lòng thử lại", "error");
-      }
-    } catch {
-      showToast("Mất kết nối — chưa chuyển được dự án", "error");
+      // S05/S08: đổi cookie + báo tab khác khoá ngữ cảnh cũ + bỏ cache SW, rồi tải lại.
+      const kq = await chuyenDuAn(id);
+      if (kq.ok) window.location.reload();
+      else showToast(kq.loi, "error");
     } finally {
       setBusy(false);
       setOpen(false);

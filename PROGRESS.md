@@ -1,5 +1,19 @@
 # PROGRESS — XBoss
 
+## 2026-10-12 — M132: link thông báo/push mang dự án, trang tracking đổi dự án trước khi mở
+
+- **Vấn đề (F-008, lộ trình §0.3):** từ migration 0161 slug sheet chỉ duy nhất **trong một dự án**, nhưng link
+  `/tracking/<slug>` trong chuông thông báo, `/notifications/all`, trang chủ hiện trường và push phân công
+  (`lib/tien-do/assignments.ts`) không mang dự án → đang chọn dự án A mà bấm thông báo của dự án B thì mở nhầm
+  lưới A (hoặc 404 sheet).
+- **Sửa:** `lib/nen/link-tracking.ts` (`linkTracking`, `docIdDuAn`, `quyetDinhDuAnTuLink`) dựng link
+  `?project=<id>`; `listNotifications` trả `projectId` (`st.project_id`); 3 điểm push phân công dùng chung hàm.
+  Trang tracking bọc cổng `CongDuAnTuLink`: khác dự án đang chọn → đổi qua thủ tục chuẩn (tách thành
+  `app/lib/chuyenDuAn.ts`, `ProjectSwitcher` dùng chung: POST `/api/project/select` kiểm quyền, phát S05, xoá
+  cache SW S08) rồi tải lại URL sạch; lỗi/không có quyền → `ErrorState` + thử lại, **không** dựng lưới sai dự án.
+- **Test:** `tests/m132-link-thong-bao.test.ts` (4 ca thuần + 1 ca DB: hai dự án cùng slug, link mang đúng dự án B).
+- Đặc tả `docs/nang-cap/M132-link-thong-bao-mang-du-an.md` (tự duyệt trong lượt `/auto-complete`, ADR-0015).
+
 ## 2026-10-12 — Lấy `/auto-complete` của khung (bản port XBoss, ADR-0015)
 
 - **Bối cảnh:** #632 loại `/auto`/`/auto-complete`/`/completion` (chạy trên `docs/work/`, `dev-task.sh`, engine Python).
@@ -1114,8 +1128,8 @@ orgId)` cache theo org; `createItem` `ON CONFLICT` theo org; sửa/xoá kèm `or
   chữ ký mới: `alerts`, `code-lists`, `cost`, `cost-report`, `thong-bao`, `route-tai-chinh-3a`,
   `audit-cost-query-reuse`, `sheet-versions`, `totp`, `traffic`, `route-quan-tri` (POST sheets cần dự án).
   ERD sinh lại, ADR-0005 cập nhật, S00 inventory sinh lại + khối tay.
-- **Còn mở / phát hiện ngoài phạm vi:** link `/tracking/<slug>` lưu trong thông báo không mang dự án
-  (giải theo dự án đang chọn); `clone-config` vẫn sinh slug duy nhất toàn hệ (chặt hơn cần); org tạo
+- **Còn mở / phát hiện ngoài phạm vi:** ~~link `/tracking/<slug>` lưu trong thông báo không mang dự án~~
+  (đã đóng ở M132, 2026-10-12); `clone-config` vẫn sinh slug duy nhất toàn hệ (chặt hơn cần); org tạo
   sau 0161 bắt đầu danh mục rỗng (chưa có luồng seed khi tạo org); `cost_settings` cũ chờ dọn sau một
   chu kỳ rollback.
 

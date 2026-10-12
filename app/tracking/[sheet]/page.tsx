@@ -31,6 +31,7 @@ import { offlineQueue } from "@/app/components/offlineQueue";
 import { moManPhucHoiNgoaiTuyen } from "@/app/components/OfflineRecoveryPanel";
 import { sortFloorsDesc } from "@/lib/nen/floors";
 import { useTrackingData } from "./useTrackingData";
+import { CongDuAnTuLink } from "./CongDuAnTuLink";
 import { TrackingToolbar } from "./TrackingToolbar";
 import { TrackingGrid } from "./TrackingGrid";
 import { locNhomTheoTask, nhomTuMoTheoLoc, GIOI_HAN_NHOM_TU_MO } from "./locTask";
@@ -59,6 +60,14 @@ function useIsMobile() {
 }
 
 export default function TrackingPage({ params }: { params: Promise<{ sheet: string }> }) {
+  return (
+    <CongDuAnTuLink>
+      <TrackingPageNoiDung params={params} />
+    </CongDuAnTuLink>
+  );
+}
+
+function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> }) {
   const { sheet } = use(params);
   const chuaGanDuAn = useChuaGanDuAn();
   const {

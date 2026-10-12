@@ -58,6 +58,7 @@ type Notif = {
   isRead: number;
   sheetSlug: string | null;
   floorLabel: string | null;
+  projectId: number | null;
 };
 type SheetNav = { id: number; code: string; name: string; slug: string };
 
@@ -324,7 +325,9 @@ export default function HomeHienTruong({
             <Card tone="sunken" pad="sm">
               <ul className="space-y-1">
                 {tbChuaDoc.map((n) => {
-                  const url = n.taskId ? trackingUrl(n.sheetSlug, null, n.floorLabel) : null;
+                  const url = n.taskId
+                    ? trackingUrl(n.sheetSlug, null, n.floorLabel, n.projectId)
+                    : null;
                   return (
                     <li key={n.id} className="text-xs text-zinc-300">
                       {url ? (
