@@ -14,7 +14,7 @@
   (`copy-framework.sh --upgrade --no-hooks` rồi xoá file mới ngoài danh sách lấy — chạy thẳng script khung
   ghi đè `/review`, `/maintain`, `incident-response.md`, đã kiểm trên bản sao).
 - **Workflow mới:** `codeql` (TS/JS + actions, `security-extended`), `dependency-review` (chặn gói high+
-  trên PR; repo chưa bật Dependency graph thì bước dò trả 404 → cảnh báo + bỏ qua thay vì đỏ mọi PR), `scorecard`, `stale-pr-alert` (PR mở > 7 ngày → 1 issue). `SECURITY.md` cập nhật (repo đã public).
+  trên PR; repo chưa bật Dependency graph thì bước dò gặp 403 như action → cảnh báo + bỏ qua thay vì đỏ mọi PR), `scorecard`, `stale-pr-alert` (PR mở > 7 ngày → 1 issue). `SECURITY.md` cập nhật (repo đã public).
 - **Agent/lệnh/hook:** agent `version-check`; lệnh `/debug`, `/incident`, `/deps-upgrade`, `/grill`, `/contract`
   (chỉnh tham chiếu cho XBoss); hook PreCompact `precompact-checkpoint` + `session-resume` nạp lại
   checkpoint khi `source=compact` (test trong `tests/claude-hooks.test.ts`).
