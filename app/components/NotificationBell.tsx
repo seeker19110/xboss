@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { formatDateTimeVN, todayISO, daysFromTodayISO } from "@/lib/nen/date";
+import { trackingUrl } from "@/app/lib/trackingUrl";
 
 type Notif = {
   id: number;
@@ -23,6 +24,7 @@ type Notif = {
   createdAt: string;
   sheetSlug: string | null;
   floorLabel: string | null;
+  projectId: number | null;
 };
 
 const POLL_MS = 30_000;
@@ -160,13 +162,13 @@ function dayBucket(createdAt: string): DayBucket {
   return "older";
 }
 
-// Đường dẫn click-through tới task liên quan (nếu có) — cùng pattern GlobalSearch:
-// `/tracking/<slug>?floor=<floorLabel>`. null khi thông báo không gắn task hoặc chưa
+// Đường dẫn click-through tới task liên quan (nếu có): `/tracking/<slug>?floor=<tầng>&project=<id>`
+// (M132 — mang dự án của task, trang tracking đổi dự án trước khi tải). null khi thông báo không gắn task hoặc chưa
 // suy ra được sheet (vd task đã bị xoá).
 function notifUrl(n: Notif): string | null {
   if (n.type === "offline_recovery_pending") return "/admin/thiet-bi-offline?tab=khoi-phuc";
   if (!n.taskId || !n.sheetSlug) return null;
-  return `/tracking/${n.sheetSlug}${n.floorLabel ? `?floor=${encodeURIComponent(n.floorLabel)}` : ""}`;
+  return trackingUrl(n.sheetSlug, null, n.floorLabel, n.projectId);
 }
 
 // Gộp các thông báo cùng `type` xuất hiện liên tiếp (≥3) thành 1 dòng bung/thu gọn được.

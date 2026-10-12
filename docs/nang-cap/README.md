@@ -498,6 +498,11 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > variations 946→267, contracts 1200→404. **Không đổi** API/schema/`lib/`/`CustomFieldsSection`.
 > Quy ước chốt trong ADR-0009 mục "DocShell cho `/claims`, `/variations`, `/contracts` — M126".
 
+## Đặc tả ĐÃ DUYỆT — lượt `/auto-complete` hoàn thiện nợ code (2026-10-12, tự duyệt theo ADR-0015)
+
+> **`M132-link-thong-bao-mang-du-an.md`** — ✅ **XONG 2026-10-12**. Link thông báo/push tới lưới tracking mang
+> `?project=<id>`; trang tracking đổi dự án qua thủ tục chuẩn (`app/lib/chuyenDuAn.ts`) trước khi dựng lưới.
+
 ## Đặc tả ĐÃ DUYỆT — sau S15 (viết + duyệt 2026-10-09)
 
 > **`M131-vault-offline-bao-tri-va-khoi-phuc.md`** — ✅ **XONG 2026-10-09 (2 phần)**. Phần 1:

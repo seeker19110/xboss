@@ -1181,9 +1181,12 @@ export async function listNotifications(user: User, limit: number) {
     createdAt: string;
     sheetSlug: string | null;
     floorLabel: string | null;
+    projectId: number | null;
   }>(
+    // projectId (M132): slug chỉ duy nhất trong một dự án — link phải mang dự án của task.
     `SELECT n.id, n.task_id AS "taskId", n.type, n.message, n.is_read AS "isRead",
-            n.created_at AS "createdAt", st.slug AS "sheetSlug", wp.floor_label AS "floorLabel"
+            n.created_at AS "createdAt", st.slug AS "sheetSlug", wp.floor_label AS "floorLabel",
+            st.project_id AS "projectId"
        FROM notifications n
        LEFT JOIN tasks t ON t.id = n.task_id
        LEFT JOIN work_packages wp ON wp.id = t.package_id

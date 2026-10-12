@@ -4,6 +4,7 @@ import { getCurrentUser, canTouchTask } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { sendPushToUsers } from "@/lib/van-hanh/push";
+import { linkTracking } from "@/lib/nen/link-tracking";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
 
 export const dynamic = "force-dynamic";
@@ -112,8 +113,8 @@ export async function POST(
 
   // Web Push tới điện thoại người liên quan (no-op nếu chưa cấu hình VAPID).
   if (recipients.length > 0) {
-    const sheet = await queryOne<{ slug: string | null }>(
-      `SELECT st.slug FROM tasks t
+    const sheet = await queryOne<{ slug: string | null; project_id: number | null }>(
+      `SELECT st.slug, st.project_id FROM tasks t
          JOIN work_packages wp ON t.package_id = wp.id
          JOIN sheet_types st ON wp.sheet_type_id = st.id
         WHERE t.id = ?`,
@@ -123,7 +124,8 @@ export async function POST(
     await sendPushToUsers(recipients, {
       title: `💬 ${user.name} — ${task.code}`,
       body: preview,
-      url: slug ? `/tracking/${slug}` : "/",
+      // M132: slug chỉ duy nhất trong dự án — link mang dự án của task.
+      url: slug ? linkTracking(slug, { projectId: sheet?.project_id }) : "/",
     }).catch(() => {
       /* push lỗi không được chặn việc lưu bình luận */
     });

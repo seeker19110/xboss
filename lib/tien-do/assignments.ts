@@ -1,4 +1,5 @@
 import { query, queryOne, run, todayISO } from "@/lib/db";
+import { linkTracking } from "@/lib/nen/link-tracking";
 import { sendPushToUsers } from "@/lib/van-hanh/push";
 
 // ===== Phân công theo hệ (sheet) với kế thừa tự động =====
@@ -63,10 +64,12 @@ export async function assignSheetManager(
   userId: number | null,
   changedBy: number,
 ): Promise<void> {
-  const prev = await queryOne<{ manager_id: number | null; code: string; slug: string | null }>(
-    `SELECT manager_id, code, slug FROM sheet_types WHERE id = ?`,
-    sheetId,
-  );
+  const prev = await queryOne<{
+    manager_id: number | null;
+    code: string;
+    slug: string | null;
+    project_id: number | null;
+  }>(`SELECT manager_id, code, slug, project_id FROM sheet_types WHERE id = ?`, sheetId);
   await run(`UPDATE sheet_types SET manager_id = ? WHERE id = ?`, userId, sheetId);
   await logAssignment(
     "sheet",
@@ -107,7 +110,11 @@ export async function assignSheetManager(
       count > 0
         ? `Bạn được giao quản lý hệ ${prev?.code ?? ""}${count > 0 ? ` (${count} task kế thừa)` : ""}`
         : `Bạn được giao quản lý hệ ${prev?.code ?? ""}`;
-    await notifyAssigned([userId], msg, prev?.slug ? `/tracking/${prev.slug}` : "/");
+    await notifyAssigned(
+      [userId],
+      msg,
+      prev?.slug ? linkTracking(prev.slug, { projectId: prev.project_id }) : "/",
+    );
   }
 }
 
@@ -123,8 +130,9 @@ export async function assignPackage(
     code: string;
     name: string;
     sheet_slug: string | null;
+    project_id: number | null;
   }>(
-    `SELECT wp.assigned_to, wp.code, wp.name, st.slug AS sheet_slug
+    `SELECT wp.assigned_to, wp.code, wp.name, st.slug AS sheet_slug, st.project_id
        FROM work_packages wp JOIN sheet_types st ON wp.sheet_type_id = st.id WHERE wp.id = ?`,
     packageId,
   );
@@ -170,7 +178,7 @@ export async function assignPackage(
     await notifyAssigned(
       [effective],
       `Bạn được giao nhóm "${prev?.name ?? prev?.code}" (${n} task kế thừa)`,
-      prev?.sheet_slug ? `/tracking/${prev.sheet_slug}` : "/",
+      prev?.sheet_slug ? linkTracking(prev.sheet_slug, { projectId: prev.project_id }) : "/",
     );
   }
 }
@@ -186,8 +194,9 @@ export async function assignTask(
     code: string;
     name: string;
     sheet_slug: string | null;
+    project_id: number | null;
   }>(
-    `SELECT t.assigned_to, t.code, t.name, st.slug AS sheet_slug
+    `SELECT t.assigned_to, t.code, t.name, st.slug AS sheet_slug, st.project_id
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
@@ -225,7 +234,7 @@ export async function assignTask(
     await notifyAssigned(
       [effective],
       `Bạn được giao task "${prev?.name ?? prev?.code}"`,
-      prev?.sheet_slug ? `/tracking/${prev.sheet_slug}` : "/",
+      prev?.sheet_slug ? linkTracking(prev.sheet_slug, { projectId: prev.project_id }) : "/",
     );
   }
 }

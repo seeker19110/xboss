@@ -10,6 +10,7 @@ import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
 import { formatDateTimeVN } from "@/lib/nen/date";
+import { trackingUrl } from "@/app/lib/trackingUrl";
 
 type Notif = {
   id: number;
@@ -20,13 +21,14 @@ type Notif = {
   createdAt: string;
   sheetSlug: string | null;
   floorLabel: string | null;
+  projectId: number | null;
 };
 
 const PAGE_SIZE = 20;
 
 function notifUrl(n: Notif): string | null {
   if (!n.taskId || !n.sheetSlug) return null;
-  return `/tracking/${n.sheetSlug}${n.floorLabel ? `?floor=${encodeURIComponent(n.floorLabel)}` : ""}`;
+  return trackingUrl(n.sheetSlug, null, n.floorLabel, n.projectId);
 }
 
 export default function AllNotificationsPage() {
