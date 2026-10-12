@@ -503,6 +503,9 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > **`M132-link-thong-bao-mang-du-an.md`** — ✅ **XONG 2026-10-12**. Link thông báo/push tới lưới tracking mang
 > `?project=<id>`; trang tracking đổi dự án qua thủ tục chuẩn (`app/lib/chuyenDuAn.ts`) trước khi dựng lưới.
 
+> **`M134-vo-hieu-hoa-tai-khoan.md`** — ✅ **XONG 2026-10-12**. `users.disabled_at` (migration 0171); user bị khoá
+> mất mọi phiên, không đăng nhập được (mật khẩu/2FA/SSO); tổ chức luôn còn ≥ 1 Admin hoạt động.
+
 ## Đặc tả ĐÃ DUYỆT — sau S15 (viết + duyệt 2026-10-09)
 
 > **`M131-vault-offline-bao-tri-va-khoi-phuc.md`** — ✅ **XONG 2026-10-09 (2 phần)**. Phần 1:

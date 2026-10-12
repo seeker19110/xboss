@@ -335,10 +335,11 @@ export async function reportRecipients(
     `SELECT u.id, u.email
        FROM users u
        JOIN projects p ON p.id = ? AND p.org_id = u.org_id
-      WHERE u.role = 'admin'
+      WHERE u.disabled_at IS NULL
+        AND (u.role = 'admin'
          OR (u.role = 'pm' AND (${nhanhBangRong}
               EXISTS (SELECT 1 FROM user_projects up
-                       WHERE up.user_id = u.id AND up.project_id = p.id)))
+                       WHERE up.user_id = u.id AND up.project_id = p.id))))
       ORDER BY u.id`,
     projectId,
   );

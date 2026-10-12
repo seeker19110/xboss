@@ -11,6 +11,7 @@ import {
   COOKIE_MAX_AGE,
   type Role,
 } from "@/lib/bao-mat/auth";
+import { taiKhoanBiKhoa, LOI_TAI_KHOAN_BI_KHOA } from "@/lib/nen/trang-thai-tai-khoan";
 import { laLoiSchemaChuaSan, phanHoiSchemaChuaSan } from "@/lib/nen/loi";
 import {
   loginBlockedSeconds,
@@ -73,8 +74,10 @@ async function dangNhap(req: NextRequest) {
       totp_enabled_at: string | null;
       session_version: number;
       org_id: number;
+      disabled_at: Date | null;
     }>(
-      `SELECT id, name, email, role, password_hash, totp_enabled_at, session_version, org_id FROM users WHERE email = ?`,
+      `SELECT id, name, email, role, password_hash, totp_enabled_at, session_version, org_id, disabled_at
+         FROM users WHERE email = ?`,
       emailNorm,
     ),
   );
@@ -82,6 +85,13 @@ async function dangNhap(req: NextRequest) {
     await recordLoginFailure(ip, emailNorm);
     return NextResponse.json({ error: "Email hoặc mật khẩu không đúng" }, { status: 401 });
   }
+
+  // M134: chỉ lộ trạng thái "bị khoá" SAU khi mật khẩu đúng (sai mật khẩu vẫn 401 chung ở trên).
+  if (taiKhoanBiKhoa(u.disabled_at))
+    return NextResponse.json(
+      { error: LOI_TAI_KHOAN_BI_KHOA, code: "account_disabled" },
+      { status: 403 },
+    );
 
   await recordLoginSuccess(ip, emailNorm);
 

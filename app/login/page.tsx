@@ -21,6 +21,7 @@ const OIDC_ERRORS: Record<string, string> = {
   oidc_rate: "Thử SSO quá nhiều lần — vui lòng chờ ít phút rồi thử lại.",
   oidc_failed: "Đăng nhập SSO thất bại — vui lòng thử lại hoặc dùng mật khẩu.",
   oidc_noemail: "Tài khoản SSO không trả về email — không thể đăng nhập.",
+  account_disabled: "Tài khoản đã bị vô hiệu hoá — liên hệ quản trị viên.",
 };
 const CACHE_PURGE_ERROR =
   "Chưa xác nhận được việc dọn bộ nhớ đệm của XBoss. Yêu cầu đăng nhập chưa được gửi; hãy thử lại khi service worker sẵn sàng.";

@@ -11,6 +11,7 @@ import {
   OIDC_TMP_COOKIE,
 } from "@/lib/bao-mat/oidc";
 import { makeToken, isSecureCookie, COOKIE, COOKIE_MAX_AGE } from "@/lib/bao-mat/auth";
+import { taiKhoanBiKhoa } from "@/lib/nen/trang-thai-tai-khoan";
 import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
@@ -85,6 +86,11 @@ export async function GET(req: NextRequest) {
   }
 
   const user = await upsertSsoUser(resolved);
+  // M134: tài khoản bị Admin vô hiệu hoá → không phát phiên dù IdP đã xác thực.
+  if (taiKhoanBiKhoa(user.disabled_at)) {
+    log.warn("OIDC: tài khoản bị vô hiệu hoá", { route: "oidc.callback", userId: user.id });
+    return toLogin(req, "account_disabled");
+  }
 
   // Phát cookie phiên (flags y hệt app/api/auth/login/route.ts). Redirect CỐ ĐỊNH về "/"
   // — KHÔNG nhận returnTo/redirect từ query (chống open-redirect).

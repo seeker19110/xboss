@@ -10,6 +10,8 @@ import { randomBytes } from "node:crypto";
 import * as oidc from "openid-client";
 import { query, queryOne, run, withOrgScope } from "@/lib/db";
 import { hashPassword } from "@/lib/bao-mat/auth";
+import { taiKhoanBiKhoa } from "@/lib/nen/trang-thai-tai-khoan";
+import { khoaVaDemAdminHoatDong } from "@/lib/bao-mat/tai-khoan";
 import { log } from "@/lib/nen/log";
 import { ROLES, type Role } from "@/lib/nen/roles";
 
@@ -93,6 +95,7 @@ export type SsoUser = {
   password_hash: string;
   session_version: number;
   org_id: number;
+  disabled_at: Date | null;
 };
 
 export async function upsertSsoUser(resolved: ResolvedSsoUser): Promise<SsoUser> {
@@ -100,11 +103,14 @@ export async function upsertSsoUser(resolved: ResolvedSsoUser): Promise<SsoUser>
   // trong phạm vi '*' do server đặt. Đồng bộ role / tạo mới chạy trong phạm vi org của tài khoản.
   const existing = await withOrgScope("*", () =>
     queryOne<SsoUser>(
-      `SELECT id, name, email, role, password_hash, session_version, org_id FROM users WHERE email = ?`,
+      `SELECT id, name, email, role, password_hash, session_version, org_id, disabled_at
+         FROM users WHERE email = ?`,
       resolved.email,
     ),
   );
 
+  // M134: tài khoản bị vô hiệu hoá — trả nguyên trạng để callback từ chối, không đồng bộ role.
+  if (existing && taiKhoanBiKhoa(existing.disabled_at)) return existing;
   if (existing)
     return withOrgScope(existing.org_id, () => dongBoRoleSso(existing, resolved), {
       readOnly: false,
@@ -124,7 +130,7 @@ export async function upsertSsoUser(resolved: ResolvedSsoUser): Promise<SsoUser>
       queryOne<SsoUser>(
         `INSERT INTO users (name, email, password_hash, role, org_id) VALUES (?, ?, ?, ?, 1)
      ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
-     RETURNING id, name, email, role, password_hash, session_version, org_id`,
+     RETURNING id, name, email, role, password_hash, session_version, org_id, disabled_at`,
         resolved.name,
         resolved.email,
         passwordHash,
@@ -143,10 +149,7 @@ async function dongBoRoleSso(existing: SsoUser, resolved: ResolvedSsoUser): Prom
   // (chống tự khoá hệ thống — cùng mẫu guard app/api/users/[id]/route.ts / M50 PR1).
   if (resolved.roleFromClaim && resolved.roleFromClaim !== existing.role) {
     if (existing.role === "admin" && resolved.roleFromClaim !== "admin") {
-      const admins = await queryOne<{ n: number }>(
-        `SELECT COUNT(*) AS n FROM users WHERE role = 'admin'`,
-      );
-      if (Number(admins?.n) <= 1) {
+      if ((await khoaVaDemAdminHoatDong(existing.org_id)) <= 1) {
         log.warn("Bỏ qua hạ cấp admin cuối cùng theo claim SSO", {
           route: "oidc.upsertSsoUser",
           email: resolved.email,
@@ -155,7 +158,12 @@ async function dongBoRoleSso(existing: SsoUser, resolved: ResolvedSsoUser): Prom
         return existing;
       }
     }
-    await run(`UPDATE users SET role = ? WHERE id = ?`, resolved.roleFromClaim, existing.id);
+    await run(
+      `UPDATE users SET role = ? WHERE id = ? AND org_id = ?`,
+      resolved.roleFromClaim,
+      existing.id,
+      existing.org_id,
+    );
     return { ...existing, role: resolved.roleFromClaim };
   }
   return existing;
