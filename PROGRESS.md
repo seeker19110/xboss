@@ -1,5 +1,19 @@
 # PROGRESS — XBoss
 
+## 2026-10-12 — Nợ kỹ thuật: `braces` (GHSA-vfj7-8cjw-p6xm) trong chuỗi lint, chờ bản vá
+
+- **Bối cảnh:** chủ repo đã bật Dependency graph + Dependabot alerts (Settings → Code security). API
+  `dependency-graph/compare` trả 200 → `dependency-review` (#632) từ PR sau chặn thật gói high+.
+- **Nợ còn mở:** `npm audit` trên main `c1976d9` báo **1 advisory high** hiện thành 5 gói —
+  `braces@3.0.3` (≤ 3.0.3, DoS cạn stack khi pattern lồng sâu) qua `eslint-config-next@16.3.8` →
+  `@next/eslint-plugin-next` → `fast-glob@3.3.1` → `micromatch@4.0.8` → `braces`. Chỉ **devDependency**, chạy
+  lúc lint với glob trong cấu hình của chính repo (không nhận input ngoài); `npm audit --omit=dev` = 0 lỗ hổng
+  nên cổng audit production của `ci.yml` vẫn xanh.
+- **Chưa sửa được:** `braces` 3.0.3 là bản mới nhất, chưa có bản vá; gợi ý của npm (hạ `eslint-config-next`
+  về 14.x) phá tương thích Next 16 — không áp.
+- **Quyết định (chủ repo, 2026-10-12):** để alert **mở**, không dismiss; chờ `braces` ra bản vá rồi nhận PR
+  Dependabot. **Đóng nợ khi:** `npm audit` (kể cả dev) hết advisory này.
+
 ## 2026-10-12 — Nâng bộ khung lên `projects-template` @ `59bd1d1`: quy trình theo rủi ro, Sonnet mặc định, trần 5 subagent
 
 - **Chính sách (ADR-0014, chủ repo chọn trong phiên):** `.claude/settings.json` đổi `opusplan` → `claude-sonnet-5-5`
