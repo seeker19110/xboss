@@ -18,6 +18,8 @@
 - **Agent/lệnh/hook:** agent `version-check`; lệnh `/debug`, `/incident`, `/deps-upgrade`, `/grill`, `/contract`
   (chỉnh tham chiếu cho XBoss); hook PreCompact `precompact-checkpoint` + `session-resume` nạp lại
   checkpoint khi `source=compact` (test trong `tests/claude-hooks.test.ts`).
+- **Merge:** status `Vercel` (preview ngoài, không xem log/redeploy được từ phiên cloud) không còn tính vào
+  điều kiện merge — chủ repo chốt 2026-10-12, ghi ở `CLAUDE.md` mục Quy ước.
 - **Không lấy** (lý do ở `XBOSS.md`): `/auto*`, `/completion`, `/audit-*`, `dev-task.sh`, engine Python,
   telemetry, cầu nối Cursor/Gemini/Codex, `.mcp.json`, `ci.yml`/`pr-policy.yml` bản khung, `core.hooksPath`.
 
