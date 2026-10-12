@@ -91,6 +91,7 @@ export const PERM_META: Record<string, PermMeta> = {
   manageDesignChanges: { label: "Quản lý thay đổi thiết kế", group: "Thay đổi thiết kế" },
 
   manageSuppliers: { label: "Quản lý hồ sơ NTP", group: "Nhà thầu phụ" },
+  evaluateSuppliers: { label: "Đánh giá NCC / NTP", group: "Nhà thầu phụ" },
 
   viewApprovalFlows: { label: "Xem cấu hình luồng duyệt", group: "Cấu hình duyệt & Cảnh báo" },
   manageApprovalFlows: { label: "Sửa cấu hình luồng duyệt", group: "Cấu hình duyệt & Cảnh báo" },

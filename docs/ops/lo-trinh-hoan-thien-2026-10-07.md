@@ -41,12 +41,20 @@ Migration mới nhất: `0170_offline_vault_bao_tri.sql`.
     `GOOGLE_SHEET_PROJECT_ID` (file bị khoá với agent).
 - **Chưa chạy cục bộ:** e2e `thiet-bi-offline-admin.spec.ts` (M131) — chờ CI.
 - **Lớp M/O:** Safari/iOS thật; UAT 7 vai trò/hợp đồng/IPC-PDF thật; review độc lập (N03/N11).
-- **Code nhỏ đã ghi nhận, chưa làm:** `POST /api/proposals` còn `Number(amount)`; `POST /api/proposals/:id/decide`
-  chưa bọc transaction đầy đủ; `DELETE /api/users/:id` với người từng duyệt IPC (cần quyết chính sách);
-  `?baseline=` EVM/S-curve không kiểm `baselines.project_id`; `mv_cost_by_month.committed` là float8;
-  `cost_settings` toàn hệ (cần đặc tả schema); báo cáo ngày/tuần cron mang tên dự án đầu; link
-  `/tracking/<slug>` trong thông báo không mang dự án; SoD đánh dấu chi chỉ so người quyết bước cuối; job dọn
-  staging mồ côi (S08); trang engineering/mepf-process còn `fixme` a11y.
+- **Code nhỏ (đối chiếu lại 2026-10-12, lượt `/auto-complete` — hồ sơ
+  `docs/nang-cap/auto/2026-10-12-hoan-thien-no-code.md`):**
+  - Đã xong từ trước: `POST /api/proposals` tiền (#601/#607); `/decide` transaction (#606); `?baseline=` kiểm dự
+    án (#604); `mv_cost_by_month.committed` NUMERIC (#603/#617); `org_cost_settings` (#604 — bảng
+    `cost_settings` cũ chờ DROP, xoá dữ liệu thật không tự quyết); báo cáo cron mỗi dự án một báo cáo.
+  - Đã sửa 2026-10-12: link `/tracking/<slug>` mang dự án (M132, #635); vô hiệu hoá tài khoản thay xoá người từng
+    duyệt IPC (M134, #636); quyền đánh giá NCC/NTP qua `CAN.evaluateSuppliers` + gỡ fixme axe cuối `/schedule`
+    (W-005).
+  - **Chờ chủ repo:** SoD đánh dấu chi mở rộng tới mọi người duyệt/người lập IPC — đổi chính sách quyền, có thể khoá
+    luồng chi của đội nhỏ (chỉ Admin/PM được đánh dấu chi).
+  - **Chấp nhận rủi ro (nợ ghi `PROGRESS.md`):** job dọn staging ảnh mồ côi theo lịch (cần nới RLS
+    `photo_upload_staging` hoặc cron mạo danh từng user — đổi mô hình bảo mật; ảnh hưởng chỉ dung lượng đĩa, đã dọn
+    khi chính user upload lại); `REPORT_EMAIL_TO`/`TELEGRAM_CHAT_ID` nhận báo cáo mọi org (cần cấu hình production
+    mới); UNIQUE `attendance` (dữ liệu production có thể đã trùng).
 - **Hoãn có chủ đích:** M60 (major deps), M49 PR3 SSO OIDC (flag tắt), plugin AutoCAD M99–M121 (chờ verify
   tay AutoCAD 2026).
 

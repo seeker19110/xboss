@@ -45,3 +45,33 @@ export async function chuyenDuAn(projectId: number): Promise<KetQuaChuyenDuAn> {
   await clearServiceWorkerCache().catch(() => undefined);
   return { ok: true };
 }
+
+export type KetQuaKiemDuAn =
+  { ok: true; conXem: boolean } | { ok: false; loi: string; status: number; code?: string };
+
+/**
+ * Dự án `projectId` còn nằm trong danh sách user được xem không (GET /api/projects). Dùng khi link
+ * `?project=` TRÙNG cookie: cookie có thể trỏ dự án user đã bị gỡ — server khi đó lặng lẽ rơi về dự
+ * án khả kiến đầu tiên, nên không được tin cookie mà dựng lưới cùng slug của dự án khác.
+ */
+export async function kiemDuAnConXem(projectId: number): Promise<KetQuaKiemDuAn> {
+  let res: Response;
+  try {
+    res = await fetch("/api/projects");
+  } catch {
+    return { ok: false, loi: "Mất kết nối — chưa kiểm được dự án", status: 0 };
+  }
+  const j = (await res.json().catch(() => null)) as {
+    projects?: { id: number }[];
+    error?: string;
+    code?: string;
+  } | null;
+  if (!res.ok || !Array.isArray(j?.projects))
+    return {
+      ok: false,
+      loi: j?.error ?? "Không kiểm được dự án — vui lòng thử lại",
+      status: res.status,
+      code: j?.code,
+    };
+  return { ok: true, conXem: j.projects.some((p) => p.id === projectId) };
+}

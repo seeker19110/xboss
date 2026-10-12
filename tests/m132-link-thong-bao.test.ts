@@ -37,7 +37,7 @@ test("quyetDinhDuAnTuLink: không có / gỡ tham số / chuyển dự án", () 
   assert.equal(quyetDinhDuAnTuLink("2", null), "chuyen"); // chưa có cookie
 });
 
-// ===== DB: listNotifications trả projectId; assignTask đẩy link có ?project= =====
+// ===== DB: listNotifications trả projectId (link push của assignTask dùng chung `linkTracking` ở trên) =====
 const S = { skip: !HAS_TEST_DB };
 const PFX = "M132";
 let duAnA = 0;
@@ -70,8 +70,12 @@ before(async () => {
     `INSERT INTO tasks (package_id, code, name) VALUES (?, '${PFX}T', 'Task B')`,
     goiB,
   );
+  // Email có hậu tố riêng mỗi lần chạy: lần chạy trước chết giữa chừng (không tới `after`) không
+  // làm lần sau đụng unique email.
   userId = await insertId(
-    `INSERT INTO users (name, email, password_hash, role) VALUES ('${PFX}', 'm132@test.local', 'x', 'engineer')`,
+    `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, 'x', 'engineer')`,
+    PFX,
+    `m132-${Date.now()}@test.local`,
   );
 });
 

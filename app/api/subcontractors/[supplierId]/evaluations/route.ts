@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, canViewSubcontractor, type Role } from "@/lib/bao-mat/auth";
+import { getCurrentUser, canViewSubcontractor, CAN } from "@/lib/bao-mat/auth";
 import { isUniqueViolation } from "@/lib/ha-tang/seqcode";
 import {
   listEvaluations,
@@ -9,11 +9,6 @@ import {
 } from "@/lib/hien-truong/subcontractors";
 
 export const dynamic = "force-dynamic";
-
-// Đánh giá hiệu quả định kỳ là nội bộ — không để subcon tự đánh giá mình (rộng hơn
-// CAN.manageSuppliers vì cho phép cả kỹ sư, giống app/api/suppliers/[id]/ratings/route.ts
-// của M04 — xem lib/auth.ts ghi chú CAN.manageSuppliers về điểm chưa nhất quán sẵn có).
-const canEvaluate = (r?: Role) => r === "admin" || r === "pm" || r === "engineer";
 
 // GET /api/subcontractors/:supplierId/evaluations — lịch sử đánh giá theo kỳ. Xem: mọi
 // vai trò đăng nhập; subcon chỉ xem đúng NTP của mình.
@@ -57,7 +52,7 @@ export async function POST(
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!canEvaluate(user.role))
+  if (!CAN.evaluateSuppliers(user.role))
     return NextResponse.json(
       { error: "Chỉ Admin/PM/Kỹ sư được đánh giá nhà thầu phụ" },
       { status: 403 },

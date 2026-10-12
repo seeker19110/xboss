@@ -36,16 +36,17 @@ Phát hiện mới: **F-012** `app/api/suppliers/[id]/ratings/route.ts` dùng `c
 
 ## Kế hoạch
 
-| ID    | Việc (F-xxx gốc)                                                    | Mức | route   | Phụ thuộc | PR · merge SHA   | Trạng thái · bằng chứng                            |
-| ----- | ------------------------------------------------------------------- | --- | ------- | --------- | ---------------- | -------------------------------------------------- |
-| W-000 | PR #634 (lệnh `/auto-complete`) xanh + merge                        | S   | tự làm  | —         | #634 · `82829ff` | Xong — mọi check xanh, merge squash                |
-| W-001 | Đối chiếu 11 mục §0.3 với code main                                 | —   | Explore | —         | —                | Xong — bảng trên                                   |
-| W-002 | F-008 link thông báo/push mang dự án, đổi dự án trước khi mở (M132) | M   | tự làm  | W-000     | #635 · `6c57616` | Xong — mọi check xanh, merge squash                |
-| W-003 | F-009 SoD đánh dấu chi: chặn mọi người đã duyệt + người lập (M133)  | M   | tự làm  | W-002     |                  | **Chờ chủ repo** — chính sách SoD (xem Quyết định) |
-| W-004 | F-003 vô hiệu hoá tài khoản thay xoá (M134, migration + auth §8)    | M   | tự làm  | W-002     |                  | Code + 12 test xong; chờ reviewer, gate, mở PR     |
-| W-005 | F-012 ratings qua `CAN` + F-011 gỡ fixme `/schedule`                | S   | tự làm  | W-004     |                  |                                                    |
-| W-006 | F-010 job dọn staging ảnh mồ côi theo lịch                          | M   | tự làm  | W-005     |                  |                                                    |
-| W-007 | Đồng bộ lộ trình §0.3 + `PROGRESS.md` + nợ chấp nhận (F-007, F-013) | S   | tự làm  | W-006     |                  |                                                    |
+| ID    | Việc (F-xxx gốc)                                                              | Mức | route   | Phụ thuộc | PR · merge SHA   | Trạng thái · bằng chứng                            |
+| ----- | ----------------------------------------------------------------------------- | --- | ------- | --------- | ---------------- | -------------------------------------------------- |
+| W-000 | PR #634 (lệnh `/auto-complete`) xanh + merge                                  | S   | tự làm  | —         | #634 · `82829ff` | Xong — mọi check xanh, merge squash                |
+| W-001 | Đối chiếu 11 mục §0.3 với code main                                           | —   | Explore | —         | —                | Xong — bảng trên                                   |
+| W-002 | F-008 link thông báo/push mang dự án, đổi dự án trước khi mở (M132)           | M   | tự làm  | W-000     | #635 · `6c57616` | Xong — mọi check xanh, merge squash                |
+| W-003 | F-009 SoD đánh dấu chi: chặn mọi người đã duyệt + người lập (M133)            | M   | tự làm  | W-002     |                  | **Chờ chủ repo** — chính sách SoD (xem Quyết định) |
+| W-004 | F-003 vô hiệu hoá tài khoản thay xoá (M134, migration + auth §8)              | M   | tự làm  | W-002     | #636 · `99782d0` | Xong — chủ repo merge squash (head `a59901a`)      |
+| W-005 | F-012 ratings qua `CAN` + F-011 gỡ fixme `/schedule`                          | S   | tự làm  | W-004     |                  | Gộp PR cùng W-007 + W-008                          |
+| W-006 | F-010 job dọn staging ảnh mồ côi theo lịch                                    | M   | —       | —         | —                | Chấp nhận rủi ro (xem Quyết định) — nợ `PROGRESS`  |
+| W-007 | Đồng bộ lộ trình §0.3 + `PROGRESS.md` + nợ chấp nhận (F-007, F-013)           | S   | tự làm  | W-005     |                  | Gộp vào PR W-005                                   |
+| W-008 | Pha 4 — sửa Thấp từ audit hội tụ (khoá FK, mở khoá, `?project=` trùng cookie) | S   | tự làm  | W-004     |                  | Code + test xong; gộp PR cùng W-005                |
 
 ## Quyết định và bằng chứng
 
@@ -95,11 +96,37 @@ Phát hiện mới: **F-012** `app/api/suppliers/[id]/ratings/route.ts` dùng `c
   lệ nên lọc là thừa · bậc 1. Kiểu `disabled_at` phía server sửa thành `Date` (pg trả `Date` cho TIMESTAMPTZ).
   Nút "Kích hoạt lại" đổi hover emerald. Để lại (Thấp): PATCH nhiều trường không gộp một transaction (kiểu
   `disabled` đã kiểm trước mọi lần ghi); dòng user bị khoá chưa làm mờ/khoá ô vai trò.
+- W-006 (F-010) → chấp nhận rủi ro, không code · loại "nới RLS `photo_upload_staging` cho vai trò bảo trì" và
+  "cron mạo danh từng user để gọi `doiSoatAnhMoCoi`" (cả hai đổi mô hình bảo mật ADR-0005/D04) · bậc 1: tác động chỉ
+  là đĩa, file mồ côi không có `task_photos` nên không route nào phục vụ (`/api/photos/:id` tra `task_photos`), và
+  đã dọn khi chính user upload lại.
+- W-007 gộp vào PR W-005 · loại PR tài liệu riêng · bậc 2 (ít PR hơn, cùng mức S).
+- W-005: một khoá `evaluateSuppliers` cho cả đánh giá NCC theo PO lẫn đánh giá NTP định kỳ · loại hai khoá riêng
+  (cùng vai trò, cùng bản chất "chấm nhà cung cấp") · bậc 2. Mặc định giữ nguyên hành vi; là quyền ghi nên vào
+  `LOCKED_PERMS` → không phải "quyền vai trò mới cho người dùng thật". `/schedule` bỏ fixme sau khi đo cục bộ 81/81
+  xanh (cả spec, desktop + mobile, 2 worker, lặp 2) — CI e2e quyết định cuối.
+- Review W-005 (`reviewer`): 0 chặn. Đã sửa: ca `validatePermOverride` (siết được, không mở thêm), dòng
+  `AUDIT-S16-QUYEN-LUC-GHI.md` + S00 sinh lại, câu chú thích e2e. Để lại: nút "Đánh giá" ở
+  `app/subcontractors/page.tsx` vẫn ẩn/hiện theo vai trò cứng như `canManage` cùng trang (client chưa có snapshot
+  quyền dùng chung; API là ranh giới) · bậc 2.
+- Pha 4 audit hội tụ (`audit-bao-mat` + `audit-logic` trên `git diff 82829ff`): **0 Cao, 0 Trung** · sửa 3 Thấp
+  (W-008): (a) `FOR UPDATE` → `FOR NO KEY UPDATE` — đã tái hiện treo khi transaction khác giữ khoá FK tới Admin, test
+  đỏ trước/xanh sau; (b) mở khoá tăng `session_version` — test token đúc lúc khoá đỏ trước; (c) `?project=` trùng
+  cookie vẫn kiểm dự án còn xem được · bậc 1. Chấp nhận Thấp còn lại (SSE sau khoá, `?project=` không hỏi, nút đánh
+  giá theo vai trò cứng, thiếu test route oidc callback) → nợ `PROGRESS.md` · bậc 2.
+- #636 được chủ repo merge khi commit sửa audit còn ở máy → dựng lại nhánh từ `origin/main` (`99782d0`) +
+  cherry-pick, gộp W-005/W-007/W-008 một PR · loại PR riêng cho từng phần (thêm 2 vòng CI ~15 phút) · bậc 2.
+- Review W-008 (`reviewer`): 0 chặn. Đã sửa: cổng `?project=` có cờ huỷ lượt cũ khi tham số đổi giữa chừng (đổi dự
+  xong mà bị thay → tải lại URL hiện tại), mất mạng khi kiểm dự án trùng cookie thì mở trang như trước (PWA) · bậc 1.
+  Để lại: chi phí `GET /api/projects` mỗi lần mở link trùng cookie (chấp nhận, đo lại nếu chậm); chưa có test treo
+  khoá FK cho nhánh hạ cấp/xoá (cùng hàm `khoaVaDemAdminHoatDong` đã có test) · bậc 2. L-03: email test M132 có hậu
+  tố theo lần chạy; thiếu test DB link push `assignTask` → nợ `PROGRESS.md` · bậc 2.
 - F-013 (UNIQUE `attendance`) → hoãn, ghi nợ · loại "thêm UNIQUE ngay" (dữ liệu production có thể đã trùng →
   migration hỏng hoặc phải xoá/gộp dữ liệu thật = không tự quyết) · bậc 1.
 
 ## Bàn giao / bước tiếp theo
 
-- W-004 (M134): nhận báo cáo `reviewer` (đang chạy) → sửa phát hiện chặn, gate `--test --build`, commit, push,
-  mở PR M134 (tiêu đề `feat` + link đặc tả + "Approved for implementation"), xanh thì merge. Sau đó W-005
-  (ratings + evaluations qua `CAN`, gỡ fixme `/schedule`). W-003 chờ chủ repo.
+- Nhánh dựng lại từ `origin/main` `99782d0` + `afc4642` (W-008 a/b) + working tree (W-005, W-007, W-008 c). Review W-008
+  xong (0 chặn) → `git add` → `npm run audit:route-scope` → gate `--test --build` → commit → push → mở PR →
+  xanh thì merge. Sau đó bàn giao clone sạch (`scratchpad/clone-sach-1`: `git pull`, `npm ci`, build, gate
+  `--test`) + GO/NO-GO; trạng thái cuối `Waiting — W-003 chờ chủ repo`.

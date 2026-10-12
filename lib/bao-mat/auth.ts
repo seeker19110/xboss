@@ -317,11 +317,11 @@ const CAN_DEFAULT = {
   // yêu cầu); quyết định (duyệt/từ chối) vẫn qua CAN.approve như VO/đề xuất.
   manageDesignChanges: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
   // Hồ sơ năng lực NTP (M33): sửa subcontractor_profiles + upload/xoá subcon_documents —
-  // Admin/PM (đánh giá subcon_evaluations dùng check riêng admin/pm/engineer, rộng hơn
-  // — xem app/api/subcontractors/[supplierId]/evaluations/route.ts). Thêm vào map trung
-  // tâm nhân dịp M33 dù app/api/suppliers/[id]/ratings/route.ts (M04) vẫn dùng canRate
-  // cục bộ — không sửa lại chỗ đó (ngoài phạm vi M33).
+  // Admin/PM.
   manageSuppliers: (r?: Role) => r === "admin" || r === "pm",
+  // Đánh giá NCC theo PO (M04) + đánh giá NTP định kỳ (M33): rộng hơn manageSuppliers vì kỹ
+  // sư hiện trường trực tiếp chấm; nội bộ nên không cho subcon/vai trò chỉ-xem.
+  evaluateSuppliers: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
   // Claim chi phí & gia hạn EOT (M34): thông tin tranh chấp/thương mại nhạy cảm —
   // xem như VO/thanh toán KL (loại cdt/subcon/viewer); ghi nhận (tạo/sửa) Admin/PM/kỹ sư.
   viewClaims: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
