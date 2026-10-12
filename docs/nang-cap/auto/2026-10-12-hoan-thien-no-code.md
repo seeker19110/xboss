@@ -36,16 +36,16 @@ Phát hiện mới: **F-012** `app/api/suppliers/[id]/ratings/route.ts` dùng `c
 
 ## Kế hoạch
 
-| ID    | Việc (F-xxx gốc)                                                    | Mức | route   | Phụ thuộc | PR · merge SHA   | Trạng thái · bằng chứng                                   |
-| ----- | ------------------------------------------------------------------- | --- | ------- | --------- | ---------------- | --------------------------------------------------------- |
-| W-000 | PR #634 (lệnh `/auto-complete`) xanh + merge                        | S   | tự làm  | —         | #634 · `82829ff` | Xong — mọi check xanh, merge squash                       |
-| W-001 | Đối chiếu 11 mục §0.3 với code main                                 | —   | Explore | —         | —                | Xong — bảng trên                                          |
-| W-002 | F-008 link thông báo/push mang dự án, đổi dự án trước khi mở (M132) | M   | tự làm  | W-000     |                  | Đã code + test (5/5 cục bộ trên Postgres 16); đang review |
-| W-003 | F-009 SoD đánh dấu chi: chặn mọi người đã duyệt + người lập (M133)  | M   | tự làm  | W-002     |                  |                                                           |
-| W-004 | F-003 vô hiệu hoá tài khoản thay xoá (M134, migration + auth §8)    | M   | tự làm  | W-003     |                  |                                                           |
-| W-005 | F-012 ratings qua `CAN` + F-011 gỡ fixme `/schedule`                | S   | tự làm  | W-004     |                  |                                                           |
-| W-006 | F-010 job dọn staging ảnh mồ côi theo lịch                          | M   | tự làm  | W-005     |                  |                                                           |
-| W-007 | Đồng bộ lộ trình §0.3 + `PROGRESS.md` + nợ chấp nhận (F-007, F-013) | S   | tự làm  | W-006     |                  |                                                           |
+| ID    | Việc (F-xxx gốc)                                                    | Mức | route   | Phụ thuộc | PR · merge SHA   | Trạng thái · bằng chứng                            |
+| ----- | ------------------------------------------------------------------- | --- | ------- | --------- | ---------------- | -------------------------------------------------- |
+| W-000 | PR #634 (lệnh `/auto-complete`) xanh + merge                        | S   | tự làm  | —         | #634 · `82829ff` | Xong — mọi check xanh, merge squash                |
+| W-001 | Đối chiếu 11 mục §0.3 với code main                                 | —   | Explore | —         | —                | Xong — bảng trên                                   |
+| W-002 | F-008 link thông báo/push mang dự án, đổi dự án trước khi mở (M132) | M   | tự làm  | W-000     | #635 · `6c57616` | Xong — mọi check xanh, merge squash                |
+| W-003 | F-009 SoD đánh dấu chi: chặn mọi người đã duyệt + người lập (M133)  | M   | tự làm  | W-002     |                  | **Chờ chủ repo** — chính sách SoD (xem Quyết định) |
+| W-004 | F-003 vô hiệu hoá tài khoản thay xoá (M134, migration + auth §8)    | M   | tự làm  | W-002     |                  | Code + 12 test xong; chờ reviewer, gate, mở PR     |
+| W-005 | F-012 ratings qua `CAN` + F-011 gỡ fixme `/schedule`                | S   | tự làm  | W-004     |                  |                                                    |
+| W-006 | F-010 job dọn staging ảnh mồ côi theo lịch                          | M   | tự làm  | W-005     |                  |                                                    |
+| W-007 | Đồng bộ lộ trình §0.3 + `PROGRESS.md` + nợ chấp nhận (F-007, F-013) | S   | tự làm  | W-006     |                  |                                                    |
 
 ## Quyết định và bằng chứng
 
@@ -76,10 +76,30 @@ Phát hiện mới: **F-012** `app/api/suppliers/[id]/ratings/route.ts` dùng `c
   chọn nên link luôn cùng dự án hiện tại.
 - Gate cục bộ: 3 file test DR/restore/migration-boundary đỏ do thiếu biến `RESTORE_TEST_*` chỉ CI đặt · không
   liên quan diff · CI quyết định.
+- W-003 (F-009 SoD đánh dấu chi) → **không tự quyết, chờ chủ repo** · loại "chặn mọi người duyệt + người lập" và
+  "chặn mọi người duyệt" · bậc 1: chỉ Admin/PM (`CAN.approve`) được đánh dấu chi
+  (`app/api/payments/bills/[id]/pay/route.ts:31`), nên mở rộng SoD có thể khoá cứng luồng chi của đội nhỏ.
+  Ví dụ: kỹ sư lập IPC, PM + Admin duyệt hai bước → không còn ai đủ quyền đánh dấu chi. Đây là đổi chính sách
+  quyền với người dùng thật, và M129 đã chốt "chỉ so người quyết bước cuối" theo spec. Làm tiếp W-004.
+- W-004 thứ tự: làm trước W-003 · bậc 2 · W-003 chờ quyết định, W-004 độc lập.
+- Audit W-004 (`audit-bao-mat`, 0 Cao): guard "Admin cuối" của hạ cấp/xoá chạy ngoài transaction → đếm có
+  khoá `khoaVaDemAdminHoatDong` (`FOR UPDATE`) trong cùng transaction với lần ghi · test đồng thời đỏ khi bỏ
+  `FOR UPDATE`. Kèm: SSO đếm admin theo org + không đồng bộ role user bị khoá; kiểm kiểu `disabled` trước mọi lần
+  ghi; push/báo cáo/health-check/khôi phục offline bỏ user bị khoá. API key do user tạo → giữ non-goal (khoá cấp
+  tổ chức, thu hồi riêng ở `/admin/integrations`).
+- Review W-004 (`reviewer`): chặn — thêm export vào `lib/bao-mat/auth.ts` làm đỏ 3 test nạp route bằng bản đồ
+  mock cố định → `taiKhoanBiKhoa`/`LOI_TAI_KHOAN_BI_KHOA` chuyển sang `lib/nen/trang-thai-tai-khoan.ts` (tầng 0,
+  thuần), hai test nạp route thêm bản thật vào bản đồ mock · loại "khai thêm vào mock auth" (giữ helper thuần
+  trong module DB/cookie) · bậc 2. Lọc push theo `users.disabled_at` → bỏ: `users` có RLS theo org (0165), JOIN
+  ở nơi gọi không có phạm vi org sẽ im lặng mất mọi push; khoá đã xoá subscription và đăng ký lại cần phiên hợp
+  lệ nên lọc là thừa · bậc 1. Kiểu `disabled_at` phía server sửa thành `Date` (pg trả `Date` cho TIMESTAMPTZ).
+  Nút "Kích hoạt lại" đổi hover emerald. Để lại (Thấp): PATCH nhiều trường không gộp một transaction (kiểu
+  `disabled` đã kiểm trước mọi lần ghi); dòng user bị khoá chưa làm mờ/khoá ô vai trò.
 - F-013 (UNIQUE `attendance`) → hoãn, ghi nợ · loại "thêm UNIQUE ngay" (dữ liệu production có thể đã trùng →
   migration hỏng hoặc phải xoá/gộp dữ liệu thật = không tự quyết) · bậc 1.
 
 ## Bàn giao / bước tiếp theo
 
-- Nhận kết quả `reviewer` + `audit-ui` cho diff W-002, sửa mục chặn, `npm run gate -- --test --build`, commit, push
-  (force-with-lease: nhánh chỉ còn lịch sử đã merge), mở PR M132 và theo tới merge.
+- W-004 (M134): nhận báo cáo `reviewer` (đang chạy) → sửa phát hiện chặn, gate `--test --build`, commit, push,
+  mở PR M134 (tiêu đề `feat` + link đặc tả + "Approved for implementation"), xanh thì merge. Sau đó W-005
+  (ratings + evaluations qua `CAN`, gỡ fixme `/schedule`). W-003 chờ chủ repo.

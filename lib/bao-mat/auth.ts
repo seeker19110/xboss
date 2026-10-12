@@ -20,6 +20,7 @@ import { getList } from "@/lib/ha-tang/code-lists";
 // được mà không kéo theo next/headers/lib/db. Re-export để mọi call-site cũ import từ @/lib/auth
 // không đổi.
 import { COOKIE, COOKIE_MAX_AGE, sign, makeToken, parseToken } from "@/lib/bao-mat/session-token";
+import { taiKhoanBiKhoa } from "@/lib/nen/trang-thai-tai-khoan";
 export { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role };
 export { COOKIE, COOKIE_MAX_AGE, makeToken, parseToken };
 
@@ -103,12 +104,15 @@ export async function getCurrentUser(): Promise<User | null> {
   // S16 (RLS 0165): tra user trong phạm vi tổ chức ghi trong token đã ký — không cần '*'. User
   // đã chuyển sang org khác thì dòng vô hình ở đây → null, cùng kết quả với kiểm orgId bên dưới.
   const u = await withOrgScope(parsed.orgId, () =>
-    queryOne<User & { password_hash: string; session_version: number }>(
-      `SELECT id, name, email, role, org_id AS "orgId", password_hash, session_version FROM users WHERE id = ?`,
+    queryOne<User & { password_hash: string; session_version: number; disabled_at: Date | null }>(
+      `SELECT id, name, email, role, org_id AS "orgId", password_hash, session_version, disabled_at
+         FROM users WHERE id = ?`,
       parsed.uid,
     ),
   );
   if (!u) return null;
+  // M134: tài khoản bị vô hiệu hoá → mọi phiên hết hiệu lực ngay (cột có sẵn trong SELECT trên).
+  if (taiKhoanBiKhoa(u.disabled_at)) return null;
   // Fragment không khớp → mật khẩu đã đổi, phiên cũ không còn hợp lệ.
   if (!u.password_hash.startsWith(parsed.pwFrag)) return null;
   // V5 — thu hồi phiên chủ động: session_version trong token < DB nghĩa là admin đã bấm
@@ -117,7 +121,7 @@ export async function getCurrentUser(): Promise<User | null> {
   if (Number(u.session_version) !== parsed.sessionVersion) return null;
   // Token ký đúng vẫn hết hiệu lực khi tài khoản đã chuyển sang tổ chức khác.
   if (u.orgId !== parsed.orgId) return null;
-  const { password_hash: _, session_version: _sv, ...rest } = u;
+  const { password_hash: _, session_version: _sv, disabled_at: _da, ...rest } = u;
   const user: User = rest;
   patchRequestContext({ userId: user.id, role: user.role, orgId: user.orgId });
   // Chốt dự án trước khi đọc quyền; lỗi nguồn không được biến thành mặc định allow.

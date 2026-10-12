@@ -338,6 +338,7 @@
 | totp_last_step | bigint | ✓ |  |
 | session_version | integer |  | `0` |
 | org_id | integer |  | `1` |
+| disabled_at | timestamptz | ✓ |  |
 
 **Khóa ngoại:**
 - `org_id` → `organizations(id)`

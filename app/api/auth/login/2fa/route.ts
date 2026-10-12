@@ -8,6 +8,7 @@ import {
   COOKIE,
   COOKIE_MAX_AGE,
 } from "@/lib/bao-mat/auth";
+import { taiKhoanBiKhoa, LOI_TAI_KHOAN_BI_KHOA } from "@/lib/nen/trang-thai-tai-khoan";
 import { decryptTotpSecret, verifyTotpCode } from "@/lib/bao-mat/totp";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 
@@ -85,13 +86,22 @@ export async function POST(req: NextRequest) {
         totp_last_step: number | null;
         session_version: number;
         org_id: number;
+        disabled_at: Date | null;
       }>(
-        `SELECT id, name, email, role, password_hash, totp_secret, totp_enabled_at, totp_last_step, session_version, org_id FROM users WHERE id = ? FOR UPDATE`,
+        `SELECT id, name, email, role, password_hash, totp_secret, totp_enabled_at, totp_last_step,
+                session_version, org_id, disabled_at
+           FROM users WHERE id = ? FOR UPDATE`,
         parsed.uid,
       );
       // pwFrag không khớp → mật khẩu đã đổi từ lúc phát pending token, token cũ không còn hợp lệ.
       if (!u || !u.password_hash.startsWith(parsed.pwFrag) || !u.totp_secret || !u.totp_enabled_at)
         return NextResponse.json({ error: "Phiên xác thực không hợp lệ" }, { status: 401 });
+      // M134: bị khoá giữa bước 1 và bước 2 → không phát phiên.
+      if (taiKhoanBiKhoa(u.disabled_at))
+        return NextResponse.json(
+          { error: LOI_TAI_KHOAN_BI_KHOA, code: "account_disabled" },
+          { status: 403 },
+        );
 
       const codeTrim = code.trim();
       let ok = false;

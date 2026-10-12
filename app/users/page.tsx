@@ -1,13 +1,20 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { UserPlus, Trash2, KeyRound, Users, LogOut } from "lucide-react";
+import { UserPlus, Trash2, KeyRound, Users, LogOut, Ban, UserCheck } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { appConfirm, appPrompt } from "@/app/components/dialogs";
 import { fetchMe } from "@/app/lib/me";
 import { ROLE_LABELS } from "@/lib/nen/roles";
 
-type User = { id: number; name: string; email: string; role: string; createdAt: string };
+type User = {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  createdAt: string;
+  disabledAt: string | null;
+};
 const ROLE_LABEL: Record<string, string> = ROLE_LABELS;
 
 export default function UsersPage() {
@@ -106,6 +113,29 @@ export default function UsersPage() {
     try {
       const res = await fetch(`/api/users/${u.id}/revoke-sessions`, { method: "POST" });
       await handle(res, `Đã thu hồi phiên đăng nhập của ${u.email}`);
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+    }
+  }
+
+  // M134: vô hiệu hoá thay cho xoá khi user còn dữ liệu kiểm toán; kích hoạt lại được.
+  async function toggleDisabled(u: User) {
+    const khoa = u.disabledAt == null;
+    if (
+      khoa &&
+      !(await appConfirm(
+        `Vô hiệu hoá ${u.email}? Người dùng bị đăng xuất trên mọi thiết bị, không đăng nhập được và thôi nhận thông báo đẩy. Dữ liệu đã ghi được giữ nguyên.`,
+        { danger: true, confirmLabel: "Vô hiệu hoá" },
+      ))
+    )
+      return;
+    try {
+      const res = await fetch(`/api/users/${u.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ disabled: khoa }),
+      });
+      await handle(res, khoa ? `Đã vô hiệu hoá ${u.email}` : `Đã kích hoạt lại ${u.email}`);
     } catch {
       setError("Mất kết nối mạng — vui lòng thử lại");
     }
@@ -238,6 +268,12 @@ export default function UsersPage() {
                         (bạn)
                       </span>
                     )}
+                    {u.disabledAt && (
+                      <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold text-zinc-300 bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded-md">
+                        <Ban className="w-3 h-3" aria-hidden="true" />
+                        Đã vô hiệu hoá
+                      </span>
+                    )}
                   </td>
                   <td className="p-3.5 text-zinc-400 font-mono text-xs">{u.email}</td>
                   <td className="p-3.5">
@@ -272,6 +308,26 @@ export default function UsersPage() {
                       </button>
                       {me?.id !== u.id && (
                         <button
+                          onClick={() => toggleDisabled(u)}
+                          title={u.disabledAt ? "Kích hoạt lại tài khoản" : "Vô hiệu hoá tài khoản"}
+                          aria-label={
+                            u.disabledAt
+                              ? `Kích hoạt lại tài khoản ${u.email}`
+                              : `Vô hiệu hoá tài khoản ${u.email}`
+                          }
+                          className={`text-zinc-400 transition p-1.5 ${
+                            u.disabledAt ? "hover:text-emerald-400" : "hover:text-amber-400"
+                          }`}
+                        >
+                          {u.disabledAt ? (
+                            <UserCheck className="w-4 h-4" />
+                          ) : (
+                            <Ban className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                      {me?.id !== u.id && (
+                        <button
                           onClick={() => removeUser(u)}
                           title="Xoá người dùng"
                           className="text-zinc-400 hover:text-rose-400 transition p-1.5"
@@ -288,7 +344,8 @@ export default function UsersPage() {
         </div>
 
         <p className="text-xs text-zinc-400">
-          Không thể xoá / hạ cấp Admin cuối cùng. Người dùng tự đổi mật khẩu tại{" "}
+          Không thể xoá / hạ cấp / vô hiệu hoá Admin cuối cùng. Người dùng còn dữ liệu (duyệt chứng
+          từ, nhật ký…) không xoá được — hãy vô hiệu hoá. Người dùng tự đổi mật khẩu tại{" "}
           <a href="/password" className="text-emerald-400 underline">
             /password
           </a>

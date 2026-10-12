@@ -132,7 +132,8 @@ export async function taoYeuCauKhoiPhuc(
         "Thiết bị này đã có yêu cầu khôi phục đang chờ xử lý",
       );
     const admins = await query<{ id: number }>(
-      `SELECT id FROM users WHERE role = 'admin' AND org_id = ? AND id <> ? ORDER BY id`,
+      `SELECT id FROM users
+        WHERE role = 'admin' AND disabled_at IS NULL AND org_id = ? AND id <> ? ORDER BY id`,
       user.orgId,
       user.id,
     );

@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import { randomInt } from "node:crypto";
 import ts from "typescript";
+import * as TRANG_THAI_TAI_KHOAN from "@/lib/nen/trang-thai-tai-khoan"; // thuần — dùng bản thật
 
 // Chạy source thật; chỉ giả lập biên framework/storage. Không thay test DB/browser.
 function load<T>(path: string, mocks: Record<string, unknown>, globals = {}): T {
@@ -73,6 +74,7 @@ function fixture(opts: { user?: TestUser; wait?: number; setup2fa?: boolean } = 
   const route = load<{ POST(req: unknown): Promise<Reply> }>("app/api/auth/login/route.ts", {
     "next/server": next,
     "@/lib/nen/loi": LOI_STUB,
+    "@/lib/nen/trang-thai-tai-khoan": TRANG_THAI_TAI_KHOAN,
     "@/lib/db": {
       withOrgScope: (_org: unknown, fn: () => Promise<unknown>) => fn(),
       queryOne: async (_sql: string, email: unknown) => {

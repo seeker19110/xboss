@@ -14,7 +14,8 @@ export async function GET() {
 
   // M54 GĐ1 PR2: cô lập tenant — chỉ trả user cùng org với người gọi.
   const users = await query(
-    `SELECT id, name, email, role, created_at AS "createdAt" FROM users WHERE org_id = ? ORDER BY id`,
+    `SELECT id, name, email, role, created_at AS "createdAt", disabled_at AS "disabledAt"
+       FROM users WHERE org_id = ? ORDER BY id`,
     me.orgId,
   );
   return NextResponse.json({ users });

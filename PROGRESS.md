@@ -1,5 +1,25 @@
 # PROGRESS — XBoss
 
+## 2026-10-12 — M134: vô hiệu hoá tài khoản (thay cho xoá khi còn dữ liệu kiểm toán)
+
+- **Vấn đề (F-003, lộ trình §0.3 mục 3):** user còn dữ liệu kiểm toán (duyệt IPC, phiếu chi…) xoá trả 409
+  `dependency_conflict` — đúng, nhưng Admin không còn cách khoá người đã nghỉ: phiên 7 ngày vẫn sống, SSO vẫn vào,
+  điện thoại vẫn nhận Web Push.
+- **Sửa:** migration `0171_users_disabled.sql` (`users.disabled_at`, chỉ `ADD COLUMN` → đi thẳng production).
+  `getCurrentUser` từ chối user bị khoá (không thêm round-trip); login mật khẩu (403 `account_disabled` chỉ SAU
+  khi mật khẩu đúng), login 2FA bước 2 và SSO OIDC đều chặn (SSO không đồng bộ role của user bị khoá).
+  `PATCH /api/users/:id { disabled }` qua `lib/bao-mat/tai-khoan.ts`: đặt `disabled_at`, tăng `session_version`
+  một lần, xoá `push_subscriptions`; idempotent. Mọi guard "Admin cuối cùng" (khoá, hạ cấp, xoá, đồng bộ role
+  SSO) đếm Admin **đang hoạt động** của đúng org qua `khoaVaDemAdminHoatDong` (`FOR UPDATE`, cùng transaction
+  với lần ghi) — trước đây hạ cấp/xoá đếm ngoài transaction, hai thao tác đồng thời lọt guard được. Người
+  nhận báo cáo, cảnh báo health-check, khôi phục offline bỏ qua user bị khoá. Hàm thuần `taiKhoanBiKhoa` ở
+  `lib/nen/trang-thai-tai-khoan.ts`. `/users`: nút vô hiệu
+  hoá/kích hoạt lại và nhãn "Đã vô hiệu hoá"; 409 khi xoá gợi ý vô hiệu hoá.
+- **Test:** `tests/m134-vo-hieu-hoa-tai-khoan.test.ts` 13 ca qua route thật (AC1 đỏ trên code cũ: token còn hợp lệ
+  nhưng `disabled_at` khác NULL vẫn được nhận; ca đồng thời "tự hạ cấp + khoá Admin kia" đỏ khi bỏ `FOR UPDATE`).
+- **Không làm (non-goal):** ẩn user bị khoá khỏi danh sách chọn người; thu hồi API key do user tạo.
+- Đặc tả `docs/nang-cap/M134-vo-hieu-hoa-tai-khoan.md` (tự duyệt trong lượt `/auto-complete`, ADR-0015).
+
 ## 2026-10-12 — M132: link thông báo/push mang dự án, trang tracking đổi dự án trước khi mở
 
 - **Vấn đề (F-008, lộ trình §0.3):** từ migration 0161 slug sheet chỉ duy nhất **trong một dự án**, nhưng link

@@ -65,7 +65,7 @@ async function handleHealthCheck(bySecret: boolean): Promise<NextResponse> {
         // Cảnh báo sức khoẻ là của CẢ HỆ THỐNG: cron bằng CRON_SECRET (chưa có actor) gửi mọi
         // Admin với phạm vi '*' do server đặt; Admin/PM bấm tay bằng phiên thì request đã thuộc
         // một tổ chức → chỉ Admin của tổ chức đó (withOrgScope từ chối nâng lên '*' — D01, S16).
-        const sqlAdmin = `SELECT email FROM users WHERE role = 'admin'`;
+        const sqlAdmin = `SELECT email FROM users WHERE role = 'admin' AND disabled_at IS NULL`;
         const rows = bySecret
           ? await withOrgScope("*", () => query<{ email: string }>(sqlAdmin))
           : await query<{ email: string }>(sqlAdmin);

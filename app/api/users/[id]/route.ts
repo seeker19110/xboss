@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN, hashPassword, ROLES, type Role } from "@/lib/bao-mat/auth";
+import { datKhoaTaiKhoan, khoaVaDemAdminHoatDong } from "@/lib/bao-mat/tai-khoan";
 
 export const dynamic = "force-dynamic";
 
-// PATCH /api/users/:id  body: { name?, role?, password? } → sửa user (Admin).
+// PATCH /api/users/:id  body: { name?, role?, password?, disable2fa?, disabled? } → sửa user (Admin).
+// `disabled` (M134): true = vô hiệu hoá (cắt mọi phiên + xoá push), false = kích hoạt lại.
 export async function PATCH(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -24,14 +26,17 @@ export async function PATCH(
   // của GET /api/users cùng cụm; route này chạy ngoài withTransaction nên RLS không tự áp
   // được, phải lọc tường minh). Thiếu điều kiện này thì admin org A đoán ID đổi được vai
   // trò/mật khẩu/2FA của user org B — chiếm quyền tài khoản xuyên tổ chức.
-  const target = await queryOne<{ id: number; role: Role }>(
-    `SELECT id, role FROM users WHERE id = ? AND org_id = ?`,
+  const target = await queryOne<{ id: number }>(
+    `SELECT id FROM users WHERE id = ? AND org_id = ?`,
     id,
     me.orgId,
   );
   if (!target) return NextResponse.json({ error: "Không tìm thấy người dùng" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
+  // Kiểm kiểu `disabled` trước mọi lần ghi — body sai không được để lại thay đổi dở dang.
+  if (body.disabled !== undefined && typeof body.disabled !== "boolean")
+    return NextResponse.json({ error: "disabled phải là true/false" }, { status: 400 });
 
   if (body.role !== undefined) {
     const role = String(body.role) as Role;
@@ -39,16 +44,22 @@ export async function PATCH(
       return NextResponse.json({ error: "Vai trò không hợp lệ" }, { status: 400 });
     // Không cho hạ cấp admin cuối cùng (kể cả tự hạ mình). Đếm THEO ORG — nếu đếm toàn hệ
     // thống, tổ chức khác có admin sẽ khiến guard cho qua dù tổ chức này chỉ còn 1 admin,
-    // làm tổ chức đó mất khả năng tự quản trị.
-    if (target.role === "admin" && role !== "admin") {
-      const admins = await queryOne<{ n: number }>(
-        `SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND org_id = ?`,
+    // làm tổ chức đó mất khả năng tự quản trị. M134: chỉ đếm Admin đang hoạt động, khoá dòng
+    // Admin trong cùng transaction với lần ghi (chống hạ cấp/khoá/xoá đồng thời lọt guard).
+    const haCapAdminCuoi = await withTransaction(async () => {
+      const soAdmin = role !== "admin" ? await khoaVaDemAdminHoatDong(me.orgId) : 0;
+      const t = await queryOne<{ role: Role; disabledAt: Date | null }>(
+        `SELECT role, disabled_at AS "disabledAt" FROM users WHERE id = ? AND org_id = ? FOR UPDATE`,
+        id,
         me.orgId,
       );
-      if (Number(admins?.n) <= 1)
-        return NextResponse.json({ error: "Không thể hạ cấp Admin cuối cùng" }, { status: 400 });
-    }
-    await run(`UPDATE users SET role = ? WHERE id = ? AND org_id = ?`, role, id, me.orgId);
+      if (t?.role === "admin" && t.disabledAt == null && role !== "admin" && soAdmin <= 1)
+        return true;
+      await run(`UPDATE users SET role = ? WHERE id = ? AND org_id = ?`, role, id, me.orgId);
+      return false;
+    });
+    if (haCapAdminCuoi)
+      return NextResponse.json({ error: "Không thể hạ cấp Admin cuối cùng" }, { status: 400 });
   }
 
   if (body.name !== undefined) {
@@ -92,8 +103,13 @@ export async function PATCH(
     if (!reset) return NextResponse.json({ error: "Không tìm thấy người dùng" }, { status: 404 });
   }
 
+  if (body.disabled !== undefined) {
+    const kq = await datKhoaTaiKhoan(id, body.disabled, me);
+    if (!kq.ok) return NextResponse.json({ error: kq.error }, { status: kq.status });
+  }
+
   const user = await queryOne(
-    `SELECT id, name, email, role FROM users WHERE id = ? AND org_id = ?`,
+    `SELECT id, name, email, role, disabled_at AS "disabledAt" FROM users WHERE id = ? AND org_id = ?`,
     id,
     me.orgId,
   );
@@ -123,29 +139,31 @@ export async function DELETE(
   // của GET /api/users cùng cụm; route này chạy ngoài withTransaction nên RLS không tự áp
   // được, phải lọc tường minh). Thiếu điều kiện này thì admin org A đoán ID xoá được thẳng
   // user org B.
-  const target = await queryOne<{ id: number; role: Role }>(
-    `SELECT id, role FROM users WHERE id = ? AND org_id = ?`,
+  const target = await queryOne<{ id: number }>(
+    `SELECT id FROM users WHERE id = ? AND org_id = ?`,
     id,
     me.orgId,
   );
   if (!target) return NextResponse.json({ error: "Không tìm thấy người dùng" }, { status: 404 });
 
-  // Đếm THEO ORG cùng lý do như nhánh PATCH ở trên — đừng để admin của tổ chức khác che lấp
-  // việc tổ chức này chỉ còn đúng 1 admin.
-  if (target.role === "admin") {
-    const admins = await queryOne<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND org_id = ?`,
-      me.orgId,
-    );
-    if (Number(admins?.n) <= 1)
-      return NextResponse.json({ error: "Không thể xoá Admin cuối cùng" }, { status: 400 });
-  }
-
   // Gỡ liên kết trước khi xoá (giữ lịch sử/thông báo sạch FK). Cùng 1 transaction: nếu user còn
   // được tham chiếu (người tạo/duyệt hợp đồng, nhật ký, chứng từ…) thì 23503 → rollback hết,
   // không để lại việc đã gỡ giao; trả 409 dependency_conflict thay vì 500 (S13c).
+  let xoaAdminCuoi = false;
   try {
     await withTransaction(async () => {
+      // Đếm THEO ORG cùng lý do như nhánh PATCH ở trên — đừng để admin của tổ chức khác che lấp
+      // việc tổ chức này chỉ còn đúng 1 admin. M134: chỉ Admin hoạt động, khoá dòng trước khi đếm.
+      const soAdmin = await khoaVaDemAdminHoatDong(me.orgId);
+      const t = await queryOne<{ role: Role; disabledAt: Date | null }>(
+        `SELECT role, disabled_at AS "disabledAt" FROM users WHERE id = ? AND org_id = ? FOR UPDATE`,
+        id,
+        me.orgId,
+      );
+      if (t?.role === "admin" && t.disabledAt == null && soAdmin <= 1) {
+        xoaAdminCuoi = true;
+        return;
+      }
       await run(`UPDATE tasks SET assigned_to = NULL WHERE assigned_to = ?`, id);
       await run(`DELETE FROM notifications WHERE user_id = ?`, id);
       await run(`DELETE FROM users WHERE id = ? AND org_id = ?`, id, me.orgId);
@@ -155,12 +173,14 @@ export async function DELETE(
     return NextResponse.json(
       {
         error:
-          "Người dùng đang được tham chiếu trong dữ liệu khác (hợp đồng, nhật ký, chứng từ…) — không xoá được, hãy đổi vai trò hoặc thu hồi phiên thay vì xoá",
+          "Người dùng đang được tham chiếu trong dữ liệu khác (hợp đồng, nhật ký, chứng từ…) — không xoá được, hãy vô hiệu hoá tài khoản thay vì xoá",
         code: "dependency_conflict",
       },
       { status: 409 },
     );
   }
+  if (xoaAdminCuoi)
+    return NextResponse.json({ error: "Không thể xoá Admin cuối cùng" }, { status: 400 });
 
   return NextResponse.json({ ok: true });
 }
