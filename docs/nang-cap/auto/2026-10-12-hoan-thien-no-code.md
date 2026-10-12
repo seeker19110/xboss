@@ -1,6 +1,6 @@
 # /auto-complete 2026-10-12-hoan-thien-no-code — Hoàn thiện phần nợ làm được bằng code
 
-- Trạng thái: Waiting — W-003 (F-009 SoD đánh dấu chi) chờ chủ repo chọn chính sách; mọi việc khác đã merge
+- Trạng thái: Done
 - Bắt đầu: 2026-10-12 · base `origin/main` `74bdce6` (+ PR #634 đang chờ CI — chứa chính lệnh này)
 - Phạm vi: các khoản nợ **code** trong `docs/ops/lo-trinh-hoan-thien-2026-10-07.md` §0.3 ("Code nhỏ đã ghi
   nhận") + phát hiện mới trong lúc rà, đối chiếu lại với code thật trên main trước khi sửa · **KHÔNG làm:**
@@ -36,17 +36,17 @@ Phát hiện mới: **F-012** `app/api/suppliers/[id]/ratings/route.ts` dùng `c
 
 ## Kế hoạch
 
-| ID    | Việc (F-xxx gốc)                                                              | Mức | route   | Phụ thuộc | PR · merge SHA   | Trạng thái · bằng chứng                            |
-| ----- | ----------------------------------------------------------------------------- | --- | ------- | --------- | ---------------- | -------------------------------------------------- |
-| W-000 | PR #634 (lệnh `/auto-complete`) xanh + merge                                  | S   | tự làm  | —         | #634 · `82829ff` | Xong — mọi check xanh, merge squash                |
-| W-001 | Đối chiếu 11 mục §0.3 với code main                                           | —   | Explore | —         | —                | Xong — bảng trên                                   |
-| W-002 | F-008 link thông báo/push mang dự án, đổi dự án trước khi mở (M132)           | M   | tự làm  | W-000     | #635 · `6c57616` | Xong — mọi check xanh, merge squash                |
-| W-003 | F-009 SoD đánh dấu chi: chặn mọi người đã duyệt + người lập (M133)            | M   | tự làm  | W-002     |                  | **Chờ chủ repo** — chính sách SoD (xem Quyết định) |
-| W-004 | F-003 vô hiệu hoá tài khoản thay xoá (M134, migration + auth §8)              | M   | tự làm  | W-002     | #636 · `99782d0` | Xong — chủ repo merge squash (head `a59901a`)      |
-| W-005 | F-012 ratings qua `CAN` + F-011 gỡ fixme `/schedule`                          | S   | tự làm  | W-004     | #637 · `c61edc6` | Xong — mọi check xanh, merge squash                |
-| W-006 | F-010 job dọn staging ảnh mồ côi theo lịch                                    | M   | —       | —         | —                | Chấp nhận rủi ro (xem Quyết định) — nợ `PROGRESS`  |
-| W-007 | Đồng bộ lộ trình §0.3 + `PROGRESS.md` + nợ chấp nhận (F-007, F-013)           | S   | tự làm  | W-005     | #637 · `c61edc6` | Xong — gộp PR W-005                                |
-| W-008 | Pha 4 — sửa Thấp từ audit hội tụ (khoá FK, mở khoá, `?project=` trùng cookie) | S   | tự làm  | W-004     | #637 · `c61edc6` | Xong — gộp PR W-005, review 0 chặn                 |
+| ID    | Việc (F-xxx gốc)                                                              | Mức | route   | Phụ thuộc | PR · merge SHA   | Trạng thái · bằng chứng                           |
+| ----- | ----------------------------------------------------------------------------- | --- | ------- | --------- | ---------------- | ------------------------------------------------- |
+| W-000 | PR #634 (lệnh `/auto-complete`) xanh + merge                                  | S   | tự làm  | —         | #634 · `82829ff` | Xong — mọi check xanh, merge squash               |
+| W-001 | Đối chiếu 11 mục §0.3 với code main                                           | —   | Explore | —         | —                | Xong — bảng trên                                  |
+| W-002 | F-008 link thông báo/push mang dự án, đổi dự án trước khi mở (M132)           | M   | tự làm  | W-000     | #635 · `6c57616` | Xong — mọi check xanh, merge squash               |
+| W-003 | F-009 SoD đánh dấu chi: chặn mọi người đã duyệt + người lập (M133)            | M   | tự làm  | W-002     |                  | Đóng — chủ repo giữ luật M129 (rủi ro chấp nhận)  |
+| W-004 | F-003 vô hiệu hoá tài khoản thay xoá (M134, migration + auth §8)              | M   | tự làm  | W-002     | #636 · `99782d0` | Xong — chủ repo merge squash (head `a59901a`)     |
+| W-005 | F-012 ratings qua `CAN` + F-011 gỡ fixme `/schedule`                          | S   | tự làm  | W-004     | #637 · `c61edc6` | Xong — mọi check xanh, merge squash               |
+| W-006 | F-010 job dọn staging ảnh mồ côi theo lịch                                    | M   | —       | —         | —                | Chấp nhận rủi ro (xem Quyết định) — nợ `PROGRESS` |
+| W-007 | Đồng bộ lộ trình §0.3 + `PROGRESS.md` + nợ chấp nhận (F-007, F-013)           | S   | tự làm  | W-005     | #637 · `c61edc6` | Xong — gộp PR W-005                               |
+| W-008 | Pha 4 — sửa Thấp từ audit hội tụ (khoá FK, mở khoá, `?project=` trùng cookie) | S   | tự làm  | W-004     | #637 · `c61edc6` | Xong — gộp PR W-005, review 0 chặn                |
 
 ## Quyết định và bằng chứng
 
@@ -123,11 +123,14 @@ Phát hiện mới: **F-012** `app/api/suppliers/[id]/ratings/route.ts` dùng `c
   tố theo lần chạy; thiếu test DB link push `assignTask` → nợ `PROGRESS.md` · bậc 2.
 - F-013 (UNIQUE `attendance`) → hoãn, ghi nợ · loại "thêm UNIQUE ngay" (dữ liệu production có thể đã trùng →
   migration hỏng hoặc phải xoá/gộp dữ liệu thật = không tự quyết) · bậc 1.
+- W-003: chủ repo trả lời (AskUserQuestion khi gọi lại `/auto-complete`, 2026-10-12) → **giữ luật M129**, F-009 thành
+  rủi ro chấp nhận trong `PROGRESS.md` + lộ trình §0.3 · không đổi code · bậc 1 (quyết định thuộc chủ repo).
 
 ## Kết quả hoàn thiện (Definition of Complete)
 
 1. §0.3 đủ kết cục: 6 mục đã xong trước (bằng chứng ở bảng trên); F-003 → #636 + #637; F-008 → #635; F-011/F-012
-   → #637; F-010, F-007, F-013 chấp nhận/hoãn có lý do trong `PROGRESS.md`; F-009 **chờ chủ repo** (W-003).
+   → #637; F-010, F-007, F-013 chấp nhận/hoãn có lý do trong `PROGRESS.md`; F-009 chấp nhận theo quyết định chủ
+   repo (giữ M129).
 2. 0 Cao/0 Trung còn mở (audit hội tụ Pha 4); CI `main` `c61edc6` xanh (CI, CodeQL, Lighthouse, Secret scan,
    Scorecard).
 3. `npm audit --omit=dev` = 0 lỗ hổng. Clone sạch (`scratchpad/clone-sach-1` @ `c61edc6`): `npm ci` OK,
@@ -143,5 +146,4 @@ lượt này không deploy.
 
 ## Bàn giao / bước tiếp theo
 
-- Chờ chủ repo trả lời W-003: đánh dấu IPC "đã chi" có chặn **mọi** người đã duyệt (và người lập) không, hay giữ
-  luật M129 "chỉ so người quyết bước cuối"? Có câu trả lời → gọi lại `/auto-complete` để làm W-003 (M133).
+- Lượt xong (`Done`). Việc còn lại đều ngoài phạm vi code: staging 0165/0166, deploy, UAT — thuộc chủ repo/vận hành.

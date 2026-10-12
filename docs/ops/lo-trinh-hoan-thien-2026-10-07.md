@@ -49,8 +49,8 @@ Migration mới nhất: `0170_offline_vault_bao_tri.sql`.
   - Đã sửa 2026-10-12: link `/tracking/<slug>` mang dự án (M132, #635); vô hiệu hoá tài khoản thay xoá người từng
     duyệt IPC (M134, #636); quyền đánh giá NCC/NTP qua `CAN.evaluateSuppliers` + gỡ fixme axe cuối `/schedule`
     (W-005).
-  - **Chờ chủ repo:** SoD đánh dấu chi mở rộng tới mọi người duyệt/người lập IPC — đổi chính sách quyền, có thể khoá
-    luồng chi của đội nhỏ (chỉ Admin/PM được đánh dấu chi).
+  - **Chấp nhận (chủ repo, 2026-10-12):** giữ luật M129 — SoD đánh dấu chi chỉ so người quyết bước cuối; mở rộng tới
+    mọi người duyệt/người lập IPC có thể khoá luồng chi của đội nhỏ (chỉ Admin/PM được đánh dấu chi).
   - **Chấp nhận rủi ro (nợ ghi `PROGRESS.md`):** job dọn staging ảnh mồ côi theo lịch (cần nới RLS
     `photo_upload_staging` hoặc cron mạo danh từng user — đổi mô hình bảo mật; ảnh hưởng chỉ dung lượng đĩa, đã dọn
     khi chính user upload lại); `REPORT_EMAIL_TO`/`TELEGRAM_CHAT_ID` nhận báo cáo mọi org (cần cấu hình production
