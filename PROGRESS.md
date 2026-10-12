@@ -1,5 +1,26 @@
 # PROGRESS — XBoss
 
+## 2026-10-12 — Nâng bộ khung lên `projects-template` @ `59bd1d1`: quy trình theo rủi ro, Sonnet mặc định, trần 5 subagent
+
+- **Chính sách (ADR-0014, chủ repo chọn trong phiên):** `.claude/settings.json` đổi `opusplan` → `claude-sonnet-5-5`
+  (Sonnet mới nhất; lập kế hoạch lớn thì `/model` lên Opus/Fable). `CLAUDE.md` thay "3 tầng bắt buộc" bằng
+  bảng mức S/M/L: phiên chính tự làm việc 1 PR, từ 2 PR giao worker theo `route:`, coordinator chỉ cho mức L
+  ≥ 2 PR độc lập; **trần 5 subagent đang chạy trong toàn cây** (coordinator còn 4 slot). Sàn chất lượng
+  (DoD, `npm run gate`, CI, test đỏ-trước, `audit-*` vùng §8) không đổi. Cập nhật kèm `coordinator.md`,
+  `.claude/README.md`, `.claude/rules/00-uu-tien-ecc.md`, TRAPS §7 (chốt chặn) + §8 mới.
+- **Tài liệu khung:** `docs/framework/` thay 6 file `KHUNG-*`/`AP-DUNG`/`BO-SUNG`/`KHOI-TAO` bằng bộ mới
+  nguyên văn + dấu bản `FRAMEWORK-VERSION` (loại khỏi prettier để `--upgrade` so hash). `docs/framework/XBOSS.md`
+  ghi phần lấy/không lấy + bảng tương ứng khung ↔ XBoss; nâng bản sau qua `scripts/framework-upgrade.sh`
+  (`copy-framework.sh --upgrade --no-hooks` rồi xoá file mới ngoài danh sách lấy — chạy thẳng script khung
+  ghi đè `/review`, `/maintain`, `incident-response.md`, đã kiểm trên bản sao).
+- **Workflow mới:** `codeql` (TS/JS + actions, `security-extended`), `dependency-review` (chặn gói high+
+  trên PR), `scorecard`, `stale-pr-alert` (PR mở > 7 ngày → 1 issue). `SECURITY.md` cập nhật (repo đã public).
+- **Agent/lệnh/hook:** agent `version-check`; lệnh `/debug`, `/incident`, `/deps-upgrade`, `/grill`, `/contract`
+  (chỉnh tham chiếu cho XBoss); hook PreCompact `precompact-checkpoint` + `session-resume` nạp lại
+  checkpoint khi `source=compact` (test trong `tests/claude-hooks.test.ts`).
+- **Không lấy** (lý do ở `XBOSS.md`): `/auto*`, `/completion`, `/audit-*`, `dev-task.sh`, engine Python,
+  telemetry, cầu nối Cursor/Gemini/Codex, `.mcp.json`, `ci.yml`/`pr-policy.yml` bản khung, `core.hooksPath`.
+
 ## 2026-10-11 — Đo lại 54 AC (S15) trên main `7f587bc` (PR #631)
 
 - `npm test -- --release-gate` trên PostgreSQL 16 cục bộ + Node 24, hai lượt: **373 file · 5031 pass · 0 fail ·

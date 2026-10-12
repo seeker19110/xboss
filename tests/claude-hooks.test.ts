@@ -84,6 +84,7 @@ test("settings.json đăng ký đủ hook, file tồn tại và chạy được"
     "protect-config.sh",
     "risk-zone-gate.sh",
     "stop-static-checks.sh",
+    "precompact-checkpoint.sh",
   ]) {
     assert.ok(lenh.includes(`/.claude/hooks/${h}`), `settings.json chưa đăng ký ${h}`);
     const st = statSync(join(HOOKS, h));
@@ -212,6 +213,27 @@ test("stop-static-checks: console.log mới trong lib/ → block; stop_hook_acti
 
   const lap = chay("stop-static-checks.sh", r, { session_id: "s", stop_hook_active: true });
   assert.equal(lap.json, null, "không được chặn lại khi đang trong vòng do chính hook gây ra");
+});
+
+test("precompact-checkpoint chụp trạng thái cây đang làm; session-resume chỉ nạp lại khi source=compact", () => {
+  const r = dungRepo();
+  writeFileSync(join(r, "lib/nen/dang-lam.ts"), "export const x = 1;\n");
+  // cwd = repo fixture: hook lấy gốc từ `git rev-parse` của cây đang làm (worktree), không từ CLAUDE_PROJECT_DIR.
+  const nen = spawnSync("bash", [join(HOOKS, "precompact-checkpoint.sh")], {
+    cwd: r,
+    input: JSON.stringify({ trigger: "auto" }),
+    encoding: "utf8",
+    env: { ...process.env, CLAUDE_PROJECT_DIR: GOC },
+  });
+  assert.equal(nen.status, 0);
+  const cp = readFileSync(join(r, ".claude/.compact-checkpoint"), "utf8");
+  assert.match(cp, /trigger: auto/);
+  assert.match(cp, /dang-lam\.ts/);
+
+  const ngu = (input: unknown) =>
+    chay("session-resume.sh", r, input).json?.hookSpecificOutput?.additionalContext as string;
+  assert.match(ngu({ source: "compact" }), /Checkpoint chụp ngay trước khi nén[\s\S]*dang-lam\.ts/);
+  assert.doesNotMatch(ngu({ source: "startup" }), /Checkpoint chụp/);
 });
 
 test("không còn file hook mồ côi (mọi *.sh trong .claude/hooks đều được đăng ký)", () => {

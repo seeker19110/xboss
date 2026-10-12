@@ -89,4 +89,18 @@ nó chỉ đọc PLAN.md rồi trả về "không có công cụ để giao vi�
 _Cách rà_: giao PLAN.md cho coordinator mà báo cáo về chỉ có "không giao được"/0 commit → đúng
 bẫy này. Cách đã dùng: phiên chính tự giao từng việc theo nhãn `route:` (mỗi việc
 `isolation: worktree`), tự gộp theo thứ tự trong PLAN.md và gọi `reviewer`.
-_Chốt chặn_: chưa có — việc đổi quy trình 3 tầng là quyết định của người dùng.
+_Chốt chặn_: ADR-0014 (2026-10-12) — 3 tầng thành tùy chọn chỉ cho mức L ≥ 2 PR độc lập; mặc định
+phiên chính tự làm (1 PR) hoặc giao thẳng worker (≥ 2 PR), không qua coordinator.
+
+## 8. Chạy thẳng `copy-framework.sh` của khung vào XBoss → ghi đè lệnh/runbook đã tuỳ biến
+
+`seeker19110/projects-template/copy-framework.sh` coi đích **chưa có** `docs/framework/FRAMEWORK-VERSION`
+là "copy lần đầu" — kể cả khi gọi `--upgrade` — và GHI ĐÈ Lớp 1: `.claude/commands/review.md`,
+`maintain.md`, `docs/ops/incident-response.md` (đã kiểm trên bản sao 2026-10-12); kèm ~117 file mới XBoss
+không dùng và `core.hooksPath=scripts/githooks` (vô hiệu husky). Clone khung `--depth 1` thì `--upgrade`
+thiếu commit cũ để merge 3 chiều.
+
+_Cách rà_: diff sau khi chạy có `M .claude/commands/*.md`/`docs/ops/*.md` mà không ai sửa tay, hoặc hàng
+loạt file lạ (`GEMINI.md`, `.mcp.json`, `scripts/_*.sh`).
+_Chốt chặn_: chỉ nâng khung qua `scripts/framework-upgrade.sh` (đòi clone đầy đủ + cây sạch, gọi
+`--upgrade --no-hooks`, xoá file mới ngoài danh sách lấy) — xem `docs/framework/XBOSS.md`.

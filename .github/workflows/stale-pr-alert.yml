@@ -1,0 +1,113 @@
+name: Stale PR alert
+
+# VÌ SAO CẦN (ADR-0014, lấy từ projects-template @ 59bd1d1): XBoss merge NGAY khi CI xanh, nên PR
+# còn mở quá một tuần gần như luôn là PR kẹt — check đỏ không ai sửa, hoặc một cổng không thể xanh
+# với tác nhân tạo PR (vd bot Dependabot không điền được mục PR template mà pr-policy.yml đòi).
+# Không cổng nào canh chuyện "PR mở lâu với cùng một check đỏ"; workflow này biến nó thành MỘT issue
+# tổng hợp hiện rõ. Chỉ ĐỌC PR + check run rồi mở/cập nhật issue. Không tự merge, không tự đóng PR.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1" # 06:17 UTC thứ Hai hằng tuần — đủ để bắt PR đọng, không ồn
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Tìm PR mở lâu và báo cáo
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          STALE_DAYS: "7"
+        with:
+          script: |
+            const staleDays = Number(process.env.STALE_DAYS || '7');
+            const cutoff = Date.now() - staleDays * 86400000;
+            const MARKER = '<!-- stale-pr-alert -->';
+
+            const prs = await github.paginate(github.rest.pulls.list, {
+              ...context.repo, state: 'open', per_page: 100,
+            });
+
+            const stale = [];
+            for (const pr of prs) {
+              if (pr.draft) continue;
+              if (new Date(pr.created_at).getTime() > cutoff) continue;
+              let failing = [];
+              let checksUnknown = false;
+              try {
+                const { data } = await github.rest.checks.listForRef({
+                  ...context.repo, ref: pr.head.sha, per_page: 100,
+                });
+                failing = data.check_runs
+                  .filter((c) => ['failure', 'timed_out', 'action_required'].includes(c.conclusion))
+                  .map((c) => c.name);
+              } catch (e) {
+                checksUnknown = true;
+                core.info(`Không đọc được check của #${pr.number}: ${e.message}`);
+              }
+              const ageDays = Math.floor((Date.now() - new Date(pr.created_at).getTime()) / 86400000);
+              stale.push({
+                n: pr.number, title: pr.title, author: pr.user.login, ageDays, failing, checksUnknown,
+              });
+            }
+
+            if (stale.length === 0) {
+              core.info(`Không có PR nào mở quá ${staleDays} ngày.`);
+              return;
+            }
+
+            const lines = stale
+              .sort((a, b) => b.ageDays - a.ageDays)
+              .map((s) => {
+                const why = s.failing.length
+                  ? `check đỏ: \`${s.failing.join('`, `')}\``
+                  : s.checksUnknown
+                    ? '**không đọc được trạng thái check** (xem log workflow)'
+                    : 'không có check đỏ — có thể đang chờ review';
+                return `- #${s.n} (${s.ageDays} ngày, @${s.author}) — ${why}`;
+              });
+
+            const body = [
+              MARKER,
+              `## ${stale.length} PR mở quá ${staleDays} ngày`,
+              '',
+              ...lines,
+              '',
+              '### Câu hỏi cần trả lời cho mỗi dòng có check đỏ',
+              '',
+              'Tác nhân tạo PR này **CÓ THỂ** làm check đó xanh không? Nếu không (vd bot không điền được',
+              'mục PR template) thì đây là **cổng tự deadlock**, không phải PR chưa đạt chuẩn —',
+              'sửa cổng, đừng chờ PR.',
+              '',
+              '_Cập nhật tự động bởi `.github/workflows/stale-pr-alert.yml`._',
+            ].join('\n');
+
+            const existing = (
+              await github.paginate(github.rest.issues.listForRepo, {
+                ...context.repo, state: 'open', per_page: 100,
+              })
+            ).find((i) => !i.pull_request && (i.body || '').includes(MARKER));
+
+            if (existing) {
+              await github.rest.issues.update({ ...context.repo, issue_number: existing.number, body });
+              core.info(`Đã cập nhật issue #${existing.number}`);
+            } else {
+              const { data } = await github.rest.issues.create({
+                ...context.repo,
+                title: `${stale.length} PR đang đọng (> ${staleDays} ngày)`,
+                body,
+              });
+              core.info(`Đã mở issue #${data.number}`);
+            }

@@ -41,14 +41,17 @@ Mục tiêu phản hồi: xác nhận trong vòng **72 giờ**; thống nhất m
 > Ngữ cảnh đặt qua GUC `app.project_id` trong `withProjectScope`/`withTransaction`
 > (`lib/db/index.ts`).
 
-## Hàng rào bảo mật DỰ KIẾN (Lớp 2 khung — chưa bật)
+## Hàng rào chuỗi cung ứng & SAST (bật 2026-10-12, ADR-0014)
 
-Nằm trong lộ trình (xem `PROGRESS.md` mục "Tiếp theo"):
+Repo đã **public** nên code scanning miễn phí. Kết quả lên tab **Security → Code scanning**:
 
-- **CodeQL (SAST)** — **bị chặn** vì repo đang **private** và chưa có GitHub Advanced Security.
-  Để bật: đưa repo **public** (CodeQL miễn phí) **hoặc** mua GHAS, rồi bật **Settings → Code security &
-  analysis → Code scanning**. Khi đủ điều kiện, thêm `.github/workflows/codeql.yml`
-  (mẫu sẵn trong `_framework-dropins/.github/workflows/codeql.yml`).
+- **CodeQL (SAST)** — `.github/workflows/codeql.yml`: TypeScript/JavaScript + chính workflow Actions, bộ
+  query `security-extended`, chạy mỗi PR/push `main` + hằng tuần.
+- **Dependency review** — `.github/workflows/dependency-review.yml`: chặn PR đưa vào gói có lỗ hổng mức
+  high trở lên (bổ sung `npm audit` của CI — báo đúng PR gây ra).
+- **OpenSSF Scorecard** — `.github/workflows/scorecard.yml`: chấm điểm chuỗi cung ứng (pin SHA, quyền
+  token, branch protection…) mỗi push `main` + hằng tuần; không công bố điểm ra ngoài.
+- **Cảnh báo PR đọng** — `.github/workflows/stale-pr-alert.yml`: PR mở quá 7 ngày → một issue tổng hợp.
 
 ## Nguyên tắc bất biến (không bao giờ phá)
 

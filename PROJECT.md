@@ -1,7 +1,7 @@
 # PROJECT.md — XBoss
 
 > Đặc tả dự án — nguồn sự thật về _cái gì cần xây_. Bản này được **viết ngược** từ code thật
-> (theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`, Bước 0) cho dự án đã phát triển.
+> (theo `docs/framework/existing-project-adoption.md`, Bước 0) cho dự án đã phát triển.
 > Đặc tả chi tiết hơn ở `spec.md`; ERD ở `docs/ERD.md`; deploy ở `DEPLOY.md`.
 
 ## 1. Vấn đề & Người dùng
