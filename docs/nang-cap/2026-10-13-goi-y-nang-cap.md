@@ -4,16 +4,16 @@
 
 ## Hiện trạng đo được
 
-| HEAD đọc | Action ghim SHA | Workflow thiếu `permissions:` cấp đầu | Dependabot | LICENSE · SECURITY | File test |
-|---|---|---|---|---|---|
-| `6eea2f6` (2026-10-13) | 39/39 | – | npm, github-actions | không · có | 470 |
+| HEAD đọc               | Action ghim SHA | Workflow thiếu `permissions:` cấp đầu | Dependabot          | LICENSE · SECURITY | File test |
+| ---------------------- | --------------- | ------------------------------------- | ------------------- | ------------------ | --------- |
+| `6eea2f6` (2026-10-13) | 39/39           | –                                     | npm, github-actions | không · có         | 470       |
 
 ## Đề xuất (🔴 cao · 🟠 trung bình · 🟢 nhẹ)
 
-| # | Mức | Đề xuất | Bằng chứng | Kiểm xong khi |
-|---|---|---|---|---|
-| 1 | 🟢 | Nâng ECC vendor từ v2.2.2 lên **v2.2.3** (`affaan-m/ECC`, phát hành 1/10/2026), chạy lại `scripts/ecc-vendor.ts` để cập nhật `.claude/ecc/lock.json` và sửa số liệu trong ADR-0013 | `docs/adr/0013-tich-hop-ecc.md:7` ghi "v2.2.2 @ `c70874f`" (URL đã đúng). Upstream v2.2.3 có 71 agent / 311 skill / 97 command, so với 68 / 293 / 94 trong ADR | `npm test` xanh (gồm `tests/ecc-vendor.test.ts`) và lock trỏ đúng tag mới |
-| 2 | 🟢 | Chọn LICENSE một cách có chủ đích, hoặc ghi rõ "giữ mọi quyền" trong README | Repo không có file LICENSE (mặc định pháp lý là giữ mọi quyền); trong khi đó vendor ECC MIT bắt buộc giữ thông báo bản quyền | Có `LICENSE` hoặc một dòng trong README; `.claude/ecc/` giữ thông báo MIT của ECC |
+| #   | Mức | Đề xuất                                                                                                                                                                            | Bằng chứng                                                                                                                                                     | Kiểm xong khi                                                                     |
+| --- | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 1   | 🟢  | Nâng ECC vendor từ v2.2.2 lên **v2.2.3** (`affaan-m/ECC`, phát hành 1/10/2026), chạy lại `scripts/ecc-vendor.ts` để cập nhật `.claude/ecc/lock.json` và sửa số liệu trong ADR-0013 | `docs/adr/0013-tich-hop-ecc.md:7` ghi "v2.2.2 @ `c70874f`" (URL đã đúng). Upstream v2.2.3 có 71 agent / 311 skill / 97 command, so với 68 / 293 / 94 trong ADR | `npm test` xanh (gồm `tests/ecc-vendor.test.ts`) và lock trỏ đúng tag mới         |
+| 2   | 🟢  | Chọn LICENSE một cách có chủ đích, hoặc ghi rõ "giữ mọi quyền" trong README                                                                                                        | Repo không có file LICENSE (mặc định pháp lý là giữ mọi quyền); trong khi đó vendor ECC MIT bắt buộc giữ thông báo bản quyền                                   | Có `LICENSE` hoặc một dòng trong README; `.claude/ecc/` giữ thông báo MIT của ECC |
 
 ## Giữ nguyên (điểm mạnh)
 

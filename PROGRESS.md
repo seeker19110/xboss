@@ -1,5 +1,10 @@
 # PROGRESS — XBoss
 
+## 2026-10-13 — Gợi ý nâng cấp từ đợt rà soát chéo (chỉ tài liệu)
+
+- Thêm `docs/nang-cap/2026-10-13-goi-y-nang-cap.md`: số liệu đo trên `main` + đề xuất có ưu tiên và tiêu chí xong,
+  gợi ý tích hợp từ catalog `seeker19110/stored`. **Chưa thực hiện đề xuất nào** — mỗi mục là việc riêng, chủ repo chọn.
+
 ## 2026-10-12 — Kết thúc lượt `/auto-complete` hoàn thiện nợ code (#635, #636, #637)
 
 - Đã merge: M132 link thông báo mang dự án (#635), M134 vô hiệu hoá tài khoản (#636), audit hội tụ + quyền
