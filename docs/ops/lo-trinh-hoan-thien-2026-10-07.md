@@ -39,7 +39,8 @@ Migration mới nhất: `0170_offline_vault_bao_tri.sql`.
 - **Vận hành/môi trường:** N05; staging cho 0165/0166/0167/0169; bật `XBOSS_STRICT_MEMBERSHIP` sau `membership:dry-run`
   - duyệt danh sách gán; bật PITR VPS; `.env.example` thêm `XBOSS_STRICT_MEMBERSHIP=0`, `XBOSS_OFFLINE_KEK`,
     `GOOGLE_SHEET_PROJECT_ID` (file bị khoá với agent).
-- **Chưa chạy cục bộ:** e2e `thiet-bi-offline-admin.spec.ts` (M131) — chờ CI.
+- **Đã chạy (2026-10-13):** e2e `thiet-bi-offline-admin.spec.ts` (M131) 5/5 xanh cục bộ (desktop + mobile, axe 2
+  theme) và nằm trong job e2e CI xanh trên `main`.
 - **Lớp M/O:** Safari/iOS thật; UAT 7 vai trò/hợp đồng/IPC-PDF thật; review độc lập (N03/N11).
 - **Code nhỏ (đối chiếu lại 2026-10-12, lượt `/auto-complete` — hồ sơ
   `docs/nang-cap/auto/2026-10-12-hoan-thien-no-code.md`):**

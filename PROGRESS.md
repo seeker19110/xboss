@@ -5,6 +5,19 @@
 - Thêm `docs/nang-cap/2026-10-13-goi-y-nang-cap.md`: số liệu đo trên `main` + đề xuất có ưu tiên và tiêu chí xong,
   gợi ý tích hợp từ catalog `seeker19110/stored`. **Chưa thực hiện đề xuất nào** — mỗi mục là việc riêng, chủ repo chọn.
 
+## 2026-10-13 — Rà lại nợ sau lượt `/auto-complete`: secret mặc định e2e ≥32 ký tự, M131 e2e chạy cục bộ
+
+- **Trạng thái:** merge #640 (`cd83afd`); lượt `/auto-complete` 2026-10-13 `Done` — không còn nợ làm được bằng
+  code, phần còn lại của #572 cần môi trường/người/thiết bị thật.
+
+- **Vấn đề (F-101):** `e2e/constants.ts` có secret mặc định 23 ký tự, trong khi webServer e2e chạy production
+  (`npm run start`) và `lib/nen/env.ts` đòi `XBOSS_SECRET` ≥32 ký tự → chạy e2e cục bộ không đặt biến thì bước đăng
+  nhập hỏng với thông báo "Email hoặc mật khẩu không đúng" (CI tự đặt secret dài nên không bị).
+- **Sửa:** kéo dài giá trị mặc định. Trước: setup đăng nhập đỏ; sau: `thiet-bi-offline-admin.spec.ts` 5/5 xanh chỉ
+  với `E2E_DATABASE_URL`/`DATABASE_URL` (DB mới). Lộ trình §0.3 bỏ mục "M131 e2e chưa chạy cục bộ".
+- Đối chiếu #572/#570: không có gì mới; nợ còn lại đều cần môi trường/người/thiết bị thật — hồ sơ
+  `docs/nang-cap/auto/2026-10-13-ra-soat-no-con-lai.md`.
+
 ## 2026-10-12 — Kết thúc lượt `/auto-complete` hoàn thiện nợ code (#635, #636, #637)
 
 - Đã merge: M132 link thông báo mang dự án (#635), M134 vô hiệu hoá tài khoản (#636), audit hội tụ + quyền

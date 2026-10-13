@@ -162,9 +162,10 @@ export XBOSS_SECRET=e2e-ci-secret-khong-bi-mat-du-32-ky-tu XBOSS_ADMIN_PASSWORD=
 npm run build && npx playwright test --project=setup --project=authed-desktop
 ```
 
-Lưu ý: mặc định `E2E_SECRET` trong `e2e/constants.ts` chỉ 23 ký tự, dưới ngưỡng 32 ký tự mà
-production yêu cầu, nên chạy e2e cục bộ **không đặt biến** thì luôn đỏ ở bước đăng nhập với
-thông báo "XBOSS_SECRET quá ngắn" — không phải lỗi test.
+Lưu ý: từ 2026-10-13 mặc định `E2E_SECRET` trong `e2e/constants.ts` đã ≥32 ký tự, nên chạy e2e cục bộ
+không đặt `XBOSS_SECRET`/`XBOSS_ADMIN_PASSWORD` cũng đăng nhập được (trước đó secret mặc định 23 ký tự làm
+bước đăng nhập đỏ với thông báo "Email hoặc mật khẩu không đúng"). Dùng DB e2e **mới**: seed không ghi đè mật
+khẩu admin đã có, DB cũ tạo bằng mật khẩu khác vẫn đỏ ở bước đăng nhập.
 
 ## 7. Kết quả cuối và nợ còn lại
 
