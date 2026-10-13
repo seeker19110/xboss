@@ -4,7 +4,7 @@ description: (ECC) Orchestrate a behavior-preserving refactor — confirm tests 
 metadata:
   origin: ECC
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · skills/orch-refine-code/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · skills/orch-refine-code/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # orch-refine-code
 

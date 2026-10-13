@@ -4,7 +4,7 @@ description: (ECC) React and Next.js performance optimization patterns adapted f
 metadata:
   origin: ECC
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · skills/react-performance/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · skills/react-performance/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # React Performance
 

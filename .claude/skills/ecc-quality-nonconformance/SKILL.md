@@ -2,7 +2,7 @@
 name: ecc-quality-nonconformance
 description: "(ECC) Quality control and non-conformance management for regulated manufacturing (FDA 21 CFR 820, IATF 16949, AS9100): NCR lifecycle and disposition, 5-Why/Ishikawa/fault-tree/8D root cause analysis, CAPA systems, SPC interpretation, AQL sampling, and supplier quality audits. Use when investigating non-conformances, performing root cause analysis, managing CAPAs, interpreting SPC data, or handling supplier quality issues."
 license: Apache-2.0
-homepage: https://github.com/affaan-m/everything-claude-code
+homepage: https://github.com/affaan-m/ECC
 metadata:
   version: 1.0.0
   origin: ECC
@@ -10,7 +10,7 @@ metadata:
   clawdbot:
     emoji: ""
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · skills/quality-nonconformance/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · skills/quality-nonconformance/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # Quality & Non-Conformance Management
 

@@ -141,3 +141,10 @@ Trạng thái (`status`) là slug: `chuan_bi`, `dang_thi_cong`, `hoan_thanh`, `t
 ## Tech Stack
 
 Next.js App Router · React · TypeScript strict · Tailwind (dark-first) · PostgreSQL qua `pg` (raw SQL, hệ migrate nhẹ) · Recharts · `@tanstack/react-table` · ExcelJS/SheetJS · `@react-pdf/renderer` · Lucide · Web Push · PWA · Sentry (tuỳ chọn). Chi tiết đầy đủ → `spec.md` §9.
+
+---
+
+## Giấy phép
+
+Chưa cấp giấy phép mã nguồn mở — mọi quyền thuộc chủ sở hữu repo. Phần vendor ECC (file `ecc-*` trong `.claude/agents|skills|commands/` và `.claude/rules/ecc/`) theo
+giấy phép MIT của tác giả gốc, giữ nguyên văn tại `.claude/ecc/LICENSE` (ADR-0013).

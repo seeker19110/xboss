@@ -10,7 +10,7 @@ paths:
   - "**/*.vue"
   - "**/*.svelte"
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · rules/web/security.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · rules/web/security.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 > This file extends [common/security.md](../common/security.md) with web-specific security content.
 
 # Web Security Rules

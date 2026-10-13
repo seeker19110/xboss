@@ -7,7 +7,7 @@ paths:
   - "**/use-*.ts"
   - "**/use-*.tsx"
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · rules/react/hooks.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · rules/react/hooks.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 # React Hooks
 
 > This file covers **React hooks** (`useState`, `useEffect`, `useMemo`, `useCallback`, custom hooks) — NOT the Claude Code `hooks/` runtime system. Naming matches the per-language convention `rules/<lang>/hooks.md` used across this repo.

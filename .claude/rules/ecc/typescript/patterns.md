@@ -5,7 +5,7 @@ paths:
   - "**/*.js"
   - "**/*.jsx"
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · rules/typescript/patterns.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · rules/typescript/patterns.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 # TypeScript/JavaScript Patterns
 
 > This file extends [common/patterns.md](../common/patterns.md) with TypeScript/JavaScript specific content.

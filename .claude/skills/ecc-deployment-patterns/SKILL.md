@@ -4,7 +4,7 @@ description: (ECC) Deployment workflows, CI/CD pipeline patterns, Docker contain
 metadata:
   origin: ECC
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · skills/deployment-patterns/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · skills/deployment-patterns/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # Deployment Patterns
 

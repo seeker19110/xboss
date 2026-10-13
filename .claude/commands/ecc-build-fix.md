@@ -1,7 +1,7 @@
 ---
 description: (ECC) Detect the project build system and incrementally fix build/type errors with minimal safe changes.
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · commands/build-fix.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · commands/build-fix.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # Build and Fix
 

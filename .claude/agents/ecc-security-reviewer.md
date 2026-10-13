@@ -4,7 +4,7 @@ description: (ECC) Security vulnerability detection and remediation specialist. 
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · agents/security-reviewer.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · agents/security-reviewer.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 ## Prompt Defense Baseline
 

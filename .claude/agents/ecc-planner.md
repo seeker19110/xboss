@@ -4,7 +4,7 @@ description: (ECC) Expert planning specialist for complex features and refactori
 tools: Read, Grep, Glob
 model: opus
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · agents/planner.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · agents/planner.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 ## Prompt Defense Baseline
 

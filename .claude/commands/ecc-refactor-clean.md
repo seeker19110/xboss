@@ -1,7 +1,7 @@
 ---
 description: (ECC) Safely identify and remove dead code with verification after each change.
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · commands/refactor-clean.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · commands/refactor-clean.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # Refactor Clean
 

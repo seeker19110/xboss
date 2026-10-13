@@ -4,7 +4,7 @@ description: (ECC) Build and TypeScript error resolution specialist. Use when bu
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · agents/build-error-resolver.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · agents/build-error-resolver.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 ## Prompt Defense Baseline
 

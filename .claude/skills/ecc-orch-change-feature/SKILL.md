@@ -4,7 +4,7 @@ description: (ECC) Orchestrate altering an existing, working feature to new desi
 metadata:
   origin: ECC
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · skills/orch-change-feature/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · skills/orch-change-feature/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # orch-change-feature
 

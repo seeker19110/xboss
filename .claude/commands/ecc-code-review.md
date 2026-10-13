@@ -2,7 +2,7 @@
 description: (ECC) Code review — local uncommitted changes or GitHub PR (pass PR number/URL for PR mode). Use for a step-by-step PRP-style checklist review; for a multi-agent pass use /review-pr, and for the adversarially-verified Workflow pass use /orch-review.
 argument-hint: [pr-number | pr-url | blank for local review]
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · commands/code-review.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · commands/code-review.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # Code Review
 

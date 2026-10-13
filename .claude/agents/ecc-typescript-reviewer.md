@@ -4,7 +4,7 @@ description: (ECC) Expert TypeScript/JavaScript code reviewer specializing in ty
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · agents/typescript-reviewer.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · agents/typescript-reviewer.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 ## Prompt Defense Baseline
 

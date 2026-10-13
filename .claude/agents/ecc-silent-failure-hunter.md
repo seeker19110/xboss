@@ -4,7 +4,7 @@ description: (ECC) Review code for silent failures, swallowed errors, bad fallba
 model: sonnet
 tools: Read, Grep, Glob, Bash
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · agents/silent-failure-hunter.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · agents/silent-failure-hunter.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 ## Prompt Defense Baseline
 

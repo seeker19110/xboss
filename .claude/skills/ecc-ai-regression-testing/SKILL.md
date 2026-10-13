@@ -4,7 +4,7 @@ description: (ECC) Regression testing strategies for AI-assisted development. Sa
 metadata:
   origin: ECC
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · skills/ai-regression-testing/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · skills/ai-regression-testing/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # AI Regression Testing
 

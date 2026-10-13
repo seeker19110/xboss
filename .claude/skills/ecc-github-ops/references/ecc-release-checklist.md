@@ -1,4 +1,4 @@
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · skills/github-ops/references/ecc-release-checklist.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · skills/github-ops/references/ecc-release-checklist.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # ECC Signed Patch Release Checklist
 

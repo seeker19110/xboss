@@ -1,7 +1,7 @@
 ---
 description: (ECC) Analyze coverage, identify gaps, and generate missing tests toward the target threshold.
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · commands/test-coverage.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · commands/test-coverage.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # Test Coverage
 

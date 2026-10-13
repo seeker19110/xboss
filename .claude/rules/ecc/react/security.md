@@ -6,7 +6,7 @@ paths:
   - "**/app/**/*.ts"
   - "**/pages/**/*.ts"
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · rules/react/security.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · rules/react/security.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 # React Security
 
 > This file extends [typescript/security.md](../typescript/security.md) and [common/security.md](../common/security.md) with React specific content.

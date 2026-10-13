@@ -4,7 +4,7 @@ description: (ECC) Accessibility Architect specializing in WCAG 2.2 compliance f
 model: sonnet
 tools: Read, Write, Edit, Grep, Glob
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · agents/a11y-architect.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · agents/a11y-architect.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 ## Prompt Defense Baseline
 
