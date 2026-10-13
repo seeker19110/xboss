@@ -7,7 +7,7 @@
   trong `00-uu-tien-ecc.md`. Tag v2.2.3 vẫn 68 agent / 293 skill / 94 command (sửa số sai trong tài liệu gợi ý).
 - **Giấy phép:** README thêm mục "Giấy phép" ghi hiện trạng (chưa cấp giấy phép mở, giữ mọi quyền; vendor ECC
   theo MIT tại `.claude/ecc/LICENSE`). Chọn giấy phép mở là quyết định của chủ repo — không tự làm.
-- Hồ sơ `docs/nang-cap/auto/2026-10-13-goi-y-642.md`.
+- Merge #643 (`c30339d`), CI 21/21 xanh; hồ sơ `docs/nang-cap/auto/2026-10-13-goi-y-642.md` (`Done`).
 
 ## 2026-10-13 — Gợi ý nâng cấp từ đợt rà soát chéo (chỉ tài liệu)
 
