@@ -7,7 +7,9 @@ export const ADMIN_EMAIL = "admin@xboss.vn";
 
 // Mật khẩu admin + secret ký phiên cho môi trường E2E (DB ephemeral, không phải bí mật thật).
 export const ADMIN_PW = process.env.XBOSS_ADMIN_PASSWORD ?? "e2e-admin-pw";
-export const E2E_SECRET = process.env.XBOSS_SECRET ?? "e2e-secret-khong-bi-mat";
+// ≥32 ký tự: webServer chạy production (`npm run start`), `lib/nen/env.ts` từ chối secret ngắn hơn →
+// đăng nhập hỏng với thông báo "sai mật khẩu" khi chạy e2e cục bộ không đặt XBOSS_SECRET.
+export const E2E_SECRET = process.env.XBOSS_SECRET ?? "e2e-secret-khong-bi-mat-du-32-ky-tu";
 // Keyring KEK vault offline (S05, định dạng `<version>:<secret ≥32 ký tự>`, khác XBOSS_SECRET) —
 // giá trị TEST cho DB ephemeral để vault/hàng đợi offline BẬT trong E2E (S08 browser acceptance).
 export const E2E_OFFLINE_KEK =
