@@ -1,6 +1,6 @@
 # /auto-complete 2026-10-13-no-flaky-con-lai — hoàn thiện dự án: nợ code còn lại sau #645
 
-- Trạng thái: Active
+- Trạng thái: Done
 - Bắt đầu: 2026-10-13 · base `origin/main` `dfd71b2`
 - Phạm vi: nợ ghi ở `PROGRESS.md` mục 2026-10-13 (#645): (a) IDB treo ở tab mở SAU khi một tab đã bị chặn (Trung);
   (b) 3 ca chập chờn chưa chẩn đoán — e2e `admin.spec.ts:52`, e2e `payment-certs-canh-bao:306`, unit
@@ -14,9 +14,9 @@
 | ID    | Việc (gốc)                                                  | Mức | route  | Phụ thuộc | PR · merge SHA   | Trạng thái · bằng chứng       |
 | ----- | ----------------------------------------------------------- | --- | ------ | --------- | ---------------- | ----------------------------- |
 | W-401 | IDB: open không sự kiện (tab sau tab bị chặn) → báo lỗi     | S   | tự làm | —         | #647 · `e97f62b` | merged; CI 21/21 xanh lần đầu |
-| W-402 | Sửa 2 ca e2e chập chờn (admin nav race, trap Tab hộp)       | S   | tự làm | W-401     |                  | đỏ-trước xong, chờ PR         |
-| W-403 | Ca unit `s16-quyen-luc-ghi-import-quet:343` (lỗi test)      | S   | tự làm | W-401     |                  | đỏ-trước xong, chờ PR         |
-| W-404 | Ca unit `s16-quyen-luc-ghi-hien-truong` cv files (lỗi test) | S   | tự làm | W-401     |                  | đỏ-trước xong, chờ PR         |
+| W-402 | Sửa 2 ca e2e chập chờn (admin nav race, trap Tab hộp)       | S   | tự làm | W-401     | #648 · `c35411c` | merged; CI 21/21 xanh lần đầu |
+| W-403 | Ca unit `s16-quyen-luc-ghi-import-quet:343` (lỗi test)      | S   | tự làm | W-401     | #648 · `c35411c` | merged; CI 21/21 xanh lần đầu |
+| W-404 | Ca unit `s16-quyen-luc-ghi-hien-truong` cv files (lỗi test) | S   | tự làm | W-401     | #648 · `c35411c` | merged; CI 21/21 xanh lần đầu |
 
 ## Quyết định và bằng chứng
 
@@ -81,8 +81,18 @@
   Lỗi app kèm (regex rev không neo: `DUCT_FLOOR3.dwg` → `Rev 3`) **không sửa trong lượt** — quét lại sau khi
   đổi parser sinh revision mới cho bản vẽ thật đã lưu sai rev (đụng dữ liệu thật, cần chủ repo đánh giá) → nợ.
 
+- Hoàn thiện: phạm vi = module hàng đợi offline (client) + trang Admin + `Modal` + 4 file test → audit theo file chạm:
+  `audit-logic` (W-401, 2 vòng, ĐẠT), `audit-ui` (W-402, ĐẠT, 2 Trung đã sửa), `reviewer` (W-402–404, chặn 1 đã
+  sửa); lượt quét cuối không sinh Cao mới. Clone sạch thay bằng CI #647/#648 (checkout sạch: build + test Postgres
+  - e2e 4 shard + coverage) · bậc 4. `npm audit --omit=dev`: 0 lỗ hổng.
+- DoC: gốc rễ có bằng chứng cho cả 6 ca (W-401 + 5 ca chập chờn) ✔; lỗi app có test hồi quy đỏ-trước (unit + e2e) ✔;
+  lỗi test sửa đúng điều kiện chờ, chạy lặp cục bộ xanh (offline-deep 42/42, admin 40/40, payment-certs 89/89) ✔;
+  CI PR #647/#648 xanh lần đầu ✔, `main` sau #647 xanh ✔ (sau #648: xem PR đóng lượt); nợ còn lại ghi `PROGRESS.md`
+  có chủ đích ✔. GO/NO-GO: không đổi (GO có điều kiện — deploy/UAT vẫn thuộc chủ repo).
+
 ## Bàn giao / bước tiếp theo
 
-- W-402/403/404 (một PR, đã có trong working tree trên base `e97f62b`): chờ e2e admin + payment-certs lặp 2
-  project × 3 trên build mới (`scratchpad/run402b.out`), rồi `gate --test --build` DB mới → commit → PR → merge.
-  Sau đó: đóng hồ sơ (Done, DoC), xoá `.claude/.auto-complete-loop`, dọn DB nháp + worktree `scratchpad/wt402`.
+- Không còn việc làm được bằng code trong phạm vi. Nợ kế tiếp (đợt sau, cần chủ repo): regex rev của
+  `parseDrawingInfo` không neo (đổi parser → quét lại sinh revision mới cho bản vẽ thật — đánh giá dữ liệu trước);
+  thông điệp/log khi IDB hết hạn chờ vì máy chậm; trap Tab tính `input.hidden`; job e2e không upload `test-results/`
+  (đổi workflow).
