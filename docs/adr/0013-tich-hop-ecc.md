@@ -4,7 +4,8 @@
 - **Ngày:** 2026-10-01
 - **Nối tiếp:** cấu hình 3 tầng trong `CLAUDE.md` ("Lập kế hoạch → điều phối → thi hành"), `docs/audit.md`,
   ADR-0012 (luật review AI theo đường dẫn — `.opencodereview/`)
-- **Nguồn upstream:** [`affaan-m/ECC`](https://github.com/affaan-m/ECC) v2.2.2 @ `c70874f`, giấy phép MIT
+- **Nguồn upstream:** [`affaan-m/ECC`](https://github.com/affaan-m/ECC) v2.2.3 @ `c05b2d6`, giấy phép MIT (quyết định lập trên v2.2.2 @ `c70874f`;
+  nâng 2026-10-13 theo quy trình skill `/ecc` — nội dung vendor chỉ đổi 1 URL `homepage`)
 
 ## Bối cảnh
 

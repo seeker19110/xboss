@@ -1,7 +1,7 @@
 ---
 description: (ECC) Sync documentation from source-of-truth files such as scripts, schemas, routes, and exports.
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · commands/update-docs.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · commands/update-docs.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # Update Documentation
 

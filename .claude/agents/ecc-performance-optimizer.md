@@ -4,7 +4,7 @@ description: (ECC) Performance analysis and optimization specialist. Use for ide
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · agents/performance-optimizer.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · agents/performance-optimizer.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 ## Prompt Defense Baseline
 

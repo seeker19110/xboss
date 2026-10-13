@@ -4,7 +4,7 @@ description: (ECC) Extracts behavioral specs from existing codebases for OpenSpe
 model: opus
 tools: Read, Grep, Glob, Bash, Write
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · agents/spec-miner.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · agents/spec-miner.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 ## Tool guardrails
 - `Write` may only create `openspec/specs/<capability>/spec.md`.

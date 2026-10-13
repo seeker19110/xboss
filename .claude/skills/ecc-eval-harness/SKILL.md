@@ -5,7 +5,7 @@ metadata:
   origin: ECC
 tools: Read, Write, Edit, Bash, Grep, Glob
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · skills/eval-harness/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · skills/eval-harness/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # Eval Harness Skill
 

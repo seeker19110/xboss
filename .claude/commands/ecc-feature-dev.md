@@ -1,7 +1,7 @@
 ---
 description: (ECC) Guided feature development with codebase understanding and architecture focus
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · commands/feature-dev.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · commands/feature-dev.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 A structured feature-development workflow that emphasizes understanding existing code before writing new code.
 

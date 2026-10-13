@@ -4,7 +4,7 @@ description: (ECC) Deeply analyzes existing codebase features by tracing executi
 model: sonnet
 tools: Read, Grep, Glob
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · agents/code-explorer.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · agents/code-explorer.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 ## Prompt Defense Baseline
 

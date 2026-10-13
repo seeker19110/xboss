@@ -10,7 +10,7 @@ paths:
   - "**/*.vue"
   - "**/*.svelte"
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · rules/web/coding-style.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · rules/web/coding-style.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 > This file extends [common/coding-style.md](../common/coding-style.md) with web-specific frontend content.
 
 # Web Coding Style

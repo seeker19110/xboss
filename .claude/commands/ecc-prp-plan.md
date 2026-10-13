@@ -2,7 +2,7 @@
 description: (ECC) Create comprehensive feature implementation plan with codebase analysis and pattern extraction
 argument-hint: <feature description | path/to/prd.md>
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · commands/prp-plan.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · commands/prp-plan.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 > Adapted from PRPs-agentic-eng by Wirasm. Part of the PRP workflow series.
 

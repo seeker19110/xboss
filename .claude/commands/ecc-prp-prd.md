@@ -2,7 +2,7 @@
 description: "(ECC) Interactive PRD generator - problem-first, hypothesis-driven product spec with back-and-forth questioning"
 argument-hint: "[feature/product idea] (blank = start with questions)"
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · commands/prp-prd.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · commands/prp-prd.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # Product Requirements Document Generator
 

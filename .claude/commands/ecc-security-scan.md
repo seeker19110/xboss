@@ -3,7 +3,7 @@ description: (ECC) Run AgentShield against agent, hook, MCP, permission, and sec
 agent: ecc-security-reviewer
 subtask: true
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · commands/security-scan.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · commands/security-scan.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # Security Scan Command
 

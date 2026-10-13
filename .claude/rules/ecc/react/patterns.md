@@ -7,7 +7,7 @@ paths:
   - "**/app/**/*.tsx"
   - "**/pages/**/*.tsx"
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · rules/react/patterns.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · rules/react/patterns.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 # React Patterns
 
 > This file extends [typescript/patterns.md](../typescript/patterns.md) and [common/patterns.md](../common/patterns.md) with React specific content. For hook-specific rules see [hooks.md](./hooks.md).

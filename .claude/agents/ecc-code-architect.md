@@ -4,7 +4,7 @@ description: (ECC) Designs feature architectures by analyzing existing codebase 
 model: sonnet
 tools: Read, Grep, Glob, Bash
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · agents/code-architect.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · agents/code-architect.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 ## Prompt Defense Baseline
 

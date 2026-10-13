@@ -4,7 +4,7 @@ description: (ECC) Accessibility patterns for React and Next.js — semantic HTM
 metadata:
   origin: community
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · skills/frontend-a11y/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · skills/frontend-a11y/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # Frontend Accessibility Patterns
 

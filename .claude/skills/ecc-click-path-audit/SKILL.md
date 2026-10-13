@@ -4,7 +4,7 @@ description: "(ECC) Trace every user-facing button/touchpoint through its full s
 metadata:
   origin: community
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · skills/click-path-audit/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · skills/click-path-audit/SKILL.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # /click-path-audit — Behavioural Flow Audit
 

@@ -1,7 +1,7 @@
 ---
 description: (ECC) Recommend the best model tier for the current task based on complexity, risk, and budget.
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · commands/model-route.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · commands/model-route.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # Model Route Command
 

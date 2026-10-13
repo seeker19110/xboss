@@ -7,7 +7,7 @@ paths:
   - "**/hooks/**/*.ts"
   - "**/hooks/**/*.js"
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · rules/react/coding-style.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · rules/react/coding-style.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 # React Coding Style
 
 > This file extends [typescript/coding-style.md](../typescript/coding-style.md) and [common/coding-style.md](../common/coding-style.md) with React specific content.

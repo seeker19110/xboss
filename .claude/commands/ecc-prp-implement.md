@@ -2,7 +2,7 @@
 description: (ECC) Execute an implementation plan with rigorous validation loops
 argument-hint: <path/to/plan.md>
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · commands/prp-implement.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · commands/prp-implement.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 > Adapted from PRPs-agentic-eng by Wirasm. Part of the PRP workflow series.
 

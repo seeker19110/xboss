@@ -4,7 +4,7 @@ description: (ECC) Analyze type design for encapsulation, invariant expression, 
 model: sonnet
 tools: Read, Grep, Glob
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · agents/type-design-analyzer.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · agents/type-design-analyzer.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 ## Prompt Defense Baseline
 

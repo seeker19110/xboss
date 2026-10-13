@@ -1,7 +1,7 @@
 ---
 description: (ECC) Answer a quick side question without interrupting or losing context from the current task. Resume work automatically after answering.
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · commands/aside.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · commands/aside.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 # Aside Command
 

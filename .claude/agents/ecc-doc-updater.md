@@ -4,7 +4,7 @@ description: (ECC) Documentation and codemap specialist. Use for updating codema
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: haiku
 ---
-<!-- ECC vendor: https://github.com/affaan-m/ECC @ c70874f · agents/doc-updater.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
+<!-- ECC vendor: https://github.com/affaan-m/ECC @ c05b2d6 · agents/doc-updater.md · MIT · sinh bởi scripts/ecc-vendor.ts — KHÔNG sửa tay, xem .claude/ecc/manifest.json -->
 
 ## Prompt Defense Baseline
 
