@@ -2,6 +2,9 @@
 
 ## 2026-10-13 — Rà lại nợ sau lượt `/auto-complete`: secret mặc định e2e ≥32 ký tự, M131 e2e chạy cục bộ
 
+- **Trạng thái:** merge #640 (`cd83afd`); lượt `/auto-complete` 2026-10-13 `Done` — không còn nợ làm được bằng
+  code, phần còn lại của #572 cần môi trường/người/thiết bị thật.
+
 - **Vấn đề (F-101):** `e2e/constants.ts` có secret mặc định 23 ký tự, trong khi webServer e2e chạy production
   (`npm run start`) và `lib/nen/env.ts` đòi `XBOSS_SECRET` ≥32 ký tự → chạy e2e cục bộ không đặt biến thì bước đăng
   nhập hỏng với thông báo "Email hoặc mật khẩu không đúng" (CI tự đặt secret dài nên không bị).
