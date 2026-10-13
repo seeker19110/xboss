@@ -1,5 +1,26 @@
 # PROGRESS — XBoss
 
+## 2026-10-13 — Gỡ 4 ca test chập chờn: 2 lỗi app (switch nav Admin, trap Tab hộp thoại) + 2 lỗi test
+
+- **Admin "Hiển thị AppShell" (lỗi app, e2e `admin.spec:52` đỏ 8/32 run CI):** switch hiện mặc định BẬT khi GET
+  `/api/nav-settings` chưa về; bấm lúc đó → GET (đọc DB trước PATCH) ghi đè cập nhật lạc quan → UI BẬT, DB TẮT.
+  Sửa: khoá switch khi đang tải **và khi GET lỗi** (trước đây lỗi/!ok cũng hiện BẬT mặc định, bấm được) + báo lỗi
+  `role="alert"` có "Thử lại". E2E giữ phản hồi GET (đỏ 4/4 build cũ) + ca GET 500 (đỏ 2/2).
+- **`Modal` trap Tab (lỗi app a11y):** tính control `disabled` là phần tử cuối → Tab từ phần tử bật cuối thoát khỏi
+  hộp `aria-modal`. Sửa: hằng `FOCUSABLE` bỏ `[disabled]`. E2E Tab từ "Huỷ" (đỏ 2/2). Ca `payment-certs:306`
+  (7/32 run) còn là lỗi test: lần mở thứ 2 Tab trước khi `Modal` kịp focus (setTimeout 50ms) → chờ focus vào hộp.
+- **M129 `payment-certs` (lỗi test, lộ khi chạy lặp cục bộ):** xoá cookie khi trang app còn mở → 401 → app tự
+  `location.replace("/login")` đua `page.goto("/login")` → `ERR_ABORTED`. Helper `doiTaiKhoan` rời trang trước.
+- **`s16-quyen-luc-ghi-import-quet:343` (lỗi test, ~5–7% lượt):** tên tệp quét chứa hậu tố base36 ngẫu nhiên; regex
+  rev của `parseDrawingInfo` đọc `r<số>` trong đó thành "Rev <số>" nên revision giữ chỗ cứng `'Rev A'` không chặn
+  → lấy rev từ parser (đỏ khi ép `Date.now()`).
+- **`s16-quyen-luc-ghi-hien-truong` cv files (lỗi test, 1/5 chạy riêng):** `UPLOAD_DIR` dùng chung giữa các DB test
+  (id đánh lại từ 1) → vớ tệp `cv<id>-*` hợp lệ của test khác → chỉ xét tệp mới sinh trong lời gọi.
+- **Nợ:** (Trung, lỗi app, cần chủ repo đánh giá dữ liệu) regex rev của `parseDrawingInfo` không neo — tên thật như
+  `DUCT_FLOOR3.dwg` ra "Rev 3"; sửa parser rồi quét lại sẽ sinh revision mới cho bản vẽ đã lưu sai rev. (Thấp) test
+  hiện trường còn cửa sổ nhỏ khi worker khác ghi `cv<id>-*` đúng lúc; trap Tab vẫn tính `input.hidden`/`fieldset
+[disabled]` và không kéo focus từ ngoài panel vào.
+
 ## 2026-10-13 — Hàng đợi offline không treo ở tab mở SAU một tab đã bị chặn nâng cấp IDB
 
 - **Lỗi app (nợ Trung từ #645):** hàng `open()` của IndexedDB chung cả origin — tab mở sau khi tab khác đã bị

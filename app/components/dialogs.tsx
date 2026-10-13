@@ -12,6 +12,12 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 const khongDangKy = () => () => {};
+/**
+ * Phần tử nhận được focus bằng Tab. Bỏ control `disabled`: trình duyệt bỏ qua chúng khi Tab, nên
+ * tính chúng là "phần tử cuối" làm trap hở — Tab từ phần tử bật cuối cùng thoát khỏi hộp aria-modal.
+ */
+const FOCUSABLE =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 // ── Modal nền tảng: overlay + Escape để đóng + khoá scroll nền ──────────────
 // Dùng chung cho mọi modal trong app thay vì tự dựng overlay từng nơi.
@@ -91,9 +97,7 @@ export function Modal({
     const t = setTimeout(() => {
       // Không cướp focus nếu người dùng đã focus sẵn vào phần tử trong modal.
       if (panelRef.current?.contains(document.activeElement)) return;
-      const first = panelRef.current?.querySelector<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      );
+      const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
       first?.focus();
     }, 50);
     return () => {
@@ -114,9 +118,7 @@ export function Modal({
         return;
       }
       if (e.key === "Tab" && panelRef.current) {
-        const focusable = panelRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        );
+        const focusable = panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE);
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
         if (!focusable.length) {
