@@ -1,5 +1,10 @@
 # PROGRESS — XBoss
 
+## 2026-10-13 — Gợi ý nâng cấp từ đợt rà soát chéo (chỉ tài liệu)
+
+- Thêm `docs/nang-cap/2026-10-13-goi-y-nang-cap.md`: số liệu đo trên `main` + đề xuất có ưu tiên và tiêu chí xong,
+  gợi ý tích hợp từ catalog `seeker19110/stored`. **Chưa thực hiện đề xuất nào** — mỗi mục là việc riêng, chủ repo chọn.
+
 ## 2026-10-13 — Rà lại nợ sau lượt `/auto-complete`: secret mặc định e2e ≥32 ký tự, M131 e2e chạy cục bộ
 
 - **Trạng thái:** merge #640 (`cd83afd`); lượt `/auto-complete` 2026-10-13 `Done` — không còn nợ làm được bằng
