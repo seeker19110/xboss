@@ -255,6 +255,35 @@ test("upgrade bị tab cũ chặn → lỗi rõ (không lưu), connection đến
   assert.equal(f.closes(), 1);
 });
 
+test("open còn bị chặn → lần mở sau reject ngay, KHÔNG xếp open mới sau nó (trình duyệt treo open đó tới khi tab cũ đóng)", async () => {
+  const f = fakeDb({});
+  const ff = fakeFactory(f);
+  const p1 = moCsdl(ff.factory);
+  ff.opens[0].onblocked?.();
+  await assert.rejects(p1, /tab cũ/);
+  await assert.rejects(moCsdl(ff.factory), /tab cũ/);
+  assert.equal(ff.opens.length, 1);
+
+  // Tab cũ đóng → open bị chặn hoàn tất (connection đến muộn bị đóng) → lần sau mở lại bình thường.
+  ff.opens[0].onupgradeneeded?.();
+  ff.opens[0].onsuccess?.();
+  const p3 = moCsdl(ff.factory);
+  assert.equal(ff.opens.length, 2);
+  ff.opens[1].onsuccess?.();
+  await p3;
+});
+
+test("open bị chặn rồi lỗi (huỷ nâng cấp) → cờ chặn được gỡ, lần sau mở lại được", async () => {
+  const f = fakeDb({});
+  const ff = fakeFactory(f);
+  const p1 = moCsdl(ff.factory);
+  ff.opens[0].onblocked?.();
+  await assert.rejects(p1, /tab cũ/);
+  ff.opens[0].onerror?.();
+  void moCsdl(ff.factory).catch(() => undefined);
+  assert.equal(ff.opens.length, 2);
+});
+
 test("CSDL đã ở version cao hơn (VersionError) → reject, không hạ cấp/xoá", async () => {
   const f = fakeDb({});
   const ff = fakeFactory(f);

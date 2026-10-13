@@ -328,7 +328,11 @@ test("A2-AC07: nâng cấp bị chặn (tab cũ giữ connection) — không tre
   await dungDbV1(tab2, true);
 
   await dangNhapCoLap(page, l.email);
+  // Đang bị chặn mà vẫn xin được khoá: hàng đợi KHÔNG treo theo open() bị chặn (trước đây mọi thao
+  // tác IDB xếp sau open đó → không xin khoá, tick sau khi hết chặn đua với lần xin khoá muộn).
+  const khoa = page.waitForResponse(laPost("/api/offline/vault/keys"), { timeout: 30_000 });
   const o = await moLuoi(page, l);
+  expect((await khoa).ok()).toBe(true);
   await catGuiO(context);
 
   // Tab 2 vẫn thấy DB version 1 và 2 bản ghi legacy nguyên vẹn (nâng cấp chưa/không được ép).
@@ -430,6 +434,8 @@ test("A2-AC08: SW bị dừng giữa lúc xếp hàng → online vẫn gửi đ�
   await context.setOffline(true);
   await o.nth(1).click();
   await expect(page.getByText(/Mất mạng — thao tác được lưu trên thiết bị/)).toBeVisible();
+  // Banner hiện ngay khi offline (cả lúc 0 op) — chờ op đã COMMIT vào hàng đợi mới đọc/đổi mạng.
+  await expect(page.getByText(/\(1 chờ gửi\), chưa lên máy chủ/)).toBeVisible();
   const [op] = (await docIdb(page)).ops2;
   expect(op).toBeTruthy();
 
@@ -503,6 +509,8 @@ test("A2-AC08: mất ACK (server đã xử lý, client không thấy response) �
   await context.setOffline(true);
   await o.nth(0).click();
   await expect(page.getByText(/Mất mạng — thao tác được lưu trên thiết bị/)).toBeVisible();
+  // Banner hiện ngay khi offline (cả lúc 0 op) — chờ op đã COMMIT vào hàng đợi mới đọc/đổi mạng.
+  await expect(page.getByText(/\(1 chờ gửi\), chưa lên máy chủ/)).toBeVisible();
   await context.setOffline(false);
   // Lần 1 xong (server đã ghi) nhưng client không biết: op còn trên thiết bị, về `pending`.
   await expect.poll(() => lan, { timeout: 30_000 }).toBe(1);
@@ -579,6 +587,8 @@ test("A2-AC08: không dựa vào Background Sync/broadcast (sync không khả d�
   await context.setOffline(true);
   await o.nth(2).click();
   await expect(page.getByText(/Mất mạng — thao tác được lưu trên thiết bị/)).toBeVisible();
+  // Banner hiện ngay khi offline (cả lúc 0 op) — chờ op đã COMMIT vào hàng đợi mới đọc/đổi mạng.
+  await expect(page.getByText(/\(1 chờ gửi\), chưa lên máy chủ/)).toBeVisible();
   const gui = page.waitForResponse(
     (r) => r.request().method() === "PATCH" && r.url().endsWith(`/api/dimensions/${dimId}`),
     { timeout: 30_000 },

@@ -19,6 +19,9 @@ async function axeKhongNghiemTrong(page: Page, nhan: string) {
 
 test.describe("Trang Thiết bị offline (Admin)", () => {
   test("2 tab hiển thị đúng, nút ≥40px, axe sạch ở theme tối + sáng", async ({ page }) => {
+    // Link footer có `transition` (màu chạy 150ms) còn nền đổi tức thì: axe chạy ngay sau khi đổi
+    // theme đo màu đang nội suy (1.01:1) → đỏ ngẫu nhiên. Giảm chuyển động = globals.css tắt transition.
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/admin/thiet-bi-offline");
     await expect(page.locator("header").getByText("Thiết bị offline", { exact: true })).toBeVisible(
       { timeout: 15_000 },
