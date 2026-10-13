@@ -11,12 +11,12 @@
 
 ## Kế hoạch
 
-| ID    | Việc (gốc)                                                  | Mức | route  | Phụ thuộc | PR · merge SHA | Trạng thái · bằng chứng |
-| ----- | ----------------------------------------------------------- | --- | ------ | --------- | -------------- | ----------------------- |
-| W-401 | IDB: open không sự kiện (tab sau tab bị chặn) → báo lỗi     | S   | tự làm | —         |                | đang làm                |
-| W-402 | Sửa 2 ca e2e chập chờn (admin nav race, trap Tab hộp)       | S   | tự làm | W-401     |                | gốc rễ xong, chờ code   |
-| W-403 | Ca unit `s16-quyen-luc-ghi-import-quet:343` (lỗi test)      | S   | tự làm | W-402     |                | gốc rễ xong, chờ code   |
-| W-404 | Ca unit `s16-quyen-luc-ghi-hien-truong` cv files (lỗi test) | S   | tự làm | W-402     |                | gốc rễ xong, chờ code   |
+| ID    | Việc (gốc)                                                  | Mức | route  | Phụ thuộc | PR · merge SHA   | Trạng thái · bằng chứng       |
+| ----- | ----------------------------------------------------------- | --- | ------ | --------- | ---------------- | ----------------------------- |
+| W-401 | IDB: open không sự kiện (tab sau tab bị chặn) → báo lỗi     | S   | tự làm | —         | #647 · `e97f62b` | merged; CI 21/21 xanh lần đầu |
+| W-402 | Sửa 2 ca e2e chập chờn (admin nav race, trap Tab hộp)       | S   | tự làm | W-401     |                  | đỏ-trước xong, chờ PR         |
+| W-403 | Ca unit `s16-quyen-luc-ghi-import-quet:343` (lỗi test)      | S   | tự làm | W-401     |                  | đỏ-trước xong, chờ PR         |
+| W-404 | Ca unit `s16-quyen-luc-ghi-hien-truong` cv files (lỗi test) | S   | tự làm | W-401     |                  | đỏ-trước xong, chờ PR         |
 
 ## Quyết định và bằng chứng
 
@@ -47,6 +47,29 @@
   dùng chung giữa các DB test (id công văn đánh lại từ 1 ở mỗi DB), test kiểm "không còn tệp `cv<id>-*`" nên vớ
   tệp hợp lệ của test/lượt khác cùng id. Sửa: so ảnh chụp tệp trước/sau lời gọi · loại "UPLOAD_DIR riêng mỗi
   worker" (đổi runner) · bậc 2.
+- Đỏ-trước W-402/403/404 (code app cũ, test mới): admin 4/4 đỏ (`aria-checked` "true" sau khi GET áp); hộp
+  thoại 2/2 đỏ (Tab từ "Huỷ" thoát hộp); s16 quét 2/2 đỏ khi ép `Date.now()` (test cũ), xanh test mới; s16 hiện
+  trường đỏ khi đặt sẵn tệp `cv<id>-*` (test cũ), xanh test mới. Bản đầu e2e admin xanh sai 2 lần: (1)
+  `page.route` không thấy request vì SW của app tự fetch `/api/*` → `test.use({ serviceWorkers: "block" })` ở
+  describe "Quản trị" (trang admin không dựa SW); (2) `waitForResponse` khớp nhầm GET `?_=` của AppHeader → khớp
+  đúng URL không query + chờ "Đang tải…" tắt (đã áp state). Bỏ ý "kéo focus từ ngoài vào" của trap (chờ focus
+  trong test là đủ, ít code hơn) · bậc 2.
+- Audit `audit-ui` W-402: ĐẠT, 0 Cao. Trung #1 (axe tab AppShell quét lúc switch đang khoá) — xác nhận bằng e2e:
+  `disabled:opacity-50` làm axe báo tương phản (2/3 desktop) → bỏ làm mờ (`disabled:cursor-not-allowed`,
+  `enabled:hover`), axe chờ `toBeEnabled`. Trung #2 (GET lỗi/!ok → vẫn hiện BẬT mặc định, bấm được = cùng lớp lỗi)
+  → sửa: `navLoi` khoá switch + `role="alert"` kèm "Thử lại"; e2e mới đỏ 2/2 trên build trước. Thấp #3/#5 →
+  `role="status"`, `aria-busy`, `unroute` trước reload. Thấp #6 (cửa sổ nhỏ còn lại ở test hiện trường khi worker
+  khác ghi `cv<id>-*` đúng lúc) → chấp nhận, ghi nợ · bậc 2. Ghi nhận ngoài diff: M129 mobile 1/3
+  `page.goto /login: net::ERR_ABORTED` cục bộ (chưa thấy ở 32 run CI).
+- M129 lặp lại (desktop, 2/6 lượt) → gốc rễ: dòng 516 `clearCookies()` khi trang app còn mở → poll kế tiếp 401 →
+  `lockPrivatePageUntilCachePurged` tự `location.replace("/login")` đua `page.goto("/login")` → lỗi test (có sẵn).
+  Sửa: helper `doiTaiKhoan` rời trang (`about:blank`) trước khi xoá cookie, áp 5 chỗ cùng mẫu trong spec ·
+  loại "goto about:blank trong `dangNhapCoLap`" (vẫn đua với redirect nếu cookie đã xoá) · bậc 1. Sau sửa
+  `payment-certs-canh-bao` 89/89 (2 project × 4); admin + payment-certs 105/105 trừ ca này trước đó.
+- Review `reviewer` W-402/403/404: chặn 1 (prettier `dialogs.tsx`) → sửa. Không chặn: race 2 GET chồng nhau khi đổi
+  tab qua lại (GET cũ mở khoá sớm/đặt lỗi muộn) → sửa bằng `navLuot` (chỉ lượt mới nhất ghi state) · bậc 1; JSDoc
+  `theme()` bị đẩy lệch → sửa; `addInitScript` trên `about:blank` có thể ném `pageerror` vô hại → giữ. Gate DB mới:
+  18/20, đỏ chỉ 3 file CI-only + prettier (đã sửa, `format:check` toàn repo xanh). Admin 40/40 sau build cuối.
 - Re-audit `audit-logic` phần để dành handle: ĐẠT, 0 Cao/Trung (không giao handle cũ sau xoá/nâng cấp; mỗi
   factory tối đa một request bỏ dở HOẶC một handle để dành; 5/6 mutant bị bắt). Thấp: `db.onclose = bo` không có
   test → thêm ca, mutant nay đỏ. `IdbTxDb.tx` không gỡ `dbPromise` khi connection chết không phát `close` (có từ
@@ -60,9 +83,6 @@
 
 ## Bàn giao / bước tiếp theo
 
-- W-401: e2e xong (offline-deep 42/42, ca mới đỏ cũ 4/4 – xanh mới 8/8), unit 17/17; đang chạy `gate --test
---build` (DB `xboss_gate401`) + re-audit phần để dành handle → commit, PR, merge. Rồi W-402/W-403: bản sửa đã soạn
-  trong worktree `scratchpad/wt402` (admin `disabled={navLoading}` + e2e giữ GET; `dialogs.tsx` FOCUSABLE bỏ
-  `disabled` + test Tab từ "Huỷ" + chờ focus lần mở 2; s16 lấy `rev` từ parser) — chép sang nhánh sau khi dựng lại
-  từ `origin/main`, chứng minh đỏ-trước (e2e admin/payment-certs build cũ; unit s16 với preload
-  `scratchpad/datenow-r.mjs`), rồi PR.
+- W-402/403/404 (một PR, đã có trong working tree trên base `e97f62b`): chờ e2e admin + payment-certs lặp 2
+  project × 3 trên build mới (`scratchpad/run402b.out`), rồi `gate --test --build` DB mới → commit → PR → merge.
+  Sau đó: đóng hồ sơ (Done, DoC), xoá `.claude/.auto-complete-loop`, dọn DB nháp + worktree `scratchpad/wt402`.

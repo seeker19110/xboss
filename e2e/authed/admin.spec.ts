@@ -11,6 +11,9 @@ async function gotoAdmin(page: Page) {
 }
 
 test.describe("Quản trị (sau đăng nhập)", () => {
+  // SW của app tự fetch mọi /api/* nên page.route không chặn được request của trang — chặn SW để
+  // test giữ phản hồi GET nav-settings (race tab "Hiển thị AppShell"); trang admin không dựa vào SW.
+  test.use({ serviceWorkers: "block" });
   test("render nội dung chính", async ({ page }) => {
     await gotoAdmin(page);
   });
@@ -81,6 +84,22 @@ test.describe("Quản trị (sau đăng nhập)", () => {
         timeout: 15_000,
       });
 
+      // GET /api/nav-settings của tab về CHẬM (mạng yếu): lấy phản hồi từ server ngay (giá trị
+      // cũ) rồi giữ lại — trước đây bấm switch trong lúc đó thì GET về sau ghi đè cập nhật lạc
+      // quan, switch nhảy về BẬT dù DB đã TẮT (đỏ ngẫu nhiên 8/32 run CI).
+      await page.route("**/api/nav-settings", async (r) => {
+        if (r.request().method() !== "GET") return r.fallback();
+        const res = await r.fetch();
+        await new Promise((ok) => setTimeout(ok, 1_500));
+        await r.fulfill({ response: res });
+      });
+      // Đúng GET của tab (không query) — AppHeader cũng GET `?_=<ts>` và có thể còn đang bay.
+      const getTab = page.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname === "/api/nav-settings" &&
+          !new URL(r.url()).search &&
+          r.request().method() === "GET",
+      );
       await page.getByRole("tab", { name: "Hiển thị AppShell" }).click();
       const row = page.getByRole("switch", { name: /Chuyển đổi số & Công nghệ/ });
       await expect(row).toBeVisible({ timeout: 15_000 });
@@ -94,8 +113,12 @@ test.describe("Quản trị (sau đăng nhập)", () => {
         ),
         row.click(),
       ]);
+      // GET của tab đã về VÀ đã áp vào state ("Đang tải…" chỉ tắt sau setNavSettings).
+      await getTab;
+      await expect(page.getByText("Đang tải…", { exact: true })).toHaveCount(0);
       await expect(row).toHaveAttribute("aria-checked", "false");
 
+      await page.unroute("**/api/nav-settings");
       // AppHeader chỉ tải nav-settings 1 lần lúc mount (không live-sync trong cùng trang) —
       // tải lại trang để xác nhận đã ghi DB thật, không phải chỉ optimistic UI.
       await page.reload();
@@ -127,10 +150,37 @@ test.describe("Quản trị (sau đăng nhập)", () => {
     ).toBeVisible({ timeout: 15_000 });
   });
 
+  test("tab Hiển thị AppShell: GET cài đặt lỗi → khoá switch + báo lỗi, Thử lại thì mở khoá", async ({
+    page,
+  }) => {
+    await gotoAdmin(page);
+    // Chỉ GET của tab (không query); AppHeader GET `?_=` không bị chạm. Không ghi gì vào DB.
+    let loi = true;
+    await page.route(
+      (u) => u.pathname === "/api/nav-settings" && !u.search,
+      (r) =>
+        r.request().method() === "GET" && loi
+          ? r.fulfill({ status: 500, json: { error: "lỗi thử" } })
+          : r.fallback(),
+    );
+    await page.getByRole("tab", { name: "Hiển thị AppShell" }).click();
+    const alert = page.getByRole("alert").filter({ hasText: "Không tải được cài đặt hiển thị" });
+    await expect(alert).toBeVisible({ timeout: 15_000 });
+    // Không biết giá trị thật → không cho bật/tắt theo mặc định đoán (trước đây hiện BẬT, bấm được).
+    await expect(page.getByRole("switch").first()).toBeDisabled();
+
+    loi = false;
+    await alert.getByRole("button", { name: "Thử lại" }).click();
+    await expect(alert).toHaveCount(0);
+    await expect(page.getByRole("switch").first()).toBeEnabled();
+  });
+
   test("tab Hiển thị AppShell không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
     await gotoAdmin(page);
     await page.getByRole("tab", { name: "Hiển thị AppShell" }).click();
     await expect(page.getByRole("switch").first()).toBeVisible({ timeout: 15_000 });
+    // Quét trạng thái thật (đã tải xong, switch bật được), không phải lúc đang khoá chờ GET.
+    await expect(page.getByRole("switch").first()).toBeEnabled();
 
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])

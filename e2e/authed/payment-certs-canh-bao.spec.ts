@@ -155,6 +155,16 @@ async function daDuocDuyet(page: Page) {
   await expect(tieuDeDot(page)).toContainText("Được duyệt", { timeout: 20_000 });
 }
 
+/**
+ * Đăng xuất để đăng nhập tài khoản khác: rời trang TRƯỚC khi xoá cookie. Xoá cookie khi trang app còn
+ * mở → lần gọi API kế tiếp của trang nhận 401 và tự `location.replace("/login")`, đua với
+ * `page.goto("/login")` của test → `net::ERR_ABORTED` (đỏ ngẫu nhiên M129).
+ */
+async function doiTaiKhoan(page: Page) {
+  await page.goto("about:blank");
+  await page.context().clearCookies();
+}
+
 /** Theme tối (darkblue) (theme sáng được kiểm riêng ở test A5-AC04 cuối file). */
 async function theme(page: Page, ten: "light" | "darkblue") {
   await page.addInitScript((t) => localStorage.setItem("xboss_theme", t), ten);
@@ -327,6 +337,12 @@ test.describe("IPC vượt khối lượng hợp đồng — cảnh báo + xác 
     const nang = axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
     expect(nang, JSON.stringify(nang, null, 2)).toEqual([]);
 
+    // Chưa tick nên "Xác nhận và duyệt" bị disabled: Tab từ "Huỷ" (phần tử bật cuối) phải quay
+    // vòng trong hộp, không thoát ra nền (trap từng tính nút disabled là phần tử cuối).
+    await dlg.getByRole("button", { name: "Huỷ" }).focus();
+    await page.keyboard.press("Tab");
+    expect(await dlg.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+
     await page.keyboard.press("Escape");
     await expect(dlg).toHaveCount(0);
     expect(soDecide).toBe(0);
@@ -338,6 +354,9 @@ test.describe("IPC vượt khối lượng hợp đồng — cảnh báo + xác 
     // Mở lại, đi hết bằng bàn phím tới "Xác nhận và duyệt" rồi Enter.
     await page.keyboard.press("Enter");
     await expect(dlg).toBeVisible();
+    // Modal focus phần tử đầu sau một nhịp (setTimeout) — chờ focus vào hộp rồi mới Tab, không thì
+    // các phím Tab chạy trước đi lạc ở trang nền (đỏ ngẫu nhiên 7/32 run CI).
+    await expect.poll(() => dlg.evaluate((el) => el.contains(document.activeElement))).toBe(true);
     const checkbox = dlg.getByRole("checkbox");
     for (
       let i = 0;
@@ -417,7 +436,7 @@ test.describe("Số tiền exact trên màn IPC (A3-AC05, lớp B)", () => {
     await expect(page.getByText("10.000.000.000.000 đ", { exact: true }).first()).toBeVisible();
 
     // Vai trò bị che (kỹ sư không có quyền xem thanh toán): API 403 và UI không lộ số nào.
-    await page.context().clearCookies();
+    await doiTaiKhoan(page);
     await dangNhapCoLap(page, co.nguoi.engineer.email);
     const che = await goiApi(page, "GET", `/api/payment-certs/${dotLon.id}`);
     expect(che.status).toBe(403);
@@ -503,7 +522,7 @@ test.describe("IPC đã duyệt — đánh dấu đã chi (M129, lớp B)", () =
     );
 
     // Đổi sang admin (người khác) để đánh dấu chi.
-    await page.context().clearCookies();
+    await doiTaiKhoan(page);
     await dangNhapCoLap(page, co.nguoi.admin.email);
     await moDot(page, d);
     await daDuocDuyet(page);
@@ -603,7 +622,7 @@ test.describe("IPC đã duyệt — chứng từ điều chỉnh (M128, lớp B)
     );
 
     // Admin (≠ người duyệt đợt) đánh dấu chi phiếu gốc → reversal sẽ sinh phiếu âm bù phần đã chi.
-    await page.context().clearCookies();
+    await doiTaiKhoan(page);
     await dangNhapCoLap(page, co.nguoi.admin.email);
     const dot = await ok(goiApi(page, "GET", `/api/payment-certs/${d.id}`), 200, "xem đợt");
     const billId = (dot.cert as { bill: { id: number } }).bill.id;
@@ -615,7 +634,7 @@ test.describe("IPC đã duyệt — chứng từ điều chỉnh (M128, lớp B)
     );
 
     // PM lập + trình chứng từ huỷ hiệu lực qua UI: cảnh báo nêu đúng −giá trị hiệu lực của đợt.
-    await page.context().clearCookies();
+    await doiTaiKhoan(page);
     await dangNhapCoLap(page, co.nguoi.pm.email);
     await moDot(page, d);
     await daDuocDuyet(page);
@@ -638,7 +657,7 @@ test.describe("IPC đã duyệt — chứng từ điều chỉnh (M128, lớp B)
     });
 
     // Admin duyệt ở hộp thư /approvals: hộp xác nhận NGUY HIỂM (huỷ hiệu lực cả đợt), axe sạch.
-    await page.context().clearCookies();
+    await doiTaiKhoan(page);
     await dangNhapCoLap(page, co.nguoi.admin.email);
     await page.goto("/approvals");
     // Dòng hộp thư = khối nhỏ nhất chứa cả nhãn loại chứng từ lẫn nút Duyệt.

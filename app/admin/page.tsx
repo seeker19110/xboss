@@ -20,6 +20,7 @@ import {
   Building2,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import Button from "@/app/components/ui/Button";
 import { fetchMe } from "@/app/lib/me";
 import { ROLE_LABELS } from "@/lib/nen/roles";
 import { DASHBOARD_TREE, dashboardStatus } from "@/app/lib/dashboardTree";
@@ -134,6 +135,8 @@ export default function AdminPage() {
   // Hiển thị AppShell (M21 PR3): bật/tắt dashboard trong sidebar.
   const [navSettings, setNavSettings] = useState<Record<string, boolean>>({});
   const [navLoading, setNavLoading] = useState(false);
+  // GET lỗi: không biết giá trị thật trong DB → khoá switch (không cho ghi đè theo mặc định đoán).
+  const [navLoi, setNavLoi] = useState(false);
   // Quản lý dự án + gán user (M22 PR2).
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
@@ -164,12 +167,27 @@ export default function AdminPage() {
       });
   }, []);
 
+  // Chỉ lượt GET mới nhất được ghi state (đổi tab qua lại khi GET cũ còn bay → không mở khoá sớm).
+  const navLuot = useRef(0);
   const loadNav = useCallback(() => {
+    const luot = ++navLuot.current;
+    const moiNhat = () => luot === navLuot.current;
     setNavLoading(true);
+    setNavLoi(false);
     fetch("/api/nav-settings", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((j) => setNavSettings(j.settings ?? {}))
-      .finally(() => setNavLoading(false));
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((j) => {
+        if (moiNhat()) setNavSettings(j.settings ?? {});
+      })
+      .catch(() => {
+        if (moiNhat()) setNavLoi(true);
+      })
+      .finally(() => {
+        if (moiNhat()) setNavLoading(false);
+      });
   }, []);
 
   const loadProjects = useCallback(() => {
@@ -773,13 +791,30 @@ export default function AdminPage() {
 
         {/* ========== TAB HIỂN THỊ APPSHELL (M21 PR3) ========== */}
         {tab === "nav" && (
-          <div className="space-y-4">
+          <div className="space-y-4" aria-busy={navLoading}>
             <p className="text-sm text-zinc-400">
               Bật/tắt dashboard hiển thị trong sidebar cho mọi người dùng. Mặc định mọi mục đều bật
               (kể cả badge &quot;Sắp có&quot; cho dashboard chưa có trang thật) — tắt ở đây để ẩn
               hẳn khỏi sidebar.
             </p>
-            {navLoading && <p className="text-sm text-zinc-500">Đang tải…</p>}
+            {navLoading && (
+              <p role="status" className="text-sm text-zinc-500">
+                Đang tải…
+              </p>
+            )}
+            {navLoi && (
+              <div
+                role="alert"
+                className="flex flex-wrap items-center gap-3 text-sm text-red-200 bg-red-950 border border-red-900 rounded-lg px-3 py-2"
+              >
+                <span className="flex-1">
+                  Không tải được cài đặt hiển thị — tạm khoá bật/tắt để không ghi sai.
+                </span>
+                <Button size="sm" onClick={loadNav}>
+                  Thử lại
+                </Button>
+              </div>
+            )}
             {DASHBOARD_TREE.map((cluster) => (
               <div
                 key={cluster.label}
@@ -802,7 +837,11 @@ export default function AdminPage() {
                         aria-checked={enabled}
                         aria-label={`${enabled ? "Tắt" : "Bật"} mục "${dash.label}"`}
                         onClick={() => toggleNav(dash.id!, !enabled)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left min-h-10 hover:bg-zinc-900/60 transition"
+                        // Chưa có giá trị thật từ DB (đang tải/lỗi): không cho bấm — GET về sau ghi
+                        // đè cập nhật lạc quan, UI hiện BẬT trong khi DB đã TẮT. Không làm mờ: chỉ
+                        // khoá thoáng chốc, chữ giữ nguyên tương phản.
+                        disabled={navLoading || navLoi}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left min-h-10 enabled:hover:bg-zinc-900/60 transition disabled:cursor-not-allowed"
                       >
                         <span className="flex-1 text-sm truncate">{dash.label}</span>
                         <span

@@ -254,19 +254,23 @@ test("import Excel: lỗi giữa chừng (sau khi đã ghi vài dòng) ⇒ ROLLB
 
 const PDF = Buffer.from("%PDF-1.4\n%%EOF");
 
-/** Tạo thư mục con riêng trong DRAWINGS_DIR thật với 3 tệp; trả mã theo ĐÚNG thứ tự quét. */
-async function taoTepQuet(): Promise<{ dir: string; codes: string[] }> {
+/**
+ * Tạo thư mục con riêng trong DRAWINGS_DIR thật với 3 tệp; trả mã + revision theo ĐÚNG thứ tự quét.
+ * Revision lấy từ parser, không giả định 'Rev A': tên tệp chứa hậu tố base36 ngẫu nhiên, có lượt
+ * mang `r<số>` mà regex rev đọc thành "Rev <số>" (từng làm ca giữ chỗ revision không chặn được).
+ */
+async function taoTepQuet(): Promise<{ dir: string; codes: string[]; revs: string[] }> {
   const { DRAWINGS_DIR, getAllDrawingFilesRecursively, parseDrawingInfo } =
     await import("@/lib/ky-thuat/drawings-scan");
   const sub = `__test_s16iq_${uniq("s").replace(/\W/g, "")}`;
   const dir = join(DRAWINGS_DIR, sub);
   mkdirSync(dir, { recursive: true });
   for (const c of ["A", "B", "C"]) writeFileSync(join(dir, `S16IQ_${sub}_${c}.pdf`), PDF);
-  const codes = getAllDrawingFilesRecursively(DRAWINGS_DIR)
+  const infos = getAllDrawingFilesRecursively(DRAWINGS_DIR)
     .filter((f) => f.relativePath.startsWith(`${sub}/`))
-    .map((f) => parseDrawingInfo(f.fileName).code);
-  assert.equal(codes.length, 3);
-  return { dir, codes };
+    .map((f) => parseDrawingInfo(f.fileName));
+  assert.equal(infos.length, 3);
+  return { dir, codes: infos.map((i) => i.code), revs: infos.map((i) => i.rev) };
 }
 
 async function goiQuet(): Promise<KetQua> {
@@ -317,9 +321,9 @@ test("quét bản vẽ: thu hồi quyền sau tệp đầu ⇒ dừng vòng lặ
   const { getPool, insertId } = await import("@/lib/db");
   const projectId = await taoDuAn("scan-mid");
   const u = await taoNguoi("engineer", "scan-mid");
-  const { dir, codes } = await taoTepQuet();
+  const { dir, codes, revs } = await taoTepQuet();
   const [ma1, ma2, ma3] = codes;
-  // Bản vẽ của tệp 2 có sẵn (chưa revision) để C1 chèn trước revision "Rev A" chưa COMMIT ⇒
+  // Bản vẽ của tệp 2 có sẵn (chưa revision) để C1 chèn trước đúng revision tệp 2 chưa COMMIT ⇒
   // lần ghi revision của tệp 2 kẹt ở unique (drawing_id, rev) SAU khi đã qua tái kiểm quyền.
   const drawing2 = await insertId(
     `INSERT INTO drawings (project_id, code, name) VALUES (?, ?, 'S16IQ tệp 2')`,
@@ -333,8 +337,8 @@ test("quét bản vẽ: thu hồi quyền sau tệp đầu ⇒ dừng vòng lặ
     await c1.query("BEGIN");
     await c1.query(
       `INSERT INTO drawing_revisions (drawing_id, rev, file_name, mime_type)
-       VALUES ($1, 'Rev A', 'giu-cho', 'application/pdf')`,
-      [drawing2],
+       VALUES ($1, $2, 'giu-cho', 'application/pdf')`,
+      [drawing2, revs[1]],
     );
     let xong = false;
     const dangBay = goiQuet().finally(() => {

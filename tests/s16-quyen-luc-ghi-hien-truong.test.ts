@@ -572,6 +572,9 @@ test(
   () =>
     voiCa("S16HT-cvfile", async (c) => {
       const cv = await taoCongVan(c);
+      // UPLOAD_DIR dùng chung giữa các DB test (id công văn đánh lại từ 1 ở mỗi DB): tệp `cv<id>-*`
+      // hợp lệ của test/lượt khác cùng id có sẵn — chỉ xét tệp MỚI sinh trong lời gọi này.
+      const coSan = new Set(await fileMoi(`cv${cv}-`));
       const fd = new FormData();
       fd.set("file", new File([PDF], "cv.pdf", { type: "application/pdf" }));
       const { POST } = await import("@/app/api/correspondences/[id]/files/route");
@@ -589,7 +592,7 @@ test(
         0,
       );
       assert.deepEqual(
-        await fileMoi(`cv${cv}-`),
+        (await fileMoi(`cv${cv}-`)).filter((n) => !coSan.has(n)),
         [],
         "file đã lưu lên storage phải bị dọn khi 403",
       );
