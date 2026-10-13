@@ -1,6 +1,6 @@
 # /auto-complete 2026-10-13-ra-soat-no-con-lai — Hoàn thiện dự án (rà lại nợ làm được bằng code)
 
-- Trạng thái: Active
+- Trạng thái: Done
 - Bắt đầu: 2026-10-13 · base `origin/main` `6eea2f6`
 - Phạm vi: đối chiếu lại lộ trình `docs/ops/lo-trinh-hoan-thien-2026-10-07.md` §0 + issue #572/#570 sau lượt
   `2026-10-12-hoan-thien-no-code` (Done); làm phần còn làm được bằng code · **KHÔNG làm:** N05/N09/N12 (VPS, PITR,
@@ -22,9 +22,9 @@
 
 ## Kế hoạch
 
-| ID    | Việc (F-xxx gốc)                                                    | Mức | route  | Phụ thuộc | PR · merge SHA | Trạng thái · bằng chứng                                             |
-| ----- | ------------------------------------------------------------------- | --- | ------ | --------- | -------------- | ------------------------------------------------------------------- |
-| W-101 | F-101 secret mặc định e2e ≥32 ký tự + ghi kết quả M131 e2e vào §0.3 | S   | tự làm | —         |                | Code xong — trước: setup đăng nhập đỏ; sau: 5/5 xanh không đặt biến |
+| ID    | Việc (F-xxx gốc)                                                    | Mức | route  | Phụ thuộc | PR · merge SHA   | Trạng thái · bằng chứng                                                                |
+| ----- | ------------------------------------------------------------------- | --- | ------ | --------- | ---------------- | -------------------------------------------------------------------------------------- |
+| W-101 | F-101 secret mặc định e2e ≥32 ký tự + ghi kết quả M131 e2e vào §0.3 | S   | tự làm | —         | #640 · `cd83afd` | Xong — mọi check xanh (gồm gitleaks), merge squash; trước: đăng nhập đỏ, sau: 5/5 xanh |
 
 ## Quyết định và bằng chứng
 
@@ -40,7 +40,21 @@
 - Gate `--test --build` trên DB mới: 5029 ca pass; chỉ 3 file DR/restore/migration-boundary đỏ do biến chỉ CI đặt
   (như mọi lượt); format sửa bằng prettier · bậc 3.
 
+- Bàn giao clone sạch: không chạy lại toàn bộ — từ `c61edc6` (clone sạch 2026-10-12: `npm ci` + build OK, 5029
+  pass) tới `main` hiện tại chỉ đổi `e2e/constants.ts` + tài liệu; gate `--test --build` hôm nay trên DB mới cho cùng
+  kết quả · loại chạy lại clone sạch (~25 phút, không thêm thông tin) · bậc 4.
+
+## Kết quả hoàn thiện (Definition of Complete)
+
+1. §0.3 không còn mục "chưa chạy/chờ" làm được bằng code: M131 e2e 5/5 xanh cục bộ + trong CI.
+2. F-101 sửa (#640) có bằng chứng đỏ trước/xanh sau; CI `main` xanh sau merge.
+3. `npm audit --omit=dev` = 0; lộ trình §0.3, `PROGRESS.md`, `docs/audit-hop-nhat-hub.md` khớp code.
+
+**Đề xuất phát hành: GO có điều kiện** — không đổi so với hồ sơ 2026-10-12 (0165/0166 qua staging trước production;
+deploy do chủ repo). Nợ còn lại của #572 (N01, N03, N05, N07 Safari/iOS, N09 PITR, N11 review độc lập, N12) đều
+cần môi trường/người/thiết bị thật — ngoài khả năng của lượt code.
+
 ## Bàn giao / bước tiếp theo
 
-- Chờ reviewer cho W-101 → `PROGRESS.md` + lộ trình §0.3 → gate `--test --build` → commit → push → PR → xanh thì
-  merge → đặt `Done`.
+- Lượt xong (`Done`). Không còn nợ làm được bằng code; việc kế tiếp thuộc vận hành/chủ repo (staging 0165/0166,
+  credential migrator #570, deploy, UAT).
