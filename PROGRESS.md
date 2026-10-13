@@ -1,6 +1,6 @@
 # PROGRESS — XBoss
 
-## 2026-10-13 — Gỡ 4 ca test chập chờn: 2 lỗi app (switch nav Admin, trap Tab hộp thoại) + 2 lỗi test
+## 2026-10-13 — Gỡ 5 ca test chập chờn: 2 lỗi app (switch nav Admin, trap Tab hộp thoại) + 3 lỗi test
 
 - **Admin "Hiển thị AppShell" (lỗi app, e2e `admin.spec:52` đỏ 8/32 run CI):** switch hiện mặc định BẬT khi GET
   `/api/nav-settings` chưa về; bấm lúc đó → GET (đọc DB trước PATCH) ghi đè cập nhật lạc quan → UI BẬT, DB TẮT.
@@ -20,6 +20,7 @@
   `DUCT_FLOOR3.dwg` ra "Rev 3"; sửa parser rồi quét lại sẽ sinh revision mới cho bản vẽ đã lưu sai rev. (Thấp) test
   hiện trường còn cửa sổ nhỏ khi worker khác ghi `cv<id>-*` đúng lúc; trap Tab vẫn tính `input.hidden`/`fieldset
 [disabled]` và không kéo focus từ ngoài panel vào.
+- Merge #648 (`c35411c`), CI 21/21 xanh lần đầu; hồ sơ `docs/nang-cap/auto/2026-10-13-no-flaky-con-lai.md` (`Done`).
 
 ## 2026-10-13 — Hàng đợi offline không treo ở tab mở SAU một tab đã bị chặn nâng cấp IDB
 
@@ -37,6 +38,7 @@
   (không log chẩn đoán); `docOpDaGiai(...).catch(() => [])` (có từ trước) nay trả rỗng sau 5s thay vì treo —
   form nhật ký có thể hiện như chưa có bản nháp; `IdbTxDb.tx` không gỡ `dbPromise` khi connection chết mà
   không phát `close` (Safari, có từ trước).
+- Merge #647 (`e97f62b`), CI 21/21 xanh lần đầu.
 
 ## 2026-10-13 — Sửa hàng đợi offline treo khi tab cũ chặn nâng cấp IDB (A2-AC07) + 2 ca e2e chập chờn
 
