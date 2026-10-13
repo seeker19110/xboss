@@ -69,6 +69,10 @@ function yeuCau<T>(r: IDBRequest<T>): Promise<T> {
   });
 }
 
+const LOI_BI_CHAN = "Hàng đợi đang được tab cũ sử dụng. Đóng các tab XBoss khác rồi thử lại.";
+/** Factory còn một open() bị chặn chưa kết thúc (success/error) — xem `moCsdl`. */
+const dangBiChan = new WeakSet<IDBFactory>();
+
 /**
  * Mở CSDL v2. Nâng cấp chỉ thêm store còn thiếu sau khi KIỂM catalog thật (store đã có mà sai
  * keyPath/index → huỷ nâng cấp, báo lỗi, không sửa/xoá). Bị tab cũ chặn → lỗi (không lưu).
@@ -76,6 +80,12 @@ function yeuCau<T>(r: IDBRequest<T>): Promise<T> {
  */
 export function moCsdl(idb: IDBFactory = indexedDB): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    // open() bị chặn vẫn nằm trong hàng của trình duyệt: open mới xếp SAU nó và treo tới khi tab cũ
+    // đóng (không nhận cả blocked) → báo lỗi ngay thay vì treo mọi thao tác hàng đợi.
+    if (dangBiChan.has(idb)) {
+      reject(new Error(LOI_BI_CHAN));
+      return;
+    }
     let req: IDBOpenDBRequest;
     try {
       req = idb.open(DB_NAME, DB_VERSION);
@@ -106,12 +116,14 @@ export function moCsdl(idb: IDBFactory = indexedDB): Promise<IDBDatabase> {
     };
     req.onblocked = () => {
       blocked = true;
-      reject(new Error("Hàng đợi đang được tab cũ sử dụng. Đóng các tab XBoss khác rồi thử lại."));
+      dangBiChan.add(idb);
+      reject(new Error(LOI_BI_CHAN));
     };
     req.onsuccess = () => {
       const db = req.result;
       // open() không huỷ được sau blocked: đóng handle đến muộn để không rò connection.
       if (blocked) {
+        dangBiChan.delete(idb);
         db.close();
         return;
       }
@@ -122,7 +134,10 @@ export function moCsdl(idb: IDBFactory = indexedDB): Promise<IDBDatabase> {
       }
       resolve(db);
     };
-    req.onerror = () => reject(req.error ?? new Error("Không mở được hàng đợi ngoại tuyến"));
+    req.onerror = () => {
+      if (blocked) dangBiChan.delete(idb);
+      reject(req.error ?? new Error("Không mở được hàng đợi ngoại tuyến"));
+    };
   });
 }
 

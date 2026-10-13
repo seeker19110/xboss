@@ -1,5 +1,25 @@
 # PROGRESS — XBoss
 
+## 2026-10-13 — Sửa hàng đợi offline treo khi tab cũ chặn nâng cấp IDB (A2-AC07) + 2 ca e2e chập chờn
+
+- **Lỗi app (A2-AC07):** `open()` bị tab cũ chặn vẫn nằm trong hàng của trình duyệt; `moCsdl` reject nhưng mọi
+  `open()` sau xếp SAU nó và treo tới khi tab cũ đóng → `IdbTxDb` cache promise treo, mọi thao tác hàng đợi
+  (mở lại op `paused_auth`, xin khoá vault, `themOp`) treo theo. Test e2e cũ không thấy vì `moLuoi` nuốt lỗi chờ
+  khoá; ca này dính 22/30 run CI gần nhất (đỏ hẳn 2 run, gồm `main` 12/10).
+- **Sửa:** `store.ts` nhớ factory còn open bị chặn chưa kết thúc (`WeakSet`) → `moCsdl` báo lỗi ngay thay vì xếp
+  open mới; open bị chặn kết thúc (success/error) thì gỡ cờ. Test hồi quy: unit (`audit-offline-store-commit`,
+  treo trên code cũ) + e2e A2-AC07 assert `POST /api/offline/vault/keys` thành công trong lúc bị chặn (timeout 30s trên
+  build cũ, 2/2).
+- **Test chờ sai điều kiện:** A2-AC08 (+2 ca cùng mẫu) chờ banner offline — banner hiện cả khi 0 op → đọc IDB trước
+  commit; nay chờ "(1 chờ gửi)". `thiet-bi-offline-admin` chạy axe khi màu link footer đang `transition` sau đổi
+  theme (1.01:1) → bật `reducedMotion`.
+- **Nợ còn lại:** (Trung, có từ trước) tab mở SAU khi một tab đã bị chặn vẫn treo IDB tới khi tab cũ đóng — cờ
+  chặn chỉ trong một tab; hướng sửa: timeout không-sự-kiện trong `moCsdl`. (Thấp) `damBaoVault` nuốt lỗi
+  `moLaiPausedAuth` không log; không làm mới thống kê khi open bị chặn hoàn tất.
+- **Flaky chưa chẩn đoán:** `e2e/authed/admin.spec.ts:52` (7/30 run), `payment-certs-canh-bao:306`
+  (10/30); job e2e không upload `test-results/` khi đỏ nên thiếu trace để chẩn đoán.
+- Hồ sơ `docs/nang-cap/auto/2026-10-13-e2e-flaky-offline.md`.
+
 ## 2026-10-13 — Làm 2 đề xuất #642: ECC vendor v2.2.3, README ghi tình trạng giấy phép
 
 - **ECC:** `manifest.json`/`lock.json` ghim tag v2.2.3 (`c05b2d6`), sinh lại bằng `npm run ecc:vendor`. Đọc diff
