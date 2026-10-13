@@ -1,6 +1,6 @@
 # /auto-complete 2026-10-13-e2e-flaky-offline — hoàn thiện dự án: ca e2e chập chờn lộ ra ở #644
 
-- Trạng thái: Active
+- Trạng thái: Done
 - Bắt đầu: 2026-10-13 · base `origin/main` `7c1917b`
 - Phạm vi: chẩn đoán gốc rễ + làm ổn định các ca e2e đỏ/flaky ở run 38344161012 (#644, PR chỉ đổi Markdown):
   `offline-deep.spec.ts:318` A2-AC07 "nâng cấp bị chặn" (đỏ cả 2 lần thử), flaky `offline-deep.spec.ts:417` A2-AC08
@@ -13,9 +13,9 @@
 
 ## Kế hoạch
 
-| ID    | Việc (gốc)                               | Mức | route  | Phụ thuộc | PR · merge SHA | Trạng thái · bằng chứng |
-| ----- | ---------------------------------------- | --- | ------ | --------- | -------------- | ----------------------- |
-| W-301 | Sửa A2-AC07 (lỗi app) + 2 ca e2e chờ sai | S   | tự làm | —         |                | đã sửa, đang kiểm       |
+| ID    | Việc (gốc)                               | Mức | route  | Phụ thuộc | PR · merge SHA   | Trạng thái · bằng chứng          |
+| ----- | ---------------------------------------- | --- | ------ | --------- | ---------------- | -------------------------------- |
+| W-301 | Sửa A2-AC07 (lỗi app) + 2 ca e2e chờ sai | S   | tự làm | —         | #645 · `85245c0` | merged; 4 shard e2e xanh lần đầu |
 
 ## Quyết định và bằng chứng
 
@@ -42,6 +42,15 @@
 - E2E lặp trên build mới: `offline-deep` + `thiet-bi-offline-admin`, 2 project × `--repeat-each=5` → 81/81 xanh
   (lần đầu 10 đỏ do assert `status()==200` — server trả 201 cho khoá mới; sửa thành `ok()`).
 
+- CI #645: 4 shard e2e xanh ngay lần đầu; `test (Postgres)` đỏ 1 ca không liên quan
+  (`s16-quyen-luc-ghi-import-quet.test.ts:343` quét bản vẽ, kết thúc sau 43ms) → bình luận PR + chạy lại 1 lần →
+  xanh. Giả thuyết: `scan-local` quét cả `DRAWINGS_DIR` dùng chung, `drawings-scan.test.ts` tạo/xoá tệp cùng thư
+  mục song song → ghi nợ `PROGRESS.md`, không sửa trong lượt (ngoài phạm vi) · bậc 2.
+- Hoàn thiện: phạm vi 1 module client + test → audit = `audit-logic` (ĐẠT); clone sạch thay bằng CI #645 (checkout
+  sạch: build + test Postgres + e2e 4 shard) · bậc 4. DoC: gốc rễ có bằng chứng ✔; test hồi quy đỏ-trước (unit +
+  e2e) ✔; lặp cục bộ 81/81 ✔; CI PR + `main` xanh ✔. GO/NO-GO: không đổi (GO có điều kiện).
+
 ## Bàn giao / bước tiếp theo
 
-- `npm run gate -- --test --build` (DB mới) → commit, push, PR W-301 → merge khi CI xanh.
+- Không còn việc làm được bằng code trong phạm vi. Nợ kế tiếp (đợt sau): flaky `admin.spec:52`,
+  `payment-certs-canh-bao:306`, `s16-quyen-luc-ghi-import-quet:343`; treo IDB ở tab mở sau tab bị chặn.

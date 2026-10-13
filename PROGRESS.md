@@ -17,8 +17,9 @@
   chặn chỉ trong một tab; hướng sửa: timeout không-sự-kiện trong `moCsdl`. (Thấp) `damBaoVault` nuốt lỗi
   `moLaiPausedAuth` không log; không làm mới thống kê khi open bị chặn hoàn tất.
 - **Flaky chưa chẩn đoán:** `e2e/authed/admin.spec.ts:52` (7/30 run), `payment-certs-canh-bao:306`
-  (10/30); job e2e không upload `test-results/` khi đỏ nên thiếu trace để chẩn đoán.
-- Hồ sơ `docs/nang-cap/auto/2026-10-13-e2e-flaky-offline.md`.
+  (10/30); unit `s16-quyen-luc-ghi-import-quet.test.ts:343` (quét bản vẽ kết thúc sớm — nghi `DRAWINGS_DIR` dùng
+  chung với `drawings-scan.test.ts` chạy song song); job e2e không upload `test-results/` khi đỏ nên thiếu trace để chẩn đoán.
+- Merge #645 (`85245c0`); hồ sơ `docs/nang-cap/auto/2026-10-13-e2e-flaky-offline.md` (`Done`).
 
 ## 2026-10-13 — Làm 2 đề xuất #642: ECC vendor v2.2.3, README ghi tình trạng giấy phép
 
