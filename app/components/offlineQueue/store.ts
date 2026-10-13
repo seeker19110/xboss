@@ -72,18 +72,38 @@ function yeuCau<T>(r: IDBRequest<T>): Promise<T> {
 const LOI_BI_CHAN = "Hàng đợi đang được tab cũ sử dụng. Đóng các tab XBoss khác rồi thử lại.";
 /** Factory còn một open() bị chặn chưa kết thúc (success/error) — xem `moCsdl`. */
 const dangBiChan = new WeakSet<IDBFactory>();
+/**
+ * Hạn chờ sự kiện ĐẦU TIÊN của open(). Tab mở SAU một tab đã bị chặn xếp open sau request bị chặn
+ * (hàng open chung cả origin) và không nhận sự kiện nào — kể cả blocked — tới khi tab cũ đóng.
+ */
+const HAN_CHO_MO_MS = 5_000;
+/**
+ * Handle hợp lệ của một open() đã bị bỏ (bị chặn/hết hạn chờ) đến muộn — giao cho lần mở kế tiếp
+ * thay vì đóng, để máy chậm thật (open > hạn chờ) không lặp mãi vòng hết hạn → báo lỗi.
+ */
+const deMuon = new WeakMap<IDBFactory, IDBDatabase>();
 
 /**
  * Mở CSDL v2. Nâng cấp chỉ thêm store còn thiếu sau khi KIỂM catalog thật (store đã có mà sai
  * keyPath/index → huỷ nâng cấp, báo lỗi, không sửa/xoá). Bị tab cũ chặn → lỗi (không lưu).
  * CSDL đã ở version cao hơn (code mới hơn) → VersionError → lỗi, không hạ cấp/xoá.
  */
-export function moCsdl(idb: IDBFactory = indexedDB): Promise<IDBDatabase> {
+export function moCsdl(
+  idb: IDBFactory = indexedDB,
+  hanChoMs = HAN_CHO_MO_MS,
+): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     // open() bị chặn vẫn nằm trong hàng của trình duyệt: open mới xếp SAU nó và treo tới khi tab cũ
     // đóng (không nhận cả blocked) → báo lỗi ngay thay vì treo mọi thao tác hàng đợi.
     if (dangBiChan.has(idb)) {
       reject(new Error(LOI_BI_CHAN));
+      return;
+    }
+    const deLai = deMuon.get(idb);
+    if (deLai) {
+      deMuon.delete(idb);
+      deLai.onversionchange = deLai.onclose = null;
+      resolve(deLai);
       return;
     }
     let req: IDBOpenDBRequest;
@@ -93,8 +113,16 @@ export function moCsdl(idb: IDBFactory = indexedDB): Promise<IDBDatabase> {
       reject(e);
       return;
     }
+    // `blocked` = đã bỏ request này (bị chặn hoặc hết hạn chờ): báo lỗi ngay, handle đến muộn để dành.
     let blocked = false;
+    const boRequest = () => {
+      blocked = true;
+      dangBiChan.add(idb);
+      reject(new Error(LOI_BI_CHAN));
+    };
+    const hen = setTimeout(boRequest, hanChoMs);
     req.onupgradeneeded = () => {
+      clearTimeout(hen);
       const db = req.result;
       const tx = req.transaction;
       if (!db.objectStoreNames.contains(STORE_OPS)) {
@@ -115,19 +143,34 @@ export function moCsdl(idb: IDBFactory = indexedDB): Promise<IDBDatabase> {
       else if (tx && tx.objectStore(STORE_META).keyPath !== "k") tx.abort();
     };
     req.onblocked = () => {
-      blocked = true;
-      dangBiChan.add(idb);
-      reject(new Error(LOI_BI_CHAN));
+      clearTimeout(hen);
+      boRequest();
     };
     req.onsuccess = () => {
+      clearTimeout(hen);
       const db = req.result;
-      // open() không huỷ được sau blocked: đóng handle đến muộn để không rò connection.
+      const catalogDung =
+        db.objectStoreNames.contains(STORE_OPS) && db.objectStoreNames.contains(STORE_META);
+      // open() không huỷ được sau khi bỏ: để dành handle đến muộn cho lần mở kế tiếp; tab khác nâng
+      // cấp/xoá CSDL trong lúc chờ → đóng ngay để không chặn họ, không rò connection.
       if (blocked) {
         dangBiChan.delete(idb);
-        db.close();
+        if (!catalogDung) {
+          db.close();
+          return;
+        }
+        const bo = () => {
+          if (deMuon.get(idb) === db) deMuon.delete(idb);
+        };
+        db.onversionchange = () => {
+          db.close();
+          bo();
+        };
+        db.onclose = bo;
+        deMuon.set(idb, db);
         return;
       }
-      if (!db.objectStoreNames.contains(STORE_OPS) || !db.objectStoreNames.contains(STORE_META)) {
+      if (!catalogDung) {
         db.close();
         reject(new Error("Catalog hàng đợi ngoại tuyến không đúng phiên bản"));
         return;
@@ -135,6 +178,7 @@ export function moCsdl(idb: IDBFactory = indexedDB): Promise<IDBDatabase> {
       resolve(db);
     };
     req.onerror = () => {
+      clearTimeout(hen);
       if (blocked) dangBiChan.delete(idb);
       reject(req.error ?? new Error("Không mở được hàng đợi ngoại tuyến"));
     };

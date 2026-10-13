@@ -245,7 +245,16 @@ test("mở thành công nhưng thiếu store v2 → reject + đóng connection (
   assert.equal(f.closes(), 1);
 });
 
-test("upgrade bị tab cũ chặn → lỗi rõ (không lưu), connection đến muộn bị đóng", async () => {
+/** Promise phải xong trong `ms` — code cũ treo thì đỏ bằng assert rõ, không bị huỷ lây cả file. */
+function trongHan<T>(p: Promise<T>, ms = 500): Promise<T> {
+  let hen: ReturnType<typeof setTimeout> | undefined;
+  const treo = new Promise<never>((_, j) => {
+    hen = setTimeout(() => j(new Error(`treo quá ${ms}ms`)), ms);
+  });
+  return Promise.race([p, treo]).finally(() => clearTimeout(hen));
+}
+
+test("upgrade bị tab cũ chặn → lỗi rõ (không lưu); handle đến muộn có catalog lạ bị đóng", async () => {
   const f = fakeDb({});
   const ff = fakeFactory(f);
   const p = moCsdl(ff.factory);
@@ -253,6 +262,42 @@ test("upgrade bị tab cũ chặn → lỗi rõ (không lưu), connection đến
   await assert.rejects(p, /tab cũ/);
   ff.opens[0].onsuccess?.();
   assert.equal(f.closes(), 1);
+});
+
+test("handle hợp lệ đến muộn được để dành cho lần mở kế tiếp; tab khác nâng cấp trong lúc chờ → đóng, bỏ", async () => {
+  const f = fakeDb({});
+  const ff = fakeFactory(f);
+  const p = moCsdl(ff.factory, 20);
+  ff.opens[0].onblocked?.();
+  await assert.rejects(p, /tab cũ/);
+  ff.opens[0].onupgradeneeded?.();
+  ff.opens[0].onsuccess?.();
+  assert.equal(f.closes(), 0);
+  assert.equal(await trongHan(moCsdl(ff.factory, 20)), f.db);
+  assert.equal(ff.opens.length, 1, "dùng lại handle đến muộn, không open mới");
+
+  // Lần bỏ thứ hai: handle để dành nhận versionchange (tab khác nâng cấp/xoá) → đóng, lần sau open mới.
+  const p2 = moCsdl(ff.factory, 20);
+  ff.opens[1].onblocked?.();
+  await assert.rejects(p2, /tab cũ/);
+  ff.opens[1].onsuccess?.();
+  f.db.onversionchange?.();
+  assert.equal(f.closes(), 1);
+  const p3 = moCsdl(ff.factory, 20);
+  assert.equal(ff.opens.length, 3);
+  ff.opens[2].onsuccess?.();
+  await p3;
+
+  // Handle để dành bị trình duyệt đóng cưỡng bức (xoá dữ liệu site) → bỏ, không giao handle chết.
+  const p4 = moCsdl(ff.factory, 20);
+  ff.opens[3].onblocked?.();
+  await assert.rejects(p4, /tab cũ/);
+  ff.opens[3].onsuccess?.();
+  f.db.onclose?.();
+  const p5 = moCsdl(ff.factory, 20);
+  assert.equal(ff.opens.length, 5, "handle đã đóng không được giao lại");
+  ff.opens[4].onsuccess?.();
+  await p5;
 });
 
 test("open còn bị chặn → lần mở sau reject ngay, KHÔNG xếp open mới sau nó (trình duyệt treo open đó tới khi tab cũ đóng)", async () => {
@@ -264,13 +309,11 @@ test("open còn bị chặn → lần mở sau reject ngay, KHÔNG xếp open m�
   await assert.rejects(moCsdl(ff.factory), /tab cũ/);
   assert.equal(ff.opens.length, 1);
 
-  // Tab cũ đóng → open bị chặn hoàn tất (connection đến muộn bị đóng) → lần sau mở lại bình thường.
+  // Tab cũ đóng → open bị chặn hoàn tất (handle để dành) → lần sau dùng được ngay.
   ff.opens[0].onupgradeneeded?.();
   ff.opens[0].onsuccess?.();
-  const p3 = moCsdl(ff.factory);
-  assert.equal(ff.opens.length, 2);
-  ff.opens[1].onsuccess?.();
-  await p3;
+  assert.equal(await trongHan(moCsdl(ff.factory)), f.db);
+  assert.equal(ff.opens.length, 1);
 });
 
 test("open bị chặn rồi lỗi (huỷ nâng cấp) → cờ chặn được gỡ, lần sau mở lại được", async () => {
@@ -280,8 +323,56 @@ test("open bị chặn rồi lỗi (huỷ nâng cấp) → cờ chặn được 
   ff.opens[0].onblocked?.();
   await assert.rejects(p1, /tab cũ/);
   ff.opens[0].onerror?.();
-  void moCsdl(ff.factory).catch(() => undefined);
+  void moCsdl(ff.factory, 20).catch(() => undefined);
   assert.equal(ff.opens.length, 2);
+});
+
+test("open không nhận sự kiện nào (tab khác đang bị chặn trước nó) → hết hạn chờ thì báo lỗi, không treo", async () => {
+  const f = fakeDb({});
+  const ff = fakeFactory(f);
+  await assert.rejects(trongHan(moCsdl(ff.factory, 20)), /tab cũ/);
+  // Open treo vẫn trong hàng: lần sau báo lỗi ngay, không xếp thêm open.
+  await assert.rejects(trongHan(moCsdl(ff.factory, 20)), /tab cũ/);
+  assert.equal(ff.opens.length, 1);
+  // Hết chặn (hoặc máy chậm) → open treo hoàn tất → handle để dành cho lần sau, không open lại.
+  ff.opens[0].onupgradeneeded?.();
+  ff.opens[0].onsuccess?.();
+  assert.equal(f.closes(), 0);
+  assert.equal(await trongHan(moCsdl(ff.factory, 20)), f.db);
+  assert.equal(ff.opens.length, 1);
+});
+
+test("open xong (success/lỗi) trước hạn chờ → hạn chờ huỷ, không đặt cờ chặn về sau", async () => {
+  const f = fakeDb({});
+  const ff = fakeFactory(f);
+  const p0 = moCsdl(ff.factory, 20);
+  ff.opens[0].onupgradeneeded?.();
+  ff.opens[0].onsuccess?.();
+  await p0;
+  // CSDL đã đủ catalog: open chỉ nhận success (không có upgradeneeded huỷ hạn chờ hộ).
+  const p = moCsdl(ff.factory, 20);
+  ff.opens[1].onsuccess?.();
+  await p;
+  const pLoi = moCsdl(ff.factory, 20);
+  ff.opens[2].error = new Error("UnknownError");
+  ff.opens[2].onerror?.();
+  await assert.rejects(pLoi, /UnknownError/);
+  await new Promise((ok) => setTimeout(ok, 60));
+  const p3 = moCsdl(ff.factory, 20);
+  assert.equal(ff.opens.length, 4, "không bị cờ chặn sót từ hạn chờ cũ");
+  ff.opens[3].onsuccess?.();
+  await trongHan(p3);
+});
+
+test("open có sự kiện trước hạn chờ (nâng cấp chậm) → không bị coi là treo", async () => {
+  const f = fakeDb({});
+  const ff = fakeFactory(f);
+  const p = moCsdl(ff.factory, 20);
+  ff.opens[0].onupgradeneeded?.();
+  await new Promise((ok) => setTimeout(ok, 40));
+  ff.opens[0].onsuccess?.();
+  await p;
+  assert.equal(f.closes(), 0);
 });
 
 test("CSDL đã ở version cao hơn (VersionError) → reject, không hạ cấp/xoá", async () => {

@@ -371,6 +371,49 @@ test("A2-AC07: nâng cấp bị chặn (tab cũ giữ connection) — không tre
   await tab2.close();
 });
 
+test("A2-AC07: tab mở SAU một tab đã bị chặn — open không nhận sự kiện nào: tick báo lỗi rõ (không treo); hết chặn thì lưu được", async ({
+  page,
+  context,
+}) => {
+  const l = await dungLuoi();
+  await theoDoiXoaDb(page);
+  const tab2 = await context.newPage();
+  await tab2.goto(TRANG_TINH);
+  await dungDbV1(tab2, true);
+
+  // Tab A mở app trước → open(v2) bị chặn và nằm trong hàng open chung của origin.
+  await dangNhapCoLap(page, l.email);
+  await moLuoi(page, l);
+
+  // Tab B mở sau: open của nó xếp SAU request bị chặn của tab A, không nhận sự kiện nào (kể cả
+  // blocked) → trước đây mọi thao tác hàng đợi của tab B treo tới khi tab cũ đóng. Tab B nhận lại
+  // khoá tab A đã xin qua unlock (cùng thiết bị + manifest) nên không có POST keys để chờ — dấu
+  // hiệu treo là tick không bao giờ ra kết quả (không báo lỗi, không báo đã lưu).
+  const tabB = await context.newPage();
+  const o = await moLuoi(tabB, l);
+  await catGuiO(context);
+
+  const truoc = await o.nth(0).isChecked();
+  await o.nth(0).click();
+  await expect(tabB.getByText(OFFLINE_SAVE_ERROR)).toBeVisible({ timeout: 15_000 });
+  await expect(tabB.getByText(/thay đổi đang\s+lưu trên thiết bị/)).toHaveCount(0);
+  await expect(o.nth(0)).toBeChecked({ checked: truoc });
+
+  // Tab cũ đóng → nâng cấp hoàn tất; tab B lưu được, legacy nguyên vẹn, không deleteDatabase.
+  await tab2.evaluate(() => (window as unknown as { __v1Giu: IDBDatabase }).__v1Giu.close());
+  await expect.poll(async () => (await docIdb(tab2)).version, { timeout: 15_000 }).toBe(2);
+  await o.nth(0).click();
+  await expect(tabB.getByText(/thay đổi đang\s+lưu trên thiết bị/)).toBeVisible({
+    timeout: 15_000,
+  });
+  const sau = await docIdb(tabB);
+  expect(sau.ops).toEqual(BAN_GHI_V1);
+  expect(sau.ops2).toHaveLength(1);
+  expect(await soLanXoaDb(page)).toBe(0);
+  await tabB.close();
+  await tab2.close();
+});
+
 test("A2-AC07: quota origin cạn lúc TẠO IDB (CDP overrideQuotaForOrigin) — tick KHÔNG báo đã lưu, không drop DB; bỏ override thì lưu được", async ({
   page,
   context,

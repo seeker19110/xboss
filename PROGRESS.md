@@ -1,5 +1,22 @@
 # PROGRESS — XBoss
 
+## 2026-10-13 — Hàng đợi offline không treo ở tab mở SAU một tab đã bị chặn nâng cấp IDB
+
+- **Lỗi app (nợ Trung từ #645):** hàng `open()` của IndexedDB chung cả origin — tab mở sau khi tab khác đã bị
+  chặn xếp open sau request bị chặn và **không nhận sự kiện nào** (kể cả `blocked`) tới khi tab cũ đóng; cờ
+  `dangBiChan` chỉ có trong tab bị chặn nên tab mới vẫn treo `IdbTxDb` (xin khoá vault, `themOp`…).
+- **Sửa:** `moCsdl` có hạn chờ sự kiện đầu tiên 5s (`HAN_CHO_MO_MS`); hết hạn → xử lý như bị chặn (đặt cờ, báo
+  lỗi "tab cũ"). Sự kiện `upgradeneeded`/`success`/`error`/`blocked` huỷ hạn chờ (nâng cấp chậm không bị coi là
+  treo). Handle hợp lệ của open đã bỏ đến muộn được **để dành cho lần mở kế tiếp** (không đóng) — máy chậm thật
+  (open > 5s) không lặp mãi vòng hết hạn; tab khác nâng cấp/xoá CSDL trong lúc để dành → đóng ngay.
+- **Test hồi quy:** unit (3 ca đỏ trên code cũ; canh thêm `clearTimeout` ở success/error — 2 mutant bị bắt) + e2e
+  A2-AC07 "tab mở SAU tab bị chặn": tick phải báo lỗi rõ trong 15s (build cũ: không bao giờ ra kết quả, 4/4 đỏ;
+  build mới 8/8 xanh).
+- **Nợ (Thấp):** hết hạn chờ vì máy chậm vẫn báo thông điệp "tab cũ" và đường tick gộp thành `OFFLINE_SAVE_ERROR`
+  (không log chẩn đoán); `docOpDaGiai(...).catch(() => [])` (có từ trước) nay trả rỗng sau 5s thay vì treo —
+  form nhật ký có thể hiện như chưa có bản nháp; `IdbTxDb.tx` không gỡ `dbPromise` khi connection chết mà
+  không phát `close` (Safari, có từ trước).
+
 ## 2026-10-13 — Sửa hàng đợi offline treo khi tab cũ chặn nâng cấp IDB (A2-AC07) + 2 ca e2e chập chờn
 
 - **Lỗi app (A2-AC07):** `open()` bị tab cũ chặn vẫn nằm trong hàng của trình duyệt; `moCsdl` reject nhưng mọi
@@ -14,7 +31,7 @@
   commit; nay chờ "(1 chờ gửi)". `thiet-bi-offline-admin` chạy axe khi màu link footer đang `transition` sau đổi
   theme (1.01:1) → bật `reducedMotion`.
 - **Nợ còn lại:** (Trung, có từ trước) tab mở SAU khi một tab đã bị chặn vẫn treo IDB tới khi tab cũ đóng — cờ
-  chặn chỉ trong một tab; hướng sửa: timeout không-sự-kiện trong `moCsdl`. (Thấp) `damBaoVault` nuốt lỗi
+  chặn chỉ trong một tab; hướng sửa: timeout không-sự-kiện trong `moCsdl` (✅ đã sửa, mục trên). (Thấp) `damBaoVault` nuốt lỗi
   `moLaiPausedAuth` không log; không làm mới thống kê khi open bị chặn hoàn tất.
 - **Flaky chưa chẩn đoán:** `e2e/authed/admin.spec.ts:52` (7/30 run), `payment-certs-canh-bao:306`
   (10/30); unit `s16-quyen-luc-ghi-import-quet.test.ts:343` (quét bản vẽ kết thúc sớm — nghi `DRAWINGS_DIR` dùng
