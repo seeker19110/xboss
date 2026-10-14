@@ -146,5 +146,5 @@ Next.js App Router · React · TypeScript strict · Tailwind (dark-first) · Pos
 
 ## Giấy phép
 
-Chưa cấp giấy phép mã nguồn mở — mọi quyền thuộc chủ sở hữu repo. Phần vendor ECC (file `ecc-*` trong `.claude/agents|skills|commands/` và `.claude/rules/ecc/`) theo
+Không cấp giấy phép mã nguồn mở (chủ repo chốt 2026-10-14) — mọi quyền thuộc chủ sở hữu repo. Phần vendor ECC (file `ecc-*` trong `.claude/agents|skills|commands/` và `.claude/rules/ecc/`) theo
 giấy phép MIT của tác giả gốc, giữ nguyên văn tại `.claude/ecc/LICENSE` (ADR-0013).

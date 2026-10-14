@@ -96,3 +96,4 @@
   `parseDrawingInfo` không neo (đổi parser → quét lại sinh revision mới cho bản vẽ thật — đánh giá dữ liệu trước);
   thông điệp/log khi IDB hết hạn chờ vì máy chậm; trap Tab tính `input.hidden`; job e2e không upload `test-results/`
   (đổi workflow).
+- Chủ repo trả lời 2026-10-14: regex rev `parseDrawingInfo` "chưa cần" xử lý — giữ nguyên, vẫn là nợ.

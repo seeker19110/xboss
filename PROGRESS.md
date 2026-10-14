@@ -1,5 +1,11 @@
 # PROGRESS — XBoss
 
+## 2026-10-14 — Chủ repo chốt 2 câu hỏi treo sau lượt /auto-complete
+
+- **Regex rev của `parseDrawingInfo`:** "chưa cần" — giữ nguyên parser, không quét lại dữ liệu bản vẽ thật. Vẫn là
+  nợ (Trung) ở mục 2026-10-13 bên dưới; chỉ mở lại khi chủ repo yêu cầu đánh giá dữ liệu.
+- **Giấy phép mã nguồn mở:** "không" — giữ mọi quyền (README mục Giấy phép); `/auto-complete` không hỏi lại.
+
 ## 2026-10-13 — Gỡ 5 ca test chập chờn: 2 lỗi app (switch nav Admin, trap Tab hộp thoại) + 3 lỗi test
 
 - **Admin "Hiển thị AppShell" (lỗi app, e2e `admin.spec:52` đỏ 8/32 run CI):** switch hiện mặc định BẬT khi GET
