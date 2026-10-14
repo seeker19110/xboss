@@ -276,7 +276,7 @@ jobs:
 
       - name: Lưu ERD sinh từ Postgres khi lỗi
         if: failure() && steps.erd.outputs.generated == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: postgres-generated-erd
           path: docs/ERD.md
@@ -462,7 +462,7 @@ jobs:
 
       - name: Lưu báo cáo khi lỗi
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report-shard-${{ matrix.shard }}
           path: playwright-report/
