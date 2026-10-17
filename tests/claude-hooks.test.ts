@@ -336,7 +336,14 @@ test("pre-commit-gate: cổng đỏ ghi chuỗi đỏ, cùng lỗi thì tăng, x
 
 test("không còn file hook mồ côi (mọi *.sh trong .claude/hooks đều được đăng ký)", () => {
   const s = readFileSync(join(GOC, ".claude/settings.json"), "utf8");
-  const moCoi = readdirSync(HOOKS).filter((f) => f.endsWith(".sh") && !s.includes(f));
+  const shFiles = readdirSync(HOOKS).filter((f) => f.endsWith(".sh"));
+  // Thư viện dùng chung (vd `_lib.sh` của khung X-Templates) không tự đăng ký trong settings: chỉ coi là
+  // không mồ côi khi một hook ĐÃ đăng ký nạp nó (`. "$(dirname "$0")/_lib.sh"`) — thư viện không ai nạp vẫn bị bắt.
+  const nap = (ten: string) => `$(dirname "$0")/${ten}`;
+  const dangKy = shFiles.filter((f) => s.includes(f));
+  const duocNap = (f: string) =>
+    dangKy.some((h) => readFileSync(join(HOOKS, h), "utf8").includes(nap(f)));
+  const moCoi = shFiles.filter((f) => !s.includes(f) && !duocNap(f));
   assert.deepEqual(moCoi, []);
   assert.ok(existsSync(join(HOOKS, "risk-zones.txt")));
 });
