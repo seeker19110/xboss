@@ -49,5 +49,11 @@ Xem `CLAUDE.md` mục **Quy trình & Definition of Done** và `.github/PULL_REQU
 ## 8. Rủi ro & Giả định còn mở
 
 - `docs/ERD.md` cập nhật tay theo migration append-only — rủi ro trôi khỏi schema thật nếu quên cập nhật cùng PR.
-- Một số cụm cross-cutting (vd `/api/costs`) chưa scope hết theo `project_id` như `/api/notifications` đã làm — xem `PROGRESS.md` mục Nợ kỹ thuật.
+- `/api/costs` hiện giải project/org scope và kiểm quyền trước report; lớp browser A4-AC06 còn cần bổ sung bằng chứng cùng scope, nhãn trùng và 403 — xem `docs/autopilot/PLAN.md`.
 - `EMBED_HOST_WHITELIST` (M31, BIM/camera viewer) là danh sách domain suy đoán, cần công ty xác nhận domain thật trước khi dùng production.
+
+## 9. Mốc autopilot 22/10/2026 — bằng chứng A4-AC06
+
+PM cần tin list/KPI và chi tiết chi phí dùng cùng phạm vi; vai trò bị cấm không nhận dữ liệu tiền.
+Lát đầu chỉ bổ sung kiểm chứng cho tiêu chí QUALITY-FINAL-1 đã duyệt: sáu ca browser × desktop/mobile với API/DB thật, không mock báo cáo; mục tiêu 12/12 pass, 0 skip ngoài setup.
+Không thay capability, schema, auth policy, công thức tiền hoặc dữ liệu thật. Blueprint toàn sản phẩm L chưa được nghiệm thu; kết quả slice không thay release audit và vận hành production.
