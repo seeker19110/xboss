@@ -17,9 +17,10 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Skeleton } from "@/app/components/Skeleton";
+import { ErrorState } from "@/app/components/ErrorState";
 import { showToast } from "@/app/components/Toast";
 import { formatDateVN } from "@/lib/nen/date";
-import { HEADER_TIEN_V1, fmtDongGonMinor, minorTuWire } from "@/lib/nen/money-dto";
+import { HEADER_TIEN_V1, fmtDongGonMinor, fmtDongMinor, minorTuWire } from "@/lib/nen/money-dto";
 import { mSumTien } from "@/app/lib/masked";
 
 type SubSection = "contracts" | "costs" | "insurance";
@@ -31,6 +32,9 @@ export default function ContractsTab() {
   // Data states
   const [contracts, setContracts] = useState<any[]>([]);
   const [costsData, setCostsData] = useState<any | null>(null);
+  const [costsLoading, setCostsLoading] = useState(true);
+  const [costsError, setCostsError] = useState(false);
+  const [costsRequest, setCostsRequest] = useState(0);
   const [insuranceData, setInsuranceData] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -42,26 +46,55 @@ export default function ContractsTab() {
   }, [searchParams]);
 
   useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
     Promise.all([
       // S10c: tiền HĐ dạng chuỗi exact (decimal-string-v1) — tổng cộng bằng bigint, không float.
-      fetch("/api/contracts", { headers: HEADER_TIEN_V1 }).then((r) =>
+      fetch("/api/contracts", { headers: HEADER_TIEN_V1, signal: controller.signal }).then((r) =>
         r.ok ? r.json() : { contracts: [] },
       ),
-      // decimal-string-v1 (S11): tiền là chuỗi exact, không dính 422 của định dạng number cũ.
-      fetch("/api/costs?groupBy=system&includeVo=1", { headers: HEADER_TIEN_V1 }).then((r) =>
-        r.ok ? r.json() : null,
+      fetch("/api/insurance-bonds", { signal: controller.signal }).then((r) =>
+        r.ok ? r.json() : { items: [] },
       ),
-      fetch("/api/insurance-bonds").then((r) => (r.ok ? r.json() : { items: [] })),
     ])
-      .then(([cData, costData, insData]) => {
+      .then(([cData, insData]) => {
+        if (controller.signal.aborted) return;
         setContracts(cData.contracts || []);
-        setCostsData(costData);
         setInsuranceData(insData.items || []);
       })
-      .catch(() => showToast("Không tải được dữ liệu hợp đồng/chi phí", "error"))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!controller.signal.aborted)
+          showToast("Không tải được dữ liệu hợp đồng/bảo lãnh", "error");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, []);
+
+  // Chi phí có trạng thái tải/thử lại riêng; API chi phí lỗi không làm mất HĐ và bảo lãnh đã tải.
+  useEffect(() => {
+    const controller = new AbortController();
+    setCostsLoading(true);
+    setCostsError(false);
+    setCostsData(null);
+    fetch("/api/costs?groupBy=system&includeVo=1", {
+      headers: HEADER_TIEN_V1,
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("costs_load_failed");
+        const nextData = await response.json();
+        if (!controller.signal.aborted) setCostsData(nextData);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setCostsError(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCostsLoading(false);
+      });
+    return () => controller.abort();
+  }, [costsRequest]);
 
   function fmtVND(n: number) {
     if (!n) return "0 đ";
@@ -70,7 +103,7 @@ export default function ContractsTab() {
     return Math.round(n).toLocaleString("vi-VN") + " đ";
   }
 
-  // Tiền HĐ (chuỗi canonical v1) → hiển thị gọn, làm tròn bằng bigint; bị che → "—".
+  // Tiền HĐ/chi phí (chuỗi canonical v1) → làm tròn bằng bigint; bị che → "—".
   function fmtTienHd(v: string | bigint | null | undefined) {
     if (v == null) return "—";
     const minor = typeof v === "bigint" ? v : minorTuWire(v);
@@ -233,61 +266,101 @@ export default function ContractsTab() {
               </div>
             </div>
 
-            {costsData?.rows?.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-zinc-800 text-zinc-400 font-medium">
-                      <th className="py-2.5 px-3">Phân Mục / Hệ</th>
-                      <th className="py-2.5 px-3 text-right">Dự Toán (Budget)</th>
-                      <th className="py-2.5 px-3 text-right">Cam Kết Chi</th>
-                      <th className="py-2.5 px-3 text-right">Thực Tế Chi</th>
-                      <th className="py-2.5 px-3 text-right">% Sử Dụng</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
-                    {costsData.rows.map((r: any) => {
-                      // % do server tính exact (null = chưa có ngân sách); số tiền rút gọn
-                      // chỉ là hiển thị xấp xỉ từ chuỗi exact.
-                      const pct: number | null = r.usagePct;
-                      const vuot = r.level === "over" || r.level === "no_budget";
-                      return (
-                        <tr key={r.key} className="hover:bg-zinc-900/40 transition">
-                          <td className="py-3 px-3 font-semibold text-zinc-200">{r.label}</td>
-                          <td className="py-3 px-3 text-right font-mono text-zinc-300">
-                            {fmtVND(Number(r.budget))}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono text-amber-400 font-semibold">
-                            {fmtVND(Number(r.committed))}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono text-emerald-400">
-                            {fmtVND(Number(r.actual))}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                vuot
-                                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                                  : "bg-zinc-800 text-zinc-300"
-                              }`}
-                            >
-                              {pct == null
-                                ? r.level === "no_budget"
-                                  ? "Chưa có NS"
-                                  : "—"
-                                : `${Math.round(pct)}%`}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+            {costsLoading ? (
+              <Skeleton className="h-64 rounded-xl" />
+            ) : costsError ? (
+              <ErrorState
+                message="Không tải được dữ liệu chi phí — kiểm tra kết nối hoặc quyền xem rồi thử lại."
+                onRetry={() => setCostsRequest((request) => request + 1)}
+              />
             ) : (
-              <div className="text-center py-12 text-zinc-500 text-xs">
-                Chưa có dữ liệu hạn mức chi phí.
-              </div>
+              <>
+                {costsData?.metadata?.coverage?.reconciled === false && (
+                  <p
+                    role="alert"
+                    className="px-3 py-2 rounded-lg border border-rose-900/60 bg-rose-500/10 text-xs text-rose-300"
+                  >
+                    Báo cáo chi phí cần đối soát — có nguồn không hợp lệ chưa được cộng vào tổng.{" "}
+                    <a href="/costs" className="underline font-semibold">
+                      Xem chi tiết ở trang Chi phí
+                    </a>
+                  </p>
+                )}
+
+                {costsData?.rows?.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-zinc-800 text-zinc-400 font-medium">
+                          <th className="py-2.5 px-3">Phân Mục / Hệ</th>
+                          <th className="py-2.5 px-3 text-right">Dự Toán (Budget)</th>
+                          <th className="py-2.5 px-3 text-right">Cam Kết Chi</th>
+                          <th className="py-2.5 px-3 text-right">Thực Tế Chi</th>
+                          <th className="py-2.5 px-3 text-right">% Sử Dụng</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/60">
+                        {costsData.rows.map((r: any) => {
+                          // % do server tính exact (null = chưa có ngân sách); số tiền rút gọn
+                          // chỉ là hiển thị xấp xỉ từ chuỗi exact.
+                          const pct: number | null = r.usagePct;
+                          const vuot = r.level === "over" || r.level === "no_budget";
+                          return (
+                            <tr key={r.key} className="hover:bg-zinc-900/40 transition">
+                              <td className="py-3 px-3 font-semibold text-zinc-200">{r.label}</td>
+                              <td
+                                className="py-3 px-3 text-right font-mono tabular-nums text-zinc-300"
+                                title={
+                                  r.budget == null ? undefined : fmtDongMinor(minorTuWire(r.budget))
+                                }
+                              >
+                                {fmtTienHd(r.budget)}
+                              </td>
+                              <td
+                                className="py-3 px-3 text-right font-mono tabular-nums text-amber-400 font-semibold"
+                                title={
+                                  r.committed == null
+                                    ? undefined
+                                    : fmtDongMinor(minorTuWire(r.committed))
+                                }
+                              >
+                                {fmtTienHd(r.committed)}
+                              </td>
+                              <td
+                                className="py-3 px-3 text-right font-mono tabular-nums text-emerald-400"
+                                title={
+                                  r.actual == null ? undefined : fmtDongMinor(minorTuWire(r.actual))
+                                }
+                              >
+                                {fmtTienHd(r.actual)}
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    vuot
+                                      ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                      : "bg-zinc-800 text-zinc-300"
+                                  }`}
+                                >
+                                  {pct == null
+                                    ? r.level === "no_budget"
+                                      ? "Chưa có NS"
+                                      : "—"
+                                    : `${Math.round(pct)}%`}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-zinc-500 text-xs">
+                    Chưa có dữ liệu hạn mức chi phí.
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
