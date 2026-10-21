@@ -5,8 +5,8 @@ import AxeBuilder from "@axe-core/playwright";
 // docs/nang-cap/M127-trang-chu-theo-vai-tro.md §8 AC1/AC2). Các project `authed-*` khác
 // dùng chung `storageState` admin (project `setup`) — spec này cần đăng nhập bằng tài
 // khoản demo `subcon`/`engineer` nên KHÔNG dùng storageState chung, tự đăng nhập qua form
-// `/login` như `e2e/auth.setup.ts`. Hai tài khoản demo do `ensureDefaultUsers()`
-// (lib/bao-mat/auth.ts) tự tạo khi gọi `/api/auth/login` lần đầu — không cần seed riêng.
+// `/login` như `e2e/auth.setup.ts`. Tài khoản demo và membership vào dự án seed được tạo
+// tường minh trong `e2e/global-setup.ts`; HTTP không tự seed.
 test.use({ storageState: { cookies: [], origins: [] } });
 
 const SUBCON = { email: "subcon@xboss.vn", pw: "sub123" };

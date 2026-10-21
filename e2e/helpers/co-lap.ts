@@ -38,8 +38,15 @@ async function voiPool<T>(fn: (p: Pool) => Promise<T>): Promise<T> {
 
 const hauTo = () => randomBytes(4).toString("hex");
 
-/** Tổ chức mới + `soDuAn` dự án rỗng + 1 người cho mỗi vai trò (cùng mật khẩu MAT_KHAU_CO_LAP). */
-export async function dungToChucCoLap(vaiTro: string[], soDuAn = 1): Promise<ToChucCoLap> {
+/**
+ * Tổ chức mới + `soDuAn` dự án rỗng + 1 người cho mỗi vai trò (cùng mật khẩu MAT_KHAU_CO_LAP).
+ * Mặc định gán mọi người vào các dự án vừa tạo; `ganDuAn: false` để fixture tự cấp subset.
+ */
+export async function dungToChucCoLap(
+  vaiTro: string[],
+  soDuAn = 1,
+  { ganDuAn = true }: { ganDuAn?: boolean } = {},
+): Promise<ToChucCoLap> {
   const h = hauTo();
   return voiPool(async (p) => {
     const org = await p.query(`INSERT INTO organizations (name) VALUES ($1) RETURNING id`, [
@@ -63,6 +70,14 @@ export async function dungToChucCoLap(vaiTro: string[], soDuAn = 1): Promise<ToC
         [`E2E ${role} ${h}`, email, bamMatKhau(MAT_KHAU_CO_LAP), role, orgId],
       );
       nguoi[role] = { id: r.rows[0].id as number, email, role };
+      if (ganDuAn) {
+        for (const projectId of duAn) {
+          await p.query("INSERT INTO user_projects (user_id, project_id) VALUES ($1, $2)", [
+            nguoi[role].id,
+            projectId,
+          ]);
+        }
+      }
     }
     return { orgId, projectId: duAn[0], duAn, nguoi };
   });
