@@ -4,6 +4,8 @@
 
 Autopilot A4-AC06: kiểm chứng scope báo cáo bằng browser + API/DB thật. Spec QUALITY-FINAL-1 được chủ dự án duyệt 25/09/2026. Kế hoạch và Gate: [PLAN](docs/autopilot/PLAN.md).
 
+T-001/T-002 có evidence xanh: trạng thái ngắn và lịch sử nguyên byte; fixture riêng + sáu ca browser compile. Chưa ghi browser/domain/build là pass. Playwright 1.63 mở Chromium production runtime thành công.
+
 Đã merge đủ #651–#662 sau review và CI xanh trên head tương ứng; lúc khởi động không còn PR mở. Main bao gồm UI recovery/exact money, harness regression và dependency updates.
 
 ## Tiếp theo

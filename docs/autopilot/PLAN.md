@@ -35,7 +35,7 @@ Không có hạn hợp đồng mới. Hạn nội bộ là deadline trên; hết
 ## Task
 
 - [x] `T-001` Chuẩn hóa trạng thái ngắn và giữ lịch sử nguyên vẹn — Gate: `python3 .xtemplates/scripts/xt.py progress-check`
-- [ ] `T-002` Fixture riêng và sáu ca browser A4-AC06 compile — Gate: `npm run typecheck`
+- [x] `T-002` Fixture riêng và sáu ca browser A4-AC06 compile — Gate: `npm run typecheck`
 - [ ] `T-003` Kiểm oracle miền costs/portfolio trên PostgreSQL disposable — Gate: `npm run test:single -- --test-concurrency=1 tests/cost-report.test.ts tests/portfolio-kpi.test.ts`
 - [ ] `T-004` Build production trên main mới và dependency đúng lock — Gate: `npm run build`
 - [ ] `T-005` Browser thật desktop/mobile cho A4-AC06 — Gate: `npm run test:e2e -- e2e/authed/a4-ac06-report-scope.spec.ts`
