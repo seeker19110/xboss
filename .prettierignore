@@ -20,3 +20,6 @@ docs/ERD.md
 # Cấu hình Claude Code (.claude/) — trước đây prettier bỏ qua nhờ .gitignore; giữ nguyên hành vi đó
 # sau khi .gitignore thu hẹp (ADR-0012), tránh định dạng lại hàng loạt agent/command không liên quan
 .claude/
+
+# Khung X-Templates cài vào .xtemplates/ (bản sao CHỈ ĐỌC do install.py ghi đè mỗi lần cập nhật) — giữ đúng byte, không format lại
+.xtemplates/
