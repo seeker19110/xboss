@@ -2169,7 +2169,7 @@ DOCTOR_SKILLS = ("autopilot", "gate", "audit", "blueprint", "research", "review"
 DOCTOR_AGENTS = ("executor", "researcher", "reviewer")
 DOCTOR_YAML_KEYS = ("lint", "typecheck", "test", "build")  # LOOP-HARNESS-008
 HOOK_REF_RE = re.compile(r"\.claude/hooks/([\w.-]+(?:/[\w.-]+)*)")
-HOOK_SIBLING_RE = re.compile(r'\$\(dirname "\$0"\)/([\w.-]+)')  # file hook nạp/gọi cạnh nó (_lib.sh, guard.py)
+HOOK_SIBLING_RE = re.compile(r'\$\(dirname "\$0"\)/([\w./-]+)')  # cả đường dẫn literal, giữ cả dấu / lặp
 YAML_KEY_RE = re.compile(r"^([A-Za-z_][\w-]*):[ \t]*(.*?)[ \t]*$")
 LOOP_GATE_KEYS = ("lint", "test")  # ADR-0011: trong vòng autopilot, hai khoá này rỗng/no-op thì dev-task.sh ĐỎ
 GATE_NOOP_RE = re.compile(r"true|:|exit( 0)?|(echo|printf)(\s.*)?")  # khớp is_noop() trong dev-task.sh
@@ -2305,18 +2305,26 @@ def _doctor_hook_files(base: Path, hooks: Dict[str, Any], deep: bool) -> List[Fi
     mà không ai thấy; `deep` thì kiểm cả cú pháp."""
     hook_dir = base / ".claude" / "hooks"
     direct = {m for cmd in _hook_commands(hooks) for m in HOOK_REF_RE.findall(cmd)}
-    present = [hook_dir / n for n in sorted(direct) if (hook_dir / n).is_file()]
-    siblings = {s for p in present for s in HOOK_SIBLING_RE.findall(p.read_text(encoding="utf-8", errors="replace"))}
+    present = [hook_dir / n for n in sorted(direct) if os.path.isfile(f"{hook_dir}/{n}")]
+    # ROOT chỉ gồm . và .. không phải file; giữ đường dẫn gốc để không bỏ qua thư mục thiếu trước ../.
+    siblings = {
+        s
+        for p in present
+        for s in HOOK_SIBLING_RE.findall(p.read_text(encoding="utf-8", errors="replace"))
+        if not all(part in {".", ".."} for part in s.split("/") if part)
+    }
     names = sorted(direct | siblings)
+    # Ghép chuỗi giữ nguyên / lặp, / cuối và /.; không để Path rút gọn hoặc bỏ hook_dir.
+    paths = [(n, f"{hook_dir}/{n}") for n in names]
     out = [
         Finding(
             "hooks", "error", f"hook cần .claude/hooks/{n} nhưng file không có — hook lặng lẽ cho qua; {INSTALL_HINT}"
         )
-        for n in names
-        if not (hook_dir / n).is_file()
+        for n, p in paths
+        if not os.path.isfile(p)
     ]
-    for n in names if deep else []:
-        err = _syntax_error(hook_dir / n) if (hook_dir / n).is_file() else None
+    for n, p in paths if deep else []:
+        err = _syntax_error(Path(p)) if os.path.isfile(p) else None
         if err:
             out.append(Finding("hooks", "error", f".claude/hooks/{n} lỗi cú pháp: {_one_line(err)[:200]}"))
     return out

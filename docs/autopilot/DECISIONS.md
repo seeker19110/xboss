@@ -44,3 +44,17 @@
 - Chọn: Seed membership demo theo org và helper cô lập gán dự án mình tạo; A4 opt-out để tự kiểm subset
 - Lý do (tiêu chí chất lượng cuối): CI home đỏ sau A4; visibleProjectIds chỉ fallback khi toàn user_projects rỗng. Cần fixture hợp lệ trong chế độ membership, giữ quyền app và mọi assertion. Home chạy riêng trên seed rỗng vẫn xanh; đang tái hiện A4 rồi home cùng DB.
 - Đường lùi: Revert thay đổi fixture nếu cơ chế cutover ứng dụng thay đổi; không xoá membership toàn cục hoặc tăng timeout để che lỗi.
+
+### D-007 · 2026-10-21T20:27:54+00:00 · Người dùng cho phép merge #663 và sửa checker doctor
+
+- Phương án: (1) Merge head CI xanh và sửa nhận diện dot-path kèm regression không hạ guard · (2) Giữ hai việc deferred sau khi đã được người dùng cho phép
+- Chọn: Merge head CI xanh và sửa nhận diện dot-path kèm regression không hạ guard
+- Lý do (tiêu chí chất lượng cuối): Chỉ dẫn trực tiếp 22/10/2026: tự merge PR #663, sửa luôn lỗi doctor rồi tiếp tục /autopilot. #663 đã merge2adda49d; giữ cấu hình L1 và hook hiện tại.
+- Đường lùi: Revert riêng patch checker nếu regression phát hiện bỏ sót file thật; không đổi hook hoặc policy.
+
+### D-008 · 2026-10-21T20:34:00+00:00 · Doctor có nên chuẩn hóa chuỗi đường dẫn trước khi kiểm file?
+
+- Phương án: (1) Giữ nguyên đường dẫn thực; chỉ bỏ navigation gồm toàn dấu chấm, dùng regression cho file thật và thư mục trung gian · (2) Chuẩn hóa lexical rồi kiểm file rút gọn
+- Chọn: Giữ nguyên đường dẫn thực; chỉ bỏ navigation gồm toàn dấu chấm, dùng regression cho file thật và thư mục trung gian
+- Lý do (tiêu chí chất lượng cuối): Review độc lập tái hiện missing/../guard.py bị báo xanh khi thiếu thư mục trung gian; đường dẫn gốc giữ đúng filesystem và không che guard thiếu/sai cú pháp. Thay cách tiếp cận sau hai blind spot, không hạ policy/hook.
+- Đường lùi: Revert bản vá checker và test/docs liên quan; giữ nguyên toàn bộ hook, settings, merge L1
