@@ -309,7 +309,15 @@ for (const { firstIndex, label, expectedStatuses } of [
       f,
       [
         () => bamVaDoc(pages[0], "POST", "/api/approvals", approve),
-        () => bamVaDoc(pages[1], "PATCH", "/api/dimensions/batch", untick),
+        async () => {
+          const response = await bamVaDoc(pages[1], "PATCH", "/api/dimensions/batch", untick);
+          if (response.status === 409) {
+            await expect(
+              pages[1].getByRole("status").filter({ hasText: "Task đã nghiệm thu" }),
+            ).toBeVisible();
+          }
+          return response;
+        },
       ],
       f.tasks[0].id,
       firstIndex,
@@ -327,9 +335,6 @@ for (const { firstIndex, label, expectedStatuses } of [
     const state = await docTrangThaiA5(f);
     expect(state.tasks.every((t) => t.status !== "nghiem_thu" || t.progress === 1)).toBe(true);
     if (statuses[0] === 200) {
-      await expect(
-        pages[1].getByRole("status").filter({ hasText: "Task đã nghiệm thu" }),
-      ).toBeVisible();
       expect(state.floors).toEqual([
         { id: expect.any(Number), approved: true, approvedBy: f.pm[0].id },
       ]);

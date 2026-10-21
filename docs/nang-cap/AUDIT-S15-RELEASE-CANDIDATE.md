@@ -419,3 +419,5 @@ Bổ sung phần B batch/approve đồng thời còn thiếu tại snapshot §A5
 - Review độc lập khác model không còn P1/P2; typecheck/build xanh. [Acceptance](../autopilot/A5-AC03-ACCEPTANCE.md) có6 MUST được đối chiếu; final verify và required CI phải xanh trên cây/HEAD cuối, trạng thái cụ thể ở PR của codex/autopilot-a5-ac03.
 
 A5-AC03 có bằng chứng P/H/B cục bộ bổ sung phần thiếu, không nâng verdict các AC khác hoặc toàn audit. M/O, thiết bị thật/Safari, UAT và RELEASE_VERIFIED giữ trạng thái cũ; không deploy. JSON blocker được lưu vào test output và log CI, không chứa credentials.
+
+D-007 của checkpoint A5: kiểm toast409 ngay trongcallbackresponse, giữ exactstatus/DB/UI/queue. Cùngobserverdelay4.5s:RED1fail+setup1pass, GREEN2/2; injection bỏ trướccommit. Stress20ordered+setup21pass vàfull13/13pass0skip/0retry sau sửa. Stressc7 từng đỏ nhưngthiếuartifact nênchưaquy nguyênnhân; Gate hiện giữlog/outputriêng đểkhông mấtbằngchứng.

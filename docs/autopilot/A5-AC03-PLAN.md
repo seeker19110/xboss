@@ -32,7 +32,7 @@ Không có hạn hợp đồng mới. L1 giữ nguyên; người dùng đã xác
 - [x] `T-001` Fixture và năm ca browser compile — Gate: `npm run typecheck`
 - [x] `T-002` P/H concurrency và approval_source trên DB disposable — Gate: `npm run test:single -- --experimental-test-module-mocks --test-concurrency=1 tests/s15-dong-thoi-lo.test.ts tests/route-nghiem-thu-bat-bien.test.ts`
 - [x] `T-003` Build production — Gate: `npm run build`
-- [x] `T-008` Chứng minh hai lịch race ổn định qua năm lượt desktop/mobile — Gate: `npm run test:e2e -- e2e/authed/a5-ac03-concurrency.spec.ts --grep 'duyệt chờ trước|bỏ tick chờ trước' --repeat-each=5 --workers=2`
+- [x] `T-008` Kiểm lặp hai lịch, giữ log/artifact riêng — Gate: `bash -o pipefail -c "npm run test:e2e -- e2e/authed/a5-ac03-concurrency.spec.ts --grep 'duyệt chờ trước|bỏ tick chờ trước' --repeat-each=5 --workers=2 --output=.autopilot/runtime/a5-repeat-final 2>&1 | tee .autopilot/runtime/a5-repeat-final.log"`
 - [x] `T-004` Browser mới và mất ACK trên desktop/mobile — Gate: `npm run test:e2e -- e2e/authed/a5-ac03-concurrency.spec.ts e2e/authed/offline-deep.spec.ts --grep 'A5-AC03|mất ACK' --workers=2`
 - [x] `T-005` Cổng tĩnh — Gate: `npm run gate`
 - [x] `T-006` Acceptance đủ bằng chứng và review độc lập — Gate: `python3 .xtemplates/scripts/xt.py blueprint-status docs/autopilot/A5-AC03-ACCEPTANCE.md --strict`
@@ -47,3 +47,9 @@ D-003: approve-vs-untick ép hai thứ tự thắng trên fixture riêng bằng 
 D-005: final verify26c25256 bắt flake ở ordered race; sửa barrier chỉ giữ taskA chung và bắt buộc cạnh secondPID→firstPID→locker cùng snapshot. Không dùng first-arrival riêng lẻ để suy người thắng. Đã mở lại T-004/T-006 sau kết quả đỏ; sau sửa, T-008 đạt20 ordered cases qua năm lượt mỗi lịch/viewport và T-004 đủ13/13,0 skip. Final verify bắt buộc kiểm lại bảy Gate sau commit.
 
 D-006: #664 đã merge8fc15d89; #665 đã retarget main, merge origin/main và cập nhật hai docs conflict, source test/checker không đổi. Người dùng đã cho phép cả hai; kiểm lại bảy Gate vàCI mới trước merge665.
+
+D-007: c7 finalverify stress đỏ nhưng thiếu stdout/artifact gốc. Giữ receipt đỏ; chưa quy nguyên nhân. Diagnostic20 ordered+setup21pass. Fault injection observer4.5s chứng minh late toast race; chuyển assertion vào response409 riêng trước observer, giữ exactstatus/queue. StressGate lưu output riêng/fullmergedlog vớipipefail để bước sau không xóa bằng chứng.
+
+D-007 RED/GREEN: cùng observerdelay4.5s, bản cũ1fail toast+setup1pass; assertion trong callback409 đạt2/2pass. Đã bỏ injection, helper trở lại đúngc7; chỉspec đổi vị tríassertion. Không xác định nguyên nhân lượtstressc7 mấtlog; receiptđỏ giữ nguyên.
+
+Sau D-007: T-00821/21pass (20ordered+setup, khôngretry/skip), T-00413/13pass0skip. Review khácmodel khôngP1/P2; helper khôngdiff, faultinjection đãbỏ. Finalverify bảy Gate vàCI cần xanh trêncommitcuối trướcmerge đãđượcphép.

@@ -16,3 +16,5 @@ Final verify26c25256 từng bắt flake vì giữ nhiều task và suy người 
 `T-002`:18/18 P/H pass,0 skip; typecheck/build xanh. Reviewer khác model đã đọc cả barrier hai lịch, context và cleanup, không còn P1/P2. JSON cây khóa được ghi dưới test output, attach theo path và log compact để CI thành công vẫn giữ bằng chứng thực (không có cookie/secret/query text).
 
 Kiểm lại mọi Gate sau commit bằng loop verify; required CI theo đúng HEAD của PR là bằng chứng chia sẻ. Không dùng kết quả cục bộ thay CI. Lệnh chính xác và giới hạn ở [PLAN](A5-AC03-PLAN.md). PR/CI trên HEAD là bằng chứng chia sẻ; runtime ignored chỉ phục vụ loop cục bộ.
+
+D-007 kiểm lại: c7T008đỏ, nguyên nhân gốc chưa xác định vì mất log; không coi diagnostic21pass là sửa xong. Observerdelay4.5s chứng minh late toast assertionRED. RED1fail+setup1pass và GREEN2/2 đã xác nhận cùngdelay4.5s; injection đã bỏ. Sau sửa: stress21/21 (20ordered+setup), full13/13 đều pass0skip/0retry; reviewkhácmodel khôngP1/P2. Toast kiểm ngay trongcallback409, trướcawaitresponsekhác/observer. Gate lưu fullmergedlog vàartifactriêng; finalverify bảy Gate bắtbuộc saucommit.

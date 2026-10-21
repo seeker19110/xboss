@@ -43,3 +43,10 @@
 - Chọn: Merge664 theo head đã xanh, restack665 vào main bằng merge thường, giải docs, kiểm lại đủ Gate/CI trên head mới rồi merge665
 - Lý do (tiêu chí chất lượng cuối): Người dùng chọn Cho phép merge cả hai ngày22/10/2026. #664 đã squash merge8fc15d89 từa81d7d9a sau11 Gate stable vàCIxanh. #665 có7 Gate stable vàCIxanh tại9f584b19; đổi base vàmerge main tạo HEAD mới cần verify/CI mới. Chỉhai docs status conflict; giữ toàn bộ source đã review và evidence A5, cập nhật receipt664.
 - Đường lùi: Dừng merge665 nếu Gate/CI đỏ hoặc có thay đổi source ngoài scope; không hạ policy hoặc bỏ assertion
+
+### D-007 · 2026-10-21T21:28:12+00:00 · Xử lý lỗi stress bị mất artifact và race toast đã chứng minh thế nào?
+
+- Phương án: (1) Giữ exactoracles; assert409toast trong action ngay sau response riêng; Gate stress lưu fullmergedlog vàoutputriêng vớipipefail; RED/GREEN cùng4.5s observerdelay rồi bỏ injection · (2) Chỉ rerun tới xanh hoặc nới status/queue/UI assertion
+- Chọn: Giữ exactoracles; assert409toast trong action ngay sau response riêng; Gate stress lưu fullmergedlog vàoutputriêng vớipipefail; RED/GREEN cùng4.5s observerdelay rồi bỏ injection
+- Lý do (tiêu chí chất lượng cuối): Finalverifyc7T008đỏ nhưngT004xanh;tail20stderr che stdout vàT004xóa test-results. Diagnostic21/21pass chưa táihiện. Review phát hiện toast4s được kiểm sauartifact/DB; SELECTpg_sleep4.5 ở observer saucommit làm caapprove-firstRED đúnglate toast332 (1fail+setup1pass). Chuyểnassertvào untickcallback trướcawaitresponsekhác/observer; cầnGREEN cùngdelay vàstressfinal. Không khẳngđịnhđây lànguyênnhân lượtT008bịmấtlog.
+- Đường lùi: Khôngmerge nếuRED/GREEN hoặcstress/finalverify/CI chưađạt; bỏtestfault trướccommit; giữreceiptc7đỏ, timeout/probe/status/DB/UI unchanged
