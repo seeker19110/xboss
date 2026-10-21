@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DollarSign, TriangleAlert, Settings2, X } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
+import Button from "@/app/components/ui/Button";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert } from "@/app/components/dialogs";
-import { showToast } from "@/app/components/Toast";
 import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
 import {
   HEADER_DINH_DANG_TIEN,
@@ -72,51 +73,72 @@ export default function CostsPage() {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [groupBy, setGroupBy] = useState<"system" | "floor">("system");
   const [includeVo, setIncludeVo] = useState(true);
   const [selected, setSelected] = useState<CostRow | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const requestId = useRef(0);
+  const requestController = useRef<AbortController | null>(null);
 
   async function load(gb: "system" | "floor", withVo = includeVo) {
-    const res = await fetch(`/api/costs?groupBy=${gb}&includeVo=${withVo ? 1 : 0}`, {
-      headers: HEADER_DINH_DANG_TIEN,
-    });
-    if (res.status === 401) {
-      redirectToLogin();
-      return;
+    const currentId = ++requestId.current;
+    requestController.current?.abort();
+    const controller = new AbortController();
+    requestController.current = controller;
+    const isCurrent = () => currentId === requestId.current && !controller.signal.aborted;
+    setLoading(true);
+    setForbidden(false);
+    setLoadError(false);
+    try {
+      const res = await fetch(`/api/costs?groupBy=${gb}&includeVo=${withVo ? 1 : 0}`, {
+        headers: HEADER_DINH_DANG_TIEN,
+        signal: controller.signal,
+      });
+      if (!isCurrent()) return;
+      if (res.status === 401) {
+        controller.abort();
+        redirectToLogin();
+        return;
+      }
+      if (res.status === 403) {
+        setForbidden(true);
+        return;
+      }
+      if (!res.ok) throw new Error("costs_load_failed");
+      const nextData = (await res.json()) as Data;
+      if (isCurrent()) setData(nextData);
+    } catch {
+      if (isCurrent()) setLoadError(true);
+    } finally {
+      if (isCurrent()) setLoading(false);
     }
-    if (res.status === 403) {
-      setForbidden(true);
-      setLoading(false);
-      return;
-    }
-    if (!res.ok) {
-      showToast("Không tải được dữ liệu chi phí", "error");
-      setLoading(false);
-      return;
-    }
-    setData(await res.json());
-    setLoading(false);
   }
 
   useEffect(() => {
-    fetchMe().then((m) => setMe(m));
-    load(groupBy);
+    let active = true;
+    fetchMe().then((m) => {
+      if (active) setMe(m);
+    });
+    void load(groupBy);
+    return () => {
+      active = false;
+      requestId.current += 1;
+      requestController.current?.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function switchGroup(gb: "system" | "floor") {
     setGroupBy(gb);
     setSelected(null);
-    setLoading(true);
-    load(gb);
+    void load(gb);
   }
 
   function toggleIncludeVo(checked: boolean) {
     setIncludeVo(checked);
     setSelected(null);
-    setLoading(true);
-    load(groupBy, checked);
+    void load(groupBy, checked);
   }
 
   const canEditSettings = me?.role === "admin" || me?.role === "pm";
@@ -132,7 +154,18 @@ export default function CostsPage() {
         </main>
       </div>
     );
-  if (!data) return null;
+  if (loadError || !data)
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white">
+        <AppHeader title="Chi phí" />
+        <main>
+          <ErrorState
+            message="Không tải được dữ liệu chi phí — kiểm tra kết nối mạng rồi thử lại."
+            onRetry={() => void load(groupBy, includeVo)}
+          />
+        </main>
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -153,6 +186,20 @@ export default function CostsPage() {
       />
 
       <main className="max-w-5xl mx-auto px-3 sm:px-6 py-6 pb-24 space-y-6">
+        {/* Nguồn lệch phạm vi không được cộng vào tổng; cảnh báo trước khi đọc KPI. */}
+        {!data.metadata.coverage.reconciled && (
+          <div
+            role="alert"
+            className="bento-card p-4 border-rose-900/60 bg-rose-500/10 text-xs text-rose-300 space-y-1"
+          >
+            <p className="flex items-center gap-2 font-bold uppercase tracking-wide">
+              <TriangleAlert className="w-4 h-4" aria-hidden="true" />
+              Báo cáo cần đối soát
+            </p>
+            <p>{moTaDoiSoat(data.metadata.coverage)}</p>
+          </div>
+        )}
+
         {/* KPI Bento Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="bento-card p-4 flex flex-col justify-between">
@@ -227,20 +274,6 @@ export default function CostsPage() {
           )}
         </div>
 
-        {/* Báo cáo chưa đủ điều kiện đối soát: nguồn lệch phạm vi KHÔNG được cộng vào tổng */}
-        {!data.metadata.coverage.reconciled && (
-          <div
-            role="alert"
-            className="bento-card p-4 border-rose-900/60 bg-rose-950/20 text-xs text-zinc-300 space-y-1"
-          >
-            <p className="flex items-center gap-2 font-bold text-rose-300 uppercase tracking-wide">
-              <TriangleAlert className="w-4 h-4 text-rose-400" aria-hidden="true" />
-              Báo cáo cần đối soát
-            </p>
-            <p>{moTaDoiSoat(data.metadata.coverage)}</p>
-          </div>
-        )}
-
         {/* Cảnh báo đang active */}
         {data.alerts.length > 0 && (
           <div className="bento-card p-4 border-amber-900/60 bg-amber-950/20 space-y-2">
@@ -273,7 +306,8 @@ export default function CostsPage() {
           <div className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl">
             <button
               onClick={() => switchGroup("system")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+              aria-pressed={groupBy === "system"}
+              className={`px-3.5 min-h-11 sm:min-h-10 rounded-lg text-xs font-semibold transition ${
                 groupBy === "system"
                   ? "bg-zinc-800 text-white shadow-xs"
                   : "text-zinc-400 hover:text-zinc-200"
@@ -283,7 +317,8 @@ export default function CostsPage() {
             </button>
             <button
               onClick={() => switchGroup("floor")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+              aria-pressed={groupBy === "floor"}
+              className={`px-3.5 min-h-11 sm:min-h-10 rounded-lg text-xs font-semibold transition ${
                 groupBy === "floor"
                   ? "bg-zinc-800 text-white shadow-xs"
                   : "text-zinc-400 hover:text-zinc-200"
@@ -293,7 +328,7 @@ export default function CostsPage() {
             </button>
           </div>
 
-          <label className="inline-flex items-center gap-2 text-xs font-medium text-zinc-300 cursor-pointer select-none">
+          <label className="inline-flex items-center gap-2 min-h-11 sm:min-h-10 text-xs font-medium text-zinc-300 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={includeVo}
@@ -339,10 +374,19 @@ export default function CostsPage() {
                     return (
                       <tr
                         key={r.key}
-                        onClick={() => setSelected(r)}
-                        className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/30 cursor-pointer transition"
+                        className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/30 transition"
                       >
-                        <td className="p-3 font-medium">{r.label}</td>
+                        <td className="p-1 font-medium">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelected(r)}
+                            aria-label={`Xem chi tiết ${r.label}`}
+                            className="w-full min-h-11 sm:min-h-10 justify-start whitespace-normal text-left focus-visible:outline-2 focus-visible:outline-emerald-500 focus-visible:outline-offset-2"
+                          >
+                            {r.label}
+                          </Button>
+                        </td>
                         <td
                           className="p-3 text-right tabular-nums text-zinc-300"
                           title={tienDayDu(r.budget)}
@@ -531,7 +575,8 @@ function SettingsModal({
             type="number"
             value={warnPct}
             onChange={(e) => setWarnPct(e.target.value)}
-            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-600"
+            inputMode="decimal"
+            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm focus:outline-none focus:border-emerald-600"
           />
         </label>
         <label className="block">
@@ -540,7 +585,8 @@ function SettingsModal({
             type="number"
             value={overPct}
             onChange={(e) => setOverPct(e.target.value)}
-            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-600"
+            inputMode="decimal"
+            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm focus:outline-none focus:border-emerald-600"
           />
         </label>
       </div>

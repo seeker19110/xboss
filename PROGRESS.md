@@ -1,5 +1,13 @@
 # PROGRESS — XBoss
 
+## 2026-10-22 — Khôi phục phần UI chi phí còn thiếu từ commit chưa merge
+
+- Đối chiếu `cdd8aea1`/`0ca24836`/`e3e6dbda` với `main` `e64b77b4`: backend S10/S11 đã được thay thế ở #595/#598 và các bản vá sau; chỉ port phần UI audit còn thiếu. Giữ contract `decimal-string-v1`, `metadata.coverage`, `approvedUnpaid`, scope và công thức hiện tại.
+- `/costs`: HTTP/lỗi mạng có thông báo và Thử lại; huỷ request khi unmount và bỏ phản hồi cũ theo generation; cảnh báo đối soát nằm trước KPI; mở chi tiết bằng button dùng được với bàn phím; nút nhóm có `aria-pressed`, input ngưỡng đủ cỡ mobile.
+- `/commercial` tab Hợp đồng: tải/thử lại chi phí độc lập để lỗi chi phí không làm mất hợp đồng/bảo lãnh; báo dữ liệu chưa đối soát; tiền chi phí dùng formatter bigint, giữ giá trị bị che và ngân sách không xác định là `—`.
+- Thêm 7 ca browser × desktop/mobile cho HTTP/network recovery, đảo thứ tự response, keyboard/axe, cảnh báo đối soát, làm tròn bigint và masking. Đỏ trước trên bản gốc: 3 ca (lỗi HTTP, đảo response, làm tròn 1,005 tỷ). Bản sửa: 29/29 browser test xanh trên production (desktop/mobile, axe, login/offline và chi phí), 27/27 test miền chi phí xanh trên PostgreSQL disposable, 18/18 cổng tĩnh xanh; `npm run build` Turbopack xanh với 2 worker do giới hạn RAM máy.
+- Căn cứ: QUALITY-FINAL-1 đã Approved for implementation bởi chủ dự án ngày 2026-09-25, A4 §5. Không thay API/schema, không sửa chứng từ hay dùng production DB.
+
 ## 2026-10-14 — Chủ repo chốt 2 câu hỏi treo sau lượt /auto-complete
 
 - **Regex rev của `parseDrawingInfo`:** "chưa cần" — giữ nguyên parser, không quét lại dữ liệu bản vẽ thật. Vẫn là
