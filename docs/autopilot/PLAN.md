@@ -12,7 +12,7 @@ Mục tiêu: sáu ca browser trên desktop/mobile, API/DB thật, không mock b�
 Không sửa app/backend/schema, công thức tiền, quyền, lockfile, CI, hook, dữ liệu thật hoặc triển khai.
 Research và contract ở [RESEARCH.md](RESEARCH.md). Lịch sử PROGRESS được giữ nguyên byte, vẫn cùng thư mục gốc để link tương đối còn đúng.
 PR của slice mới cần người merge theo `merge_autonomy: L1`; quyền merge các PR cũ đã được thực hiện đầy đủ.
-Doctor có false positive đường dẫn `..` trong hook; không sửa checker/hook để ép xanh, ghi việc cần người riêng.
+Doctor có false positive đường dẫn `..` trong hook. Người dùng 22/10/2026 đã chỉ định “tự merge PR #663, sửa luôn lỗi doctor rồi tiếp tục /autopilot”; D-007 cho phép vá checker có regression, giữ nguyên hook/policy và cấu hình L1.
 
 ## Ngân sách (4 con số)
 
@@ -28,7 +28,7 @@ Không có hạn hợp đồng mới. Hạn nội bộ là deadline trên; hết
 ## Điểm dừng bắt buộc về hành động
 
 - Production, dữ liệu thật, secret, tiền thật, thông báo đối ngoại.
-- Sửa quyền, CI/hook/checker bảo vệ; không làm trong slice này.
+- Sửa quyền, CI/hook bảo vệ; không làm trong slice này. Riêng lỗi nhận diện dot-path của doctor đã được người dùng cho phép sửa tại D-007.
 - Merge PR mới theo L1: làm xong, review, kiểm CI rồi gom cho người.
 - Cùng chữ ký lỗi ba lần: máy blocked; lần hai phải đổi cách.
 
@@ -42,8 +42,11 @@ Không có hạn hợp đồng mới. Hạn nội bộ là deadline trên; hết
 - [x] `T-006` Toàn bộ cổng tĩnh của repo — Gate: `npm run gate`
 - [x] `T-007` Đối chiếu đủ acceptance của slice với bằng chứng và review — Gate: `python3 .xtemplates/scripts/xt.py blueprint-status docs/autopilot/A4-AC06-ACCEPTANCE.md --strict`
 - [x] `T-010` Sửa fixture membership E2E để A4 chạy chung home/IPC/offline, giữ assertion hiện có — Gate: `npm run test:e2e -- e2e/authed/a4-ac06-report-scope.spec.ts e2e/authed/home-hien-truong.spec.ts e2e/authed/payment-certs-canh-bao.spec.ts e2e/authed/offline-idb-abort.spec.ts --workers=2`
-- [ ] `T-008` Người review và merge PR của slice theo L1 — Gate: `bash -c 'gh pr view --json state --jq .state | rg -x MERGED'`
-- [ ] `T-009` Người xử lý checker doctor của harness bằng thay đổi được duyệt — Gate: `python3 .xtemplates/scripts/xt.py doctor`
+- [x] `T-008` Merge PR #663 theo chỉ dẫn trực tiếp của người dùng — Gate: `bash -c 'gh pr view 663 --json state --jq .state | rg -x MERGED'`
+- [x] `T-011` Regression doctor phân biệt dot-path và file sibling thật — Gate: `npm run test:single -- tests/xt-doctor.test.ts`
+- [x] `T-009` Vá checker doctor theo chỉ dẫn người dùng, giữ guard thật — Gate: `python3 .xtemplates/scripts/xt.py doctor`
+
+- [ ] `T-012` Tích hợp PR doctor theo L1 — Gate: `bash -c 'gh pr view codex/autopilot-doctor --json state --jq .state | rg -x MERGED'`
 
 ## Contract và file ownership
 
@@ -57,3 +60,5 @@ Root sở hữu docs, state và runtime; reviewer chỉ đọc. Không sửa hel
 ## Ước lượng
 
 Một PR test/docs; P50 1 giờ, P90 3 giờ, cộng thời gian CI và người merge. Không có phụ thuộc dịch vụ ngoài.
+
+D-007/D-008: executor doctor chỉ sửa `.xtemplates/scripts/xt.py` và `tests/xt-doctor.test.ts`; root giữ docs/state. Scanner đọc đầy đủ relative path và dùng filesystem gốc, chỉ bỏ navigation toàn dấu chấm. Review phải giữ lỗi cho file thật thiếu/sai cú pháp và thư mục trung gian thiếu.

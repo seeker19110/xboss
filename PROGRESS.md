@@ -2,28 +2,26 @@
 
 ## Đang làm
 
-PR [#663](https://github.com/seeker19110/xboss/pull/663): D-006 sửa tương tác fixture khi A4 bật membership toàn DB. Seed demo và helper cô lập nay có grant cùng org rõ ràng; A4 giữ subset/foreign-grant để kiểm boundary. T-010 chạy chung A4/home/IPC/offline: 43 pass, 2 skip có sẵn dành riêng viewport mobile trên desktop. Typecheck sau sửa xanh; CI phải đối chiếu trên HEAD mới.
+Đã merge [PR #663](https://github.com/seeker19110/xboss/pull/663) theo chỉ dẫn trực tiếp, main `2adda49d592d744fb6eddb0954bb6f035196f5a0`. CI của head `a327f4e7bcd33d5f2038175db696898afee5b51d` xanh trước merge. #651–#662 cũng đã merge.
 
-Autopilot A4-AC06: kiểm chứng scope báo cáo với browser/API/DB thật theo QUALITY-FINAL-1 Approved 25/09/2026. [PLAN](docs/autopilot/PLAN.md) có evidence xanh T-001–T-007: progress/typecheck, 18/18 oracle costs/portfolio không skip, production build, sáu ca desktop/mobile (12 lượt + setup), 18/18 cổng tĩnh, strict acceptance không còn MUST mở của slice.
+Nhánh `codex/autopilot-doctor` sửa false positive ROOT/../.. của checker theo D-007/D-008. Scanner đọc full relative path, giữ đường dẫn thực và chỉ bỏ navigation gồm toàn dấu chấm; regression gọi checker Python thật từ Node. Không đổi hook/settings/policy hoặc L1. Gate T-011/T-009/typecheck được ghi lại sau bản vá; kết quả review/CI và final verify theo đúng HEAD ở PR.
 
-Browser kiểm list/KPI/filter cùng scope; hai sheet trùng code/T1 đúng dòng và tiền; theo link thật kiểm bill IDs/tiền/sheet của trang đích; engineer/subcon/viewer/cdt nhận nguyên body 403 an toàn, không có UI tài chính. Review độc lập đóng cả hai finding sau sửa.
-
-Đã merge đủ #651–#662 với CI xanh trên từng head; không còn PR cũ mở khi khởi động.
+A4-AC06 đã có 13/13 browser desktop/mobile, 18/18 oracle costs/portfolio, build và 18/18 cổng tĩnh. Regression A4/home/IPC/offline:43 pass,2 skip desktop có sẵn cho ca chỉ chạy mobile. PR #663 đã tích hợp các bằng chứng này; không nghiệm thu toàn sản phẩm.
 
 ## Tiếp theo
 
-PR của nhánh này dùng CI theo đúng HEAD và kiểm lại tám Gate bằng `loop verify` trước bàn giao; trạng thái chia sẻ ghi ở PR. Merge PR mới theo L1, T-008 chờ người. [GO-NO-GO](GO-NO-GO.md) chỉ cho slice A4-AC06 và liệt kê bước xử lý phần chờ; blueprint toàn sản phẩm vẫn mở.
-
-T-009 đã defer: doctor nhận nhầm `..` trong đường dẫn hook là file thiếu. Các file hook thật tồn tại; cần bản vá checker được review riêng. Không sửa cổng bảo vệ trong slice báo cáo.
+Tiếp tục A5-AC03 trên nhánh riêng: bốn ca browser đồng thời, khóa DB chứng minh overlap, kiểm history/approval_source và regression mất ACK. Spec Approved 25/09/2026; giữ PARTIAL nếu chưa đủ bằng chứng. Một PR cho mỗi slice; PR mới theo L1 cần người merge sau khi diff/review/CI sẵn sàng.
 
 ## Quyết định
 
-[D-001–D-006](docs/autopilot/DECISIONS.md): dùng toàn bộ acceptance A4-AC06 cho slice; blueprint sản phẩm L còn 1152 MUST/639 SHOULD chưa audit. Không nghiệm thu toàn sản phẩm. D-004 sửa cờ Node để oracle chạy đúng API mock; D-005 giới hạn hai worker; D-006 sửa fixture, giữ assertion và policy sản phẩm.
+[D-001–D-008](docs/autopilot/DECISIONS.md): A4-AC06 giữ đầy đủ acceptance; D-007 ghi quyền người dùng merge #663/sửa doctor; D-008 giữ filesystem semantics sau review phát hiện lexical normalization che thư mục trung gian thiếu. [FB-002](docs/xtemplates-feedback/FB-002.md) ghi bản vá harness và regression.
 
-Người dùng đã thu hồi hướng dẫn AGENTS.md cũ trong hội thoại 22/10/2026. Không khôi phục file đang sửa/xóa ở checkout gốc. Giữ nguyên quyết định cũ về parser revision và giấy phép.
+BLUEPRINT toàn sản phẩm còn 1152 MUST/639 SHOULD chưa audit. Không thay bằng chứng test thành M/O hoặc production. Người dùng đã thu hồi AGENTS.md cũ; không khôi phục WIP/file xóa tại checkout gốc. Giữ quyết định cũ về parser revision và giấy phép.
 
 ## Bàn giao phiên
 
-Base đã merge: `a723c578afd1f3c08ccd305fb809d0a7309ae152`. Nhánh `codex/autopilot-a4-ac06`; runtime/evidence riêng ở `.autopilot/`; PostgreSQL disposable và browser production, không mock báo cáo. Không đổi app/backend/schema/quyền/CI hay triển khai.
+Base main đã merge `2adda49d592d744fb6eddb0954bb6f035196f5a0`; nhánh hiện tại `codex/autopilot-doctor`.
 
-[Lịch sử nguyên byte](PROGRESS-HISTORY-2026-10-22.md), SHA256 `ce10b14403c8be6fdba16cb755e0b6c919d3552624a3f39b3862d4f95edc8009`. Xem [research](docs/autopilot/RESEARCH.md). Bằng chứng chia sẻ sẽ là PR/CI.
+[PLAN](docs/autopilot/PLAN.md) và [GO-NO-GO](GO-NO-GO.md) phân biệt phần đã merge, bản vá và giới hạn. Runtime/evidence ở `.autopilot/`, chỉ dùng PostgreSQL disposable và browser production. Final verify chạy sau commit trên cây cuối; CI đối chiếu head PR.
+
+[Lịch sử nguyên byte](PROGRESS-HISTORY-2026-10-22.md), SHA256 `ce10b14403c8be6fdba16cb755e0b6c919d3552624a3f39b3862d4f95edc8009`.
