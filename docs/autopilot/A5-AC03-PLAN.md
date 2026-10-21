@@ -36,7 +36,7 @@ Không có hạn hợp đồng mới. L1 giữ nguyên; người dùng đã xác
 - [x] `T-004` Browser mới và mất ACK trên desktop/mobile — Gate: `npm run test:e2e -- e2e/authed/a5-ac03-concurrency.spec.ts e2e/authed/offline-deep.spec.ts --grep 'A5-AC03|mất ACK' --workers=2`
 - [x] `T-005` Cổng tĩnh — Gate: `npm run gate`
 - [x] `T-006` Acceptance đủ bằng chứng và review độc lập — Gate: `python3 .xtemplates/scripts/xt.py blueprint-status docs/autopilot/A5-AC03-ACCEPTANCE.md --strict`
-- [ ] `T-007` Merge PR slice theo L1 — Gate: `bash -c 'gh pr view codex/autopilot-a5-ac03 --json state --jq .state | rg -x MERGED'`
+- [x] `T-007` Merge PR slice theo L1 — Gate: `bash -c 'gh pr view codex/autopilot-a5-ac03 --json state --jq .state | rg -x MERGED'`
 
 Một PR test/docs, stack lên doctor nếu chưa merge; không dồn hai slice vào một PR. P50 1 giờ, P90 3 giờ cộng CI/người merge. Nếu không chứng minh được overlap hoặc thiếu nhánh acceptance thì giữ A5-AC03 PARTIAL.
 
@@ -53,3 +53,5 @@ D-007: c7 finalverify stress đỏ nhưng thiếu stdout/artifact gốc. Giữ r
 D-007 RED/GREEN: cùng observerdelay4.5s, bản cũ1fail toast+setup1pass; assertion trong callback409 đạt2/2pass. Đã bỏ injection, helper trở lại đúngc7; chỉspec đổi vị tríassertion. Không xác định nguyên nhân lượtstressc7 mấtlog; receiptđỏ giữ nguyên.
 
 Sau D-007: T-00821/21pass (20ordered+setup, khôngretry/skip), T-00413/13pass0skip. Review khácmodel khôngP1/P2; helper khôngdiff, faultinjection đãbỏ. Finalverify bảy Gate vàCI cần xanh trêncommitcuối trướcmerge đãđượcphép.
+
+Đã merge #665 tại9c13f54a61a50c58c2372b990b0827bd88b2a5d6 từhead7511e109 sau7Gate stable vàtoànbộCI main xanh; quyềnngười dùngD006. Receipt được ghi ởslice A1 kếtiếp, không đổi history/evidence loopA5.
