@@ -25,7 +25,7 @@ Approve đôi: chính xác 200+409, một floor row và một history nghiệm t
 - Timeout mỗi Gate: 3600 giây (`XT_RECORD_TIMEOUT`).
 - Hạn: 6 giờ từ loop init của worktree này, không reset loop doctor.
 
-Không có hạn hợp đồng mới. Merge PR mới theo L1 cần người; làm xong và kiểm CI trước khi gom chờ. Dữ liệu thật, production, tiền thật, thông báo, sửa cổng/quyền nằm ngoài slice. Gate lỗi lần hai phải đổi cách; ba lần cùng chữ ký thì máy blocked, không skip hoặc nới assertion.
+Không có hạn hợp đồng mới. L1 giữ nguyên; người dùng đã xác nhận cho phép merge664và665 theo D-006, chỉ thực hiện khi CI của HEAD mới xanh. Dữ liệu thật, production, tiền thật, thông báo, sửa cổng/quyền nằm ngoài slice. Gate lỗi lần hai phải đổi cách; ba lần cùng chữ ký thì máy blocked, không skip hoặc nới assertion.
 
 ## Task
 
@@ -45,3 +45,5 @@ Fixture chỉ tạo org/project/users/WBS riêng và đóng mọi context/pool; 
 D-003: approve-vs-untick ép hai thứ tự thắng trên fixture riêng bằng probe DB cho action đầu trước khi start action sau; cả hai phải cùng chờ trước release, timeout tổng dưới15 giây. Bốn nhóm nghiệp vụ thành năm ca mới × hai viewport, cộng mất ACK × hai và setup:13 lượt bắt buộc.
 
 D-005: final verify26c25256 bắt flake ở ordered race; sửa barrier chỉ giữ taskA chung và bắt buộc cạnh secondPID→firstPID→locker cùng snapshot. Không dùng first-arrival riêng lẻ để suy người thắng. Đã mở lại T-004/T-006 sau kết quả đỏ; sau sửa, T-008 đạt20 ordered cases qua năm lượt mỗi lịch/viewport và T-004 đủ13/13,0 skip. Final verify bắt buộc kiểm lại bảy Gate sau commit.
+
+D-006: #664 đã merge8fc15d89; #665 đã retarget main, merge origin/main và cập nhật hai docs conflict, source test/checker không đổi. Người dùng đã cho phép cả hai; kiểm lại bảy Gate vàCI mới trước merge665.

@@ -46,7 +46,7 @@ Không có hạn hợp đồng mới. Hạn nội bộ là deadline trên; hết
 - [x] `T-011` Regression doctor phân biệt dot-path và file sibling thật — Gate: `npm run test:single -- tests/xt-doctor.test.ts`
 - [x] `T-009` Vá checker doctor theo chỉ dẫn người dùng, giữ guard thật — Gate: `python3 .xtemplates/scripts/xt.py doctor`
 
-- [ ] `T-012` Tích hợp PR doctor theo L1 — Gate: `bash -c 'gh pr view codex/autopilot-doctor --json state --jq .state | rg -x MERGED'`
+- [x] `T-012` Tích hợp PR doctor theo L1 — Gate: `bash -c 'gh pr view codex/autopilot-doctor --json state --jq .state | rg -x MERGED'`
 
 ## Contract và file ownership
 
@@ -62,3 +62,5 @@ Root sở hữu docs, state và runtime; reviewer chỉ đọc. Không sửa hel
 Một PR test/docs; P50 1 giờ, P90 3 giờ, cộng thời gian CI và người merge. Không có phụ thuộc dịch vụ ngoài.
 
 D-007/D-008: executor doctor chỉ sửa `.xtemplates/scripts/xt.py` và `tests/xt-doctor.test.ts`; root giữ docs/state. Scanner đọc đầy đủ relative path và dùng filesystem gốc, chỉ bỏ navigation toàn dấu chấm. Review phải giữ lỗi cho file thật thiếu/sai cú pháp và thư mục trung gian thiếu.
+
+#664 đã merge theo quyền người dùng tại8fc15d89ffa11132f3f539f5288d8d5a4c6670b4;37 regression,11 Gate stable vàCIxanh tạihead a81d7d9a. Receipt cập nhật trong PR A5 kế tiếp, giữ nguyên evidence cũ.

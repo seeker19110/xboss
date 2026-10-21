@@ -13,12 +13,12 @@ Theo spec QUALITY-FINAL-1 Approved25/09/2026. Nhánh codex/autopilot-a5-ac03 sta
 
 ## Tích hợp và phần chờ
 
-[#663](https://github.com/seeker19110/xboss/pull/663) đã merge theo chỉ dẫn tại2adda49d. [#664](https://github.com/seeker19110/xboss/pull/664) sửa doctor:37/37 regression, doctor0 lỗi,18 cổng tĩnh và11 Gate final verify stable, toàn bộ CI xanh tại a81d7d9a. merge-check HUMAN do checker là đường dẫn cổng nhạy cảm và vượt150 dòng; T-012 của loop trước đã defer.
+[#663](https://github.com/seeker19110/xboss/pull/663) đã merge theo chỉ dẫn tại2adda49d. [#664](https://github.com/seeker19110/xboss/pull/664) sửa doctor:37/37 regression, doctor0 lỗi,18 cổng tĩnh và11 Gate final verify stable, toàn bộ CI xanh tại a81d7d9a. Người dùng đã cho phép merge cả hai PR; #664 đã squash merge vào main tại8fc15d89ffa11132f3f539f5288d8d5a4c6670b4. T-012 của loop trước hoàn tất.
 
-T-007 của slice A5 là merge PR mới theo L1. Sau khi PR doctor đáy được người cho phép/merge: đổi base PR A5 về main, git merge origin/main vào nhánh A5, giải conflict nếu có mà giữ code đã review, push; kiểm lại tree/CI/merge-check theo HEAD mới. Không rewrite/force-push, không gộp slice A5 vào PR doctor.
+T-007 của slice A5: người dùng đã cho phép merge #665 sau khi cập nhật base/main và kiểm lại CI. PR đã retarget main, merge origin/main; chỉ GO-NO-GO/PROGRESS conflict, giữ trạng thái A5 và cập nhật receipt doctor. Source test/fixture/checker giữ nguyên đã review; HEAD mới phải qua bảy Gate stable và toàn bộ CI trước merge. Không rewrite/force-push, không gộp slice A5 vào PR doctor.
 
 ## Giới hạn và khi chạy thật
 
 BLUEPRINT toàn sản phẩm1152 MUST/639 SHOULD chưa audit; không xác nhận M/O, thiết bị thật/Safari, hợp đồng thật, restore/PITR hoặc production. Không deploy/ký RELEASE_VERIFIED. Khi chạy thật thu bằng chứng release riêng theo runbook hiện hành.
 
-Quyết định tự duyệt [D-001–D-005](docs/autopilot/A5-AC03-DECISIONS.md):giữ đầy đủ AC03, giữ contract dấu vết M120, ép cả hai lịch race và chứng minh queue thay vì suy từ first-arrival. Fixture chỉ ở DB disposable; giữ audit/input cô lập đến global-setup kế tiếp, đóng contexts/pool.
+Quyết định tự duyệt [D-001–D-006](docs/autopilot/A5-AC03-DECISIONS.md):giữ đầy đủ AC03, giữ contract dấu vết M120, ép cả hai lịch race và chứng minh queue thay vì suy từ first-arrival. Fixture chỉ ở DB disposable; giữ audit/input cô lập đến global-setup kế tiếp, đóng contexts/pool.
