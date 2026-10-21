@@ -2,34 +2,26 @@
 
 ## Đang làm
 
-Autopilot A4-AC06: kiểm chứng scope báo cáo bằng browser + API/DB thật. Spec QUALITY-FINAL-1 được chủ dự án duyệt 25/09/2026. Kế hoạch và Gate: [PLAN](docs/autopilot/PLAN.md).
+Autopilot A4-AC06: kiểm chứng scope báo cáo với browser/API/DB thật theo QUALITY-FINAL-1 Approved 25/09/2026. [PLAN](docs/autopilot/PLAN.md) có evidence xanh T-001–T-005: progress/typecheck, 18/18 oracle costs/portfolio không skip, production build, sáu ca desktop/mobile (12 lượt + setup).
 
-T-001/T-002 có evidence xanh: trạng thái ngắn và lịch sử nguyên byte; fixture riêng + sáu ca browser compile. Chưa ghi browser/domain/build là pass. Playwright 1.63 mở Chromium production runtime thành công.
+Browser kiểm list/KPI/filter cùng scope; hai sheet trùng code/T1 đúng dòng và tiền; theo link thật kiểm bill IDs/tiền/sheet của trang đích; engineer/subcon/viewer/cdt nhận nguyên body 403 an toàn, không có UI tài chính. Review độc lập đóng cả hai finding sau sửa.
 
-Hai finding review độc lập đã được sửa và reviewer xác nhận đóng: response chứng từ của chính trang drilldown và body 403 an toàn chính xác. Typecheck được ghi lại xanh sau sửa. T-003 lượt đầu lỗi loader `mock.module` trước assertion; D-004 thêm cờ Node hỗ trợ API, giữ nguyên test và threshold.
-
-T-003 đã qua: 18/18 oracle costs/portfolio trên PostgreSQL disposable, 0 skip. Bằng chứng loader thiếu cờ được tái hiện ở runtime; lệnh cuối có cùng cờ mà `scripts/test-flags.mjs` khai báo.
-
-T-004 build production xanh. T-005 sẽ chạy đủ 12 lượt desktop/mobile với hai worker theo D-005; không giảm case/assertion. T-009 đã defer vì cần bản vá checker riêng được review.
-
-Đã merge đủ #651–#662 sau review và CI xanh trên head tương ứng; lúc khởi động không còn PR mở. Main bao gồm UI recovery/exact money, harness regression và dependency updates.
+Đã merge đủ #651–#662 với CI xanh trên từng head; không còn PR cũ mở khi khởi động.
 
 ## Tiếp theo
 
-Fixture tổ chức/role riêng → typecheck → oracle miền → production build → desktop/mobile → gate → review và PR. Không sửa app/backend/schema/quyền/tiền/CI. Runtime chỉ dùng PostgreSQL disposable.
+Chạy toàn bộ gate tĩnh; ghi acceptance và checkpoint A4-AC06; review diff cuối; một PR với CI đúng head; verify lại cây cuối. Merge PR mới theo L1, T-008 chờ người sau khi PR xanh.
 
-Doctor báo false positive tên file `..` trong đường dẫn hook; giữ nguyên checker và ghi việc chờ người. Không coi cảnh báo này là bằng chứng hook thực tế thiếu.
+T-009 đã defer: doctor nhận nhầm `..` trong đường dẫn hook là file thiếu. Các file hook thật tồn tại; cần bản vá checker được review riêng. Không sửa cổng bảo vệ trong slice báo cáo.
 
 ## Quyết định
 
-[D-001/D-002](docs/autopilot/DECISIONS.md): lát đầu đóng đủ A4-AC06; blueprint sản phẩm L có 1152 MUST/639 SHOULD chưa audit, không tick khống hay nghiệm thu toàn bộ sản phẩm. Loop dùng acceptance riêng của slice.
+[D-001–D-005](docs/autopilot/DECISIONS.md): dùng toàn bộ acceptance A4-AC06 cho slice; blueprint sản phẩm L còn 1152 MUST/639 SHOULD chưa audit. Không nghiệm thu toàn sản phẩm. D-004 sửa cờ Node để oracle chạy đúng API mock; D-005 giới hạn hai worker, giữ nguyên 12 lượt và assertion.
 
-Người dùng đã thu hồi bộ hướng dẫn AGENTS.md cũ trong hội thoại 22/10/2026. Không khôi phục các file người dùng đang sửa/xóa ở checkout gốc.
-
-Giữ lịch sử nguyên byte tại [PROGRESS-HISTORY-2026-10-22.md](PROGRESS-HISTORY-2026-10-22.md). Quyết định cũ về parser revision và giấy phép không bị mở lại.
+Người dùng đã thu hồi hướng dẫn AGENTS.md cũ trong hội thoại 22/10/2026. Không khôi phục file đang sửa/xóa ở checkout gốc. Giữ nguyên quyết định cũ về parser revision và giấy phép.
 
 ## Bàn giao phiên
 
-Base đã có trên main: `a723c578afd1f3c08ccd305fb809d0a7309ae152`. Nhánh: `codex/autopilot-a4-ac06`.
+Base đã merge: `a723c578afd1f3c08ccd305fb809d0a7309ae152`. Nhánh `codex/autopilot-a4-ac06`; runtime/evidence riêng ở `.autopilot/`; PostgreSQL disposable và browser production, không mock báo cáo. Không đổi app/backend/schema/quyền/CI hay triển khai.
 
-State/evidence cục bộ ở `.autopilot/`; bằng chứng chia sẻ sẽ là PR/CI. Merge PR mới giữ L1. Xem [research](docs/autopilot/RESEARCH.md); lịch sử trước loop giữ SHA256 `ce10b14403c8be6fdba16cb755e0b6c919d3552624a3f39b3862d4f95edc8009`.
+[Lịch sử nguyên byte](PROGRESS-HISTORY-2026-10-22.md), SHA256 `ce10b14403c8be6fdba16cb755e0b6c919d3552624a3f39b3862d4f95edc8009`. Xem [research](docs/autopilot/RESEARCH.md). Bằng chứng chia sẻ sẽ là PR/CI.

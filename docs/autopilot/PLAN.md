@@ -38,7 +38,7 @@ Không có hạn hợp đồng mới. Hạn nội bộ là deadline trên; hết
 - [x] `T-002` Fixture riêng và sáu ca browser A4-AC06 compile — Gate: `npm run typecheck`
 - [x] `T-003` Kiểm oracle miền costs/portfolio trên PostgreSQL disposable — Gate: `npm run test:single -- --experimental-test-module-mocks --test-concurrency=1 tests/cost-report.test.ts tests/portfolio-kpi.test.ts`
 - [x] `T-004` Build production trên main mới và dependency đúng lock — Gate: `npm run build`
-- [ ] `T-005` Browser thật desktop/mobile cho A4-AC06 — Gate: `npm run test:e2e -- e2e/authed/a4-ac06-report-scope.spec.ts --workers=2`
+- [x] `T-005` Browser thật desktop/mobile cho A4-AC06 — Gate: `npm run test:e2e -- e2e/authed/a4-ac06-report-scope.spec.ts --workers=2`
 - [ ] `T-006` Toàn bộ cổng tĩnh của repo — Gate: `npm run gate`
 - [ ] `T-007` Đối chiếu đủ acceptance của slice với bằng chứng và review — Gate: `python3 .xtemplates/scripts/xt.py blueprint-status docs/autopilot/A4-AC06-ACCEPTANCE.md --strict`
 - [ ] `T-008` Người review và merge PR của slice theo L1 — Gate: `bash -c 'gh pr view --json state --jq .state | rg -x MERGED'`
