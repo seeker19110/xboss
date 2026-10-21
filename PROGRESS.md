@@ -1,5 +1,10 @@
 # PROGRESS — XBoss
 
+## 2026-10-22 — Đồng bộ phiên bản CodeQL (PR #655)
+
+- Hai job CodeQL đỏ vì `init` 4.38.2 tạo cấu hình cho `analyze` 4.38.3. Đồng bộ cả hai bước về SHA `24c54180a607b1449ed407dd24f251e4e9147c8d` (v4.38.3), giữ nguyên quyền và các cổng kiểm tra.
+- Kiểm tra YAML hợp lệ, SHA đầy đủ và đồng nhất, `git diff --check` xanh; chờ hai job CodeQL và CI đầy đủ trên head mới trước khi merge.
+
 ## 2026-10-14 — Chủ repo chốt 2 câu hỏi treo sau lượt /auto-complete
 
 - **Regex rev của `parseDrawingInfo`:** "chưa cần" — giữ nguyên parser, không quét lại dữ liệu bản vẽ thật. Vẫn là
