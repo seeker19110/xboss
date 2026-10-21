@@ -1,45 +1,48 @@
-# Autopilot — A1-AC01 ·22/10/2026
+# Autopilot — A1-AC01 · 22/10/2026
 
-> Phiên chính tự duyệt theo D-001, tiếp tục chỉ dẫn /autopilot sau khi #663/#664/#665 đều merge; main9c13f54a. Không áp dụng AGENTS.md cũ đã được người dùng thu hồi.
+> Phiên chính tự duyệt D-001/D-002 theo QUALITY-FINAL-1 Approved 25/09/2026. Tiếp tục /autopilot sau khi #663/#664/#665 đã merge; base main `9c13f54a`. Không áp dụng AGENTS.md cũ đã được người dùng thu hồi.
 
 ## G0–G4: phạm vi và chỉ số hoàn tất
 
-QUALITY-FINAL-1 Approved25/09/2026, A1-SCOPE §4 A1-AC01 và TEST-MATRIX §3 yêu cầu hai admin khác tổ chức không đọc/ghi/chọn/export xuyên org. S15 vẫn PARTIAL vì thiếu B hai org và M; lát này bổ sung đúng bốn luồng, cả hai chiều A↔B và desktop/mobile, không suy thành audit406route hoặc toàn1152MUST/639SHOULD.
+Admin cần quản lý người/dự án và xuất tiến độ trong đúng tổ chức. A1-SCOPE §4 A1-AC01 và TEST-MATRIX §3 yêu cầu hai admin khác tổ chức không đọc/ghi/chọn/export chéo. S15 hiện PARTIAL vì thiếu B hai org và M. Lát này bổ sung bốn luồng B cookie, cả hai chiều A↔B trên desktop/mobile, và chạy lại P/H theo bảng RESEARCH.
 
-Người dùng là admin tổ chức quản lý người/dự án và xuất tiến độ. Chỉ số: bốn ca B ×hai viewport +setup=9 lượt pass0skip, P/H hiện hành xanh, sáu MUST đối chiếu đủ, review khácmodel khôngP1/P2, finalverify/CI theo HEAD. Không đổi spec, app, schema, policy, dependency, CI/hook hoặc dữ liệu thật theo phạm vi dự kiến; nếu gặp bug nghiệp vụ thì ghi decision và sửa đúng contract đã duyệt trước khi mở PR.
+Chỉ số: bốn ca × hai viewport + setup = 9 lượt pass, 0 skip; P/H bắt buộc 0 skip; typecheck/build và 18 cổng tĩnh xanh; sáu MUST có bằng chứng; review khác model không còn P1/P2; final verify ổn định và CI đúng HEAD. A1 tổng thể giữ PARTIAL: M, OIDC browser đầy đủ và API-key write hai org/hai chiều còn mở. Không suy slice thành audit 406 route hoặc toàn 1152 MUST/639 SHOULD.
 
-Coverage của lát này là B cookie bốn luồng và P/H liệt kê trong RESEARCH. Không đóng toàn A1-AC01 hoặc toàn inventory auth; M, OIDC browser đầy đủ và API-key write hai org/hai chiều còn mở.
+Giữ stack theo lock: Node 24, Next 16, PostgreSQL 16, Playwright 1.63, ExcelJS hiện có. Không thêm thư viện/dịch vụ. Dự kiến chỉ test/docs; nếu thấy bug nghiệp vụ, ghi decision và sửa theo contract đã duyệt. Không đổi spec, schema, policy, dependency, hook/CI hoặc dữ liệu thật.
 
-Research nguồn repo tại A1-AC01-RESEARCH.md. Giữ Node24/Next16/PostgreSQL/Playwright1.63/ExcelJS theo lock; không thư viện/dịch vụ mới. Lớp B dùng browser/cookie thật → route hiện hữu → DB disposable; SQL chỉ dựng input, không mock auth/API/DB/download. P/H hiện hành có mock transport next/headers và mạng Google theo từng suite, nhưng dùng DB/auth thật.
+Research nằm tại A1-AC01-RESEARCH.md. Lớp B dùng browser/cookie/HTTP/DB/download thật, SQL chỉ dựng input. P/H hiện hành dùng mock next/headers làm transport và mạng Google theo từng suite; DB/auth thật. S16 chạy bằng xboss_app LOGIN, NOSUPERUSER, NOBYPASSRLS trên DB disposable đã migrate.
 
 ## Contract và ownership
 
-Executor chỉ tạo e2e/helpers/a1-org-boundary-fixtures.ts và e2e/authed/a1-ac01-org-boundary.spec.ts. Root sở hữu docs/runtime/gates/git/PR; reviewer khácmodel chỉ đọc, không agent lồng.
+Executor sở hữu hai file e2e/helpers/a1-org-boundary-fixtures.ts và e2e/authed/a1-ac01-org-boundary.spec.ts. Root sở hữu docs/runtime/gates/git/PR; reviewer khác model chỉ đọc. Không agent lồng.
 
-Mỗi ca hai org, mỗi org hai project và bảy role hợp lệ admin/pm/engineer/subcon/bch/cdt/viewer; gọi riêng dungToChucCoLap(roles,2), không role trùng. Chỉ hai admin login, context cookie rỗng, giữ thiết bị/mobile; /auth/me chứng minh hai ID/org/role. WBS/sheet slug/sentinel riêng mỗi project, sheet code có thể trùng; fixture chỉ0%, không trực tiếp dựng output nghiệp vụ. Đóng mọi context/pool, giữ audit/input tới global-setup của DB disposable, không DELETE audit hoặc seed để dọn.
+Mỗi ca có hai org, mỗi org hai project và bảy role admin/pm/engineer/subcon/bch/cdt/viewer. Gọi riêng dungToChucCoLap(roles, 2); chỉ hai admin login UI với context cookie rỗng, giữ cấu hình desktop/mobile. /api/auth/me chứng minh hai ID/org khác nhau và cùng role admin. WBS/slug/sentinel riêng theo project; sheet code có thể trùng. Fixture chỉ có input 0%, không dựng output nghiệp vụ. Đóng context/pool, giữ input/audit tới global setup của DB disposable.
 
-Read: cả hai /portfolio,/users và GET/api/projects,/api/users đúng tập own IDs/names; có own positive data trước kiểm loại foreign.
-Write: cả hai chiều PATCH foreign user với roleviewer hợp lệ và DELETE foreign→404, DB mục tiêu không đổi. Chọn target ngoại tách khỏi đối chứng nội bộ. Cùngorg đổi role engineer→viewer bằng combobox, xóa user khác chưa có dữ liệu bằng dialog thật;200 và UI sau reload đúng.
-Select: mỗi admin UI chọn project2 cùngorg→200, reload giữ pathname và cookiexboss_project đúngID. POST foreignProject→403, cookie/UI vẫnown. Khi kiểm foreignoption vắng phải mở listbox và chứng minh ownoption hiện, tránh vắng vì menu đóng.
-Export: mỗi admin chọn project qua UI, click linkXuấtExcel thật, đọc file download bằng ExcelJS. Có task/project đangchọn và headers literal, loại sentinel org khác lẫn project cùngorg chưa chọn; filename chứa code đangchọn. Foreignslug→404, DB business khácorg khôngđổi; echo slug đãgửi không tính dữ liệu bịlộ.
+- Read: /portfolio, /users và GET /api/projects, /api/users đúng tập own ID/name; có own positive controls trước khi kiểm foreign vắng.
+- Write: foreign PATCH role viewer hợp lệ và DELETE đều 404, target DB bất biến. Target foreign tách khỏi own controls: engineer→viewer qua combobox và xóa user chưa có dữ liệu qua dialog thật; 200 và UI sau reload đúng.
+- Select: UI chọn project thứ hai cùng org → POST 200, reload cùng URL và cookie xboss_project đúng ID. Foreign POST 403 giữ cookie/UI. Chỉ kiểm foreign option vắng khi listbox mở và own option hiện.
+- Export: chọn project qua UI, click link “Xuất Excel”, đọc download bằng ExcelJS. Kiểm filename, headers literal và task đang chọn; loại sentinel org khác lẫn own project chưa chọn. Foreign slug 404 và DB business foreign bất biến; echo slug đã gửi không tính là dữ liệu bị lộ.
 
-Transient UI cần kiểm ngay cùng response trước observer/disk như D-007 A5; không dựa toast còn sống sauđọcDB. Một case nhiều bước hai chiều có timeout60s dự kiến, không nới domain assertions. Gate browser giữ fullmergedlog/output riêng bằngpipefail theo FB004.
+D-004: chỉ POST chọn project được gắn observer browser fetch thật: đọc clone body qua binding, trả nguyên Response cho app và cleanup. Có trì hoãn thời điểm app nhận response; slice chỉ chứng minh chức năng, không chứng minh timing reload nguyên trạng. Không route/mock/API gọi lại.
+
+Kiểm toast ngay sau response, trước observer DB/disk theo D-007 A5. Timeout mỗi ca 60 giây cho nhiều bước hai chiều, giữ nguyên assertions nghiệp vụ. Gate browser giữ full log/output riêng bằng pipefail theo FB004. Nhánh export task trễ dựa thêm P/H s02c-dashboard-scope có dữ liệu trễ; fixture B mới chỉ có input 0%.
 
 ## Ngân sách và điểm dừng
 
-- Tối đa28 vòng, dự toán mềm45000token; không provider trả phí.
-- Timeout mỗiGate3600s; loop mới giới hạn4giờ, không reset history/clock loop trước.
-- L1 giữ nguyên. Quyền người dùng vừa cấp chỉ cho #664/#665; PR mới xétmerge-check khi code/CI hoàn tất, không tự đổi policy.
-- Gate lỗi lầnhai đổi cách; ba lần cùngchữký thìblocked, không skip/nớiassertion. M/O/staging/production/tiền thật/thông báo nằm ngoài slice.
+- Tối đa 28 vòng, dự toán mềm 45000 token; không provider trả phí.
+- Timeout mỗi Gate 3600 giây; loop mới giới hạn bốn giờ, không reset history/deadline loop trước.
+- L1 giữ nguyên. Quyền vừa cấp chỉ cho #664/#665; PR mới xét merge-check khi code/review/CI hoàn tất.
+- Gate lỗi lần hai thì đổi cách; ba lần cùng chữ ký thì blocked. Không skip hoặc nới assertion. M/O/staging/production/tiền thật/thông báo nằm ngoài slice.
 
 ## Task
 
 - [x] `T-001` Fixture và bốn ca browser compile — Gate: `npm run typecheck`
-- [ ] `T-002` P/H org scope hiện hành trên DB disposable — Gate: `npm run test:single -- --experimental-test-module-mocks --test-concurrency=1 tests/route-users-cach-ly-org.test.ts tests/project-select-org.test.ts tests/s02c-dashboard-scope.test.ts tests/api-key-tenant-security.test.ts tests/s16-app-role-duong-phu.test.ts tests/traffic-token.test.ts tests/s02e-org-config.test.ts`
-- [ ] `T-003` Build production — Gate: `npm run build`
-- [ ] `T-004` B hai chiều desktop/mobile và download thật — Gate: `bash -o pipefail -c "npm run test:e2e -- e2e/authed/a1-ac01-org-boundary.spec.ts --workers=2 --output=.autopilot/runtime/a1-browser 2>&1 | tee .autopilot/runtime/a1-browser.log"`
-- [ ] `T-005` Cổng tĩnh — Gate: `npm run gate`
-- [ ] `T-006` Acceptance đủbằngchứng/review độc lập — Gate: `python3 .xtemplates/scripts/xt.py blueprint-status docs/autopilot/A1-AC01-ACCEPTANCE.md --strict`
-- [ ] `T-007` MergePR slice theoL1 — Gate: `bash -c 'gh pr view codex/autopilot-a1-ac01 --json state --jq .state | rg -x MERGED'`
+- [x] `T-002` P/H org scope hiện hành trên DB disposable — Gate: `npm run test:single -- --experimental-test-module-mocks --test-concurrency=1 tests/route-users-cach-ly-org.test.ts tests/project-select-org.test.ts tests/s02c-dashboard-scope.test.ts tests/api-key-tenant-security.test.ts tests/s16-app-role-duong-phu.test.ts tests/traffic-token.test.ts tests/s02e-org-config.test.ts`
+- [x] `T-003` Build production — Gate: `npm run build`
+- [x] `T-004` B hai chiều desktop/mobile và download thật — Gate: `bash -o pipefail -c "npm run test:e2e -- e2e/authed/a1-ac01-org-boundary.spec.ts --workers=2 --output=.autopilot/runtime/a1-browser 2>&1 | tee .autopilot/runtime/a1-browser.log"`
+- [x] `T-005` Lặp ba lần select/export hai viewport, 12 ca + setup — Gate: `bash -o pipefail -c "npm run test:e2e -- e2e/authed/a1-ac01-org-boundary.spec.ts --grep 'UI chọn|UI download' --repeat-each=3 --workers=2 --output=.autopilot/runtime/a1-repeat-final 2>&1 | tee .autopilot/runtime/a1-repeat-final.log"`
+- [x] `T-006` Cổng tĩnh — Gate: `npm run gate`
+- [x] `T-007` Acceptance đủ bằng chứng/review độc lập — Gate: `python3 .xtemplates/scripts/xt.py blueprint-status docs/autopilot/A1-AC01-ACCEPTANCE.md --strict`
+- [ ] `T-008` Merge PR slice theo L1 — Gate: `bash -c 'gh pr view codex/autopilot-a1-ac01 --json state --jq .state | rg -x MERGED'`
 
-Một PR test/docs khi slice xong; base main mới nhất, không gộp với PR đãmerge. P50 2giờ/P90 4giờ cộngCI/người merge; thiếumột nhánh acceptance thì giữ PARTIAL.
+Một PR test/docs khi slice xong, base main mới nhất. P50 hai giờ/P90 bốn giờ cộng CI/người merge; thiếu nhánh acceptance thì giữ PARTIAL.

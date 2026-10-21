@@ -421,3 +421,16 @@ Bổ sung phần B batch/approve đồng thời còn thiếu tại snapshot §A5
 A5-AC03 có bằng chứng P/H/B cục bộ bổ sung phần thiếu, không nâng verdict các AC khác hoặc toàn audit. M/O, thiết bị thật/Safari, UAT và RELEASE_VERIFIED giữ trạng thái cũ; không deploy. JSON blocker được lưu vào test output và log CI, không chứa credentials.
 
 D-007 của checkpoint A5: kiểm toast409 ngay trongcallbackresponse, giữ exactstatus/DB/UI/queue. Cùngobserverdelay4.5s:RED1fail+setup1pass, GREEN2/2; injection bỏ trướccommit. Stress20ordered+setup21pass vàfull13/13pass0skip/0retry sau sửa. Stressc7 từng đỏ nhưngthiếuartifact nênchưaquy nguyênnhân; Gate hiện giữlog/outputriêng đểkhông mấtbằngchứng.
+
+## 12. Checkpoint 22/10/2026 — bổ sung B cookie cho A1-AC01
+
+Theo A1-SCOPE §4 và TEST-MATRIX Approved 25/09/2026, bổ sung bốn luồng hai admin khác tổ chức, cả hai chiều A↔B: read, write, select và export. Giữ nguyên snapshot lịch sử §2 và verdict A1-AC01 tổng thể PARTIAL.
+
+- B: e2e/authed/a1-ac01-org-boundary.spec.ts, bốn ca × desktop/mobile + setup = 9/9 pass, 0 skip/retry. Hai org, mỗi org hai project/bảy role, login UI và cookie thật. SQL chỉ dựng input 0%; HTTP/DB/download thật.
+- Read kiểm own positive controls và tập ID/name chính xác; foreign PATCH/DELETE 404, select 403, export foreign slug 404, DB target bất biến. Own UI đổi role/xóa/chọn project thành công.
+- Download Excel qua anchor thật, đọc workbook bằng ExcelJS: headers/dòng/task/filename đúng project đang chọn, loại sentinel org khác và own project chưa chọn. B không dựng task trễ; nhánh export trễ có P/H s02c-dashboard-scope.
+- Select/export lặp ba lần mỗi viewport: 12 ca + setup = 13/13 pass, 0 skip/retry. D-004 observer đọc clone từ fetch thật và trả nguyên Response; passive listener kiểm wire status/payload. Instrumentation trì hoãn app nhận response, nên chỉ chứng minh contract chức năng, không timing reload nguyên trạng. Hai probe đỏ trước đó được giữ, không nới timeout hoặc bỏ assertion.
+- P/H bảy suite trong PLAN: 48/48 pass, 0 skip, gồm session/API-key/cron/2FA/OIDC/traffic theo bảng RESEARCH. S16 dùng xboss_app NOSUPERUSER/NOBYPASSRLS; browser dùng owner disposable. P/H có mock transport next/headers và mạng Google, không mock DB/auth.
+- Typecheck/build và 18/18 cổng tĩnh pass; review độc lập Astra không còn P1/P2. Strict, final verify và CI theo commit cuối được ghi ở PR nhánh codex/autopilot-a1-ac01 và acceptance riêng.
+
+[Acceptance A1](../autopilot/A1-AC01-ACCEPTANCE.md) có sáu MUST của lát, không thay toàn A1. M, UAT Safari/iOS/thiết bị thật, OIDC browser đầy đủ, API-key write hai org/hai chiều và toàn auth inventory vẫn mở. M/O, các AC khác và RELEASE_VERIFIED giữ nguyên; checkpoint này không xác nhận release hoặc production.

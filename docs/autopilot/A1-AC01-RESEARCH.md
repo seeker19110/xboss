@@ -26,3 +26,19 @@ P/H dùng mock next/headers làm transport, S16 mock mạng Google; không mock 
 S16 đọc TEST_DATABASE_URL, mở pool xboss_app với mật khẩu placeholder migration 0069 trên DB disposable. Role đã kiểm tại container local: LOGIN, NOSUPERUSER, NOBYPASSRLS. Migrations chạy bằng owner ci; không dùng DB hoặc mật khẩu production.
 
 Stack giữ theo lock: Node 24.21.0, Next 16, PostgreSQL 16, Playwright 1.63, ExcelJS hiện có. Không thêm dependency/capability hoặc sửa auth. Review độc lập khác model xác nhận phạm vi và giới hạn trên ngày 22/10/2026.
+
+## Review và bằng chứng hiện có
+
+Reviewer độc lập Astra đã đọc hai file fixture/spec và đối chiếu route/UI/export ngày 22/10/2026, không thấy P1/P2. Đã kiểm oracle hai chiều, foreign target tách positive controls, reload tài liệu mới/cookie/menu, workbook thật và cleanup context/pool. Review chỉ đọc; runtime/CI phải xác nhận riêng.
+
+T-001 typecheck PASS; T-002 gồm bảy suite P/H: 48/48 pass, 0 fail, 0 skip, gồm S16 qua app role NOBYPASSRLS thật; T-003 build PASS. T-004 sau D-004 và sửa locator đạt 9/9 pass (43.5 giây), 0 skip/retry. Lớp B chạy server bằng owner của DB disposable; bằng chứng phòng tuyến RLS đến từ P/H S16 chạy app role, không suy từ lượt browser owner.
+
+## Probe observer đọc response
+
+Lượt T-004 đầu trên source 477944f7: 5 pass, 4 fail (select/export ở cả desktop/mobile); cả bốn stack dừng tại response.json sau reload. Đã giữ log, error-context và evidence dưới runtime/a1-browser-red-post-reload*. Đây chưa phải bằng chứng lỗi app. D-003 chuyển body read vào response promise để kiểm giả thuyết timing; probe focused bật trace cho thấy đọc sớm vẫn kẹt CDP body, cần đổi phương pháp thay vì tăng timeout/bỏ assertion.
+
+Probe early-read kết thúc: 1 setup pass, 4 focused select/export fail, cùng body hang; trace/log riêng a1-early-body-focused giữ nguyên. D-004 đổi phương pháp: observer browser gọi fetch thật và đọc clone response, binding chỉ chuyển snapshot/lỗi, Node assert. Trả nguyên Response cho app, cleanup wrapper/binding. Instrumentation trì hoãn app nhận response; chỉ chứng minh chức năng, không chứng minh timing reload nguyên trạng. Reviewer Astra xác nhận phạm vi và yêu cầu giữ toàn oracle.
+
+D-004 focused runtime: 4 pass, 1 fail (42.9 giây). Select cả desktop/mobile đã pass, mobile download/workbook đã pass; desktop chỉ lỗi tên locator. UI hiện hành tại app/components/home/HomeDieuHanh.tsx: desktop link “Excel” (285), mobile aria-label “Xuất Excel” (233). Sửa selector theo viewport và kiểm exact href /api/export/excel, giữ actual download và workbook oracle. Thêm Gate lặp ba lần select/export hai viewport để kiểm observer trên nhiều context/fixture: 12 ca + setup = 13 lượt dự kiến; T-005 đã đạt 13/13 pass (12 ca + setup), 0 skip/retry, 1.8 phút.
+
+T-006: 18/18 cổng tĩnh pass. Review cuối source đóng băng bởi Astra không có P1/P2; nhãn Excel desktop/mobile và exact href đã được đối chiếu. Mọi verdict ở trên là local trước final verify/CI, trạng thái cuối theo HEAD được ghi ở PR.

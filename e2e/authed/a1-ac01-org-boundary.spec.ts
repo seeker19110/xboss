@@ -126,6 +126,99 @@ async function cookieDuAn(page: Page) {
   return cookies.find((c) => c.name === "xboss_project")?.value;
 }
 
+type LuaChonQuanSatA1 = {
+  status: number;
+  body: unknown;
+  postData: unknown;
+  observerError: string | null;
+};
+let soObserver = 0;
+
+async function quanSatLuaChon(page: Page) {
+  const bindingName = `a1ProjectSelect${++soObserver}`;
+  const restoreName = `${bindingName}Restore`;
+  let ghiNhan!: (snapshot: LuaChonQuanSatA1) => void;
+  const snapshot = new Promise<LuaChonQuanSatA1>((resolve) => {
+    ghiNhan = resolve;
+  });
+  // Callback chỉ ACK snapshot; assertion ở Node bên ngoài binding không thể làm app fetch reject.
+  const binding = await page.exposeBinding(bindingName, (_source, value: LuaChonQuanSatA1) => {
+    ghiNhan(value);
+  });
+  const dispose = async () => {
+    try {
+      if (!page.isClosed()) {
+        await page
+          .evaluate((name) => {
+            const hooks = window as unknown as Record<string, unknown>;
+            const restore = hooks[name];
+            if (typeof restore === "function") restore();
+          }, restoreName)
+          .catch(() => {}); // Document có thể đã reload/đóng; wrapper không sống qua navigation.
+      }
+    } finally {
+      await binding.dispose();
+    }
+  };
+  try {
+    await page.evaluate(
+      ({ bindingName, restoreName }) => {
+        const hooks = window as unknown as Record<string, unknown>;
+        const originalFetch = window.fetch;
+        const wrapped: typeof fetch = async (input, init) => {
+          const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+          const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+          if (
+            url.origin !== location.origin ||
+            url.pathname !== "/api/project/select" ||
+            method.toUpperCase() !== "POST"
+          )
+            return originalFetch.call(window, input, init);
+
+          let postData: unknown = null;
+          let requestClone: Request | undefined;
+          let observerError: string | null = null;
+          try {
+            if (typeof init?.body === "string") postData = JSON.parse(init.body);
+            else if (input instanceof Request && init?.body === undefined)
+              requestClone = input.clone();
+            else throw new Error("Project select phải gửi JSON body đọc được");
+          } catch (error) {
+            observerError = String(error);
+          }
+          const response = await originalFetch.call(window, input, init);
+          let body: unknown = null;
+          try {
+            if (requestClone) postData = await requestClone.json();
+            body = await response.clone().json();
+          } catch (error) {
+            observerError = String(error);
+          }
+          try {
+            const ack = hooks[bindingName] as (value: LuaChonQuanSatA1) => Promise<void>;
+            await ack({ status: response.status, body, postData, observerError });
+          } catch {
+            // Binding lỗi → test thiếu snapshot/đỏ; app vẫn nhận chính response thật.
+          }
+          return response;
+        };
+        // Fetch thật, cùng arguments và original Response. Clone + ACK trì hoãn response tới app:
+        // observer này kiểm functional contract, không cung cấp bằng chứng timing của app.
+        window.fetch = wrapped;
+        hooks[restoreName] = () => {
+          if (window.fetch === wrapped) window.fetch = originalFetch;
+          delete hooks[restoreName];
+        };
+      },
+      { bindingName, restoreName },
+    );
+    return { snapshot, dispose };
+  } catch (error) {
+    await dispose();
+    throw error;
+  }
+}
+
 /** Chọn khác dự án thật và chứng minh reload cùng URL, sau đó mở lại listbox để kiểm scope. */
 async function chonDuAnThuHai(page: Page, isMobile: boolean, org: ToChucA1) {
   await page.goto("/");
@@ -135,28 +228,42 @@ async function chonDuAnThuHai(page: Page, isMobile: boolean, org: ToChucA1) {
   const next = listbox.getByRole("option").filter({ hasText: org.projects[1].name });
   await expect(next).toBeVisible();
   await expect(next).toHaveAttribute("aria-selected", "false");
-  const [response] = await Promise.all([
-    page.waitForResponse(
-      (r) => new URL(r.url()).pathname === "/api/project/select" && r.request().method() === "POST",
-    ),
-    page.waitForEvent("framenavigated", (frame) => frame === page.mainFrame()),
-    next.click(),
-  ]);
-  expect(response.status()).toBe(200);
-  expect(await response.json()).toEqual({ ok: true });
-  expect(response.request().postDataJSON()).toEqual({ projectId: org.projects[1].id });
-  await page.waitForFunction((previous) => performance.timeOrigin !== previous, oldDocument, {
-    timeout: 15_000,
-  });
-  await page.waitForLoadState("domcontentloaded");
-  await expect(page).toHaveURL(url);
-  expect(await page.evaluate(() => performance.timeOrigin)).not.toBe(oldDocument);
-  expect(await cookieDuAn(page)).toBe(String(org.projects[1].id));
-  const reopened = await moBoChon(page, isMobile, org.projects[1]);
-  await expect(
-    reopened.listbox.getByRole("option").filter({ hasText: org.projects[1].name }),
-  ).toHaveAttribute("aria-selected", "true");
-  return reopened;
+  const observer = await quanSatLuaChon(page);
+  try {
+    await Promise.all([
+      observer.snapshot.then((value) => {
+        expect(value.observerError).toBeNull();
+        expect(value.status).toBe(200);
+        expect(value.body).toEqual({ ok: true });
+        expect(value.postData).toEqual({ projectId: org.projects[1].id });
+      }),
+      page
+        .waitForResponse(
+          (r) =>
+            new URL(r.url()).pathname === "/api/project/select" && r.request().method() === "POST",
+        )
+        .then((response) => {
+          expect(response.status()).toBe(200);
+          expect(response.request().postDataJSON()).toEqual({ projectId: org.projects[1].id });
+        }),
+      page.waitForEvent("framenavigated", (frame) => frame === page.mainFrame()),
+      next.click(),
+    ]);
+    await page.waitForFunction((previous) => performance.timeOrigin !== previous, oldDocument, {
+      timeout: 15_000,
+    });
+    await page.waitForLoadState("domcontentloaded");
+    await expect(page).toHaveURL(url);
+    expect(await page.evaluate(() => performance.timeOrigin)).not.toBe(oldDocument);
+    expect(await cookieDuAn(page)).toBe(String(org.projects[1].id));
+    const reopened = await moBoChon(page, isMobile, org.projects[1]);
+    await expect(
+      reopened.listbox.getByRole("option").filter({ hasText: org.projects[1].name }),
+    ).toHaveAttribute("aria-selected", "true");
+    return reopened;
+  } finally {
+    await observer.dispose();
+  }
 }
 
 function entete(ws: ExcelJS.Worksheet, headers: string[]) {
@@ -316,8 +423,9 @@ test("A1-AC01: UI download Excel project đang chọn, foreign sheet 404 giữ b
     const selected = own.projects[1];
     await chonDuAnThuHai(page, isMobile, own);
     await page.goto("/");
-    const link = page.getByRole("link", { name: "Xuất Excel", exact: true });
+    const link = page.getByRole("link", { name: isMobile ? "Xuất Excel" : "Excel", exact: true });
     await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute("href", "/api/export/excel");
     const [download, response] = await Promise.all([
       page.waitForEvent("download"),
       page.waitForResponse(
