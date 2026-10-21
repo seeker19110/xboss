@@ -434,3 +434,14 @@ Theo A1-SCOPE §4 và TEST-MATRIX Approved 25/09/2026, bổ sung bốn luồng h
 - Typecheck/build và 18/18 cổng tĩnh pass; review độc lập Astra không còn P1/P2. Strict, final verify và CI theo commit cuối được ghi ở PR nhánh codex/autopilot-a1-ac01 và acceptance riêng.
 
 [Acceptance A1](../autopilot/A1-AC01-ACCEPTANCE.md) có sáu MUST của lát, không thay toàn A1. M, UAT Safari/iOS/thiết bị thật, OIDC browser đầy đủ, API-key write hai org/hai chiều và toàn auth inventory vẫn mở. M/O, các AC khác và RELEASE_VERIFIED giữ nguyên; checkpoint này không xác nhận release hoặc production.
+
+## 13. Checkpoint 22/10/2026 — API-key write hai org qua app role
+
+Sau #666 merge main 273a09d2, bổ sung P/H cho POST engineering/agent-sessions và POST /:id/claims theo A1-SCOPE §4/TEST-MATRIX Approved 25/09/2026. Không sửa snapshot lịch sử hoặc nâng A1-AC01 tổng thể khỏi PARTIAL.
+
+- tests/a1-api-key-write-org.test.ts: 7/7 pass, 0 skip; metadata role/RLS + bound engineering/global engineering/read-only scope, ba nhóm cả A→B và B→A. Hai admin cùng role, key thật; handler NextRequest/Bearer và DB thật, context rỗng mới, không cookie/mock auth/DB/socket HTTP/B.
+- xboss_app NOSUPERUSER/NOBYPASSRLS không sở hữu các bảng; sessions/claims/conflicts RLS/FORCE RLS. Owner chỉ dựng org/user/project/key và oracle; session setup qua handler 201, own claim 200 xác nhận round 2/hai claims/một conflict đúng session/key/project và foreign state bất biến.
+- Bound foreign session trả exact 422; global foreign project từ open/claims trả exact 404; read-only scope với own target/payload hợp lệ từ open/claims trả exact 403. Owner SELECT * đủ ba bảng của cả hai project trước/sau MỖI denial, có dữ liệu sẵn; không chỉ đọc qua RLS hoặc so round_count. Telemetry key/rate-limit được loại rõ khỏi business snapshot.
+- Sáu suite regression trong PLAN 80/80 pass, 0 skip; typecheck/build, static 18/18 và strict đúng sáu MUST đạt (0 mở/miễn) pass. Review độc lập Astra không thấy P1/P2. Final verify và toàn CI phải được kiểm theo cây/HEAD cuối trước merge; receipt tại PR nhánh codex/autopilot-a1-api-key-write, [QA](../autopilot/A1-KEY-WRITE-QA.md) ghi các lượt cục bộ và giới hạn.
+
+[Acceptance](../autopilot/A1-KEY-WRITE-ACCEPTANCE.md) chỉ phủ hai route trên. engineering/ingest, engineering/intelligence, toàn auth inventory, OIDC browser và M/O/UAT thiết bị vẫn mở; không xác nhận release hoặc production. Các checkpoint cũ được giữ như bằng chứng lịch sử, không diễn giải thành verdict mới.
