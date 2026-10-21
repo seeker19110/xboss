@@ -1,6 +1,6 @@
 # PROGRESS — XBoss
 
-## 2026-10-22 — Khôi phục phần UI chi phí còn thiếu từ commit chưa merge
+## 2026-10-22 — Khôi phục phần UI chi phí còn thiếu từ commit chưa merge (PR #662)
 
 - Đối chiếu `cdd8aea1`/`0ca24836`/`e3e6dbda` với `main` `e64b77b4`: backend S10/S11 đã được thay thế ở #595/#598 và các bản vá sau; chỉ port phần UI audit còn thiếu. Giữ contract `decimal-string-v1`, `metadata.coverage`, `approvedUnpaid`, scope và công thức hiện tại.
 - `/costs`: HTTP/lỗi mạng có thông báo và Thử lại; huỷ request khi unmount và bỏ phản hồi cũ theo generation; cảnh báo đối soát nằm trước KPI; mở chi tiết bằng button dùng được với bàn phím; nút nhóm có `aria-pressed`, input ngưỡng đủ cỡ mobile.
