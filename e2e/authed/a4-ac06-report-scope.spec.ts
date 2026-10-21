@@ -36,6 +36,10 @@ type BaoCao = {
   projectTotals: { budget: string; committed: string; actual: string };
   metadata: { projectId: number; coverage: { reconciled: boolean } };
 };
+type DanhSachPhieu = {
+  moneyFormat: string;
+  bills: { id: number; amount: string; sheetTypeId: number; floorLabel: string }[];
+};
 
 async function chonDuAn(page: Page, projectId: number) {
   const response = await docJsonTrinhDuyet(page, "/api/project/select", {
@@ -203,6 +207,51 @@ test("A4-AC06: hai sheet trùng code/T1 giữ dòng, tiền và drilldown riêng
     await expect(dialog).toHaveCount(0);
   }
 
+  // Đi theo link thật và kiểm request do trang đích phát: href đúng chưa chứng minh scope đích.
+  const first = fixture.dongTang[0];
+  await page
+    .getByRole("row")
+    .filter({ has: page.locator(`td[title="${first.budgetDayDu}"]`) })
+    .getByRole("button", { name: detailName, exact: true })
+    .click();
+  const destinationDialog = page.getByRole("dialog", { name: first.label, exact: true });
+  await expect(destinationDialog).toBeVisible();
+  const billsPromise = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/payments/bills" &&
+      response.request().method() === "GET",
+  );
+  const [billsResponse] = await Promise.all([
+    billsPromise,
+    destinationDialog.getByRole("link").click(),
+  ]);
+  await expect(page).toHaveURL(/\/payments(?:\?.*)?$/);
+  expect(billsResponse.status()).toBe(200);
+  expect(billsResponse.request().headers()["x-xboss-money-format"]).toBe("decimal-string-v1");
+  const destination = (await billsResponse.json()) as DanhSachPhieu;
+  expect(destination.moneyFormat).toBe("decimal-string-v1");
+  expect(destination.bills.map((bill) => bill.id).sort((a, b) => a - b)).toEqual(
+    fixture.dongTang.map((row) => row.billId).sort((a, b) => a - b),
+  );
+  for (const row of fixture.dongTang) {
+    expect(destination.bills.find((bill) => bill.id === row.billId)).toMatchObject({
+      amount: row.actual,
+      sheetTypeId: row.sheetTypeId,
+      floorLabel: row.floorLabel,
+    });
+  }
+  expect(destination.bills.map((bill) => bill.id)).not.toContain(fixture.sentinel.billId);
+  expect(JSON.stringify(destination)).not.toContain(fixture.sentinel.actual);
+  expect(JSON.stringify(destination)).not.toContain(fixture.sentinel.sheetCode);
+  const paymentsMain = page.locator("main");
+  await expect(paymentsMain.getByText("Đã thanh toán", { exact: true }).first()).toBeVisible();
+  await expect(paymentsMain).not.toContainText(fixture.sentinel.sheetCode);
+  await expect(paymentsMain).not.toContainText(fixture.sentinel.actualDayDu);
+  await expect(paymentsMain).not.toContainText(fixture.duAnNgoai.name);
+
+  await page.goto("/costs");
+  await page.getByRole("button", { name: "Theo tầng", exact: true }).click();
+  await expect(page.getByRole("button", { name: detailName, exact: true })).toHaveCount(2);
   const cookieBefore = (await page.context().cookies()).find(
     (cookie) => cookie.name === "xboss_project",
   );
@@ -234,8 +283,7 @@ for (const role of ["engineer", "subcon", "viewer", "cdt"]) {
     for (const query of ["groupBy=system", "groupBy=floor", "export=excel"]) {
       const response = await docJsonTrinhDuyet(page, `/api/costs?${query}`);
       expect(response.status, query).toBe(403);
-      expect(Object.keys(response.body), query).toEqual(["error"]);
-      expect(typeof response.body.error).toBe("string");
+      expect(response.body, query).toEqual({ error: "Chỉ Admin/PM/BCH được xem chi phí" });
       for (const field of [
         "rows",
         "totals",

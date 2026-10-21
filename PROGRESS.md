@@ -6,6 +6,10 @@ Autopilot A4-AC06: kiểm chứng scope báo cáo bằng browser + API/DB thật
 
 T-001/T-002 có evidence xanh: trạng thái ngắn và lịch sử nguyên byte; fixture riêng + sáu ca browser compile. Chưa ghi browser/domain/build là pass. Playwright 1.63 mở Chromium production runtime thành công.
 
+Hai finding review độc lập đã được sửa và reviewer xác nhận đóng: response chứng từ của chính trang drilldown và body 403 an toàn chính xác. Typecheck được ghi lại xanh sau sửa. T-003 lượt đầu lỗi loader `mock.module` trước assertion; D-004 thêm cờ Node hỗ trợ API, giữ nguyên test và threshold.
+
+T-003 đã qua: 18/18 oracle costs/portfolio trên PostgreSQL disposable, 0 skip. Bằng chứng loader thiếu cờ được tái hiện ở runtime; lệnh cuối có cùng cờ mà `scripts/test-flags.mjs` khai báo.
+
 Đã merge đủ #651–#662 sau review và CI xanh trên head tương ứng; lúc khởi động không còn PR mở. Main bao gồm UI recovery/exact money, harness regression và dependency updates.
 
 ## Tiếp theo

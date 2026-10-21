@@ -7,6 +7,7 @@ import { dungTaskTienDo, dungToChucCoLap } from "./co-lap";
 
 type DuAnA4 = { id: number; name: string; status: "active" | "handover" | "closed" };
 export type DongTangA4 = {
+  billId: number;
   sheetTypeId: number;
   sheetCode: string;
   floorLabel: string;
@@ -48,13 +49,14 @@ async function taoDongTang(
      VALUES ($1, 'T1', $2::numeric, $3)`,
     [sheetTypeId, budget, contract.rows[0].id],
   );
-  await client.query(
+  const bill = await client.query<{ id: number }>(
     `INSERT INTO payment_bills
        (responsible, type, amount, paid_date, project_id, sheet_type_id, floor_label, contract_id)
-     VALUES ($1, 'bill', $2::numeric, CURRENT_DATE, $3, $4, 'T1', $5)`,
+     VALUES ($1, 'bill', $2::numeric, CURRENT_DATE, $3, $4, 'T1', $5) RETURNING id`,
     [`Người phụ trách ${slug}`, actual, projectId, sheetTypeId, contract.rows[0].id],
   );
   return {
+    billId: bill.rows[0].id,
     sheetTypeId,
     sheetCode: code,
     floorLabel: "T1",

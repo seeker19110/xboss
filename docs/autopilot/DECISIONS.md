@@ -22,3 +22,11 @@
 - Chọn: Duyệt 9 task: test/docs, bằng chứng thật, gate nguyên trạng, merge L1 và doctor defer cho người
 - Lý do (tiêu chí chất lượng cuối): Scope và falsifier rõ theo spec; source nghiệp vụ không đổi, có rollback, test context riêng trên DB disposable. Không đánh đồng một slice với release toàn sản phẩm.
 - Đường lùi: Revert PR test/docs và dùng lại PROGRESS history nguyên byte.
+
+### D-004 · 2026-10-21T19:53:35+00:00 · Sửa lệnh oracle miền thiếu cờ Node cho mock.module
+
+- Phương án: (1) Thêm --experimental-test-module-mocks để chạy đúng hai test với assertion nguyên vẹn · (2) Bỏ mock/test hoặc ghi skip cho lỗi loader
+- Chọn: Thêm --experimental-test-module-mocks để chạy đúng hai test với assertion nguyên vẹn
+- Lý do (tiêu chí chất lượng cuối): Lượt T-003 đầu fail trước khi chạy assertion do mock.module không có khi thiếu cờ. Bổ sung điều kiện runtime, không đổi test, scope hoặc threshold.
+- Đường lùi: Trả lệnh cũ khi Node hỗ trợ API không cần cờ; giữ log fail ban đầu trong evidence.
+- Làm rõ lưu trữ: `loop record` ghi đè evidence cùng ID; JSON hiện hành là lượt 18/18 xanh. Lỗi ban đầu nằm trong hội thoại và PROGRESS; `.autopilot/runtime/T003-loader-repro.log` là lượt tái hiện lỗi thiếu cờ, không phải log nguyên bản.
