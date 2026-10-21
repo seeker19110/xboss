@@ -10,6 +10,8 @@ Hai finding review độc lập đã được sửa và reviewer xác nhận đ�
 
 T-003 đã qua: 18/18 oracle costs/portfolio trên PostgreSQL disposable, 0 skip. Bằng chứng loader thiếu cờ được tái hiện ở runtime; lệnh cuối có cùng cờ mà `scripts/test-flags.mjs` khai báo.
 
+T-004 build production xanh. T-005 sẽ chạy đủ 12 lượt desktop/mobile với hai worker theo D-005; không giảm case/assertion. T-009 đã defer vì cần bản vá checker riêng được review.
+
 Đã merge đủ #651–#662 sau review và CI xanh trên head tương ứng; lúc khởi động không còn PR mở. Main bao gồm UI recovery/exact money, harness regression và dependency updates.
 
 ## Tiếp theo

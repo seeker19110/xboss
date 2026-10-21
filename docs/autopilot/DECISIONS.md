@@ -30,3 +30,10 @@
 - Lý do (tiêu chí chất lượng cuối): Lượt T-003 đầu fail trước khi chạy assertion do mock.module không có khi thiếu cờ. Bổ sung điều kiện runtime, không đổi test, scope hoặc threshold.
 - Đường lùi: Trả lệnh cũ khi Node hỗ trợ API không cần cờ; giữ log fail ban đầu trong evidence.
 - Làm rõ lưu trữ: `loop record` ghi đè evidence cùng ID; JSON hiện hành là lượt 18/18 xanh. Lỗi ban đầu nằm trong hội thoại và PROGRESS; `.autopilot/runtime/T003-loader-repro.log` là lượt tái hiện lỗi thiếu cờ, không phải log nguyên bản.
+
+### D-005 · 2026-10-21T19:55:57+00:00 · Giới hạn worker browser theo RAM 5,8 GB của runtime
+
+- Phương án: (1) Chạy đủ 6 case trên desktop/mobile với 2 worker song song · (2) Dùng mặc định 50% CPU dù số CPU host lớn hơn tài nguyên RAM
+- Chọn: Chạy đủ 6 case trên desktop/mobile với 2 worker song song
+- Lý do (tiêu chí chất lượng cuối): Giữ nguyên 12 lượt kiểm thử, assertion và fixture cách ly; chỉ giới hạn song song để không OOM trong môi trường build/browser dùng chung.
+- Đường lùi: Bỏ workers=2 khi runtime có tài nguyên phù hợp, không thay tiêu chí nghiệm thu.
