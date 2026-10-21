@@ -7,6 +7,11 @@
 - Giữ `merge_autonomy: L1`, quyền và hook hiện có. Merge/deploy, thay chính sách quyền và xử lý dependency được tách khỏi kiểm chứng này. Lệnh bọc như `bash deploy.sh` vẫn là giới hạn đã ghi ở PR; không xem guard là sandbox.
 - Xác minh: 18/18 cổng tĩnh và production build Turbopack xanh (2 worker theo RAM máy). Lượt release gate cục bộ đầu có 5027 pass, 7 fail, 24 cancelled và 1 skip có allowlist; timeout do quá tải đã chạy lại 4 file với 256/256 pass, recovery verifier sau khi bổ sung client PostgreSQL 16 có 24/24 pass. Riêng restore smoke yêu cầu fixture CI (`GITHUB_ACTIONS`, marker và IP service); giữ cổng đó, xác nhận đầy đủ bằng CI trên SHA mới của PR. Không ghi kết quả release cục bộ là pass.
 
+## 2026-10-22 — Đồng bộ phiên bản CodeQL (PR #655)
+
+- Hai job CodeQL đỏ vì `init` 4.38.2 tạo cấu hình cho `analyze` 4.38.3. Đồng bộ cả hai bước về SHA `24c54180a607b1449ed407dd24f251e4e9147c8d` (v4.38.3), giữ nguyên quyền và các cổng kiểm tra.
+- Kiểm tra YAML hợp lệ, SHA đầy đủ và đồng nhất, `git diff --check` xanh; chờ hai job CodeQL và CI đầy đủ trên head mới trước khi merge.
+
 ## 2026-10-14 — Chủ repo chốt 2 câu hỏi treo sau lượt /auto-complete
 
 - **Regex rev của `parseDrawingInfo`:** "chưa cần" — giữ nguyên parser, không quét lại dữ liệu bản vẽ thật. Vẫn là
