@@ -62,3 +62,7 @@ Không thay capability, schema, auth policy, công thức tiền hoặc dữ li�
 
 PM cần hai phiên tick/batch/duyệt cùng lúc vẫn có tiến độ và lịch sử nhất quán; hủy nghiệm thu tầng phải giữ task đã duyệt riêng. Spec QUALITY-FINAL-1 Approved 25/09/2026 và S15 hiện còn thiếu lớp B batch/approve đồng thời. [PLAN](docs/autopilot/A5-AC03-PLAN.md) tự duyệt D-001 trong nhật ký riêng, sáu MUST, năm ca mới cho bốn nhóm nghiệp vụ desktop/mobile có khóa taskA chung chứng minh overlap và cạnh queue cho lịch ép, kiểm lặp20 ordered cases cùng regression mất ACK có sẵn; chỉ số thành công là tất cả lượt bắt buộc pass, không skip, đúng API/DB/UI và review đóng finding.
 Tái sử dụng stack/schema/contracts hiện tại, chỉ thêm test/docs với dữ liệu cô lập trên PostgreSQL disposable. Không đổi app, auth policy, hook, CI, dependency hoặc production; nếu chưa đủ bằng chứng thì A5-AC03 giữ PARTIAL.
+
+## 11. Slice tiếp — A1-AC01 org boundary
+
+Sau khi #663/#664/#665 đã merge (main 9c13f54a), /autopilot bổ sung B còn thiếu cho A1-AC01 Approved 25/09/2026. Hai admin khác org kiểm cả hai chiều read/write/select/export, bốn ca desktop/mobile với UI/cookie/API/DB/download thật và positive controls cùng org; sáu MUST trong A1-AC01-ACCEPTANCE.md. P/H session/API-key/cron/2FA/OIDC/traffic được chạy lại theo RESEARCH, không suy thành bao phủ toàn auth inventory. S15 và A1 tổng thể giữ PARTIAL vì còn M và các nhánh chưa có bằng chứng; không coi slice này là audit toàn 406 route.
