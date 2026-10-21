@@ -1,4 +1,4 @@
-// A4-AC06: dữ liệu riêng trong DB E2E; không dùng ID cố định hoặc sửa fixture dùng chung.
+// A4-AC06: dữ liệu riêng trong DB E2E; không dùng ID cố định hoặc sửa dữ liệu seed dùng chung.
 import { randomBytes } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import type { Page } from "@playwright/test";
@@ -70,7 +70,7 @@ async function taoDongTang(
 
 export async function dungFixtureBaoCaoA4(vaiTro = ["pm"]) {
   if (!E2E_DB) throw new Error("Thiếu E2E_DATABASE_URL — fixture A4 chỉ dùng DB E2E");
-  const co = await dungToChucCoLap(vaiTro, 4);
+  const co = await dungToChucCoLap(vaiTro, 4, { ganDuAn: false });
   const ngoai = await dungToChucCoLap([], 1);
   const h = randomBytes(6).toString("hex");
   const duAn: DuAnA4[] = [

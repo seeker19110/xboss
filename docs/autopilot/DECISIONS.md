@@ -37,3 +37,10 @@
 - Chọn: Chạy đủ 6 case trên desktop/mobile với 2 worker song song
 - Lý do (tiêu chí chất lượng cuối): Giữ nguyên 12 lượt kiểm thử, assertion và fixture cách ly; chỉ giới hạn song song để không OOM trong môi trường build/browser dùng chung.
 - Đường lùi: Bỏ workers=2 khi runtime có tài nguyên phù hợp, không thay tiêu chí nghiệm thu.
+
+### D-006 · 2026-10-21T20:10:12+00:00 · Sửa tương tác fixture E2E khi A4 kích hoạt membership toàn DB
+
+- Phương án: (1) Seed membership demo theo org và helper cô lập gán dự án mình tạo; A4 opt-out để tự kiểm subset · (2) Chuyển từng test cũ sang fixture membership riêng trong nhiều file
+- Chọn: Seed membership demo theo org và helper cô lập gán dự án mình tạo; A4 opt-out để tự kiểm subset
+- Lý do (tiêu chí chất lượng cuối): CI home đỏ sau A4; visibleProjectIds chỉ fallback khi toàn user_projects rỗng. Cần fixture hợp lệ trong chế độ membership, giữ quyền app và mọi assertion. Home chạy riêng trên seed rỗng vẫn xanh; đang tái hiện A4 rồi home cùng DB.
+- Đường lùi: Revert thay đổi fixture nếu cơ chế cutover ứng dụng thay đổi; không xoá membership toàn cục hoặc tăng timeout để che lỗi.

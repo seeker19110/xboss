@@ -399,6 +399,11 @@ Hai oracle miền CR/PKPI: 18/18 pass; typecheck, production build và gate 18/1
 Hai finding review độc lập đã đóng sau sửa; PR cần CI trên đúng HEAD và người merge theo L1.
 Lệnh và đối chiếu từng tiêu chí: [acceptance A4-AC06](../autopilot/A4-AC06-ACCEPTANCE.md).
 
+CI đầu phát hiện A4 kích hoạt membership khiến demo home thiếu grant. D-006 chỉ sửa
+fixture E2E; regression gộp A4/home/IPC/offline có 43 pass, 2 skip desktop của hai ca
+chỉ dành viewport mobile. Assertion home/IPC/offline và policy ứng dụng giữ nguyên.
+Review độc lập D-006 không có finding actionable; không dùng lượt này nâng các AC khác.
+
 Phần thiếu B của riêng A4-AC06 trong §9.1 được bổ sung tại checkpoint này. Không suy ra
 verdict mới cho AC khác, không cộng lại tổng toàn bộ audit khi chưa tái kiểm. Lớp M/O,
 benchmark A4-AC08 và `RELEASE_VERIFIED` giữ trạng thái ở checkpoint trước. Không deploy.

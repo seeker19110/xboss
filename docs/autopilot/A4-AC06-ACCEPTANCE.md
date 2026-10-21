@@ -17,5 +17,6 @@ Chỉ là tiêu chí của slice kiểm chứng browser; blueprint toàn sản p
 - P/H: `npm run test:single -- --experimental-test-module-mocks --test-concurrency=1 tests/cost-report.test.ts tests/portfolio-kpi.test.ts` trên PostgreSQL riêng: **18/18 pass**, 0 skip. Typecheck, production build và **18/18 cổng tĩnh** xanh.
 - Reviewer độc lập khác model đọc diff; hai finding về đích chứng từ và nội dung lỗi 403 đã được sửa rồi review lại, không còn finding actionable. Đây là review tự động; merge PR vẫn chờ người theo L1.
 - Evidence runtime do `xt.py loop record` sinh ở `.autopilot/evidence/`; kiểm lại cây cuối bằng `loop verify`. PR/CI là bằng chứng chia sẻ theo HEAD; không dùng thư mục runtime ignored thay cho CI.
+- D-006/T-010: regression chạy chung A4/home/IPC/offline có **43 pass, 2 skip desktop** của hai ca chỉ dành viewport mobile. Seed/helper cấp membership cùng org rõ ràng; A4 opt-out để giữ project không gán và grant sai org. Không đổi assertion cũ hoặc quyền sản phẩm; review độc lập không còn finding actionable.
 
 Phạm vi này không audit các AC khác, không xác nhận lớp M/O hoặc deploy production. Costs chưa có exporter; query export chỉ chứng minh không bypass 403, không chứng nhận exporter chưa tồn tại.

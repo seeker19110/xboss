@@ -41,12 +41,14 @@ Không có hạn hợp đồng mới. Hạn nội bộ là deadline trên; hết
 - [x] `T-005` Browser thật desktop/mobile cho A4-AC06 — Gate: `npm run test:e2e -- e2e/authed/a4-ac06-report-scope.spec.ts --workers=2`
 - [x] `T-006` Toàn bộ cổng tĩnh của repo — Gate: `npm run gate`
 - [x] `T-007` Đối chiếu đủ acceptance của slice với bằng chứng và review — Gate: `python3 .xtemplates/scripts/xt.py blueprint-status docs/autopilot/A4-AC06-ACCEPTANCE.md --strict`
+- [x] `T-010` Sửa fixture membership E2E để A4 chạy chung home/IPC/offline, giữ assertion hiện có — Gate: `npm run test:e2e -- e2e/authed/a4-ac06-report-scope.spec.ts e2e/authed/home-hien-truong.spec.ts e2e/authed/payment-certs-canh-bao.spec.ts e2e/authed/offline-idb-abort.spec.ts --workers=2`
 - [ ] `T-008` Người review và merge PR của slice theo L1 — Gate: `bash -c 'gh pr view --json state --jq .state | rg -x MERGED'`
 - [ ] `T-009` Người xử lý checker doctor của harness bằng thay đổi được duyệt — Gate: `python3 .xtemplates/scripts/xt.py doctor`
 
 ## Contract và file ownership
 
 Executor chỉ tạo `e2e/helpers/a4-report-fixtures.ts` và `e2e/authed/a4-ac06-report-scope.spec.ts`.
+D-006 mở rộng T-010 sau CI: executor được sửa `e2e/global-setup.ts`, `e2e/helpers/co-lap.ts` và fixture A4 để seed/gán membership rõ ràng; home spec chỉ sửa comment seed. Không sửa app, policy, timeout hoặc assertion của test cũ.
 PM có ba dự án active/handover/closed cùng org được gán, một cùng org không gán và grant sai org để kiểm boundary.
 Hai sheet khác tháp có code/tầng giống nhau, khóa khác; HĐ 1/7 tỷ, actual 0,1/0,8 tỷ, org khác có sentinel.
 Bốn vai trò engineer/subcon/viewer/cdt có membership hợp lệ, phiên riêng; system/floor phải 403 chỉ lỗi, không rows/totals/alerts/metadata hoặc tiền trong DOM.

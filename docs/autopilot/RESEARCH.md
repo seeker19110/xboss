@@ -28,3 +28,13 @@ Các hook thực tế và test hồi quy được kiểm riêng; không sửa ch
 Theo skill, muốn sửa cài đặt hook cần người chạy `python3 <bản clone X-Templates>/scripts/install.py <gốc dự án>`; trường hợp regex false positive cần bản vá checker được review.
 
 Lịch sử PROGRESS giữ nguyên tại `PROGRESS-HISTORY-2026-10-22.md`, SHA256 `ce10b14403c8be6fdba16cb755e0b6c919d3552624a3f39b3862d4f95edc8009`.
+
+## Tương tác fixture phát hiện qua CI (D-006)
+
+`lib/ha-tang/projects.ts::visibleProjectIds` chỉ dùng fallback legacy khi toàn bảng `user_projects` rỗng. A4 cần membership thật để kiểm visibility nên làm các tài khoản demo/PM cũ không có grant mất dự án. Đây là điều kiện fixture; không sửa policy ứng dụng.
+
+Đối chứng: home chạy riêng trên seed rỗng 5/5 pass. Cùng DB, một ca A4 Portfolio chạy trước hai ca home desktop: A4 pass, cả hai home fail; snapshot hiện đúng “Bạn chưa được gán dự án nào”. CI shard 1 và 3 cũng fail hai ca home desktop/mobile. Không tăng timeout hoặc xoá membership toàn cục.
+
+D-006 chuẩn hoá global E2E seed và helper tổ chức cô lập với membership cùng org rõ ràng; fixture A4 opt-out để giữ subset/foreign-grant cố ý. T-010 chạy chung A4/home/IPC/offline để kiểm tương tác. Đây là thay đổi fixture test, không cutover production.
+
+Sau sửa: T-010 có 43 pass, 2 skip đúng điều kiện desktop của hai ca chỉ dành mobile; typecheck xanh. Reviewer độc lập đã rà diff và caller của helper, không có finding actionable. `feedback collect` lần cuối không có tín hiệu framework mới.
