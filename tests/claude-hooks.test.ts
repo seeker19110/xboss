@@ -77,6 +77,77 @@ function chay(
 
 const quyet = (r: ReturnType<typeof chay>) => r.json?.hookSpecificOutput?.permissionDecision;
 
+test("X-Templates: repo lồng có cổng riêng phải hỏi trước, không chạy mã của repo đó", () => {
+  const r = dungRepo();
+  const long = join(r, "vendor", "thu-vien");
+  mkdirSync(join(long, "scripts"), { recursive: true });
+  git(long, "init", "-q", "-b", "main");
+  writeFileSync(join(long, "xt.yaml"), "test: true\n");
+  const marker = join(long, "da-chay-cong");
+  writeFileSync(
+    join(long, "scripts/dev-task.sh"),
+    '#!/usr/bin/env bash\ntouch "$(dirname "$0")/../da-chay-cong"\n',
+    { mode: 0o755 },
+  );
+
+  for (const command of [
+    `cd '${long}' && git commit -m 'thu'`,
+    `git -C '${long}' commit -m 'thu'`,
+    "git commit -m 'thu'",
+  ]) {
+    const res = chay("pre-bash-guard.sh", r, { cwd: long, tool_input: { command } });
+    assert.equal(res.code, 0, res.stderr);
+    assert.equal(quyet(res), "ask", command);
+    assert.equal(
+      existsSync(marker),
+      false,
+      "Hook không được chạy cổng của repo lồng trước khi hỏi",
+    );
+  }
+});
+
+test("X-Templates: commit trong dự án chạy đúng cổng của dự án và chặn khi cổng đỏ", () => {
+  const r = dungRepo();
+  mkdirSync(join(r, ".xtemplates/scripts"), { recursive: true });
+  const gate = join(r, ".xtemplates/scripts/dev-task.sh");
+  const marker = join(r, "da-chay-cong");
+  writeFileSync(
+    gate,
+    '#!/usr/bin/env bash\nprintf "%s" "$1" > "$CLAUDE_PROJECT_DIR/da-chay-cong"\n',
+    { mode: 0o755 },
+  );
+  const input = { cwd: r, tool_input: { command: "git commit -m 'thu'" } };
+  const xanh = chay("pre-bash-guard.sh", r, input);
+  assert.equal(xanh.code, 0, xanh.stderr);
+  assert.equal(readFileSync(marker, "utf8"), "gate");
+
+  writeFileSync(gate, "#!/usr/bin/env bash\nexit 1\n", { mode: 0o755 });
+  const do_ = chay("pre-bash-guard.sh", r, input);
+  assert.equal(do_.code, 2);
+  assert.match(do_.stderr, /Cổng trước commit ĐỎ/);
+});
+
+test("X-Templates: chặn force push, hỏi hành động đối ngoại, cho phép lệnh kiểm tra cục bộ", () => {
+  const r = dungRepo();
+  for (const [command, decision] of [
+    ["git push --force origin nhanh-thu", "deny"],
+    ["ssh root@203.0.113.5", "ask"],
+    ["npm install left-pad", "ask"],
+    ["gh pr merge 661 --squash", "ask"],
+    ["npm ci", undefined],
+    ["git status --short", undefined],
+  ] as const) {
+    const res = chay("pre-bash-guard.sh", r, { cwd: r, tool_input: { command } });
+    assert.equal(res.code, 0, res.stderr);
+    assert.equal(quyet(res), decision, command);
+  }
+  const mcp = chay("pre-mcp-guard.sh", r, {
+    tool_name: "mcp__github__merge_pull_request",
+    tool_input: { repository_full_name: "seeker19110/xboss", pr_number: 661 },
+  });
+  assert.equal(quyet(mcp), "ask");
+});
+
 test("môi trường có jq (thiếu jq thì mọi hook thành no-op âm thầm)", () => {
   assert.ok(coJq(), "Cài jq — hook .claude/hooks/*.sh dựa vào jq để đọc input");
 });
@@ -336,7 +407,14 @@ test("pre-commit-gate: cổng đỏ ghi chuỗi đỏ, cùng lỗi thì tăng, x
 
 test("không còn file hook mồ côi (mọi *.sh trong .claude/hooks đều được đăng ký)", () => {
   const s = readFileSync(join(GOC, ".claude/settings.json"), "utf8");
-  const moCoi = readdirSync(HOOKS).filter((f) => f.endsWith(".sh") && !s.includes(f));
+  const shFiles = readdirSync(HOOKS).filter((f) => f.endsWith(".sh"));
+  // Thư viện dùng chung (vd `_lib.sh` của khung X-Templates) không tự đăng ký trong settings: chỉ coi là
+  // không mồ côi khi một hook ĐÃ đăng ký nạp nó (`. "$(dirname "$0")/_lib.sh"`) — thư viện không ai nạp vẫn bị bắt.
+  const nap = (ten: string) => `$(dirname "$0")/${ten}`;
+  const dangKy = shFiles.filter((f) => s.includes(f));
+  const duocNap = (f: string) =>
+    dangKy.some((h) => readFileSync(join(HOOKS, h), "utf8").includes(nap(f)));
+  const moCoi = shFiles.filter((f) => !s.includes(f) && !duocNap(f));
   assert.deepEqual(moCoi, []);
   assert.ok(existsSync(join(HOOKS, "risk-zones.txt")));
 });

@@ -1,5 +1,12 @@
 # PROGRESS — XBoss
 
+## 2026-10-22 — Hoàn thiện kiểm chứng X-Templates (PR #661)
+
+- Bổ sung 3 nhóm test tích hợp chạy hook thật: repo lồng có `xt.yaml` không được tự chạy cổng của repo đó; commit trong dự án chạy đúng cổng và bị chặn khi cổng đỏ; force push/hành động đối ngoại/merge qua Bash hoặc MCP vẫn qua hàng rào, lệnh kiểm tra cục bộ được tiếp tục.
+- Test repo lồng đỏ trên `a422b2ed` (trước bản vá `09ebb84c`), xanh trên HEAD của PR. Bộ `claude-hooks` có 16/16 ca xanh, không skip; fixture chỉ dùng repo và script cục bộ.
+- Giữ `merge_autonomy: L1`, quyền và hook hiện có. Merge/deploy, thay chính sách quyền và xử lý dependency được tách khỏi kiểm chứng này. Lệnh bọc như `bash deploy.sh` vẫn là giới hạn đã ghi ở PR; không xem guard là sandbox.
+- Xác minh: 18/18 cổng tĩnh và production build Turbopack xanh (2 worker theo RAM máy). Lượt release gate cục bộ đầu có 5027 pass, 7 fail, 24 cancelled và 1 skip có allowlist; timeout do quá tải đã chạy lại 4 file với 256/256 pass, recovery verifier sau khi bổ sung client PostgreSQL 16 có 24/24 pass. Riêng restore smoke yêu cầu fixture CI (`GITHUB_ACTIONS`, marker và IP service); giữ cổng đó, xác nhận đầy đủ bằng CI trên SHA mới của PR. Không ghi kết quả release cục bộ là pass.
+
 ## 2026-10-22 — Đồng bộ phiên bản CodeQL (PR #655)
 
 - Hai job CodeQL đỏ vì `init` 4.38.2 tạo cấu hình cho `analyze` 4.38.3. Đồng bộ cả hai bước về SHA `24c54180a607b1449ed407dd24f251e4e9147c8d` (v4.38.3), giữ nguyên quyền và các cổng kiểm tra.
