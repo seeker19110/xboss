@@ -384,3 +384,21 @@ chứng lớp B tương ứng.
   với `bench/a4-ac08-baseline.json`; máy đo khác → NOT_RUN.
 - `npm run test:mutation` cục bộ: không chạy, dựa vào bước mutation xanh của CI push main cùng SHA.
 - Lớp M/O: như §6/§7 — vẫn WAITING_RELEASE, không ký `RELEASE_VERIFIED`.
+
+## 10. Checkpoint 22/10/2026 — bổ sung lớp B cho A4-AC06
+
+Base `a723c578` đã gồm các PR #651–#662. Lát test tiếp theo chỉ bổ sung bằng chứng
+A4-AC06, không tái audit 54 AC hoặc sửa các snapshot và tổng lịch sử ở trên.
+
+| AC      | Bằng chứng bổ sung                                                                                                                                                                                                                                   | Verdict của lát này |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| A4-AC06 | `e2e/authed/a4-ac06-report-scope.spec.ts`: 6 ca × desktop/mobile; list/KPI/filter cùng org/status/visibility, nhãn sheet/tầng trùng không ghép nhầm, theo link thật kiểm bill IDs/tiền/scope, 4 role nhận body 403 an toàn và không có DOM tài chính | PASS P/H/B          |
+
+Browser production/API/DB thật: 12 lượt + setup = 13/13 pass, không mock, không skip.
+Hai oracle miền CR/PKPI: 18/18 pass; typecheck, production build và gate 18/18 xanh.
+Hai finding review độc lập đã đóng sau sửa; PR cần CI trên đúng HEAD và người merge theo L1.
+Lệnh và đối chiếu từng tiêu chí: [acceptance A4-AC06](../autopilot/A4-AC06-ACCEPTANCE.md).
+
+Phần thiếu B của riêng A4-AC06 trong §9.1 được bổ sung tại checkpoint này. Không suy ra
+verdict mới cho AC khác, không cộng lại tổng toàn bộ audit khi chưa tái kiểm. Lớp M/O,
+benchmark A4-AC08 và `RELEASE_VERIFIED` giữ trạng thái ở checkpoint trước. Không deploy.

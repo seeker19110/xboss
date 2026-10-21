@@ -2,7 +2,7 @@
 
 ## Đang làm
 
-Autopilot A4-AC06: kiểm chứng scope báo cáo với browser/API/DB thật theo QUALITY-FINAL-1 Approved 25/09/2026. [PLAN](docs/autopilot/PLAN.md) có evidence xanh T-001–T-005: progress/typecheck, 18/18 oracle costs/portfolio không skip, production build, sáu ca desktop/mobile (12 lượt + setup).
+Autopilot A4-AC06: kiểm chứng scope báo cáo với browser/API/DB thật theo QUALITY-FINAL-1 Approved 25/09/2026. [PLAN](docs/autopilot/PLAN.md) có evidence xanh T-001–T-007: progress/typecheck, 18/18 oracle costs/portfolio không skip, production build, sáu ca desktop/mobile (12 lượt + setup), 18/18 cổng tĩnh, strict acceptance không còn MUST mở của slice.
 
 Browser kiểm list/KPI/filter cùng scope; hai sheet trùng code/T1 đúng dòng và tiền; theo link thật kiểm bill IDs/tiền/sheet của trang đích; engineer/subcon/viewer/cdt nhận nguyên body 403 an toàn, không có UI tài chính. Review độc lập đóng cả hai finding sau sửa.
 
@@ -10,7 +10,7 @@ Browser kiểm list/KPI/filter cùng scope; hai sheet trùng code/T1 đúng dòn
 
 ## Tiếp theo
 
-Chạy toàn bộ gate tĩnh; ghi acceptance và checkpoint A4-AC06; review diff cuối; một PR với CI đúng head; verify lại cây cuối. Merge PR mới theo L1, T-008 chờ người sau khi PR xanh.
+PR của nhánh này dùng CI theo đúng HEAD và kiểm lại bảy Gate bằng `loop verify` trước bàn giao; trạng thái chia sẻ ghi ở PR. Merge PR mới theo L1, T-008 chờ người. [GO-NO-GO](GO-NO-GO.md) chỉ cho slice A4-AC06 và liệt kê bước xử lý phần chờ; blueprint toàn sản phẩm vẫn mở.
 
 T-009 đã defer: doctor nhận nhầm `..` trong đường dẫn hook là file thiếu. Các file hook thật tồn tại; cần bản vá checker được review riêng. Không sửa cổng bảo vệ trong slice báo cáo.
 
