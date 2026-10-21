@@ -166,10 +166,14 @@ test("A5-AC03: hai PM duyệt tầng đồng thời — 200+409, một hiệu �
 }, info) => {
   await tickHet(pages[0], f);
   const buttons = await Promise.all(pages.map((page) => moXacNhanTang(page)));
-  const race = await dongThoiDuoiKhoa(f, [
-    () => bamVaDoc(pages[0], "POST", "/api/approvals", buttons[0]),
-    () => bamVaDoc(pages[1], "POST", "/api/approvals", buttons[1]),
-  ]);
+  const race = await dongThoiDuoiKhoa(
+    f,
+    [
+      () => bamVaDoc(pages[0], "POST", "/api/approvals", buttons[0]),
+      () => bamVaDoc(pages[1], "POST", "/api/approvals", buttons[1]),
+    ],
+    f.tasks[0].id,
+  );
   await bangChungKhoa(info, race);
   expect(race.responses.map((r) => r.status).sort()).toEqual([200, 409]);
   const loser = race.responses[0].status === 409 ? pages[0] : pages[1];
@@ -220,18 +224,22 @@ test("A5-AC03: batch chồng ô không lost update; replay bằng UI không nhâ
 }, info) => {
   const task = f.tasks[0];
   await Promise.all(pages.map((page) => moLuoi(page, f)));
-  const race = await dongThoiDuoiKhoa(f, [
-    () =>
-      goiApi(pages[0], "PATCH", "/api/dimensions/batch", {
-        ids: task.dimIds.slice(0, 4),
-        installed: true,
-      }),
-    () =>
-      goiApi(pages[1], "PATCH", "/api/dimensions/batch", {
-        ids: task.dimIds.slice(2, 6),
-        installed: true,
-      }),
-  ]);
+  const race = await dongThoiDuoiKhoa(
+    f,
+    [
+      () =>
+        goiApi(pages[0], "PATCH", "/api/dimensions/batch", {
+          ids: task.dimIds.slice(0, 4),
+          installed: true,
+        }),
+      () =>
+        goiApi(pages[1], "PATCH", "/api/dimensions/batch", {
+          ids: task.dimIds.slice(2, 6),
+          installed: true,
+        }),
+    ],
+    task.id,
+  );
   await bangChungKhoa(info, race);
   expect(race.responses).toEqual([
     { status: 200, body: { ok: true, updated: 4, installed: true } },
@@ -303,11 +311,16 @@ for (const { firstIndex, label, expectedStatuses } of [
         () => bamVaDoc(pages[0], "POST", "/api/approvals", approve),
         () => bamVaDoc(pages[1], "PATCH", "/api/dimensions/batch", untick),
       ],
+      f.tasks[0].id,
       firstIndex,
     );
     await bangChungKhoa(info, race);
     expect(race.barrier.firstIndex).toBe(firstIndex);
     expect(race.barrier.firstWaiters).toHaveLength(1);
+    expect(race.barrier.lockedTaskId).toBe(f.tasks[0].id);
+    expect(race.barrier.orderedChain.length).toBeGreaterThanOrEqual(2);
+    expect(race.barrier.orderedChain.at(-1)).toBe(race.barrier.firstWaiters[0].pid);
+    expect(race.barrier.orderedChain[0]).not.toBe(race.barrier.firstWaiters[0].pid);
     const statuses = race.responses.map((r) => r.status);
     expect(statuses).toEqual(expectedStatuses);
     expect(statuses.every((status) => status < 500)).toBe(true);

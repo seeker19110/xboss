@@ -29,3 +29,10 @@
 - Chọn: Tăng dự toán mềm slice từ40000 lên60000 token, giữ nguyên deadline6h/trần28 vòng/evidence đã chạy
 - Lý do (tiêu chí chất lượng cuối): Người dùng không đặt giới hạn token; hai lịch ép riêng, lưu proof thành công và kiểm grammar đủ6 MUST cần thêm review/verification. Ưu tiên hoàn tất phần đã nhận, không reset clock/counters hoặc bỏ gate.
 - Đường lùi: Nếu người dùng đặt budget thấp hơn thì checkpoint theo giới hạn mới; không thay evidence hoặc deadline
+
+### D-005 · 2026-10-21T21:02:13+00:00 · Ép thứ tự race sau flake của final verify thế nào?
+
+- Phương án: (1) Chỉ khóa taskA chung, xác nhận cùng snapshot firstPID còn chờ locker và secondPID xếp sau firstPID trước release · (2) Giữ khóa nhiều task và suy thứ tự thắng chỉ từ thời điểm waiter đầu xuất hiện
+- Chọn: Chỉ khóa taskA chung, xác nhận cùng snapshot firstPID còn chờ locker và secondPID xếp sau firstPID trước release
+- Lý do (tiêu chí chất lượng cuối): Final verify26c25256 bắt untick-first mobile nhận200/409 thay422/200; JSON cho thấy hai waiter độc lập cùng chờ locker. First arrival không đủ khi đang giữ nhiều dòng. Cạnh hàng đợi trên cùng dòng chứng minh thứ tự serialize; giữ exact assertions và hai lịch, cần chạy lặp desktop/mobile.
+- Đường lùi: Giữ acceptance thứ tự race mở/PARTIAL nếu không chứng minh được cạnh khóa; không đổi oracle hoặc claim cả hai lịch đã được ép

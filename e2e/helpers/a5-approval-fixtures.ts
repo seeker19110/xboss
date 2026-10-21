@@ -163,11 +163,32 @@ async function docCayCho(observer: PoolClient, blockerPid: number): Promise<Wait
   return r.rows;
 }
 
+/** Trả đường second → … → first bằng chính edges của một lần observer đọc. */
+function timDuongCho(waiters: WaiterA5[], startPid: number, firstPid: number): number[] {
+  const byPid = new Map(waiters.map((w) => [w.pid, w.blockers]));
+  const paths: number[][] = [[startPid]];
+  const seen = new Set<number>();
+  while (paths.length) {
+    const path = paths.shift()!;
+    const pid = path[path.length - 1];
+    if (pid === firstPid) return path;
+    if (seen.has(pid)) continue;
+    seen.add(pid);
+    for (const blocker of byPid.get(pid) ?? []) {
+      if (!seen.has(blocker)) paths.push([...path, blocker]);
+    }
+  }
+  return [];
+}
+
 export async function dongThoiDuoiKhoa(
   f: FixtureA5,
   actions: [() => Promise<KetQuaHttpA5>, () => Promise<KetQuaHttpA5>],
+  lockedTaskId: number,
   firstIndex?: 0 | 1,
 ) {
+  if (!f.tasks.some((t) => t.id === lockedTaskId))
+    throw new Error("Barrier A5 chỉ được khoá task thuộc fixture của ca");
   const locker = await f.pool.connect();
   let observer: PoolClient | undefined;
   const started: (Promise<PromiseSettledResult<KetQuaHttpA5>> | undefined)[] = [
@@ -191,10 +212,16 @@ export async function dongThoiDuoiKhoa(
     transaction = true;
     const pid = await locker.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
     const blockerPid = pid.rows[0].pid;
-    await locker.query("SELECT id FROM tasks WHERE id = ANY($1::int[]) ORDER BY id FOR UPDATE", [
-      f.tasks.map((t) => t.id),
-    ]);
+    // Chỉ khoá task CHUNG của hai thao tác. Khoá cả A+B cho phép hai request đợi hai
+    // row khác nhau: có overlap nhưng không bảo đảm thứ tự sau khi locker nhả.
+    const locked = await locker.query<{ id: number }>(
+      "SELECT id FROM tasks WHERE id = $1 FOR UPDATE",
+      [lockedTaskId],
+    );
+    expect(locked.rows).toEqual([{ id: lockedTaskId }]);
     let firstWaiters: WaiterA5[] = [];
+    let firstPid: number | null = null;
+    let orderedChain: number[] = [];
     let waiters: WaiterA5[] = [];
     const probe = observer;
     if (firstIndex !== undefined) {
@@ -203,11 +230,12 @@ export async function dongThoiDuoiKhoa(
         .poll(
           async () => {
             firstWaiters = await docCayCho(probe, blockerPid);
-            return new Set(firstWaiters.map((w) => w.pid)).size;
+            return firstWaiters.length === 1 && firstWaiters[0].blockers.includes(blockerPid);
           },
           { timeout: 3_000, intervals: [25, 50, 100], message: "Request đầu phải thực sự chờ DB" },
         )
-        .toBeGreaterThanOrEqual(1);
+        .toBe(true);
+      firstPid = firstWaiters[0].pid;
       // Chỉ gửi request thứ hai SAU bằng chứng request đã chọn đang chờ khoá task.
       start(firstIndex === 0 ? 1 : 0);
     } else {
@@ -219,12 +247,30 @@ export async function dongThoiDuoiKhoa(
         async () => {
           // Observer autocommit riêng: không giữ snapshot pg_stat_activity của transaction khoá.
           waiters = await docCayCho(probe, blockerPid);
-          return new Set(waiters.map((w) => w.pid)).size;
+          const count = new Set(waiters.map((w) => w.pid)).size;
+          if (firstPid === null) return count;
+          orderedChain = [];
+          // Trong CÙNG snapshot, first vẫn đợi locker và second phải đợi first.
+          // Hai waiter độc lập cùng đợi locker không chứng minh thứ tự, nên không nhả khoá.
+          const first = waiters.filter((w) => w.pid === firstPid);
+          if (first.length !== 1 || !first[0].blockers.includes(blockerPid)) return 0;
+          for (const second of waiters) {
+            if (second.pid === firstPid) continue;
+            const path = timDuongCho(waiters, second.pid, firstPid);
+            if (path.length >= 2) {
+              orderedChain = path;
+              break;
+            }
+          }
+          return orderedChain.length >= 2 ? count : 0;
         },
         {
           timeout: firstIndex === undefined ? 7_500 : 4_500,
           intervals: [25, 50, 100],
-          message: "Hai request thật phải cùng chờ DB",
+          message:
+            firstIndex === undefined
+              ? "Hai request thật phải cùng chờ DB"
+              : "Request thứ hai phải xếp sau request đầu trên cùng task",
         },
       )
       .toBeGreaterThanOrEqual(2);
@@ -238,7 +284,15 @@ export async function dongThoiDuoiKhoa(
     }) as [KetQuaHttpA5, KetQuaHttpA5];
     return {
       responses,
-      barrier: { blockerPid, firstIndex: firstIndex ?? null, firstWaiters, waiters },
+      barrier: {
+        lockedTaskId,
+        blockerPid,
+        firstIndex: firstIndex ?? null,
+        firstPid,
+        firstWaiters,
+        orderedChain,
+        waiters,
+      },
     };
   } finally {
     if (transaction) {

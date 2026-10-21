@@ -414,7 +414,7 @@ Bổ sung phần B batch/approve đồng thời còn thiếu tại snapshot §A5
 
 - P/H: s15-dong-thoi-lo và route-nghiem-thu-bat-bien trên PostgreSQL disposable:18/18 pass,0 skip.
 - B:5 ca mới × desktop/mobile + ca mất ACK có sẵn ×2 + setup:13/13 pass,0 skip. Browser production, cookie/HTTP/DB thật, không mock nghiệp vụ.
-- Hai PM khác ID và context đúng thiết bị; cây pg_blocking_pids xác nhận≥2 request cùng chờ task row trước unlock. Approve-vs-untick ép cả hai thứ tự bằng probe action đầu, trả chính xác200/409 và422/200.
+- Hai PM khác ID và context đúng thiết bị; chỉ khóa taskA chung, cây pg_blocking_pids xác nhận≥2 request cùng chờ trước unlock. Approve-vs-untick chỉ release khi cùng snapshot thấy secondPID→firstPID→locker, trả chính xác200/409 và422/200. T-008 kiểm lặp20 ordered cases (năm lượt mỗi lịch/viewport) pass,0 skip.
 - Batch chồng giữ hợp ô và history liên tục; replay UI không tăng state/history. M120 vẫn đóng dấu tick online; retry mất ACK cùng key có đúng1receipt/effect. Hủy floor giữ task source task và audit của nó, chỉ trả task source floor về hoàn thành.
 - Review độc lập khác model không còn P1/P2; typecheck/build xanh. [Acceptance](../autopilot/A5-AC03-ACCEPTANCE.md) có6 MUST được đối chiếu; final verify và required CI phải xanh trên cây/HEAD cuối, trạng thái cụ thể ở PR của codex/autopilot-a5-ac03.
 
