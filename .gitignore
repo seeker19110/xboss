@@ -70,3 +70,6 @@ xboss.tar.gz
 
 # Log do PM2 sinh (ecosystem.config.js)
 logs/
+
+# X-Templates: trạng thái autopilot cục bộ
+.autopilot/

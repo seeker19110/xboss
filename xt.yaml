@@ -1,0 +1,32 @@
+# xt.yaml — lệnh chuẩn của dự án cho agent và hook (YAML PHẲNG `task: lệnh`, do .xtemplates/scripts/dev-task.sh đọc).
+# Agent KHÔNG suy diễn lệnh từ văn xuôi; đọc file này. Để trống "" = không có; thiếu khoá = tự dò (package.json/pyproject/go.mod/Cargo.toml/Makefile).
+# Khi autopilot đang chạy, lint/test để "" hoặc lệnh không kiểm gì (true, :, exit 0, echo …) = cổng ĐỎ (ADR-0011): điền ở task đầu PLAN.
+# Nhà của bộ khoá: LOOP-HARNESS-008 (framework/11-autonomous-loop/harness-files.md). `scripts/dev-task.sh` CHỈ chạy các khoá format · lint · typecheck · test · build · format_file
+# (`gate` = build → typecheck → lint → test; lint nên gồm kiểm format). Khoá khác (install, dev, e2e, migrate, init, smoke, audit…) là lệnh KHAI BÁO để agent ĐỌC và chạy trực tiếp; dev-task không chạy.
+# Mẫu theo stack (giữ MỘT bộ, xoá phần còn lại):
+#   Node:   lint: npm run lint · typecheck: npm run typecheck · test: npm test -- --run · build: npm run build · format: npm run format · format_file: npx --no-install prettier --write "{}"
+#   Python: lint: ruff check . · typecheck: pyright · test: pytest -q · build: "" · format: ruff format . · format_file: case "{}" in *.py) ruff format "{}" ;; esac
+#   Go:     lint: go vet ./... · typecheck: "" · test: go test ./... · build: go build ./... · format: gofmt -l -w . · format_file: gofmt -w "{}"
+lint: npm run format:check && npm run lint
+typecheck: npm run typecheck
+test: npm test
+build: DATABASE_URL=postgres://ci:ci@localhost:5432/xboss_test npm run build
+format: npm run format
+format_file: npx --no-install prettier --write "{}"
+# Merge PR (ADR-0013/0014/0015, LOOP-STOP-022): L3 (mặc định) = mở PR là bật auto-merge của GitHub, merge khi required check
+# xanh (cần bật "Allow auto-merge" + ruleset có required check; ghi miễn trừ WF-REVIEW-007); L2 = máy chỉ tự merge làn nhanh
+# (`xt.py merge-check`); L1 = người merge mọi PR.
+# merge_risk_paths: glob thêm vào danh sách đường dẫn nhạy cảm (luôn để người merge), cách nhau dấu phẩy.
+merge_autonomy: L1
+merge_risk_paths: "migrations/*, deploy.sh, ecosystem.config.js, DEPLOY.md, next.config.mjs, proxy.ts, lib/bao-mat/*, .env.example"
+# Tuỳ chọn, agent đọc và chạy trực tiếp (dev-task không chạy): e2e, audit (dependency), perf (k6/lighthouse), migrate (áp migration local), install, dev, init, smoke
+e2e: npm run test:e2e
+audit: npm audit --audit-level=critical
+# --- Nguồn (không bịa): package.json "scripts" + .github/workflows/ci.yml ---
+# lint = job static của CI (format:check + lint). typecheck/build = đúng bước CI (build cần DATABASE_URL tồn tại, Pool lazy, không nối DB).
+# test = `npm test`: KHÔNG có TEST_DATABASE_URL thì test tích hợp tự skip (CI chạy `npm test -- --release-gate` trên Postgres 16) →
+#   xanh ở đây CHƯA đủ bằng chứng cho lát chạm DB/tiền/tiến độ; chạy lại với TEST_DATABASE_URL trước khi mở PR.
+# Khai báo cho agent đọc (dev-task không chạy): cổng tĩnh ĐẦY ĐỦ của CI (check:* + PROGRESS) và test release-gate.
+static: npm run gate
+test_release: npm test -- --release-gate
+# Merge: main tự deploy qua deploy.yml (workflow_run sau CI) và có deploy.sh/VPS thật → L1 (người merge mọi PR) tới khi chủ repo quyết L2.
