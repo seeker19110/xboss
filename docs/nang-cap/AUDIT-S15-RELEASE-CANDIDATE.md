@@ -407,3 +407,17 @@ Review độc lập D-006 không có finding actionable; không dùng lượt n�
 Phần thiếu B của riêng A4-AC06 trong §9.1 được bổ sung tại checkpoint này. Không suy ra
 verdict mới cho AC khác, không cộng lại tổng toàn bộ audit khi chưa tái kiểm. Lớp M/O,
 benchmark A4-AC08 và `RELEASE_VERIFIED` giữ trạng thái ở checkpoint trước. Không deploy.
+
+## 11. Checkpoint 22/10/2026 — bổ sung lớp B cho A5-AC03
+
+Bổ sung phần B batch/approve đồng thời còn thiếu tại snapshot §A5 theo A5-BUSINESS-CHAIN và TEST-MATRIX Approved25/09/2026. Giữ nguyên các bảng snapshot lịch sử; checkpoint này chỉ cập nhật A5-AC03.
+
+- P/H: s15-dong-thoi-lo và route-nghiem-thu-bat-bien trên PostgreSQL disposable:18/18 pass,0 skip.
+- B:5 ca mới × desktop/mobile + ca mất ACK có sẵn ×2 + setup:13/13 pass,0 skip. Browser production, cookie/HTTP/DB thật, không mock nghiệp vụ.
+- Hai PM khác ID và context đúng thiết bị; chỉ khóa taskA chung, cây pg_blocking_pids xác nhận≥2 request cùng chờ trước unlock. Approve-vs-untick chỉ release khi cùng snapshot thấy secondPID→firstPID→locker, trả chính xác200/409 và422/200. T-008 kiểm lặp20 ordered cases (năm lượt mỗi lịch/viewport) pass,0 skip.
+- Batch chồng giữ hợp ô và history liên tục; replay UI không tăng state/history. M120 vẫn đóng dấu tick online; retry mất ACK cùng key có đúng1receipt/effect. Hủy floor giữ task source task và audit của nó, chỉ trả task source floor về hoàn thành.
+- Review độc lập khác model không còn P1/P2; typecheck/build xanh. [Acceptance](../autopilot/A5-AC03-ACCEPTANCE.md) có6 MUST được đối chiếu; final verify và required CI phải xanh trên cây/HEAD cuối, trạng thái cụ thể ở PR của codex/autopilot-a5-ac03.
+
+A5-AC03 có bằng chứng P/H/B cục bộ bổ sung phần thiếu, không nâng verdict các AC khác hoặc toàn audit. M/O, thiết bị thật/Safari, UAT và RELEASE_VERIFIED giữ trạng thái cũ; không deploy. JSON blocker được lưu vào test output và log CI, không chứa credentials.
+
+D-007 của checkpoint A5: kiểm toast409 ngay trongcallbackresponse, giữ exactstatus/DB/UI/queue. Cùngobserverdelay4.5s:RED1fail+setup1pass, GREEN2/2; injection bỏ trướccommit. Stress20ordered+setup21pass vàfull13/13pass0skip/0retry sau sửa. Stressc7 từng đỏ nhưngthiếuartifact nênchưaquy nguyênnhân; Gate hiện giữlog/outputriêng đểkhông mấtbằngchứng.

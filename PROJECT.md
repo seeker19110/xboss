@@ -57,3 +57,8 @@ Xem `CLAUDE.md` mục **Quy trình & Definition of Done** và `.github/PULL_REQU
 PM cần tin list/KPI và chi tiết chi phí dùng cùng phạm vi; vai trò bị cấm không nhận dữ liệu tiền.
 Lát đầu bổ sung kiểm chứng cho tiêu chí QUALITY-FINAL-1 đã duyệt: sáu ca browser × desktop/mobile với API/DB thật, không mock báo cáo; đã đạt 12/12 lượt + setup = 13/13 pass, 0 skip. Oracle miền 18/18, typecheck, build và gate 18/18 xanh cục bộ; trạng thái CI chia sẻ theo HEAD của PR. Kết luận chỉ cho A4-AC06, không cho toàn sản phẩm hoặc production.
 Không thay capability, schema, auth policy, công thức tiền hoặc dữ liệu thật. Blueprint toàn sản phẩm L chưa được nghiệm thu; kết quả slice không thay release audit và vận hành production.
+
+## 10. Slice kế tiếp — A5-AC03 browser concurrency
+
+PM cần hai phiên tick/batch/duyệt cùng lúc vẫn có tiến độ và lịch sử nhất quán; hủy nghiệm thu tầng phải giữ task đã duyệt riêng. Spec QUALITY-FINAL-1 Approved 25/09/2026 và S15 hiện còn thiếu lớp B batch/approve đồng thời. [PLAN](docs/autopilot/A5-AC03-PLAN.md) tự duyệt D-001 trong nhật ký riêng, sáu MUST, năm ca mới cho bốn nhóm nghiệp vụ desktop/mobile có khóa taskA chung chứng minh overlap và cạnh queue cho lịch ép, kiểm lặp20 ordered cases cùng regression mất ACK có sẵn; chỉ số thành công là tất cả lượt bắt buộc pass, không skip, đúng API/DB/UI và review đóng finding.
+Tái sử dụng stack/schema/contracts hiện tại, chỉ thêm test/docs với dữ liệu cô lập trên PostgreSQL disposable. Không đổi app, auth policy, hook, CI, dependency hoặc production; nếu chưa đủ bằng chứng thì A5-AC03 giữ PARTIAL.
