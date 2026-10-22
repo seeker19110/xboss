@@ -6,7 +6,7 @@ Không có lát nào dở. A2-AC10 lớp B (spec `e2e/authed/a2-ac10-diary-confl
 
 ## Tiếp theo
 
-- **Deploy to VPS đỏ** (run 39764210485): thiếu secret `VPS_SSH_KNOWN_HOSTS` — chặn fail-closed có chủ đích, không sửa bằng code. Chủ repo lấy host key qua console VPS (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`), đối chiếu rồi dán dòng known_hosts vào secret (xem `DEPLOY.md`), sau đó chạy lại deploy.
+- **Deploy to VPS đỏ** (run 39764210485, 39789754927): `VPS_SSH_KNOWN_HOSTS` được khai ở Actions → Variables nhưng workflow chỉ đọc `secrets.*` nên nhận rỗng và dừng fail-closed. Sửa: `deploy.yml` đọc `secrets.VPS_SSH_KNOWN_HOSTS || vars.VPS_SSH_KNOWN_HOSTS` (host key là dữ liệu công khai), vẫn dừng khi cả hai rỗng/không khớp `VPS_HOST`; test hồi quy `tests/deploy-known-hosts.test.ts` (đỏ trước sửa). Sau merge cần xem run deploy kế tiếp qua bước SSH.
 - A2 còn mở: Safari/iOS thiết bị thật (cần người); ảnh mồ côi giữ P/H S06.
 - Chọn lát S15 tiếp theo hoặc audit 1152 MUST/639 SHOULD.
 
