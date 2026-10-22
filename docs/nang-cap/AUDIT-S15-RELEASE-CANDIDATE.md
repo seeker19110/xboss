@@ -434,3 +434,15 @@ Theo A1-SCOPE §4 và TEST-MATRIX Approved 25/09/2026, bổ sung bốn luồng h
 - Typecheck/build và 18/18 cổng tĩnh pass; review độc lập Astra không còn P1/P2. Strict, final verify và CI theo commit cuối được ghi ở PR nhánh codex/autopilot-a1-ac01 và acceptance riêng.
 
 [Acceptance A1](../autopilot/A1-AC01-ACCEPTANCE.md) có sáu MUST của lát, không thay toàn A1. M, UAT Safari/iOS/thiết bị thật, OIDC browser đầy đủ, API-key write hai org/hai chiều và toàn auth inventory vẫn mở. M/O, các AC khác và RELEASE_VERIFIED giữ nguyên; checkpoint này không xác nhận release hoặc production.
+
+## 13. Checkpoint 22/10/2026 — bổ sung lớp B cho A2-AC10
+
+Theo A2 §acceptance, TEST-MATRIX §4 và S06 (Approved 25/09/2026), bổ sung "B diary conflict thật" còn thiếu ở bảng §2. Giữ nguyên snapshot lịch sử và verdict A2-AC10 tổng thể PARTIAL.
+
+- B: `e2e/authed/a2-ac10-diary-conflict.spec.ts`, ba ca × desktop/mobile + setup = 7/7 pass; lặp ba lần mỗi viewport 19/19, 0 skip/retry. Mỗi ca một tổ chức cô lập (PM + kỹ sư), login UI, cookie/IDB/SW/HTTP/DB thật; không mock auth/API/DB.
+- If-Match cũ: hàng đợi gửi `If-Match: v1` + `Idempotency-Key` = operationId → 412, op `conflict` bền trong IndexedDB, DB giữ v2, 0 receipt; "Giữ bản trên thiết bị" tạo op key mới với If-Match = etag v2 vừa xem → 200, đúng một receipt.
+- Tạo-nếu-chưa-có: `If-None-Match: *` → 412, `created_by` vẫn là kỹ sư; "Dùng bản máy chủ" bỏ op, không PUT nào nữa, DB nguyên vẹn.
+- Mất ACK: `route.fetch()` cho server COMMIT rồi cắt response; "Gửi lại ngay" cùng key/If-Match cũ → 200 replay, không 412 giả, version/nội dung giữ nguyên, đúng một receipt.
+- Lát sửa một lỗi UI thật (D-A2-002): `OfflineQueueBadge` mount lại màn phục hồi khi hàng đợi về 0, mất thông báo kết quả/focus; RED trước vá được lưu.
+
+[Acceptance A2-AC10](../autopilot/A2-AC10-ACCEPTANCE.md) có sáu MUST của lát. M Safari/iOS/thiết bị thật vẫn NOT_RUN; ảnh mồ côi giữ P/H S06. Checkpoint này không xác nhận release hoặc production.

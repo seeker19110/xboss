@@ -35,7 +35,16 @@ export default function OfflineQueueBadge() {
       </>
     );
   }
-  if (total === 0 && !legacy && !docLoi) return panel;
+  // Giữ panel ở CÙNG vị trí cây với các nhánh có badge (Fragment, phần tử thứ 2): trả `panel`
+  // trần khi hàng đợi về 0 làm React mount lại màn phục hồi đang mở → mất thông báo kết quả
+  // ("Đã bỏ bản trên thiết bị…") và focus ngay lúc người dùng vừa giải quyết xong (A2-AC10).
+  if (total === 0 && !legacy && !docLoi)
+    return (
+      <>
+        {null}
+        {panel}
+      </>
+    );
 
   // Ưu tiên: mất mạng → có lỗi/khoá/dữ liệu cũ → đang gửi → đang chờ.
   let Icon = CloudUpload;
