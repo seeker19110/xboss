@@ -1,4 +1,23 @@
-# PLAN.md — Tích hợp OpenCodeReview (OCR): luật review XBoss theo đường dẫn (2026-10-01)
+# PLAN.md — M136 nâng cấp trải nghiệm và hiệu năng (2026-10-23)
+
+Người dùng đã duyệt kế hoạch và yêu cầu triển khai hoàn thiện. Base đã reconcile: `efd31ba0`.
+Contract chi tiết và phạm vi từng slice ở `docs/nang-cap/M136-trai-nghiem-hieu-nang-tinh-gon.md`;
+tiến độ/bằng chứng và phần phụ thuộc vận hành ở `docs/goals/upgrade-ux-performance-2026-10.md`.
+
+Các slice độc lập A (lưu/keyboard), B (shell/search/copy), C (poll/kiểm kê) được thực hiện trên
+worktree riêng, phiên chính tích hợp và sở hữu D (dashboard/loading/benchmark). Không thay
+schema/dependency/auth/tiền/nghiệm thu/private-cache. Không bỏ capability sống hoặc dữ liệu thật
+khi chưa đủ bằng chứng. Test logic RED trước vá, review chéo, targeted checks, full release gate,
+build production và E2E desktop/mobile trước khi kết luận kết quả kỹ thuật. Chủ dự án đã duyệt
+commit, push và deploy sau kiểm chứng; phát hành qua PR/CI và kiểm tra production sau deploy.
+
+A–E đã triển khai và kiểm chứng: 18/18 gate, build, full release gate 5.152 pass/0 fail,
+45 browser mới và hồi quy liên quan. Bằng chứng ở `docs/ops/evidence/m136/verification.md`.
+UAT/usage/rollout F chưa diễn ra; không đánh dấu toàn mục tiêu hoàn tất.
+
+Phần bên dưới là kế hoạch OCR lịch sử đã hoàn tất, không phải phạm vi M136.
+
+## Lịch sử — Tích hợp OpenCodeReview (OCR), 2026-10-01
 
 **Cập nhật:** 2026-10-01 · **Nhánh tích hợp:** `claude/elegant-carson-8jv8kz` (= `origin/main` `03d504b` + 1 commit đặc tả của phiên chính). **Trạng thái:** ĐÃ THI HÀNH 2026-10-01 (coordinator không giao được việc — xem TRAPS.md §7 — phiên chính giao trực tiếp A ∥ C → B).
 

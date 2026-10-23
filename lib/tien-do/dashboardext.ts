@@ -6,8 +6,8 @@
 import { query, queryOne, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCostReport } from "@/lib/tai-chinh/cost";
 import { DUE_SOON_COND, dueSoonParams, loadDueSoonThresholds } from "@/lib/tien-do/due-soon";
-import { sheetProgressKpi } from "@/lib/tien-do/kpi";
-import { progressAtDate } from "@/lib/tien-do/report";
+import { sheetProgressKpi, type SheetKpi } from "@/lib/tien-do/kpi";
+import { progressAtDate, type TaskProgressAtDate } from "@/lib/tien-do/report";
 
 export async function tableExists(name: string): Promise<boolean> {
   const row = await queryOne<{ exists: boolean }>(
@@ -169,7 +169,10 @@ export type SystemCrossRow = {
 // Bảng so sánh chéo hệ: % tiến độ, số TẦNG trễ (quyết 2026-07-11 — 1 tầng nhiều task
 // trễ vẫn tính 1 lần, gộp theo floor_label trong phạm vi hệ đó), NCR mở, % ngân sách
 // đã dùng — mỗi hệ trong danh mục systems (màn hình chỉ huy trưởng đa hệ, §3b kế hoạch tổng).
-export async function bySystemBlock(projectId?: number | null): Promise<SystemCrossRow[]> {
+export async function bySystemBlock(
+  projectId?: number | null,
+  options: { includeBudget?: boolean } = {},
+): Promise<SystemCrossRow[]> {
   const today = todayISO();
   // sheet_types/work_packages/tasks chưa có project_id trực tiếp — suy qua towers.
   const towerJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
@@ -203,7 +206,7 @@ export async function bySystemBlock(projectId?: number | null): Promise<SystemCr
   );
   // Một báo cáo exact cho dự án (không N+1); thiếu dự án → không số liệu chi phí (fail-closed).
   const cost =
-    projectId != null
+    projectId != null && options.includeBudget !== false
       ? (
           await getCostReport(
             { kind: "project", projectId },
@@ -295,22 +298,24 @@ export async function dueSoonBlock(opts: {
 // Δ % tiến độ tổng có trọng số: hôm nay − 7 ngày trước. Hôm nay lấy từ sheetProgressKpi
 // (Σ avgProgress·total / Σ total); mốc cũ tái dựng từ task_history qua progressAtDate —
 // đúng cách nhánh `?range=week` của /api/dashboard đang làm. null khi không có task nào.
-export async function weekDeltaBlock(opts: {
-  projectId?: number | null;
-  systemId?: number | null;
-}): Promise<number | null> {
+export async function weekDeltaBlock(
+  opts: { projectId?: number | null; systemId?: number | null },
+  snapshot: { kpi?: readonly SheetKpi[]; previousRows?: readonly TaskProgressAtDate[] } = {},
+): Promise<number | null> {
   const projectId = opts.projectId ?? null;
   const systemId = opts.systemId ?? null;
 
-  const kpi = await sheetProgressKpi({ projectId, systemId });
+  const kpi = snapshot.kpi ?? (await sheetProgressKpi({ projectId, systemId }));
   const total = kpi.reduce((s, k) => s + Number(k.total), 0);
   if (total === 0) return null;
   const nowPct = kpi.reduce((s, k) => s + Number(k.avgProgress ?? 0) * Number(k.total), 0) / total;
 
-  const prevRows = await progressAtDate(daysFromTodayISO(-7), {
-    ...(systemId != null ? { systemId } : {}),
-    ...(projectId != null ? { projectId } : {}),
-  });
+  const prevRows =
+    snapshot.previousRows ??
+    (await progressAtDate(daysFromTodayISO(-7), {
+      ...(systemId != null ? { systemId } : {}),
+      ...(projectId != null ? { projectId } : {}),
+    }));
   if (prevRows.length === 0) return null;
   const prevPct = prevRows.reduce((s, r) => s + r.progress, 0) / prevRows.length;
 

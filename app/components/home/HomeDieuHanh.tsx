@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
@@ -81,6 +81,9 @@ export default function HomeDieuHanh({
     loading,
     loi,
     loiPhu,
+    secondaryLoading,
+    secondaryErrors,
+    retrySecondary,
     fetchedAt,
     tai,
   } = useDieuHanhData();
@@ -88,6 +91,14 @@ export default function HomeDieuHanh({
   // sheet/tầng/trạng thái của riêng nó).
   const [reasonFilter, setReasonFilter] = useState("");
   const [newSheetOpen, setNewSheetOpen] = useState(false);
+  const [reorderSaving, setReorderSaving] = useState(false);
+  const reorderSavingRef = useRef(false);
+  const [reorderMessage, setReorderMessage] = useState<{ error: boolean; text: string } | null>(
+    null,
+  );
+  const [reasonSaving, setReasonSaving] = useState(false);
+  const reasonSavingRef = useRef(false);
+  const [reasonMessage, setReasonMessage] = useState<{ error: boolean; text: string } | null>(null);
   const compact = useIsCompact();
 
   // Tab đang mở: state cục bộ + ghi vào URL (cùng khuôn với `HubShell`) — đọc thẳng từ
@@ -181,31 +192,82 @@ export default function HomeDieuHanh({
     window.location.reload();
   }
 
-  function reorderSheets(next: KPI[]) {
+  async function reorderSheets(next: KPI[]) {
+    if (reorderSavingRef.current) return;
+    const previous = kpiOrder;
+    reorderSavingRef.current = true;
+    setReorderSaving(true);
+    setReorderMessage({ error: false, text: "Đang lưu thứ tự trang..." });
     setKpiOrder(next);
-    fetch("/api/sheets", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: next.map((k) => k.sheetId) }),
-    });
+    // Chỉ rollback bản lạc quan của request này; không ghi đè dữ liệu vừa được tải mới.
+    const rollback = () => setKpiOrder((current) => (current === next ? previous : current));
+    try {
+      const res = await fetch("/api/sheets", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: next.map((k) => k.sheetId) }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        rollback();
+        setReorderMessage({
+          error: true,
+          text: j?.error ?? "Không lưu được thứ tự — kéo lại để thử lại",
+        });
+        return;
+      }
+      setReorderMessage({ error: false, text: "Đã lưu thứ tự trang" });
+    } catch {
+      rollback();
+      setReorderMessage({
+        error: true,
+        text: "Mất kết nối — thứ tự đã được khôi phục. Kiểm tra mạng rồi kéo lại để thử lại.",
+      });
+    } finally {
+      reorderSavingRef.current = false;
+      setReorderSaving(false);
+    }
   }
 
   async function setReason(taskId: number, reason: string) {
-    const res = await fetch(`/api/tasks/${taskId}/delay-reason`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason: reason || null }),
-    });
-    if (!res.ok) return;
-    setData(
-      (d) =>
-        d && {
-          ...d,
-          delayedTasks: d.delayedTasks.map((t) =>
-            t.id === taskId ? { ...t, delayReason: reason || null } : t,
-          ),
-        },
-    );
+    if (reasonSavingRef.current) return;
+    reasonSavingRef.current = true;
+    setReasonSaving(true);
+    setReasonMessage({ error: false, text: "Đang lưu lý do trễ..." });
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/delay-reason`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reason || null }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        setReasonMessage({
+          error: true,
+          text: j?.error ?? "Không lưu được lý do trễ — chọn lại để thử lại",
+        });
+        return;
+      }
+      // Giữ giá trị cũ cho tới khi server xác nhận — lỗi không làm đổi lý do/Pareto.
+      setData(
+        (d) =>
+          d && {
+            ...d,
+            delayedTasks: d.delayedTasks.map((t) =>
+              t.id === taskId ? { ...t, delayReason: reason || null } : t,
+            ),
+          },
+      );
+      setReasonMessage({ error: false, text: "Đã lưu lý do trễ" });
+    } catch {
+      setReasonMessage({
+        error: true,
+        text: "Mất kết nối — lý do trễ chưa thay đổi. Kiểm tra mạng rồi chọn lại để thử lại.",
+      });
+    } finally {
+      reasonSavingRef.current = false;
+      setReasonSaving(false);
+    }
   }
 
   return (
@@ -308,7 +370,11 @@ export default function HomeDieuHanh({
           {canImport && (
             <>
               <DocToolbar.Sep />
-              <Button icon={Plus} onClick={() => setNewSheetOpen(true)}>
+              <Button
+                icon={Plus}
+                onClick={() => setNewSheetOpen(true)}
+                disabled={secondaryLoading.sheets || !!secondaryErrors.sheets}
+              >
                 Thêm trang
               </Button>
             </>
@@ -319,28 +385,81 @@ export default function HomeDieuHanh({
         <DieuHanhStats
           canImport={canImport}
           onAddSheet={() => setNewSheetOpen(true)}
+          addSheetDisabled={secondaryLoading.sheets || !!secondaryErrors.sheets}
           pct={overview.pct}
           totalTasks={overview.totalTasks}
           delayedGroups={overview.delayed}
           delayedTasks={allDelayed.length}
-          sheetCount={sheets.length}
+          sheetCount={data?.kpi.length ?? 0}
           approvals={data?.approvals ?? null}
           dueSoon={data?.dueSoon ?? null}
           weekDelta={data?.weekDelta ?? null}
         />
 
+        {(Object.values(secondaryLoading).some(Boolean) || loiPhu) && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-sm space-y-2">
+            {Object.values(secondaryLoading).some(Boolean) && (
+              <p role="status" className="text-zinc-400">
+                Đang tải dữ liệu phụ:{" "}
+                {[
+                  secondaryLoading.sheets && "danh sách trang",
+                  secondaryLoading.systems && "hệ thi công",
+                  secondaryLoading.reasons && "nguyên nhân trễ",
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+                .
+              </p>
+            )}
+            {loiPhu && (
+              <div role="alert" className="space-y-2">
+                {Object.entries(secondaryErrors).map(([source, message]) => (
+                  <p key={source} className="text-amber-300">
+                    {source === "sheets"
+                      ? "Danh sách trang"
+                      : source === "systems"
+                        ? "Hệ thi công"
+                        : "Nguyên nhân trễ"}
+                    : {message}
+                  </p>
+                ))}
+                <Button size="sm" onClick={retrySecondary}>
+                  Thử lại dữ liệu phụ
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Z2: thân 2 cột — cột chính (tiến độ → đường găng → bảng trễ) + cột phải ── */}
         <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
           <div className="min-w-0 space-y-6">
-            <DieuHanhTabs
-              canImport={canImport}
-              tab={tab}
-              onTabChange={selectTab}
-              kpiOrder={kpiOrder}
-              onReorder={reorderSheets}
-              onDeleteSheet={deleteSheet}
-              chartData={chartData}
-            />
+            <fieldset
+              disabled={reorderSaving}
+              aria-busy={reorderSaving}
+              className="min-w-0"
+              onDragStartCapture={(e) => {
+                if (reorderSavingRef.current) e.preventDefault();
+              }}
+            >
+              <DieuHanhTabs
+                canImport={canImport}
+                tab={tab}
+                onTabChange={selectTab}
+                kpiOrder={kpiOrder}
+                onReorder={reorderSheets}
+                onDeleteSheet={deleteSheet}
+                chartData={chartData}
+              />
+            </fieldset>
+            {reorderMessage && (
+              <p
+                role={reorderMessage.error ? "alert" : "status"}
+                className={`text-sm ${reorderMessage.error ? "text-red-400" : "text-zinc-400"}`}
+              >
+                {reorderMessage.text}
+              </p>
+            )}
 
             {/* ── Theo hệ thi công (M15) — CỐ Ý để ngoài thẻ tab: đây là đường vào duy
                 nhất còn lại tới trang hệ /system/[code] từ trang chủ (sidebar đã bỏ mục
@@ -383,17 +502,29 @@ export default function HomeDieuHanh({
             <ScheduleControlPanel />
 
             {/* ── Bảng trễ ── */}
-            <DelayedSection
-              tasks={allDelayed}
-              kpi={data?.kpi ?? []}
-              sheetLabel={(s) => sheetNameByCode.get(s) ?? s}
-              reasonFilter={reasonFilter}
-              delayReasons={delayReasons}
-              groupProgress={groupProgressMap}
-              canEditReason={me.role !== "subcon"}
-              onSetReason={setReason}
-              canImport={canImport}
-            />
+            <fieldset disabled={reasonSaving} aria-busy={reasonSaving} className="min-w-0">
+              <DelayedSection
+                tasks={allDelayed}
+                kpi={data?.kpi ?? []}
+                sheetLabel={(s) => sheetNameByCode.get(s) ?? s}
+                reasonFilter={reasonFilter}
+                delayReasons={delayReasons}
+                groupProgress={groupProgressMap}
+                canEditReason={
+                  me.role !== "subcon" && !secondaryLoading.reasons && !secondaryErrors.reasons
+                }
+                onSetReason={setReason}
+                canImport={canImport}
+              />
+            </fieldset>
+            {reasonMessage && (
+              <p
+                role={reasonMessage.error ? "alert" : "status"}
+                className={`text-sm ${reasonMessage.error ? "text-red-400" : "text-zinc-400"}`}
+              >
+                {reasonMessage.text}
+              </p>
+            )}
 
             {/* ── M9: KPI chất lượng + so sánh chéo hệ ── */}
             {data && (

@@ -131,16 +131,18 @@ export async function GET(req: NextRequest) {
 
   // `?range=week|month` (M36 PR3): thêm % đầu kỳ + Δ kỳ cho từng dòng KPI — tái dựng từ
   // task_history qua `progressAtDate` (mốc 7/30 ngày trước), gộp theo sheetId.
-  const kpiWithDelta =
+  const previousRows =
     range === "week" || range === "month"
-      ? await (async () => {
-          const pastDate = range === "week" ? daysFromTodayISO(-7) : daysFromTodayISO(-30);
-          const prevRows = await progressAtDate(pastDate, {
-            ...(systemId !== null ? { systemId } : {}),
-            projectId,
-          });
+      ? await progressAtDate(range === "week" ? daysFromTodayISO(-7) : daysFromTodayISO(-30), {
+          ...(systemId !== null ? { systemId } : {}),
+          projectId,
+        })
+      : undefined;
+  const kpiWithDelta =
+    previousRows !== undefined
+      ? (() => {
           const prevBySheet = new Map<number, number[]>();
-          for (const r of prevRows) {
+          for (const r of previousRows) {
             if (!prevBySheet.has(r.sheetId)) prevBySheet.set(r.sheetId, []);
             prevBySheet.get(r.sheetId)!.push(r.progress);
           }
@@ -170,9 +172,12 @@ export async function GET(req: NextRequest) {
     qualityBlock(projectId),
     procurementBlock(projectId),
     workfrontBlock(projectId),
-    bySystemBlock(projectId),
+    bySystemBlock(projectId, { includeBudget: false }),
     dueSoonBlock({ projectId, systemId }),
-    weekDeltaBlock({ projectId, systemId }),
+    weekDeltaBlock(
+      { projectId, systemId },
+      { kpi: kpiRaw, ...(range === "week" ? { previousRows } : {}) },
+    ),
   ]);
   const vo = canViewFinance ? await voBlock(projectId) : null;
 

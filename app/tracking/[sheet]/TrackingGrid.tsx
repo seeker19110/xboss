@@ -850,9 +850,21 @@ export function TrackingGrid({
                 </span>
               ) : (
                 <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-sm font-medium truncate flex-1">
-                    {renderName(pkg.name)}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={onToggle}
+                    aria-expanded={expanded}
+                    aria-label={`${expanded ? "Thu" : "Mở"} nhóm ${pkg.name}`}
+                    title={pkg.name}
+                    className="flex items-center gap-1 min-h-11 min-w-0 flex-1 text-left text-sm font-medium rounded-lg hover:text-emerald-300"
+                  >
+                    {expanded ? (
+                      <ChevronDown className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    )}
+                    <span className="truncate">{renderName(pkg.name)}</span>
+                  </button>
                   {ce && editName === null && (
                     <button
                       onClick={(e) => {

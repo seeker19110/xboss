@@ -16,14 +16,14 @@ import { Card, Chip, Section } from "@/app/components/ui";
 // tiến độ → đường găng → bảng trễ. Không có số liệu nào tự tính ở đây — Pareto nhận
 // nguyên số đã tính trong `app/page.tsx`.
 
-// 7 phân hệ hợp nhất: dữ liệu điều hướng thuần (không phải số liệu dự án). Trước đây khai
+// 6 phân hệ hợp nhất: dữ liệu điều hướng thuần (không phải số liệu dự án). Trước đây khai
 // ngay trong render của trang chủ kèm các chip trạng thái cắm cứng ("100% Khớp", "LOD
 // 400", "Quyết toán kỳ 6") — số liệu giả, không đọc từ DB, dễ khiến người xem tin nhầm là
 // tình trạng thật; đã bỏ hẳn, chỉ giữ phần điều hướng.
 const HUBS: { title: string; desc: string; href: string; icon: LucideIcon; tint: string }[] = [
   {
     title: "1. Chỉ huy hiện trường & An toàn",
-    desc: "Việc của tôi, Nhật ký TT06, Nghiệm thu, Mặt bằng & AI HSE",
+    desc: "Việc của tôi, Nhật ký, Nghiệm thu, Mặt bằng & An toàn",
     href: "/site",
     icon: HardHat,
     tint: "bg-emerald-500/10 text-emerald-300",
@@ -50,8 +50,8 @@ const HUBS: { title: string; desc: string; href: string; icon: LucideIcon; tint:
     tint: "bg-violet-500/10 text-violet-300",
   },
   {
-    title: "5. Trí tuệ AI & Digital Twin",
-    desc: "Zalo/Voice Copilot, Gate 0, AI Swarm Debates & IoT Telemetry",
+    title: "5. Đối tượng & Quy trình kỹ thuật",
+    desc: "Duyệt đối tượng kỹ thuật, kiểm tra nguồn và phối hợp tác tử",
     href: "/engineering-intelligence",
     icon: Brain,
     tint: "bg-rose-500/10 text-rose-300",
@@ -84,7 +84,12 @@ const LIFECYCLE = [
     desc: "PO 6 bước · QR GRN cổng",
     href: "/procurement",
   },
-  { stage: "GĐ 3", title: "Hiện trường & HSE", desc: "Nhật ký TT06 · AI Vision", href: "/site" },
+  {
+    stage: "GĐ 3",
+    title: "Hiện trường & HSE",
+    desc: "Nhật ký · An toàn hiện trường",
+    href: "/site",
+  },
   {
     stage: "GĐ 4",
     title: "Nghiệm thu & IPC",
@@ -94,7 +99,7 @@ const LIFECYCLE = [
   {
     stage: "GĐ 5",
     title: "Hoàn công & Bàn giao",
-    desc: "T&C · Điều 24 · Digital Twin",
+    desc: "T&C · Hoàn công · Bàn giao",
     href: "/governance?tab=lifecycle",
   },
 ];
@@ -174,7 +179,7 @@ export default function HomeRail({
 
       <Section
         title="Trung tâm điều hành"
-        description="7 phân hệ hợp nhất — bấm để mở đúng cockpit"
+        description="6 phân hệ — mở tổng quan và tác vụ liên quan"
       >
         <Card pad="sm" className="space-y-0.5">
           {HUBS.map((hub) => {

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { formatDateTimeVN, todayISO, daysFromTodayISO } from "@/lib/nen/date";
 import { trackingUrl } from "@/app/lib/trackingUrl";
+import { createVisiblePoll } from "@/app/lib/visiblePoll";
 
 type Notif = {
   id: number;
@@ -206,6 +207,7 @@ export default function NotificationBell() {
   const [push, setPush] = useState<PushState>("unavailable");
   const keyRef = useRef<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<ReturnType<typeof createVisiblePoll> | null>(null);
 
   // Kiểm tra khả năng Web Push: cần SW đã đăng ký (production) + VAPID key trên server.
   useEffect(() => {
@@ -266,18 +268,30 @@ export default function NotificationBell() {
     }
   }
 
-  async function load() {
-    const r = await fetch("/api/notifications").catch(() => null);
-    if (!r?.ok) return;
-    const j = await r.json();
-    setItems(j.notifications ?? []);
-    setUnread(j.unread ?? 0);
+  function load() {
+    pollRef.current?.refresh();
   }
 
   useEffect(() => {
-    load();
-    const t = setInterval(load, POLL_MS);
-    return () => clearInterval(t);
+    const poll = createVisiblePoll({
+      visibility: document,
+      everyMs: POLL_MS,
+      load: async (signal) => {
+        const r = await fetch("/api/notifications", { signal });
+        if (!r.ok) throw new Error(`Không tải được thông báo (${r.status})`);
+        return (await r.json()) as { notifications?: Notif[]; unread?: number };
+      },
+      onData: (data) => {
+        setItems(data.notifications ?? []);
+        setUnread(data.unread ?? 0);
+      },
+      // Lỗi tải giữ danh sách hiện có; lượt poll sau tự thử lại.
+    });
+    pollRef.current = poll;
+    return () => {
+      pollRef.current = null;
+      poll.dispose();
+    };
   }, []);
 
   useEffect(() => {
