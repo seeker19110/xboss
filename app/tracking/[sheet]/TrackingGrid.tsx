@@ -49,6 +49,7 @@ import { useCauTrucLuoi } from "./useCauTrucLuoi";
 import { ThanhVungChon } from "./ThanhVungChon";
 import { ODimension } from "./ODimension";
 import { taskKhopLoc } from "./locTask";
+import { DanhSachKeo, HangKeo, TayNamKeo, luuThuTu } from "./KeoTha";
 
 // Ngày rút gọn d/M cho dòng task (đỡ chiếm chỗ trên lưới).
 const fmtShortDate = (d: string | null) => {
@@ -578,6 +579,18 @@ export function TrackingGrid({
   // Chiều rộng cột dùng chung cho hàng nhóm lẫn bảng task; ce gate nút sửa, anHang ẩn hàng lọc task
   const ce = canEdit && editMode;
   const anHang = (status: string) => !taskKhopLoc(status, taskFilter);
+  // Kéo thả task trong nhóm (M135): tắt khi lọc task vì hàng ẩn làm thứ tự hiển thị lệch thứ tự thật.
+  const keoTask = ce && !taskFilter;
+  const sapXepTask = async (ids: number[]) => {
+    setGrid((g) =>
+      g ? { ...g, tasks: ids.flatMap((id) => g.tasks.find((t) => t.id === id) ?? []) } : g,
+    );
+    const loi = await luuThuTu(`/api/workpackages/${pkg.id}/tasks`, { ids });
+    if (loi) {
+      appAlert(loi);
+      load();
+    }
+  };
   const hpc = (col: string) => (hiddenPrintCols.has(col) ? " print-hidden-col" : "");
   const showBoq = canEdit; // BOQ chỉ hiển thị cho Admin/PM (luôn hiện, kể cả khi chỉ xem)
   const W_BOQ = showBoq ? 110 : 0;
@@ -590,7 +603,7 @@ export function TrackingGrid({
   // "CH 01"/"X1-X6" dùng cột hẹp 44px (vẫn ≥40px vùng chạm) để tầng nhiều căn không phải
   // cuộn ngang quá xa; có nhãn dài kiểu kích thước ống "1300X700" thì giữ 60px đủ 2 dòng.
   const W_DIM = visibleColumns.every((c) => c.length <= 6) ? 44 : 60;
-  const W_ACT = 88;
+  const W_ACT = 112; // đủ chỗ cho tay nắm kéo (M135) + 5 nút thao tác
   // Sticky left offset tính tự động từ các hằng số trên
   const LEFT_CODE = W_BOQ;
   const LEFT_NAME = W_BOQ + W_CODE;
@@ -1116,6 +1129,7 @@ export function TrackingGrid({
                     className="flex items-center gap-0.5 shrink-0"
                     onClick={(e) => e.stopPropagation()}
                   >
+                    <TayNamKeo nhan="Kéo để đổi vị trí nhóm" />
                     <button
                       onClick={() => movePkg("up")}
                       disabled={pkgIdx === 0}
@@ -1306,369 +1320,381 @@ export function TrackingGrid({
 
         {showTable && (
           <tbody>
-            {grid.tasks.map((t, ti) => (
-              <Fragment key={t.id}>
-                <tr className="hover:bg-zinc-800/30 transition-colors" hidden={anHang(t.status)}>
-                  {showBoq && (
-                    <td
-                      className={`${stkBoq} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden${hpc("BOQ")}`}
-                      style={{ left: 0 }}
-                    >
-                      <button
-                        onClick={() => ce && editTaskBoq(t)}
-                        title={
-                          ce ? `${t.boqCode ?? "Chưa gán"} — bấm để sửa` : (t.boqCode ?? "Chưa gán")
-                        }
-                        className={`font-mono text-[10px] truncate block w-full text-center ${ce ? "text-amber-400 hover:underline cursor-pointer" : "text-amber-400/70 cursor-default"}`}
+            <DanhSachKeo ids={grid.tasks.map((t) => t.id)} tat={!keoTask} onSapXep={sapXepTask}>
+              {grid.tasks.map((t, ti) => (
+                <Fragment key={t.id}>
+                  <HangKeo
+                    id={t.id}
+                    className="hover:bg-zinc-800/30 transition-colors"
+                    hidden={anHang(t.status)}
+                  >
+                    {showBoq && (
+                      <td
+                        className={`${stkBoq} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden${hpc("BOQ")}`}
+                        style={{ left: 0 }}
                       >
-                        {t.boqCode ?? "—"}
-                      </button>
-                      {(t.drawingUrl || ce) &&
-                        (t.drawingUrl ? (
-                          <span className="flex items-center justify-center gap-0.5 mt-0.5">
-                            <a
-                              href={t.drawingUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              title={`Bản vẽ: ${t.drawingUrl}`}
-                              className="text-sky-400 hover:text-sky-300"
+                        <button
+                          onClick={() => ce && editTaskBoq(t)}
+                          title={
+                            ce
+                              ? `${t.boqCode ?? "Chưa gán"} — bấm để sửa`
+                              : (t.boqCode ?? "Chưa gán")
+                          }
+                          className={`font-mono text-[10px] truncate block w-full text-center ${ce ? "text-amber-400 hover:underline cursor-pointer" : "text-amber-400/70 cursor-default"}`}
+                        >
+                          {t.boqCode ?? "—"}
+                        </button>
+                        {(t.drawingUrl || ce) &&
+                          (t.drawingUrl ? (
+                            <span className="flex items-center justify-center gap-0.5 mt-0.5">
+                              <a
+                                href={t.drawingUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                title={`Bản vẽ: ${t.drawingUrl}`}
+                                className="text-sky-400 hover:text-sky-300"
+                              >
+                                <Link2 className="w-3 h-3" />
+                              </a>
+                              {ce && (
+                                <button
+                                  aria-label="Sửa"
+                                  onClick={() => editTaskDrawing(t)}
+                                  className="text-zinc-500 hover:text-emerald-400"
+                                >
+                                  <Pencil className="w-2.5 h-2.5" />
+                                </button>
+                              )}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => editTaskDrawing(t)}
+                              title="Thêm link bản vẽ / BBNT"
+                              className="block mx-auto mt-0.5 text-zinc-700 hover:text-sky-400"
                             >
                               <Link2 className="w-3 h-3" />
-                            </a>
+                            </button>
+                          ))}
+                      </td>
+                    )}
+                    <td
+                      className={`${stkCode} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden${hpc("STT")}`}
+                      style={{ left: LEFT_CODE, width: W_CODE, minWidth: W_CODE }}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="font-mono text-zinc-400 text-[10px]">
+                          {String(ti + 1).padStart(2, "0")}
+                        </span>
+                      </div>
+                    </td>
+                    <td
+                      className={`${stkName} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 align-middle overflow-hidden${hpc("Công việc")}`}
+                      style={{
+                        left: isMobile ? 0 : LEFT_NAME,
+                        width: W_NAME,
+                        minWidth: W_NAME,
+                        maxWidth: W_NAME,
+                      }}
+                    >
+                      {editTask?.id === t.id ? (
+                        <span className="flex items-center gap-1">
+                          <input
+                            ref={editTaskInputRef}
+                            autoFocus
+                            value={editTask.value}
+                            onChange={(e) => setEditTask({ id: t.id, value: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveTaskName(t.id, editTask.value);
+                              if (e.key === "Escape") setEditTask(null);
+                            }}
+                            className="bg-zinc-800 border border-emerald-600 rounded px-1 py-0.5 text-xs w-full outline-none"
+                          />
+                          <button
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              wrapSel(
+                                editTaskInputRef,
+                                "**",
+                                () => editTask.value,
+                                (v) => setEditTask((et) => et && { ...et, value: v }),
+                              );
+                            }}
+                            title="Bôi đậm (**text**)"
+                            className="shrink-0 text-xs font-bold text-zinc-400 hover:text-white px-0.5"
+                          >
+                            B
+                          </button>
+                          <button
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              wrapSel(
+                                editTaskInputRef,
+                                "__",
+                                () => editTask.value,
+                                (v) => setEditTask((et) => et && { ...et, value: v }),
+                              );
+                            }}
+                            title="Chữ mảnh (__text__)"
+                            className="shrink-0 text-xs font-light text-zinc-400 hover:text-white px-0.5"
+                          >
+                            T
+                          </button>
+                          <button
+                            aria-label="Lưu"
+                            onClick={() => saveTaskName(t.id, editTask.value)}
+                            className="text-emerald-400"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span className="truncate flex-1" title={t.name}>
+                            {renderName(t.name)}
+                          </span>
+                          {ce && (
+                            <button
+                              aria-label="Sửa"
+                              onClick={() => setEditTask({ id: t.id, value: t.name })}
+                              className="shrink-0 text-zinc-500 hover:text-emerald-400"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {editMode && (
+                          <button
+                            onClick={() => setAllInRow(t, true)}
+                            className="text-[10px] text-emerald-500 hover:underline"
+                          >
+                            Tất cả
+                          </button>
+                        )}
+                        {editMode && (
+                          <button
+                            onClick={() => setAllInRow(t, false)}
+                            className="text-[10px] text-zinc-500 hover:underline"
+                          >
+                            Bỏ
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setHistoryTask(t)}
+                          title="Lịch sử tiến độ"
+                          className="text-zinc-500 hover:text-emerald-400"
+                        >
+                          <History className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => setPhotosTask(t)}
+                          title="Ảnh hiện trường"
+                          className={`flex items-center gap-0.5 ${t.photoCount > 0 ? "text-sky-400 hover:text-sky-300" : "text-zinc-500 hover:text-sky-400"}`}
+                        >
+                          <Camera className="w-3 h-3" />
+                          {t.photoCount > 0 && <span className="text-[10px]">{t.photoCount}</span>}
+                        </button>
+                        <button
+                          onClick={() => setCommentsTask(t)}
+                          title="Bình luận / trao đổi"
+                          className={`flex items-center gap-0.5 ${t.commentCount > 0 ? "text-violet-400 hover:text-violet-300" : "text-zinc-500 hover:text-violet-400"}`}
+                        >
+                          <MessageSquare className="w-3 h-3" />
+                          {t.commentCount > 0 && (
+                            <span className="text-[10px]">{t.commentCount}</span>
+                          )}
+                        </button>
+                        {t.status === "nghiem_thu" ? (
+                          <span className="flex items-center gap-1 text-[10px] text-teal-200 bg-teal-950 px-1.5 py-0.5 rounded">
+                            ✓ Đã NT
                             {ce && (
                               <button
-                                aria-label="Sửa"
-                                onClick={() => editTaskDrawing(t)}
-                                className="text-zinc-500 hover:text-emerald-400"
+                                onClick={() => approveTask(t, false)}
+                                title="Huỷ nghiệm thu"
+                                className="text-teal-500 hover:text-red-400"
                               >
-                                <Pencil className="w-2.5 h-2.5" />
+                                <X className="w-2.5 h-2.5" />
                               </button>
                             )}
                           </span>
                         ) : (
-                          <button
-                            onClick={() => editTaskDrawing(t)}
-                            title="Thêm link bản vẽ / BBNT"
-                            className="block mx-auto mt-0.5 text-zinc-700 hover:text-sky-400"
+                          ce &&
+                          t.progressPercent >= 1 && (
+                            <button
+                              onClick={() => approveTask(t, true)}
+                              title="Duyệt nghiệm thu (task đã 100%)"
+                              className="text-[10px] text-teal-200 border border-teal-800 bg-teal-950 hover:bg-teal-900 px-1.5 py-0.5 rounded"
+                            >
+                              Nghiệm thu
+                            </button>
+                          )
+                        )}
+                        {t.status === "tre" && (
+                          <select
+                            value={t.delayReason ?? ""}
+                            onChange={(e) => setDelayReason(t, e.target.value)}
+                            title="Nguyên nhân trễ — giúp PM thống kê và xử lý"
+                            className={`text-[10px] rounded px-1 py-0.5 outline-none border max-w-[110px] ${
+                              t.delayReason
+                                ? "bg-orange-950 border-orange-900 text-orange-200"
+                                : "bg-zinc-800 border-zinc-700 text-zinc-300"
+                            }`}
                           >
-                            <Link2 className="w-3 h-3" />
-                          </button>
-                        ))}
-                    </td>
-                  )}
-                  <td
-                    className={`${stkCode} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden${hpc("STT")}`}
-                    style={{ left: LEFT_CODE, width: W_CODE, minWidth: W_CODE }}
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      <span className="font-mono text-zinc-400 text-[10px]">
-                        {String(ti + 1).padStart(2, "0")}
-                      </span>
-                    </div>
-                  </td>
-                  <td
-                    className={`${stkName} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 align-middle overflow-hidden${hpc("Công việc")}`}
-                    style={{
-                      left: isMobile ? 0 : LEFT_NAME,
-                      width: W_NAME,
-                      minWidth: W_NAME,
-                      maxWidth: W_NAME,
-                    }}
-                  >
-                    {editTask?.id === t.id ? (
-                      <span className="flex items-center gap-1">
-                        <input
-                          ref={editTaskInputRef}
-                          autoFocus
-                          value={editTask.value}
-                          onChange={(e) => setEditTask({ id: t.id, value: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") saveTaskName(t.id, editTask.value);
-                            if (e.key === "Escape") setEditTask(null);
-                          }}
-                          className="bg-zinc-800 border border-emerald-600 rounded px-1 py-0.5 text-xs w-full outline-none"
-                        />
-                        <button
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            wrapSel(
-                              editTaskInputRef,
-                              "**",
-                              () => editTask.value,
-                              (v) => setEditTask((et) => et && { ...et, value: v }),
-                            );
-                          }}
-                          title="Bôi đậm (**text**)"
-                          className="shrink-0 text-xs font-bold text-zinc-400 hover:text-white px-0.5"
-                        >
-                          B
-                        </button>
-                        <button
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            wrapSel(
-                              editTaskInputRef,
-                              "__",
-                              () => editTask.value,
-                              (v) => setEditTask((et) => et && { ...et, value: v }),
-                            );
-                          }}
-                          title="Chữ mảnh (__text__)"
-                          className="shrink-0 text-xs font-light text-zinc-400 hover:text-white px-0.5"
-                        >
-                          T
-                        </button>
-                        <button
-                          aria-label="Lưu"
-                          onClick={() => saveTaskName(t.id, editTask.value)}
-                          className="text-emerald-400"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </button>
-                      </span>
-                    ) : (
-                      <div className="flex items-center gap-1 min-w-0">
-                        <span className="truncate flex-1" title={t.name}>
-                          {renderName(t.name)}
-                        </span>
-                        {ce && (
-                          <button
-                            aria-label="Sửa"
-                            onClick={() => setEditTask({ id: t.id, value: t.name })}
-                            className="shrink-0 text-zinc-500 hover:text-emerald-400"
-                          >
-                            <Pencil className="w-3 h-3" />
-                          </button>
+                            <option value="">— Lý do trễ? —</option>
+                            {Object.entries(DELAY_REASON_LABEL).map(([k, v]) => (
+                              <option key={k} value={k}>
+                                {v}
+                              </option>
+                            ))}
+                          </select>
                         )}
                       </div>
-                    )}
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {editMode && (
-                        <button
-                          onClick={() => setAllInRow(t, true)}
-                          className="text-[10px] text-emerald-500 hover:underline"
-                        >
-                          Tất cả
-                        </button>
-                      )}
-                      {editMode && (
-                        <button
-                          onClick={() => setAllInRow(t, false)}
-                          className="text-[10px] text-zinc-500 hover:underline"
-                        >
-                          Bỏ
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setHistoryTask(t)}
-                        title="Lịch sử tiến độ"
-                        className="text-zinc-500 hover:text-emerald-400"
-                      >
-                        <History className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => setPhotosTask(t)}
-                        title="Ảnh hiện trường"
-                        className={`flex items-center gap-0.5 ${t.photoCount > 0 ? "text-sky-400 hover:text-sky-300" : "text-zinc-500 hover:text-sky-400"}`}
-                      >
-                        <Camera className="w-3 h-3" />
-                        {t.photoCount > 0 && <span className="text-[10px]">{t.photoCount}</span>}
-                      </button>
-                      <button
-                        onClick={() => setCommentsTask(t)}
-                        title="Bình luận / trao đổi"
-                        className={`flex items-center gap-0.5 ${t.commentCount > 0 ? "text-violet-400 hover:text-violet-300" : "text-zinc-500 hover:text-violet-400"}`}
-                      >
-                        <MessageSquare className="w-3 h-3" />
-                        {t.commentCount > 0 && (
-                          <span className="text-[10px]">{t.commentCount}</span>
-                        )}
-                      </button>
-                      {t.status === "nghiem_thu" ? (
-                        <span className="flex items-center gap-1 text-[10px] text-teal-200 bg-teal-950 px-1.5 py-0.5 rounded">
-                          ✓ Đã NT
-                          {ce && (
-                            <button
-                              onClick={() => approveTask(t, false)}
-                              title="Huỷ nghiệm thu"
-                              className="text-teal-500 hover:text-red-400"
-                            >
-                              <X className="w-2.5 h-2.5" />
-                            </button>
-                          )}
-                        </span>
-                      ) : (
-                        ce &&
-                        t.progressPercent >= 1 && (
-                          <button
-                            onClick={() => approveTask(t, true)}
-                            title="Duyệt nghiệm thu (task đã 100%)"
-                            className="text-[10px] text-teal-200 border border-teal-800 bg-teal-950 hover:bg-teal-900 px-1.5 py-0.5 rounded"
-                          >
-                            Nghiệm thu
-                          </button>
-                        )
-                      )}
-                      {t.status === "tre" && (
-                        <select
-                          value={t.delayReason ?? ""}
-                          onChange={(e) => setDelayReason(t, e.target.value)}
-                          title="Nguyên nhân trễ — giúp PM thống kê và xử lý"
-                          className={`text-[10px] rounded px-1 py-0.5 outline-none border max-w-[110px] ${
-                            t.delayReason
-                              ? "bg-orange-950 border-orange-900 text-orange-200"
-                              : "bg-zinc-800 border-zinc-700 text-zinc-300"
-                          }`}
-                        >
-                          <option value="">— Lý do trễ? —</option>
-                          {Object.entries(DELAY_REASON_LABEL).map(([k, v]) => (
-                            <option key={k} value={k}>
-                              {v}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  </td>
-                  <td
-                    className={`${stkPct} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center align-middle overflow-hidden${hpc("%")}`}
-                    style={{ left: LEFT_PCT }}
-                  >
-                    <span
-                      className={
-                        Math.round(t.progressPercent * 100) === 100
-                          ? "text-emerald-400"
-                          : "text-zinc-300"
-                      }
-                    >
-                      {Math.round((t.progressPercent ?? 0) * 100)}%
-                    </span>
-                  </td>
-                  {/* ── Ngày BĐ / Số ngày / Ngày KT ── */}
-                  {(() => {
-                    const effStart = t.startDate ?? pkg.startDate;
-                    const effEnd = t.endDate ?? pkg.endDate;
-                    const days = diffDays(effStart, effEnd);
-                    const inherited = !t.startDate && !!pkg.startDate;
-                    const openDates = () =>
-                      ce &&
-                      setDatesTarget({
-                        ids: [t.id],
-                        init: { start: t.startDate ?? "", end: t.endDate ?? "" },
-                        actual: { start: t.actualStartDate ?? null, end: t.actualEndDate ?? null },
-                      });
-                    const baseCell = `border-b border-r border-zinc-800 px-1 py-1 text-center align-middle text-[10px] whitespace-nowrap`;
-                    const dateCls = `${baseCell} ${inherited ? "text-zinc-500 italic" : "text-zinc-400"} ${ce ? "cursor-pointer hover:bg-zinc-800" : ""}`;
-                    return (
-                      <>
-                        <td
-                          className={dateCls + hpc("Ngày BĐ")}
-                          style={{ width: W_DATE }}
-                          onClick={openDates}
-                        >
-                          <span className="flex flex-col items-center gap-0">
-                            {fmtColDate(effStart)}
-                            {t.startDate && ce && (
-                              <RotateCcw
-                                className="w-2.5 h-2.5 text-zinc-700 hover:text-amber-400 mt-0.5"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  resetTaskDates(t);
-                                }}
-                              />
-                            )}
-                          </span>
-                        </td>
-                        <td
-                          className={`${baseCell} text-zinc-400${hpc("Số ngày")} ${ce ? "cursor-pointer hover:bg-zinc-800" : ""}`}
-                          style={{ width: W_DAYS }}
-                          onClick={openDates}
-                        >
-                          {days ?? ""}
-                        </td>
-                        <td
-                          className={dateCls + hpc("Ngày KT")}
-                          style={{ width: W_DATE }}
-                          onClick={openDates}
-                        >
-                          {fmtColDate(effEnd)}
-                        </td>
-                      </>
-                    );
-                  })()}
-                  {visibleColumns.map((col, ci) => (
-                    <ODimension
-                      key={col}
-                      cell={t.cells[col]}
-                      nhanCot={col}
-                      tenTask={t.name}
-                      editMode={editMode}
-                      daChon={vungChon.oTrongVung(ti, ci)}
-                      anKhiIn={hiddenPrintCols.has(col)}
-                      onToggle={() => {
-                        const cell = t.cells[col];
-                        if (cell) toggle(cell, t, col);
-                      }}
-                      onPointerDown={(e) => {
-                        // Chỉ bật chọn vùng ở chế độ sửa — lúc chỉ xem thì kéo tay phải để
-                        // cuộn trang, không được cướp thao tác cuộn; đang lọc task cũng tắt.
-                        if (!editMode || e.button === 2 || taskFilter) return;
-                        if (e.shiftKey) vungChon.moRongToi(ti, ci);
-                        else vungChon.batDau(ti, ci);
-                      }}
-                      onPointerEnter={() => editMode && !taskFilter && vungChon.keoToi(ti, ci)}
-                      onPointerUp={() => vungChon.ketThucKeo()}
-                    />
-                  ))}
-                  {(ce || hasVariants) && (
-                    <td className="border-b border-zinc-800/60 text-center align-middle p-1 w-[88px] min-w-[88px]">
-                      {ce && (
-                        <div className="flex justify-center items-center gap-0.5">
-                          <button
-                            onClick={() => moveTask(t, "up")}
-                            disabled={ti === 0}
-                            title="Lên"
-                            className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"
-                          >
-                            <ChevronUp className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => moveTask(t, "down")}
-                            disabled={ti === grid.tasks.length - 1}
-                            title="Xuống"
-                            className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"
-                          >
-                            <ChevronDownIcon className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => copyTask(t)}
-                            title="Sao chép task"
-                            className="text-zinc-700 hover:text-sky-400"
-                          >
-                            <Copy className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => insertBlankTask(t.id)}
-                            title="Chèn task trống bên dưới"
-                            aria-label="Chèn task trống bên dưới"
-                            className="text-zinc-700 hover:text-emerald-400"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => deleteTask(t)}
-                            title="Xoá task"
-                            className="text-zinc-700 hover:text-red-400"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
                     </td>
-                  )}
-                </tr>
-              </Fragment>
-            ))}
+                    <td
+                      className={`${stkPct} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center align-middle overflow-hidden${hpc("%")}`}
+                      style={{ left: LEFT_PCT }}
+                    >
+                      <span
+                        className={
+                          Math.round(t.progressPercent * 100) === 100
+                            ? "text-emerald-400"
+                            : "text-zinc-300"
+                        }
+                      >
+                        {Math.round((t.progressPercent ?? 0) * 100)}%
+                      </span>
+                    </td>
+                    {/* ── Ngày BĐ / Số ngày / Ngày KT ── */}
+                    {(() => {
+                      const effStart = t.startDate ?? pkg.startDate;
+                      const effEnd = t.endDate ?? pkg.endDate;
+                      const days = diffDays(effStart, effEnd);
+                      const inherited = !t.startDate && !!pkg.startDate;
+                      const openDates = () =>
+                        ce &&
+                        setDatesTarget({
+                          ids: [t.id],
+                          init: { start: t.startDate ?? "", end: t.endDate ?? "" },
+                          actual: {
+                            start: t.actualStartDate ?? null,
+                            end: t.actualEndDate ?? null,
+                          },
+                        });
+                      const baseCell = `border-b border-r border-zinc-800 px-1 py-1 text-center align-middle text-[10px] whitespace-nowrap`;
+                      const dateCls = `${baseCell} ${inherited ? "text-zinc-500 italic" : "text-zinc-400"} ${ce ? "cursor-pointer hover:bg-zinc-800" : ""}`;
+                      return (
+                        <>
+                          <td
+                            className={dateCls + hpc("Ngày BĐ")}
+                            style={{ width: W_DATE }}
+                            onClick={openDates}
+                          >
+                            <span className="flex flex-col items-center gap-0">
+                              {fmtColDate(effStart)}
+                              {t.startDate && ce && (
+                                <RotateCcw
+                                  className="w-2.5 h-2.5 text-zinc-700 hover:text-amber-400 mt-0.5"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    resetTaskDates(t);
+                                  }}
+                                />
+                              )}
+                            </span>
+                          </td>
+                          <td
+                            className={`${baseCell} text-zinc-400${hpc("Số ngày")} ${ce ? "cursor-pointer hover:bg-zinc-800" : ""}`}
+                            style={{ width: W_DAYS }}
+                            onClick={openDates}
+                          >
+                            {days ?? ""}
+                          </td>
+                          <td
+                            className={dateCls + hpc("Ngày KT")}
+                            style={{ width: W_DATE }}
+                            onClick={openDates}
+                          >
+                            {fmtColDate(effEnd)}
+                          </td>
+                        </>
+                      );
+                    })()}
+                    {visibleColumns.map((col, ci) => (
+                      <ODimension
+                        key={col}
+                        cell={t.cells[col]}
+                        nhanCot={col}
+                        tenTask={t.name}
+                        editMode={editMode}
+                        daChon={vungChon.oTrongVung(ti, ci)}
+                        anKhiIn={hiddenPrintCols.has(col)}
+                        onToggle={() => {
+                          const cell = t.cells[col];
+                          if (cell) toggle(cell, t, col);
+                        }}
+                        onPointerDown={(e) => {
+                          // Chỉ bật chọn vùng ở chế độ sửa — lúc chỉ xem thì kéo tay phải để
+                          // cuộn trang, không được cướp thao tác cuộn; đang lọc task cũng tắt.
+                          if (!editMode || e.button === 2 || taskFilter) return;
+                          if (e.shiftKey) vungChon.moRongToi(ti, ci);
+                          else vungChon.batDau(ti, ci);
+                        }}
+                        onPointerEnter={() => editMode && !taskFilter && vungChon.keoToi(ti, ci)}
+                        onPointerUp={() => vungChon.ketThucKeo()}
+                      />
+                    ))}
+                    {(ce || hasVariants) && (
+                      <td className="border-b border-zinc-800/60 text-center align-middle p-1 w-[112px] min-w-[112px]">
+                        {ce && (
+                          <div className="flex justify-center items-center gap-0.5">
+                            <TayNamKeo nhan={`Kéo để đổi vị trí task ${t.code}`} />
+                            <button
+                              onClick={() => moveTask(t, "up")}
+                              disabled={ti === 0}
+                              title="Lên"
+                              className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => moveTask(t, "down")}
+                              disabled={ti === grid.tasks.length - 1}
+                              title="Xuống"
+                              className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"
+                            >
+                              <ChevronDownIcon className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => copyTask(t)}
+                              title="Sao chép task"
+                              className="text-zinc-700 hover:text-sky-400"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => insertBlankTask(t.id)}
+                              title="Chèn task trống bên dưới"
+                              aria-label="Chèn task trống bên dưới"
+                              className="text-zinc-700 hover:text-emerald-400"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => deleteTask(t)}
+                              title="Xoá task"
+                              className="text-zinc-700 hover:text-red-400"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    )}
+                  </HangKeo>
+                </Fragment>
+              ))}
+            </DanhSachKeo>
           </tbody>
         )}
       </table>

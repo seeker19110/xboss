@@ -498,6 +498,12 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 > variations 946→267, contracts 1200→404. **Không đổi** API/schema/`lib/`/`CustomFieldsSection`.
 > Quy ước chốt trong ADR-0009 mục "DocShell cho `/claims`, `/variations`, `/contracts` — M126".
 
+## Đặc tả ĐÃ DUYỆT — yêu cầu chủ repo 2026-10-23
+
+> **`M135-keo-tha-sap-xep-tracking.md`** — ✅ **XONG 2026-10-23**. Kéo thả đổi thứ tự nhóm (tầng) trong
+> sheet và task trong nhóm trên `/tracking/[sheet]` (`@dnd-kit`, cảm ứng nhấn giữ 200 ms, bàn phím);
+> `PUT /api/workpackages` + `PUT /api/workpackages/:id/tasks` ghi cả danh sách trong 1 transaction, tập lệch → 409.
+
 ## Đặc tả ĐÃ DUYỆT — lượt `/auto-complete` hoàn thiện nợ code (2026-10-12, tự duyệt theo ADR-0015)
 
 > **`M132-link-thong-bao-mang-du-an.md`** — ✅ **XONG 2026-10-12**. Link thông báo/push tới lưới tracking mang

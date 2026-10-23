@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EditableText from "@/app/components/EditableText";
-import { Modal, appConfirm } from "@/app/components/dialogs";
+import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import EmptyState from "@/app/components/EmptyState";
 import { Button, Card } from "@/app/components/ui";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -35,7 +35,8 @@ import { CongDuAnTuLink } from "./CongDuAnTuLink";
 import { TrackingToolbar } from "./TrackingToolbar";
 import { TrackingGrid } from "./TrackingGrid";
 import { locNhomTheoTask, nhomTuMoTheoLoc, GIOI_HAN_NHOM_TU_MO } from "./locTask";
-import type { UserItem } from "./types";
+import type { Data, UserItem } from "./types";
+import { DanhSachKeo, MucKeo, luuThuTu } from "./KeoTha";
 
 // Đọc giá trị lọc ban đầu từ query string (vd mở link chia sẻ đã kèm bộ lọc). Chỉ dùng
 // làm giá trị khởi tạo useState — các lần đổi sau do người dùng thao tác trên UI, rồi
@@ -101,6 +102,9 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
   // Lọc cấp TASK trong nhóm (M124 việc 4) — khác statusFilter ở trên (lọc theo p.status).
   const [taskFilter, setTaskFilter] = useState(() => initTuUrl("task"));
   const [canEdit, setCanEdit] = useState(false);
+  // Thứ tự nhóm tạm (lạc quan) sau khi kéo thả — chỉ áp khi `nguon` vẫn là đúng bản `data` lúc thả;
+  // tải lại xong `data` đổi tham chiếu nên bản tạm tự hết hiệu lực, không cần effect dọn (M135).
+  const [thuTuNhomTam, setThuTuNhomTam] = useState<{ nguon: Data; ids: number[] } | null>(null);
   const [canProgress, setCanProgress] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [sheetModal, setSheetModal] = useState<{
@@ -351,8 +355,12 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
     ...new Set((data?.packages ?? []).map((p) => p.floorLabel).filter((f): f is string => !!f)),
   ].sort(sortFloorsDesc);
   const q = deferredQuery.toLowerCase();
+  const tatCaNhom =
+    data && thuTuNhomTam?.nguon === data
+      ? thuTuNhomTam.ids.flatMap((id) => data.packages.find((p) => p.id === id) ?? [])
+      : (data?.packages ?? []);
   const packages = locNhomTheoTask(
-    (data?.packages ?? []).filter(
+    tatCaNhom.filter(
       (p) =>
         (!q ||
           p.code.toLowerCase().includes(q) ||
@@ -362,6 +370,43 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
         (!statusFilter || p.status === statusFilter),
     ),
     taskFilter,
+  );
+  // Kéo thả nhóm chỉ khi thấy ĐỦ danh sách — đang lọc thì không suy ra được thứ tự toàn phần (FR2).
+  const keoNhom =
+    canEdit && editMode && !!data?.sheet.id && !q && !floorFilter && !statusFilter && !taskFilter;
+  const sapXepNhom = async (ids: number[]) => {
+    if (!data) return;
+    setThuTuNhomTam({ nguon: data, ids });
+    const loi = await luuThuTu("/api/workpackages", { sheetTypeId: data.sheet.id, ids });
+    if (loi) {
+      setThuTuNhomTam(null);
+      appAlert(loi);
+    }
+    load();
+  };
+  const theNhom = (p: (typeof packages)[number], pi: number) => (
+    <Card key={p.id} pad="none" className="overflow-hidden">
+      <TrackingGrid
+        pkg={p}
+        pkgIdx={pi}
+        pkgCount={packages.length}
+        expanded={!!expanded[p.id]}
+        onToggle={() => setExpanded((s) => ({ ...s, [p.id]: !s[p.id] }))}
+        canEdit={canEdit}
+        editMode={editMode}
+        refreshKey={refreshKey}
+        isMobile={isMobile}
+        onChanged={load}
+        onOfflineTick={enqueue}
+        onOfflineTickBatch={enqueueBatch}
+        hiddenPrintCols={hiddenPrintCols}
+        onColsLoaded={handleColsLoaded}
+        sheetCols={allSheetCols}
+        pendingFront={!!p.floorLabel && pendingFronts.has(p.floorLabel)}
+        qcReason={qcBlocked.get(p.id)}
+        taskFilter={taskFilter}
+      />
+    </Card>
   );
 
   return (
@@ -611,30 +656,13 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
             cột căn thẳng nhau khi mở/đóng nhóm */}
         <div className="overflow-x-auto scrollbar-none">
           <div className="space-y-2" style={{ width: "max-content", minWidth: "100%" }}>
-            {packages.map((p, pi) => (
-              <Card key={p.id} pad="none" className="overflow-hidden">
-                <TrackingGrid
-                  pkg={p}
-                  pkgIdx={pi}
-                  pkgCount={packages.length}
-                  expanded={!!expanded[p.id]}
-                  onToggle={() => setExpanded((s) => ({ ...s, [p.id]: !s[p.id] }))}
-                  canEdit={canEdit}
-                  editMode={editMode}
-                  refreshKey={refreshKey}
-                  isMobile={isMobile}
-                  onChanged={load}
-                  onOfflineTick={enqueue}
-                  onOfflineTickBatch={enqueueBatch}
-                  hiddenPrintCols={hiddenPrintCols}
-                  onColsLoaded={handleColsLoaded}
-                  sheetCols={allSheetCols}
-                  pendingFront={!!p.floorLabel && pendingFronts.has(p.floorLabel)}
-                  qcReason={qcBlocked.get(p.id)}
-                  taskFilter={taskFilter}
-                />
-              </Card>
-            ))}
+            <DanhSachKeo ids={packages.map((p) => p.id)} tat={!keoNhom} onSapXep={sapXepNhom}>
+              {packages.map((p, pi) => (
+                <MucKeo key={p.id} id={p.id}>
+                  {theNhom(p, pi)}
+                </MucKeo>
+              ))}
+            </DanhSachKeo>
             {packages.length === 0 && (
               <Card pad="none">
                 <EmptyState

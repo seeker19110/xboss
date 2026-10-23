@@ -7,6 +7,8 @@ import { recomputePackage } from "@/lib/tien-do/recompute";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
 import { packageProjectId } from "@/lib/tien-do/workpackages";
 import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { docDanhSachId, LoiLechDanhSach, sapXepTaskTrongNhom } from "@/lib/tien-do/sap-xep";
 
 export const dynamic = "force-dynamic";
 
@@ -108,4 +110,50 @@ export async function POST(
   const id = kq.value.id;
 
   return NextResponse.json({ id }, { status: 201 });
+}
+
+// PUT /api/workpackages/:id/tasks — kéo thả: lưu thứ tự mới của MỌI task trong nhóm (M135).
+// body: { ids: number[] } — ids phải đúng bằng tập task hiện có của nhóm (không đổi nhóm).
+export async function PUT(
+  req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
+  const params = await paramsP;
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.editStructure(user.role))
+    return NextResponse.json({ error: "Chỉ Admin/PM được sắp xếp thứ tự" }, { status: 403 });
+
+  const pkgId = Number(params.id);
+  if (!Number.isInteger(pkgId) || pkgId <= 0)
+    return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const body = await req.json().catch(() => ({}));
+  const doc = docDanhSachId(body?.ids);
+  if ("loi" in doc) return NextResponse.json({ error: doc.loi }, { status: doc.status });
+
+  const visible = await visibleProjectIds(user);
+  const pid = await packageProjectId(pkgId);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
+  const blocked = await assertModuleEnabled("tracking", pid);
+  if (blocked) return blocked;
+
+  try {
+    // D01: tái kiểm quyền ngay trước ghi; khoá + so tập + ghi trong cùng transaction.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.editStructure(user.role),
+      () => sapXepTaskTrongNhom(pkgId, doc.ids),
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin/PM được sắp xếp thứ tự" }, { status: 403 });
+  } catch (err) {
+    if (err instanceof LoiLechDanhSach)
+      return NextResponse.json(
+        { error: "Danh sách task đã thay đổi ở máy khác — tải lại rồi thử lại" },
+        { status: 409 },
+      );
+    throw err;
+  }
+  return NextResponse.json({ ok: true });
 }
