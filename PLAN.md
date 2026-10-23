@@ -13,7 +13,10 @@ commit, push và deploy sau kiểm chứng; phát hành qua PR/CI và kiểm tra
 
 A–E đã triển khai và kiểm chứng: 18/18 gate, build, full release gate 5.152 pass/0 fail,
 45 browser mới và hồi quy liên quan. Bằng chứng ở `docs/ops/evidence/m136/verification.md`.
-UAT/usage/rollout F chưa diễn ra; không đánh dấu toàn mục tiêu hoàn tất.
+Đã merge/deploy qua #675 trên main `d413650c`; F1 rollout và public smoke VERIFIED.
+[Bằng chứng phát hành](docs/ops/evidence/m136/release.md). F2–F3 UAT/usage chưa diễn ra;
+không đánh dấu toàn mục tiêu hoàn tất. Vòng đối soát 24/10 theo
+[plan autopilot](docs/autopilot/M136-RELEASE-PLAN.md).
 
 Phần bên dưới là kế hoạch OCR lịch sử đã hoàn tất, không phải phạm vi M136.
 

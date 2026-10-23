@@ -42,7 +42,7 @@ Form: idle → pending → thành công (đóng/cập nhật) hoặc lỗi HTTP/
 | C — poll và kiểm kê         | `app/components/NotificationBell.tsx`, helper poll nếu cần, `scripts/dem-du-lieu-engineering.ts`, helper script và test/E2E mới tên `upgrade-ops-*`                                          | FR6/FR9; single-flight/visibility, read-only, không nuốt lỗi          |
 | D — dashboard và bằng chứng | `app/api/dashboard/route.ts`, `lib/tien-do/dashboardext.ts`, `app/components/home/useDieuHanhData.ts`, benchmark và test/E2E mới tên `upgrade-performance-*`                                 | FR7–8/FR10; response không đổi, tránh query lặp, chứng minh trước/sau |
 
-Agent chỉ sửa file trong slice, không sửa docs chung/lockfile/schema. Phiên chính tích hợp bằng diff và chạy cổng; chưa commit/push/merge trong đợt này. Root giữ tài liệu và cấu hình kiểm thử.
+Agent chỉ sửa file trong slice, không sửa docs chung/lockfile/schema. Phiên chính tích hợp bằng diff và chạy cổng; mốc triển khai ban đầu chưa commit/push/merge. Chủ dự án duyệt phát hành sau kiểm chứng, kết quả ở §7. Root giữ tài liệu và cấu hình kiểm thử.
 
 ## 5. API và data contract
 
@@ -63,4 +63,8 @@ exit 0 (383 file, 5.152 pass, 0 fail, 1 skip theo allowlist), 45 E2E mới và c
 Dashboard API p95 trong lab giảm khoảng 29%, bản tuần khoảng 50%; hash response không đổi.
 Trang chủ mobile vẫn khoảng 4,1 giây tới dữ liệu chính; chưa có bằng chứng Core Web Vitals
 người dùng thật. [Báo cáo và dữ liệu nguyên bản](../ops/evidence/m136/verification.md).
-UAT, usage và rollout chưa diễn ra; trạng thái toàn mục tiêu vẫn NOT COMPLETE.
+[PR #675](https://github.com/seeker19110/xboss/pull/675) đã merge main `d413650c` và deploy
+production thành công lúc 20:57 UTC+7 ngày 23/10. CI main và public smoke desktop/mobile đã
+qua, kiểm lại 24/10 cũng đạt. [Evidence phát hành](../ops/evidence/m136/release.md).
+Goal tách F1 rollout VERIFIED và F2–F3 UAT/usage WAITING. Không có business flow đăng nhập
+trên production hoặc UAT người thật mới; toàn mục tiêu vẫn NOT COMPLETE.
