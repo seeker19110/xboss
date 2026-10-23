@@ -7,7 +7,7 @@
 
 ## Tiếp theo
 
-- **Deploy to VPS đỏ** (run 39764210485, 39789754927): `VPS_SSH_KNOWN_HOSTS` được khai ở Actions → Variables nhưng workflow chỉ đọc `secrets.*` nên nhận rỗng và dừng fail-closed. Sửa: `deploy.yml` đọc `secrets.VPS_SSH_KNOWN_HOSTS || vars.VPS_SSH_KNOWN_HOSTS` (host key là dữ liệu công khai), vẫn dừng khi cả hai rỗng/không khớp `VPS_HOST`; test hồi quy `tests/deploy-known-hosts.test.ts` (đỏ trước sửa). Sau merge cần xem run deploy kế tiếp qua bước SSH.
+- **Deploy to VPS đỏ lần 2** (run 39899182765, sau #670): đã đọc được `VPS_SSH_KNOWN_HOSTS` nhưng `ssh-keygen -F "$VPS_HOST"` không khớp dòng nào (dán khoá trần / nhãn domain khác IP / CRLF). Sửa: `scripts/ops/chuan-hoa-known-hosts.sh` gắn nhãn lại = `VPS_HOST` (khoá ghim giữ nguyên, `StrictHostKeyChecking=yes`), bỏ dòng không phải khoá (fingerprint) rồi vẫn fail-closed khi không còn khoá hợp lệ (`ssh-keygen -lf`); test `tests/deploy-known-hosts.test.ts` 11/11 (5 đỏ trước sửa). Sau merge xem run deploy kế tiếp qua bước SSH — nếu vẫn đỏ ở bước gửi build thì khoá dán không phải khoá thật của VPS (đối chiếu fingerprint theo DEPLOY.md).
 - **npm audit đỏ** (static, PR #670, 22/10): advisory critical mới cho `next` 16.0.0–16.4.0 (GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r, GHSA-673q-mjm6-r5xr). Nâng `next` + `eslint-config-next` 16.3.8 → 16.4.2; `npm audit --omit=dev --audit-level=high` xanh. Còn 5 high chỉ ở chuỗi dev `eslint-config-next`→`braces` (CI chỉ chặn critical cho dev).
 - A2 còn mở: Safari/iOS thiết bị thật (cần người); ảnh mồ côi giữ P/H S06.
 - Chọn lát S15 tiếp theo hoặc audit 1152 MUST/639 SHOULD.
