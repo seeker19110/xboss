@@ -2,7 +2,10 @@
 
 ## Đang làm
 
-- (trống — chờ chọn việc tiếp theo)
+- **M135 kéo thả sắp xếp tracking** (`docs/nang-cap/M135-keo-tha-sap-xep-tracking.md`): kéo nhóm (tầng) trong
+  sheet + task trong nhóm, chỉ Admin/PM ở chế độ sửa, tắt khi đang lọc; `lib/tien-do/sap-xep.ts`, `PUT
+/api/workpackages`, `PUT /api/workpackages/:id/tasks`, `KeoTha.tsx`; test `tests/sap-xep-tracking.test.ts`
+  14/14. PR đang mở.
 
 ## Tiếp theo
 

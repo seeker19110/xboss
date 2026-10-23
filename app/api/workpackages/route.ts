@@ -5,6 +5,8 @@ import { boqTakenBy } from "@/lib/khoi-luong/boq";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
 import { sheetTypeProjectId } from "@/lib/tien-do/workpackages";
 import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { docDanhSachId, LoiLechDanhSach, sapXepNhomTrongSheet } from "@/lib/tien-do/sap-xep";
 
 export const dynamic = "force-dynamic";
 
@@ -108,4 +110,45 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ id }, { status: 201 });
+}
+
+// PUT /api/workpackages — kéo thả: lưu thứ tự mới của MỌI nhóm trong một sheet (M135).
+// body: { sheetTypeId, ids: number[] } — ids phải đúng bằng tập nhóm hiện có của sheet.
+export async function PUT(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.editStructure(user.role))
+    return NextResponse.json({ error: "Chỉ Admin/PM được sắp xếp thứ tự" }, { status: 403 });
+
+  const body = await req.json().catch(() => ({}));
+  const sheetTypeId = Number(body?.sheetTypeId);
+  if (!Number.isInteger(sheetTypeId) || sheetTypeId <= 0)
+    return NextResponse.json({ error: "Thiếu sheetTypeId" }, { status: 400 });
+  const doc = docDanhSachId(body?.ids);
+  if ("loi" in doc) return NextResponse.json({ error: doc.loi }, { status: doc.status });
+
+  const visible = await visibleProjectIds(user);
+  const pid = await sheetTypeProjectId(sheetTypeId);
+  if (pid == null || !visible.includes(pid))
+    return NextResponse.json({ error: "sheetTypeId không tồn tại" }, { status: 404 });
+  const blocked = await assertModuleEnabled("tracking", pid);
+  if (blocked) return blocked;
+
+  try {
+    // D01: tái kiểm quyền ngay trước ghi; khoá + so tập + ghi trong cùng transaction.
+    const kq = await ghiNeuConQuyen(
+      () => CAN.editStructure(user.role),
+      () => sapXepNhomTrongSheet(sheetTypeId, doc.ids),
+    );
+    if (!kq.ok)
+      return NextResponse.json({ error: "Chỉ Admin/PM được sắp xếp thứ tự" }, { status: 403 });
+  } catch (err) {
+    if (err instanceof LoiLechDanhSach)
+      return NextResponse.json(
+        { error: "Danh sách nhóm đã thay đổi ở máy khác — tải lại rồi thử lại" },
+        { status: 409 },
+      );
+    throw err;
+  }
+  return NextResponse.json({ ok: true });
 }
