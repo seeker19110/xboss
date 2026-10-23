@@ -1,11 +1,14 @@
-# Tiến độ — 23/10/2026
+# Tiến độ — 24/10/2026
 
 ## Đang làm
 
-- **M136 — nâng cấp trải nghiệm và hiệu năng** (người dùng duyệt 23/10/2026): đã triển khai trên worktree từ `efd31ba0`, bảo toàn checkout gốc có 1.508 tệp xóa. Luồng lưu tracking/dashboard có lỗi/thử lại/rollback, keyboard nhóm, search mobile/menu thường dùng, header 360/393px, dọn copy lỗi thời, poll tab ẩn, kiểm kê chỉ đọc và dashboard tránh tính lặp/tải phụ độc lập. 18/18 cổng static và production build xanh; 25 unit + 4 DB mới, 45 browser mới xanh. Hồi quy shell/dashboard/role/tracking/offline, input mobile và kéo M135 đã qua; full release gate exit 0 (383 file, 5.152 pass, 0 fail, 1 skip đúng allowlist). Cùng fixture, dashboard API p95 giảm 329,60→232,49ms, bản tuần 259,20→129,31ms; hash không đổi. Mobile trang chủ vẫn khoảng 4,1s. Bằng chứng: `docs/ops/evidence/m136/verification.md`; spec/goal ở `docs/nang-cap/M136-trai-nghiem-hieu-nang-tinh-gon.md` và `docs/goals/upgrade-ux-performance-2026-10.md`. Chưa UAT người thật, usage/rollout production hoặc bỏ capability sống.
+- **M136 — nâng cấp trải nghiệm và hiệu năng** (người dùng duyệt 23/10/2026): đã triển khai trên worktree từ `efd31ba0`, bảo toàn checkout gốc có 1.508 tệp xóa. Luồng lưu tracking/dashboard có lỗi/thử lại/rollback, keyboard nhóm, search mobile/menu thường dùng, header 360/393px, dọn copy lỗi thời, poll tab ẩn, kiểm kê chỉ đọc và dashboard tránh tính lặp/tải phụ độc lập. 18/18 cổng static và production build xanh; 25 unit + 4 DB mới, 45 browser mới xanh. Hồi quy shell/dashboard/role/tracking/offline, input mobile và kéo M135 đã qua; full release gate exit 0 (383 file, 5.152 pass, 0 fail, 1 skip đúng allowlist). Cùng fixture, dashboard API p95 giảm 329,60→232,49ms, bản tuần 259,20→129,31ms; hash không đổi. Mobile trang chủ vẫn khoảng 4,1s. Bằng chứng: `docs/ops/evidence/m136/verification.md`; spec/goal ở `docs/nang-cap/M136-trai-nghiem-hieu-nang-tinh-gon.md` và `docs/goals/upgrade-ux-performance-2026-10.md`. Đã merge **#675** tại `d413650c`, CI main xanh (5.160 pass, E2E 693 pass; số skip hiện hữu ghi trong evidence), deploy VPS và public smoke desktop/mobile 23–24/10 đạt. [Bằng chứng phát hành](docs/ops/evidence/m136/release.md). F1 rollout VERIFIED; F2 UAT người thật/thiết bị thực và F3 usage/quyết định capability còn WAITING. Không lấy ngày deploy làm ngày bắt đầu usage.
+
+- **Bổ sung PR #676 — vá Zod**: CI phát hiện GHSA-mrhx-c7xc-m3w5 high trên lock 4.6.5; D-002 theo `/autopilot` nâng riêng Zod lên 4.6.6, giữ schema/auth/CI. Audit production 0 vulnerability, env 11/11, engineering DB 55/55 (0 skip) và build mới đạt; gate 18/18 đạt, chờ CI HEAD sửa Zod trước merge L1. Bản vá chưa lên production; [hồ sơ](docs/ops/evidence/m136/zod-repair.md).
 
 ## Tiếp theo
 
+- M136: owner bố trí UAT 3–5 người và Safari/cảm ứng thật theo runbook; operator xác nhận nguồn/coverage/thời điểm thu usage trước pilot. PR đối soát và vá Zod **#676** đã mở, chờ merge theo L1; plan `docs/autopilot/M136-RELEASE-PLAN.md`; public smoke chưa chứng minh lỗi app mới; bản vá dependency phát sinh được ghi riêng ở trên.
 - A2 còn mở: Safari/iOS thiết bị thật (cần người); ảnh mồ côi giữ P/H S06.
 - Chọn lát S15 tiếp theo hoặc audit 1152 MUST/639 SHOULD.
 
@@ -17,4 +20,4 @@ D-A2-001 tự duyệt lát B theo QUALITY-FINAL-1 Approved 25/09/2026. D-A2-002 
 
 ## Bàn giao phiên
 
-Mốc main: `a7530e9`. Loop một phiên (`docs/autopilot/A2-AC10-PLAN.md`), bằng chứng `.autopilot/evidence/T-00x.json`. Node 24 cục bộ qua `/root/.local/bin/node` (khớp CI; không sửa /opt/node22). Toàn 1152 MUST/639 SHOULD chưa audit; M/O/production/release giữ trạng thái cũ.
+Mốc main đã đối soát: `d413650c`. M136 đã phát hành; vòng hiện tại lưu bằng chứng và giữ UAT/usage chờ người. Loop đối soát (`docs/autopilot/M136-RELEASE-PLAN.md`) trên nhánh `codex/m136-release-reconciliation`; evidence phát hành đã lưu ở `docs/ops/evidence/m136/release.json`. Node 24 qua `/home/liend/.local/opt/node-v24.21.0/bin`; không đổi hệ thống; lockfile chỉ đổi Zod theo D-002, không nâng gói khác. Toàn 1152 MUST/639 SHOULD chưa audit; M/O/production/release giữ trạng thái cũ.

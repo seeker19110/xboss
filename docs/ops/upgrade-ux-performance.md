@@ -6,6 +6,9 @@ Nguồn: kế hoạch nâng cấp được chủ dự án duyệt ngày 23/10/20
 
 Kết quả ngày 23/10/2026 và dữ liệu đo nguyên bản ở
 [`evidence/m136/verification.md`](evidence/m136/verification.md).
+M136 đã phát hành qua #675 trên main `d413650c`, CI/deploy và public smoke đã qua;
+đối soát 24/10 ở [release.md](evidence/m136/release.md), metadata ở
+[release.json](evidence/m136/release.json). UAT/usage còn chờ, không nghiệm thu thay bằng smoke.
 
 ## Benchmark có thể chạy lại
 
@@ -96,6 +99,12 @@ Chỉ dùng bản build đã qua các cổng và E2E tương ứng; rollout nhó
 liệu/p95 và phản hồi người dùng trên cùng chu kỳ báo cáo. Nếu lỗi mới ảnh hưởng quyền, dữ liệu,
 tiến độ/nghiệm thu hoặc offline thì dừng mở rộng và revert thay đổi tương ứng. Đợt này không
 thay schema/dependency nên không cần migration dữ liệu để quay lại.
+
+F1 rollout đã VERIFIED; bước tiếp theo là pilot/UAT và xác nhận nguồn usage theo các mục trên.
+Ghi ngày bắt đầu thu thực, phạm vi dự án/vai trò, coverage bị thiếu, người chịu trách nhiệm và
+chu kỳ cần quan sát; ngày deploy không tự tạo cửa sổ 30 ngày. Kết quả UAT phải có số người,
+thiết bị, ngày thử, thời gian/trợ giúp/lỗi từng tác vụ và kết luận owner trước đóng F2.
+Không xóa module sống trong lúc chờ dữ liệu hoặc chỉ dựa vào ring buffer/đếm dòng.
 
 Không đánh dấu toàn goal Complete khi mới có bằng chứng kỹ thuật; UAT, usage và production
 verification được ghi đúng trạng thái trong hồ sơ goal.

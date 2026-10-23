@@ -1,6 +1,6 @@
 # Bộ đặc tả nâng cấp XBoss — theo nhóm module (đã triển khai xong M0–M52)
 
-**23/10/2026 — [M136: trải nghiệm công trường, hiệu năng và tinh gọn](M136-trai-nghiem-hieu-nang-tinh-gon.md): đã triển khai và kiểm chứng mã nguồn theo phê duyệt trong chat; 18/18 gate, build, 5.152 test pass, browser và số đo trước–sau. [Bằng chứng](../ops/evidence/m136/verification.md). UAT, usage và rollout theo hồ sơ goal, chưa nghiệm thu toàn sản phẩm.**
+**23/10/2026 — [M136: trải nghiệm công trường, hiệu năng và tinh gọn](M136-trai-nghiem-hieu-nang-tinh-gon.md): đã triển khai và kiểm chứng mã nguồn theo phê duyệt trong chat; 18/18 gate, build, 5.152 test pass, browser và số đo trước–sau. [Bằng chứng](../ops/evidence/m136/verification.md). Đã merge/deploy qua #675; [CI và public smoke](../ops/evidence/m136/release.md) đã kiểm chứng, đối soát 24/10. UAT và usage còn chờ theo hồ sơ goal; chưa nghiệm thu toàn sản phẩm.**
 
 > ## ⛔ ĐÃ GỠ KHỎI SẢN PHẨM — toàn bộ cụm CAD/BIM (2026-09-04, đợt 3)
 >

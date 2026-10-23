@@ -1,0 +1,198 @@
+{
+  "repository": "seeker19110/xboss",
+  "pullRequest": "https://github.com/seeker19110/xboss/pull/675",
+  "sourceCommit": "12a99e648ba87cbb7bb41e2193e8016fc7c97f5b",
+  "mergeCommit": "d413650c567fa9a515eae5081e612eea53ea8913",
+  "sourceAndMainTree": "af3117dc037d710093c9ff901b028eb1b6bfa3ad",
+  "prCi": {
+    "runId": 39960994295,
+    "conclusion": "success",
+    "attempt": 2,
+    "retryReason": "Ubuntu font package downloads stalled for over 10 minutes on one runner; reran only E2E shard 4/4, retaining passed jobs"
+  },
+  "mainCi": {
+    "runId": 39963366086,
+    "status": "completed",
+    "conclusion": "success",
+    "unitPassed": 5160,
+    "unitFailed": 0,
+    "unitAllowlistedSkips": 1,
+    "e2ePassed": 693,
+    "e2eExistingConditionalSkips": 51,
+    "mutationRunnable": 52,
+    "mutationSurvivors": 0,
+    "coverageLines": 91.68,
+    "coverageBranches": 85.02,
+    "coverageFunctions": 94.84
+  },
+  "deploy": {
+    "runId": 39964822526,
+    "status": "completed",
+    "headSha": "d413650c567fa9a515eae5081e612eea53ea8913",
+    "conclusion": "success",
+    "url": "https://github.com/seeker19110/xboss/actions/runs/39964822526",
+    "completedAt": "2026-10-23T13:57:15Z",
+    "verifiedBuildSha": "d413650c567fa9a515eae5081e612eea53ea8913",
+    "nodeMajor": 24,
+    "postReloadHealth": "passed",
+    "logCompletionAt": "2026-10-23T13:57:11.6161254Z"
+  },
+  "initialPublicSmoke": {
+    "checkedAt": "2026-10-23T13:57:30.608Z",
+    "origin": "https://xboss.donghanhcungban.org",
+    "readOnly": true,
+    "browsers": [
+      {
+        "name": "desktop",
+        "loginStatus": 200,
+        "seriousAxeViolations": 0,
+        "pageErrors": [],
+        "failedAssets": [],
+        "cssHashes": [
+          {
+            "path": "/_next/static/chunks/2bpv1fgmoiccv.css",
+            "sha256": "85915d60e97f896dd9be966bdc9f7c4a6630b27be9a9d0a13ac4e24a7de663b0"
+          }
+        ],
+        "hasResponsiveHeader": true,
+        "hasInsetFocus": true,
+        "protectedApis": [
+          {
+            "endpoint": "/api/dashboard",
+            "status": 401
+          },
+          {
+            "endpoint": "/api/search?q=m136",
+            "status": 401
+          }
+        ]
+      },
+      {
+        "name": "mobile",
+        "loginStatus": 200,
+        "seriousAxeViolations": 0,
+        "pageErrors": [],
+        "failedAssets": [],
+        "cssHashes": [
+          {
+            "path": "/_next/static/chunks/2bpv1fgmoiccv.css",
+            "sha256": "85915d60e97f896dd9be966bdc9f7c4a6630b27be9a9d0a13ac4e24a7de663b0"
+          }
+        ],
+        "hasResponsiveHeader": true,
+        "hasInsetFocus": true,
+        "protectedApis": [
+          {
+            "endpoint": "/api/dashboard",
+            "status": 401
+          },
+          {
+            "endpoint": "/api/search?q=m136",
+            "status": 401
+          }
+        ]
+      }
+    ],
+    "/api/health": {
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "db": true,
+        "migration": "0171_users_disabled.sql",
+        "uptime_s": 90
+      }
+    },
+    "/api/ready": {
+      "status": 200,
+      "body": {
+        "ready": true,
+        "schema": "ok",
+        "migrationsApplied": 171,
+        "appliedHead": "0171_users_disabled.sql"
+      }
+    },
+    "status": "PASS"
+  },
+  "publicRecheck": {
+    "checkedAt": "2026-10-23T21:51:19.350Z",
+    "origin": "https://xboss.donghanhcungban.org",
+    "readOnly": true,
+    "browsers": [
+      {
+        "name": "desktop",
+        "loginStatus": 200,
+        "seriousAxeViolations": 0,
+        "pageErrors": [],
+        "failedAssets": [],
+        "cssHashes": [
+          {
+            "path": "/_next/static/chunks/2bpv1fgmoiccv.css",
+            "sha256": "85915d60e97f896dd9be966bdc9f7c4a6630b27be9a9d0a13ac4e24a7de663b0"
+          }
+        ],
+        "hasResponsiveHeader": true,
+        "hasInsetFocus": true,
+        "protectedApis": [
+          {
+            "endpoint": "/api/dashboard",
+            "status": 401
+          },
+          {
+            "endpoint": "/api/search?q=m136",
+            "status": 401
+          }
+        ]
+      },
+      {
+        "name": "mobile",
+        "loginStatus": 200,
+        "seriousAxeViolations": 0,
+        "pageErrors": [],
+        "failedAssets": [],
+        "cssHashes": [
+          {
+            "path": "/_next/static/chunks/2bpv1fgmoiccv.css",
+            "sha256": "85915d60e97f896dd9be966bdc9f7c4a6630b27be9a9d0a13ac4e24a7de663b0"
+          }
+        ],
+        "hasResponsiveHeader": true,
+        "hasInsetFocus": true,
+        "protectedApis": [
+          {
+            "endpoint": "/api/dashboard",
+            "status": 401
+          },
+          {
+            "endpoint": "/api/search?q=m136",
+            "status": 401
+          }
+        ]
+      }
+    ],
+    "/api/health": {
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "db": true,
+        "migration": "0171_users_disabled.sql",
+        "uptime_s": 28470
+      }
+    },
+    "/api/ready": {
+      "status": 200,
+      "body": {
+        "ready": true,
+        "schema": "ok",
+        "migrationsApplied": 171,
+        "appliedHead": "0171_users_disabled.sql"
+      }
+    },
+    "status": "PASS"
+  },
+  "scope": "Public, unauthenticated, read-only browser smoke; no production login or writes.",
+  "limitations": [
+    "Production smoke is public/read-only; authenticated business flows were verified in CI, not exercised on production.",
+    "Real-user UAT and long-term usage measurement remain pending.",
+    "No field Core Web Vitals, real Safari/iOS or touch-device UAT, or verified usage window is claimed."
+  ]
+}

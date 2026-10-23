@@ -1,8 +1,9 @@
 # M136 — Bằng chứng triển khai ngày 23/10/2026
 
-Đã triển khai các slice A–D theo đặc tả M136 được chủ dự án duyệt. Mã nguồn đang ở
-worktree `codex/upgrade-ux-performance`, base `efd31ba0`. Chủ dự án đã duyệt commit, push và
-deploy sau khi xem bằng chứng này; phát hành qua PR/CI, chưa xác nhận production tại checkpoint này.
+Đây là báo cáo kiểm chứng local trước phát hành: slice A–D trên base `efd31ba0`,
+worktree `codex/upgrade-ux-performance`. Chủ dự án duyệt commit/push/deploy sau khi xem bằng chứng.
+M136 sau đó đã merge/deploy qua PR #675; kết quả CI và public smoke 23–24/10 được lưu riêng
+trong [release.md](release.md) và [release.json](release.json). Không thay số đo lab bằng số CI.
 Checkout gốc có 1.508 tệp xóa từ trước được giữ nguyên.
 
 ## Thay đổi đã kiểm chứng
