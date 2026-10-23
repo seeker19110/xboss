@@ -4,7 +4,7 @@
 | --------------------- | -------------------------------------------------------------------------- |
 | Goal ID               | UPGRADE-2026-10                                                            |
 | Owner                 | Chủ dự án                                                                  |
-| State                 | WAITING — UAT người thật và usage                                          |
+| State                 | WAITING — CI/merge bản vá Zod, UAT và usage                                |
 | Main SHA đã reconcile | `d413650c567fa9a515eae5081e612eea53ea8913`                                 |
 | Bắt đầu               | 2026-10-23                                                                 |
 | Đối soát              | 2026-10-24                                                                 |
@@ -26,6 +26,7 @@ Hoàn thiện các luồng lưu khi mạng yếu, điều hướng mobile, dashb
 | F1  | Phát hành production và public smoke         | VERIFIED | PR #675, CI/deploy cùng SHA, release.md và release.json     |
 | F2  | UAT 3–5 người, Safari/cảm ứng thật           | WAITING  | Chưa có người/thiết bị và kết quả nghiệm thu                |
 | F3  | Usage và quyết định giữ/gộp/gỡ capability    | WAITING  | Chưa xác nhận nguồn/coverage/thời điểm thu và cửa sổ đủ dài |
+| F4  | Vá Zod mới phát hiện trong CI và phát hành   | WAITING  | PR #676, chưa merge/deploy; chi tiết zod-repair.md          |
 
 ## Current truth
 
@@ -54,7 +55,9 @@ chưa chứng minh đạt Core Web Vitals ngoài thực địa.
 ## Iteration 2 — 2026-10-24
 
 - Đối soát main/GitHub/production, lưu evidence phát hành vào repo và sửa trạng thái rollout.
-- Không tìm thấy lỗi code mới từ bước đối soát; không mở rộng capability để thay UAT/usage.
+- Không tìm thấy lỗi app mới từ public smoke. CI sau đó phát hiện dependency Zod high:
+  D-002 bổ sung riêng bản vá 4.6.5→4.6.6 trong #676, không mở capability hoặc nới gate.
+  [Hồ sơ và giới hạn](../ops/evidence/m136/zod-repair.md); bản vá chưa merge/deploy.
 - Plan: [M136-RELEASE-PLAN.md](../autopilot/M136-RELEASE-PLAN.md). [PR đối soát #676](https://github.com/seeker19110/xboss/pull/676) chờ merge theo L1; bản cập nhật hồ sơ này chưa nằm trên main trước khi PR được merge.
 - F2: owner bố trí 3–5 người đại diện theo bảng tác vụ trong runbook, gồm thiết bị Safari/
   cảm ứng thật; ghi thời gian, trợ giúp, lỗi và kết luận. Không thay người thật bằng agent.
@@ -70,5 +73,6 @@ chưa chứng minh đạt Core Web Vitals ngoài thực địa.
 - [x] Rollout F1 được kiểm chứng; kết quả và giới hạn được lưu trong repo.
 - [ ] F2 có UAT người thật và thiết bị thực.
 - [ ] F3 có cửa sổ usage phù hợp và quyết định owner về capability.
+- [ ] F4 bản vá Zod qua CI, được merge/phát hành và kiểm chứng.
 
-**Kết luận:** M136 CODE VERIFIED và DEPLOYED; toàn mục tiêu NOT COMPLETE vì F2–F3 chưa diễn ra.
+**Kết luận:** M136 CODE VERIFIED và DEPLOYED; toàn mục tiêu NOT COMPLETE vì F2–F4 còn mở.

@@ -79,7 +79,7 @@
     "undici": "^8.10.0",
     "web-push": "^3.6.7",
     "xlsx": "npm:@e965/xlsx@^0.20.3",
-    "zod": "^4.5.4"
+    "zod": "4.6.6"
   },
   "overrides": {
     "postcss": ">=8.5.18",
