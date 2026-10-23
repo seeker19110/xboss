@@ -82,10 +82,13 @@ trên VPS; build ở runner mà thiếu nó thì Sentry client tự tắt, khôn
 tin lần đầu, dễ bị MITM): (1) vào VPS bằng console của nhà cung cấp, chạy
 `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` để lấy fingerprint; (2) trên máy bạn chạy
 `ssh-keyscan -t ed25519 <host>` rồi `ssh-keygen -lf -` để tính fingerprint và so khớp với bước 1;
-(3) chỉ khi khớp mới dán dòng known_hosts (`<host> ssh-ed25519 AAAA...`) vào repository secret
+(3) chỉ khi khớp mới dán khoá (`ssh-ed25519 AAAA...` — nội dung `/etc/ssh/ssh_host_ed25519_key.pub`,
+có/không có host phía trước; **không** dán fingerprint `SHA256:...`) vào repository secret
 **hoặc** Actions variable cùng tên (host key là dữ liệu công khai; workflow ưu tiên secret, rơi về
 variable). Workflow dùng `StrictHostKeyChecking=yes`, cổng SSH 22, và dừng job nếu cả hai đều
-thiếu hoặc không khớp `VPS_HOST`.
+thiếu hoặc không còn khoá hợp lệ. Nhãn host trong dòng dán được gắn lại thành `VPS_HOST`
+(`scripts/ops/chuan-hoa-known-hosts.sh`) nên domain ↔ IP lệch nhau không còn làm dừng deploy;
+khoá ghim vẫn là thứ duy nhất ssh tin.
 
 **Chạy nhiều instance / tách Postgres / backup:** xem mục
 ["Chạy nhiều instance"](#chạy-nhiều-instance-cluster-tuỳ-chọn--m53-pr4) bên dưới (quan hệ
