@@ -7,6 +7,7 @@ Không có lát nào dở. A2-AC10 lớp B (spec `e2e/authed/a2-ac10-diary-confl
 ## Tiếp theo
 
 - **Deploy to VPS đỏ** (run 39764210485, 39789754927): `VPS_SSH_KNOWN_HOSTS` được khai ở Actions → Variables nhưng workflow chỉ đọc `secrets.*` nên nhận rỗng và dừng fail-closed. Sửa: `deploy.yml` đọc `secrets.VPS_SSH_KNOWN_HOSTS || vars.VPS_SSH_KNOWN_HOSTS` (host key là dữ liệu công khai), vẫn dừng khi cả hai rỗng/không khớp `VPS_HOST`; test hồi quy `tests/deploy-known-hosts.test.ts` (đỏ trước sửa). Sau merge cần xem run deploy kế tiếp qua bước SSH.
+- **npm audit đỏ** (static, PR #670, 22/10): advisory critical mới cho `next` 16.0.0–16.4.0 (GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r, GHSA-673q-mjm6-r5xr). Nâng `next` + `eslint-config-next` 16.3.8 → 16.4.2; `npm audit --omit=dev --audit-level=high` xanh. Còn 5 high chỉ ở chuỗi dev `eslint-config-next`→`braces` (CI chỉ chặn critical cho dev).
 - A2 còn mở: Safari/iOS thiết bị thật (cần người); ảnh mồ côi giữ P/H S06.
 - Chọn lát S15 tiếp theo hoặc audit 1152 MUST/639 SHOULD.
 
