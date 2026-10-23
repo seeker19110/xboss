@@ -43,6 +43,8 @@ Kiểm toast ngay sau response, trước observer DB/disk theo D-007 A5. Timeout
 - [x] `T-005` Lặp ba lần select/export hai viewport, 12 ca + setup — Gate: `bash -o pipefail -c "npm run test:e2e -- e2e/authed/a1-ac01-org-boundary.spec.ts --grep 'UI chọn|UI download' --repeat-each=3 --workers=2 --output=.autopilot/runtime/a1-repeat-final 2>&1 | tee .autopilot/runtime/a1-repeat-final.log"`
 - [x] `T-006` Cổng tĩnh — Gate: `npm run gate`
 - [x] `T-007` Acceptance đủ bằng chứng/review độc lập — Gate: `python3 .xtemplates/scripts/xt.py blueprint-status docs/autopilot/A1-AC01-ACCEPTANCE.md --strict`
-- [ ] `T-008` Merge PR slice theo L1 — Gate: `bash -c 'gh pr view codex/autopilot-a1-ac01 --json state --jq .state | rg -x MERGED'`
+- [x] `T-008` Merge PR slice theo L1 — Gate: `bash -c 'gh pr view codex/autopilot-a1-ac01 --json state --jq .state | rg -x MERGED'`
 
 Một PR test/docs khi slice xong, base main mới nhất. P50 hai giờ/P90 bốn giờ cộng CI/người merge; thiếu nhánh acceptance thì giữ PARTIAL.
+
+T-008 đã có receipt: người dùng “Cho phép merge #666”; PR #666 merge 273a09d2d403157c534df9260f1ada942ca1327a từ head 5f8a8fd5, 7 Gate PASS STABLE và toàn CI xanh. E2E CI 642 pass/50 skip baseline/0 flaky. Checkpoint đóng task được mang sang lát kế tiếp, không sửa branch đã đóng.

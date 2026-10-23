@@ -2,7 +2,8 @@
 
 ## Đang làm
 
-Không có lát nào dở. A2-AC10 lớp B (spec `e2e/authed/a2-ac10-diary-conflict.spec.ts` + vá `OfflineQueueBadge` giữ panel phục hồi) đã merge ở #668 `6690593`. CI/CodeQL/Lighthouse/Secret scan/Scorecard trên main xanh.
+- **PR #667** (A1 API-key write hai org, nhánh `codex/autopilot-a1-api-key-write`, test/docs): test mới `tests/a1-api-key-write-org.test.ts` 7/7 pass trên Postgres. CI đỏ vì `docs/nang-cap/AUDIT-2026-09-25/S00-SCOPE-INVENTORY.md` (file sinh) chưa cập nhật cột Test cho route `engineering/agent-sessions` → đã chạy lại `npm run audit:route-scope`; merge `main` (#668–#670) vào nhánh, gộp checkpoint S15 thành §13 (A2-AC10) + §14 (A1 key write). CodeQL báo `js/insufficient-password-hash` ở `hashApiKey` (`lib/bao-mat/api-keys.ts`) — báo sai: key `xbk_` là 256 bit ngẫu nhiên, SHA-256 là đúng (KDF chậm chỉ cho mật khẩu người dùng); nếu còn đỏ cần chủ repo dismiss "False positive" ở Security → Code scanning.
+- A2-AC10 lớp B đã merge ở #668 `6690593`.
 
 ## Tiếp theo
 
