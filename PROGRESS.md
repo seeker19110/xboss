@@ -6,7 +6,7 @@
 
 ## Tiếp theo
 
-- M136: owner bố trí UAT 3–5 người và Safari/cảm ứng thật theo runbook; operator xác nhận nguồn/coverage/thời điểm thu usage trước pilot. Plan đối soát `docs/autopilot/M136-RELEASE-PLAN.md`; không có lỗi code mới được chứng minh trong bước này.
+- M136: owner bố trí UAT 3–5 người và Safari/cảm ứng thật theo runbook; operator xác nhận nguồn/coverage/thời điểm thu usage trước pilot. PR đối soát **#676** đã mở, chờ merge theo L1; plan `docs/autopilot/M136-RELEASE-PLAN.md`; không có lỗi code mới được chứng minh trong bước này.
 - A2 còn mở: Safari/iOS thiết bị thật (cần người); ảnh mồ côi giữ P/H S06.
 - Chọn lát S15 tiếp theo hoặc audit 1152 MUST/639 SHOULD.
 

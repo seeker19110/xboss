@@ -36,10 +36,10 @@ Merge PR mới theo `xt.yaml: merge_autonomy: L1`; không đổi chính sách n�
 
 - [x] `T-001` Lưu bằng chứng phát hành đã rà thông tin nhạy cảm và kiểm sự nhất quán — Gate: `git diff --check`
 - [x] `T-002` Đồng bộ goal/spec/runbook/PROGRESS, giữ đúng phần còn chờ và soát độc lập — Gate: `npm run gate`
-- [ ] `T-003` Commit/push và mở PR đối soát đã qua cổng — Gate: `gh pr view codex/m136-release-reconciliation --repo seeker19110/xboss --json url,state,headRefOid`
+- [x] `T-003` Commit/push và mở PR đối soát đã qua cổng — Gate: `gh pr view codex/m136-release-reconciliation --repo seeker19110/xboss --json url,state,headRefOid`
 - [ ] `T-004` UAT 3–5 người và Safari/cảm ứng thật — Gate: `python3 .xtemplates/scripts/xt.py blueprint-status docs/autopilot/M136-RELEASE-ACCEPTANCE.md --strict`
 - [ ] `T-005` Thu đủ usage theo kỳ và owner quyết định giữ/gộp/gỡ — Gate: `python3 .xtemplates/scripts/xt.py blueprint-status docs/autopilot/M136-RELEASE-ACCEPTANCE.md --strict`
-- [ ] `T-006` Merge PR tài liệu khi được duyệt theo L1 — Gate: `gh pr view codex/m136-release-reconciliation --repo seeker19110/xboss --json state,mergeCommit`
+- [ ] `T-006` Merge PR tài liệu khi được duyệt theo L1 — Gate: `gh pr view codex/m136-release-reconciliation --repo seeker19110/xboss --json state --jq .state | rg -x MERGED`
 
 ## Hoàn thành và đường lùi
 
@@ -53,3 +53,7 @@ Rollback tài liệu bằng revert PR; production M136 giữ quy trình rollback
 Ngày 24/10: `npm run gate` 18/18 xanh, `git diff --check` đạt. Reviewer độc lập
 không có finding P1/P2; SHA/tree, link, scope, secret/PII và giới hạn smoke được soát.
 Full test/build/E2E của mã M136 đã có trong CI phát hành; lát này không đổi mã chạy.
+
+Đã commit/push và mở [PR #676](https://github.com/seeker19110/xboss/pull/676).
+T-004/005 và hai MUST sản phẩm được defer, không miễn trừ; T-006 chờ merge theo L1.
+[Checkpoint GO/NO-GO](../ops/evidence/m136/GO-NO-GO.md).

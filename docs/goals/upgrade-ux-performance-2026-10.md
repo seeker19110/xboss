@@ -55,7 +55,7 @@ chưa chứng minh đạt Core Web Vitals ngoài thực địa.
 
 - Đối soát main/GitHub/production, lưu evidence phát hành vào repo và sửa trạng thái rollout.
 - Không tìm thấy lỗi code mới từ bước đối soát; không mở rộng capability để thay UAT/usage.
-- Plan: [M136-RELEASE-PLAN.md](../autopilot/M136-RELEASE-PLAN.md). PR đối soát mới tuân L1.
+- Plan: [M136-RELEASE-PLAN.md](../autopilot/M136-RELEASE-PLAN.md). [PR đối soát #676](https://github.com/seeker19110/xboss/pull/676) chờ merge theo L1; bản cập nhật hồ sơ này chưa nằm trên main trước khi PR được merge.
 - F2: owner bố trí 3–5 người đại diện theo bảng tác vụ trong runbook, gồm thiết bị Safari/
   cảm ứng thật; ghi thời gian, trợ giúp, lỗi và kết luận. Không thay người thật bằng agent.
 - F3: owner/operator xác nhận nguồn, scope và coverage đo trước pilot; ghi ngày bắt đầu thu
