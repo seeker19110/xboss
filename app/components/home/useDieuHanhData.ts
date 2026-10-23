@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { taiJson } from "@/app/lib/taiDuLieu";
 import type {
   QualityBlock,
@@ -61,6 +61,9 @@ export type DashData = {
   weekDelta?: number | null;
 };
 
+type SecondarySource = "sheets" | "systems" | "reasons";
+const SECONDARY_SOURCES: SecondarySource[] = ["sheets", "systems", "reasons"];
+
 export function useDieuHanhData() {
   const [data, setData] = useState<DashData | null>(null);
   const [kpiOrder, setKpiOrder] = useState<KPI[]>([]);
@@ -70,19 +73,75 @@ export function useDieuHanhData() {
   const [delayReasons, setDelayReasons] = useState<{ code: string; label: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [loi, setLoi] = useState<string | null>(null);
-  const [loiPhu, setLoiPhu] = useState(false);
+  const [secondaryLoading, setSecondaryLoading] = useState<Record<SecondarySource, boolean>>({
+    sheets: true,
+    systems: true,
+    reasons: true,
+  });
+  const [secondaryErrors, setSecondaryErrors] = useState<Partial<Record<SecondarySource, string>>>(
+    {},
+  );
   const [fetchedAt, setFetchedAt] = useState("");
+  const requestRef = useRef<AbortController | null>(null);
+  const secondaryRef = useRef<Partial<Record<SecondarySource, AbortController>>>({});
+
+  const taiPhu = useCallback(async (parent: AbortController, sources = SECONDARY_SOURCES) => {
+    const load = async <T>(source: SecondarySource, url: string, apply: (data: T) => void) => {
+      secondaryRef.current[source]?.abort();
+      const request = new AbortController();
+      secondaryRef.current[source] = request;
+      setSecondaryLoading((current) => ({ ...current, [source]: true }));
+      setSecondaryErrors((current) => {
+        const next = { ...current };
+        delete next[source];
+        return next;
+      });
+      const result = await taiJson<T>(url, { signal: request.signal });
+      if (
+        requestRef.current !== parent ||
+        parent.signal.aborted ||
+        request.signal.aborted ||
+        secondaryRef.current[source] !== request
+      )
+        return;
+      if (result.ok) apply(result.data);
+      else setSecondaryErrors((current) => ({ ...current, [source]: result.loi }));
+      setSecondaryLoading((current) => ({ ...current, [source]: false }));
+    };
+    await Promise.all(
+      sources.map((source) => {
+        if (source === "sheets")
+          return load<{ sheets: SheetNav[] }>(source, "/api/sheets", (result) =>
+            setSheets(result.sheets ?? []),
+          );
+        if (source === "systems")
+          return load<{ systems: SystemCard[] }>(source, "/api/systems", (result) =>
+            setSystems((result.systems ?? []).filter((system) => system.sheetCount > 0)),
+          );
+        return load<{ items: { code: string; label: string }[] }>(
+          source,
+          "/api/code-lists?domain=delay_reason",
+          (result) =>
+            setDelayReasons(
+              (result.items ?? []).map((item) => ({ code: item.code, label: item.label })),
+            ),
+        );
+      }),
+    );
+  }, []);
 
   const tai = useCallback(async () => {
+    requestRef.current?.abort();
+    const request = new AbortController();
+    requestRef.current = request;
+    const isCurrent = () => requestRef.current === request && !request.signal.aborted;
     setLoading(true);
     setLoi(null);
-    setLoiPhu(false);
-    const [dash, sh, sys, cl] = await Promise.all([
-      taiJson<DashData>("/api/dashboard"),
-      taiJson<{ sheets: SheetNav[] }>("/api/sheets"),
-      taiJson<{ systems: SystemCard[] }>("/api/systems"),
-      taiJson<{ items: { code: string; label: string }[] }>("/api/code-lists?domain=delay_reason"),
-    ]);
+    const init = { signal: request.signal };
+    const primary = taiJson<DashData>("/api/dashboard", init);
+    void taiPhu(request);
+    const dash = await primary;
+    if (!isCurrent()) return;
     if (!dash.ok) {
       setLoi(dash.loi);
       setLoading(false);
@@ -90,18 +149,17 @@ export function useDieuHanhData() {
     }
     setData(dash.data);
     setKpiOrder(dash.data.kpi ?? []);
-    setSheets(sh.ok ? (sh.data.sheets ?? []) : []);
-    setSystems(sys.ok ? (sys.data.systems ?? []).filter((d) => d.sheetCount > 0) : []);
-    setDelayReasons(
-      cl.ok ? (cl.data.items ?? []).map((i) => ({ code: i.code, label: i.label })) : [],
-    );
-    setLoiPhu(!sh.ok || !sys.ok || !cl.ok);
     setFetchedAt(new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }));
     setLoading(false);
-  }, []);
+  }, [taiPhu]);
 
   useEffect(() => {
+    const secondaryRequests = secondaryRef.current;
     void tai();
+    return () => {
+      requestRef.current?.abort();
+      Object.values(secondaryRequests).forEach((request) => request.abort());
+    };
   }, [tai]);
 
   return {
@@ -114,7 +172,14 @@ export function useDieuHanhData() {
     delayReasons,
     loading,
     loi,
-    loiPhu,
+    loiPhu: Object.keys(secondaryErrors).length > 0,
+    secondaryLoading,
+    secondaryErrors,
+    retrySecondary: () => {
+      const parent = requestRef.current;
+      if (parent && !parent.signal.aborted)
+        void taiPhu(parent, Object.keys(secondaryErrors) as SecondarySource[]);
+    },
     fetchedAt,
     tai,
   };

@@ -1,0 +1,157 @@
+{
+  "phase": "candidate",
+  "measuredAt": "2026-10-23T13:09:06.659Z",
+  "node": "v24.21.0",
+  "browser": "153.0.8010.12",
+  "samples": 5,
+  "fixture": "E2E PostgreSQL disposable; seed-sample",
+  "conditions": {
+    "viewport": "Pixel 5 (393×851)",
+    "latencyMs": 150,
+    "downloadBytesPerSecond": 200000,
+    "uploadBytesPerSecond": 93750,
+    "cpuSlowdown": 4,
+    "serviceWorkers": "blocked",
+    "note": "Lab tại lúc dữ liệu chính sẵn sàng; không phải Core Web Vitals người dùng thật"
+  },
+  "api": [
+    {
+      "endpoint": "/api/dashboard",
+      "requests": 25,
+      "concurrency": 5,
+      "p50Ms": 157.01,
+      "p95Ms": 232.49,
+      "medianBodyBytes": 37605,
+      "statuses": {
+        "200": 25
+      },
+      "responseHashes": ["888dc58231aef3fd08b547f3300213028e950923a456febd4b0de7de37847798"]
+    },
+    {
+      "endpoint": "/api/dashboard?range=week",
+      "requests": 25,
+      "concurrency": 5,
+      "p50Ms": 119.95,
+      "p95Ms": 129.31,
+      "medianBodyBytes": 37856,
+      "statuses": {
+        "200": 25
+      },
+      "responseHashes": ["7931b8a77e51be6896440d321c6ab477e632860735e0dddf778661b764afdef5"]
+    },
+    {
+      "endpoint": "/api/tasks?sheet=ogtd",
+      "requests": 25,
+      "concurrency": 5,
+      "p50Ms": 62.78,
+      "p95Ms": 76.15,
+      "medianBodyBytes": 12222,
+      "statuses": {
+        "200": 25
+      },
+      "responseHashes": ["1468690a0cbe93dd6da464b0747101d70867dec278ac98edcfa27e52313ecbc5"]
+    }
+  ],
+  "pages": [
+    {
+      "path": "/",
+      "sample": 1,
+      "readyMs": 4107,
+      "requests": 42,
+      "apiRequests": 17,
+      "responseBodyBytes": 394789,
+      "lcpAtReadyMs": 3884,
+      "clsAtReady": 0.0027891902600071096
+    },
+    {
+      "path": "/",
+      "sample": 2,
+      "readyMs": 4116,
+      "requests": 42,
+      "apiRequests": 17,
+      "responseBodyBytes": 394789,
+      "lcpAtReadyMs": 3912,
+      "clsAtReady": 0.0027891902600071096
+    },
+    {
+      "path": "/",
+      "sample": 3,
+      "readyMs": 3927,
+      "requests": 42,
+      "apiRequests": 17,
+      "responseBodyBytes": 394789,
+      "lcpAtReadyMs": 3828,
+      "clsAtReady": 0.0027891902600071096
+    },
+    {
+      "path": "/",
+      "sample": 4,
+      "readyMs": 4184,
+      "requests": 42,
+      "apiRequests": 17,
+      "responseBodyBytes": 394789,
+      "lcpAtReadyMs": 3972,
+      "clsAtReady": 0.0027891902600071096
+    },
+    {
+      "path": "/",
+      "sample": 5,
+      "readyMs": 4082,
+      "requests": 42,
+      "apiRequests": 17,
+      "responseBodyBytes": 394086,
+      "lcpAtReadyMs": 3872,
+      "clsAtReady": 0.0027891902600071096
+    },
+    {
+      "path": "/tracking/ogtd",
+      "sample": 1,
+      "readyMs": 3435,
+      "requests": 27,
+      "apiRequests": 13,
+      "responseBodyBytes": 366361,
+      "lcpAtReadyMs": 3264,
+      "clsAtReady": 0.005117992832158285
+    },
+    {
+      "path": "/tracking/ogtd",
+      "sample": 2,
+      "readyMs": 3377,
+      "requests": 27,
+      "apiRequests": 13,
+      "responseBodyBytes": 366361,
+      "lcpAtReadyMs": 3276,
+      "clsAtReady": 0.005117992832158285
+    },
+    {
+      "path": "/tracking/ogtd",
+      "sample": 3,
+      "readyMs": 3521,
+      "requests": 27,
+      "apiRequests": 13,
+      "responseBodyBytes": 366361,
+      "lcpAtReadyMs": 3388,
+      "clsAtReady": 0.005117992832158285
+    },
+    {
+      "path": "/tracking/ogtd",
+      "sample": 4,
+      "readyMs": 3423,
+      "requests": 27,
+      "apiRequests": 13,
+      "responseBodyBytes": 366361,
+      "lcpAtReadyMs": 3284,
+      "clsAtReady": 0.005117992832158285
+    },
+    {
+      "path": "/tracking/ogtd",
+      "sample": 5,
+      "readyMs": 3508,
+      "requests": 27,
+      "apiRequests": 13,
+      "responseBodyBytes": 366361,
+      "lcpAtReadyMs": 3312,
+      "clsAtReady": 0.005117992832158285
+    }
+  ]
+}

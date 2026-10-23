@@ -22,12 +22,14 @@ import {
   isNavItemActive,
   canSeeNavItem,
   findActiveNav,
-  resolveVisibleTree,
-  flattenDashboards,
   type DashNode,
   type DashCluster,
 } from "@/app/lib/dashboardTree";
-import { MODULES } from "@/lib/nen/modules";
+import {
+  frequentShellLinks,
+  resolveShellNavigation,
+  shellNavLinks,
+} from "@/app/lib/upgrade-shell-navigation";
 import { ROLE_LABELS, type Role } from "@/lib/nen/roles";
 
 type Me = { id: number; name: string; email: string; role: string };
@@ -54,6 +56,7 @@ export default function AppHeader({
   title?: ReactNode;
   subtitle?: ReactNode;
   back?: boolean; // giữ prop để không vỡ trang gọi cũ — không dùng nữa
+  /** false = nút tìm kiếm gọn; mobile vẫn có tìm kiếm trên mọi trang. */
   search?: boolean;
   children?: ReactNode;
   /** Nút hành động riêng của trang (vd Excel/PDF/Import) — hiển thị chung thanh cố định dưới đáy. */
@@ -125,7 +128,6 @@ export default function AppHeader({
     }
   }
 
-  const isHome = path === "/";
   const navPath = path + pathQuery;
   const active = path ? findActiveNav(navPath) : undefined;
   const pageTitle = title ?? active?.item.label ?? "XBoss";
@@ -136,7 +138,7 @@ export default function AppHeader({
 
   // Lá thật (có href) hoặc dashboard mockup chưa có trang ("coming-soon" — thiếu href
   // VÀ không children): dùng chung cho cả dashboard cấp 3 đơn lẫn mục con cấp 4.
-  function renderLeaf(item: DashNode) {
+  function renderLeaf(item: DashNode, frequent = false) {
     const Icon = item.icon;
     if (!item.href) {
       return (
@@ -155,20 +157,22 @@ export default function AppHeader({
       );
     }
     const itemActive = isNavItemActive(item, navPath);
+    const displayLabel = frequent && item.href === "/" ? "Tổng quan dự án" : item.label;
     return (
       <a
         key={item.href}
         href={item.href}
-        title={item.label}
+        title={displayLabel}
+        aria-label={frequent ? `Mở nhanh: ${displayLabel}` : undefined}
         aria-current={itemActive ? "page" : undefined}
-        className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
+        className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-11 border-l-2 ${
           itemActive
             ? "bg-emerald-500/10 text-emerald-300 font-semibold border-emerald-400"
             : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60 border-transparent"
         }`}
       >
         <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
-        <span className="sidebar-label flex-1 truncate">{item.label}</span>
+        <span className="sidebar-label flex-1 truncate">{displayLabel}</span>
       </a>
     );
   }
@@ -187,7 +191,7 @@ export default function AppHeader({
             href={`/hub/${dash.id}`}
             title={`Tổng quan ${dash.label}`}
             aria-current={path === `/hub/${dash.id}` ? "page" : undefined}
-            className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
+            className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-11 border-l-2 ${
               path === `/hub/${dash.id}`
                 ? "bg-emerald-500/10 text-emerald-300 font-semibold border-emerald-400"
                 : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60 border-transparent"
@@ -238,32 +242,37 @@ export default function AppHeader({
     );
   }
 
-  // M52 PR4: module tắt (feature_flags) → ẩn thêm nav của module đó, cộng dồn lên trên
-  // nav_settings (M21 PR3). Khớp theo `href` — MODULES.nav được giữ đồng bộ với các
-  // dashboard cấp 3 thật trong DASHBOARD_TREE (xem ghi chú lib/modules.ts).
-  const disabledModuleHrefs = new Set(
-    MODULES.filter((m) => featureFlags.get(m.key) === false).flatMap((m) =>
-      m.nav.map((n) => n.href),
-    ),
-  );
-  const effectiveNavSettings = new Map(navSettings);
-  if (disabledModuleHrefs.size > 0) {
-    for (const { dashboard } of flattenDashboards()) {
-      if (dashboard.id && dashboard.href && disabledModuleHrefs.has(dashboard.href)) {
-        effectiveNavSettings.set(dashboard.id, false);
-      }
-    }
-  }
+  const visibleTree = resolveShellNavigation(DASHBOARD_TREE, me?.role, navSettings, featureFlags);
+  const frequentLinks = frequentShellLinks(visibleTree, me?.role);
+  const allModulesOpen = openMap["all-modules"] ?? true;
 
-  // Cây đã lọc theo vai trò + bật/tắt admin (M21 PR3) + cờ tính năng (M52 PR4) — nguồn
-  // duy nhất để render sidebar.
-  const visibleTree = resolveVisibleTree(DASHBOARD_TREE, me?.role, effectiveNavSettings);
-
-  // Nội dung điều hướng dùng chung cho cả sidebar desktop lẫn drawer mobile.
+  // Cả hai vùng lấy cùng cây đã lọc; giữ nguyên khoá gập/mở cụm cũ.
   function renderNav() {
     return (
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2" aria-label="Điều hướng chính">
-        {visibleTree.map(renderCluster)}
+        {frequentLinks.length > 0 && (
+          <div role="group" aria-label="Thường dùng" className="mb-3 border-b border-zinc-800 pb-3">
+            <div className="sidebar-label px-4 py-2 text-xs font-semibold text-zinc-400">
+              Thường dùng
+            </div>
+            {frequentLinks.map((item) => renderLeaf(item, true))}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => toggleDash("all-modules", allModulesOpen)}
+          aria-expanded={allModulesOpen}
+          title="Tất cả phân hệ"
+          className="w-[calc(100%-1rem)] mx-2 px-2.5 py-2 min-h-11 flex items-center gap-2 rounded-lg text-xs font-semibold text-zinc-300 hover:bg-zinc-900/60"
+        >
+          <Menu className="w-[18px] h-[18px] shrink-0" aria-hidden="true" />
+          <span className="sidebar-label flex-1 text-left">Tất cả phân hệ</span>
+          <ChevronDown
+            className={`sidebar-label w-3 h-3 transition-transform ${allModulesOpen ? "" : "-rotate-90"}`}
+            aria-hidden="true"
+          />
+        </button>
+        {(allModulesOpen || collapsed) && visibleTree.map(renderCluster)}
       </nav>
     );
   }
@@ -329,7 +338,7 @@ export default function AppHeader({
 
       {/* ── Topbar ── */}
       <header className="sticky top-0 z-30 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-800 safe-top print:hidden">
-        <div className="flex items-center gap-2 px-3 sm:px-6 h-12 min-w-0">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-x-2 px-3 sm:px-6 h-[var(--app-header-height)] min-w-0">
           <button
             onClick={() => setMobileOpen(true)}
             aria-label="Mở menu"
@@ -357,13 +366,14 @@ export default function AppHeader({
             )}
           </div>
 
-          {search && (
-            <div className="hidden md:block w-full max-w-xs shrink">
-              <GlobalSearch placement="top" />
-            </div>
-          )}
+          <GlobalSearch
+            compact={!search}
+            featureFlags={featureFlags}
+            navigationItems={shellNavLinks(visibleTree)}
+            frequentItems={frequentLinks}
+          />
 
-          <div className="flex items-center gap-1.5 shrink-0 ml-1">
+          <div className="flex items-center justify-end gap-1.5 shrink-0 sm:ml-1 w-full sm:w-auto border-t border-zinc-800/60 sm:border-0 py-0.5 sm:py-0">
             {children}
             <OfflineQueueBadge />
             <ThemeToggle />
@@ -396,24 +406,10 @@ export default function AppHeader({
         </div>
       </header>
 
-      {/* Thanh cố định dưới đáy — chỉ hiện khi có nội dung: tìm kiếm chỉ ở trang chủ,
-          hành động riêng của trang (Excel/PDF/Import…) ở trang có truyền bottomActions.
-          .app-bottombar tự bù chiều rộng sidebar trên desktop (xem globals.css). */}
-      {(isHome || bottomActions) && (
-        <div
-          className={`app-bottombar fixed bottom-0 inset-x-0 z-30 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800 safe-bottom print:hidden ${
-            // Chỉ có ô tìm kiếm (trang chủ, không nút riêng) → ẩn hẳn trên desktop vì ô
-            // tìm kiếm đã nằm trên topbar; giữ lại trên mobile. `app-bottombar-mobile-only`
-            // báo cho globals.css bỏ khoảng chừa đáy trang từ md.
-            bottomActions ? "" : "md:hidden app-bottombar-mobile-only"
-          }`}
-        >
+      {/* Thanh đáy chỉ dành cho hành động riêng; tìm kiếm có một instance trên topbar. */}
+      {bottomActions && (
+        <div className="app-bottombar fixed bottom-0 inset-x-0 z-30 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800 safe-bottom print:hidden">
           <div className="flex items-center gap-2 px-3 sm:px-6 py-2 overflow-x-auto scrollbar-none">
-            {search && isHome && (
-              <div className="flex-1 min-w-[140px] md:hidden">
-                <GlobalSearch />
-              </div>
-            )}
             {bottomActions}
           </div>
         </div>

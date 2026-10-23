@@ -126,11 +126,10 @@ function SiteCommandContent() {
     },
     {
       id: "hse-safety",
-      label: "An Toàn HSE & AI Vision",
+      label: "An toàn HSE & Rủi ro",
       icon: ShieldAlert,
       badge: "QCVN 18",
-      description:
-        "Giám sát an toàn QCVN 18, AI Camera Vision nhận diện vi phạm PPE và quản trị rủi ro.",
+      description: "Theo dõi ghi nhận an toàn, hành động khắc phục và rủi ro tại công trường.",
       content: <HseSafetyTab />,
     },
     {
@@ -148,7 +147,7 @@ function SiteCommandContent() {
       title="Trung Tâm Chỉ Huy Tác Nghiệp Hiện Trường"
       subtitle="Phân hệ hợp nhất 14 công cụ Việc của tôi, Nhật ký TT06, Nghiệm thu, Mặt bằng, HSE và Thiết bị máy móc"
       icon={HardHat}
-      badge="Site Commander"
+      badge="Hiện trường"
       tabs={tabs}
       defaultTab="tasks-diary"
       stats={stats}

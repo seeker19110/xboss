@@ -1,7 +1,5 @@
 "use client";
-// Tìm kiếm toàn cục & Command Palette (M57 PR1 & Pinnacle): task/nhóm → nhảy tới sheet + tầng;
-// kho hồ sơ (hợp đồng/công văn/họp/nhật ký/NCR/vật tư/bản vẽ/tài liệu/bình luận);
-// các phân hệ Kỹ thuật Đỉnh cao (Engineering OS). Hỗ trợ phím tắt toàn cầu Ctrl+K / Cmd+K.
+// Một hộp tìm kiếm cho mọi cỡ màn hình: trigger trên topbar, modal có focus-trap và trả focus.
 import { useEffect, useRef, useState } from "react";
 import {
   Search,
@@ -16,19 +14,15 @@ import {
   PencilRuler,
   FileText,
   MessageSquare,
-  Sparkles,
-  QrCode,
-  TrendingUp,
-  ShieldCheck,
-  Workflow,
   Command,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { slugFromCode } from "@/lib/nen/sheets";
-import { STATUS_LABEL, type StatusSlug } from "@/lib/tien-do/status";
+import { Modal } from "@/app/components/dialogs";
+import Button from "@/app/components/ui/Button";
+import { enabledShellSearchHits, type ShellNavLink } from "@/app/lib/upgrade-shell-navigation";
 
-// Hit của task/nhóm (shape SearchHit cũ — KHÔNG đổi).
 type WbsHit = {
   kind: "task" | "package";
   id: number;
@@ -41,8 +35,6 @@ type WbsHit = {
   floorLabel: string | null;
   sheetType: string;
 };
-
-// Hit của nguồn kho hồ sơ (shape DocHit từ lib/search.ts).
 type DocHit = {
   kind: string;
   id: number | string;
@@ -51,73 +43,15 @@ type DocHit = {
   subtitle: string | null;
   url: string;
 };
-
-type ModuleHit = {
-  kind: "module";
-  id: string;
-  code: string;
-  title: string;
-  subtitle: string;
-  url: string;
-  icon?: LucideIcon;
-};
-
+type ModuleHit = DocHit & { kind: "module"; icon: LucideIcon };
 type Hit = WbsHit | DocHit | ModuleHit;
 
-function isWbs(h: Hit): h is WbsHit {
-  return h.kind === "task" || h.kind === "package";
+function isWbs(hit: Hit): hit is WbsHit {
+  return hit.kind === "task" || hit.kind === "package";
 }
 
-const STATIC_MODULE_HITS: ModuleHit[] = [
-  {
-    kind: "module",
-    id: "mod-apex",
-    code: "M88",
-    title: "Apex Cockpit (Command Center)",
-    subtitle: "Trung tâm hợp nhất 32+ siêu hệ thống kỹ thuật",
-    url: "/engineering",
-    icon: Sparkles,
-  },
-  {
-    kind: "module",
-    id: "mod-cashflow",
-    code: "M85",
-    title: "Dynamic Cashflow & Working Capital",
-    subtitle: "Mô phỏng dòng tiền S-Curve & rủi ro vốn lưu động",
-    url: "/engineering/cashflow",
-    icon: TrendingUp,
-  },
-  {
-    kind: "module",
-    id: "mod-esign",
-    code: "M84",
-    title: "Paperless Smart e-Signature PKI",
-    subtitle: "Ký số BBNT pháp lý 3 bên bảo mật mật mã",
-    url: "/engineering/esign",
-    icon: ShieldCheck,
-  },
-  {
-    kind: "module",
-    id: "mod-qr",
-    code: "M78",
-    title: "Smart QR Logistics & Barcode",
-    subtitle: "Quản lý chuỗi cung ứng vật tư & đối soát GRN",
-    url: "/procurement?tab=qr-logistics",
-    icon: QrCode,
-  },
-  {
-    kind: "module",
-    id: "mod-wf",
-    code: "ENG-3",
-    title: "Quy trình Phê duyệt Gate 0",
-    subtitle: "Thẩm định uỷ quyền kỹ thuật & Phân tách trách nhiệm",
-    url: "/engineering/workflows",
-    icon: Workflow,
-  },
-];
-
 const KIND_META: Record<string, { label: string; icon: LucideIcon; color: string }> = {
-  module: { label: "Phân hệ Kỹ thuật Đỉnh cao", icon: Sparkles, color: "text-amber-400" },
+  module: { label: "Phân hệ", icon: Command, color: "text-emerald-400" },
   package: { label: "Nhóm công việc", icon: Boxes, color: "text-amber-400" },
   task: { label: "Công việc", icon: ListTodo, color: "text-emerald-400" },
   contract: { label: "Hợp đồng", icon: FileSignature, color: "text-violet-400" },
@@ -131,255 +65,242 @@ const KIND_META: Record<string, { label: string; icon: LucideIcon; color: string
   comment: { label: "Bình luận", icon: MessageSquare, color: "text-emerald-400" },
 };
 
-function metaOf(kind: string, hit?: Hit) {
-  if (hit && "icon" in hit && hit.icon) {
-    return { label: KIND_META[kind]?.label ?? "Phân hệ", icon: hit.icon, color: "text-amber-400" };
-  }
-  return KIND_META[kind] ?? { label: kind, icon: FileText, color: "text-zinc-300" };
+function hitUrl(hit: Hit): string {
+  if (!isWbs(hit)) return hit.url || "/";
+  const slug = hit.sheetSlug ?? slugFromCode(hit.sheetType);
+  return slug
+    ? `/tracking/${slug}${hit.floorLabel ? `?floor=${encodeURIComponent(hit.floorLabel)}` : ""}`
+    : "/";
 }
 
-function hitUrl(h: Hit): string {
-  if (h.kind === "module") return h.url;
-  if (!isWbs(h)) return h.url || "/";
-  const slug = h.sheetSlug ?? slugFromCode(h.sheetType);
-  if (!slug) return "/";
-  return `/tracking/${slug}${h.floorLabel ? `?floor=${encodeURIComponent(h.floorLabel)}` : ""}`;
+function moduleHits(items: readonly ShellNavLink[]): ModuleHit[] {
+  return items.map((item) => ({
+    kind: "module",
+    id: item.href,
+    code: null,
+    title: item.label,
+    subtitle: "Mở phân hệ",
+    url: item.href,
+    icon: item.icon,
+  }));
 }
+
+const EMPTY_LINKS: ShellNavLink[] = [];
+const EMPTY_FLAGS: ReadonlyMap<string, boolean> = new Map();
 
 export default function GlobalSearch({
-  placement = "bottom",
+  navigationItems = EMPTY_LINKS,
+  frequentItems = EMPTY_LINKS,
+  compact = false,
+  featureFlags = EMPTY_FLAGS,
 }: {
-  placement?: "top" | "bottom";
+  navigationItems?: readonly ShellNavLink[];
+  frequentItems?: readonly ShellNavLink[];
+  compact?: boolean;
+  featureFlags?: ReadonlyMap<string, boolean>;
 } = {}) {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
   const [active, setActive] = useState(0);
-  const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const seqRef = useRef(0);
+  const activeOptionRef = useRef<HTMLAnchorElement>(null);
 
-  // Phím tắt toàn cầu Ctrl+K / Cmd+K
   useEffect(() => {
-    function onGlobalKeyDown(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setOpen((prev) => {
-          if (!prev) {
-            setTimeout(() => inputRef.current?.focus(), 50);
-          }
-          return !prev;
-        });
-      }
+    if (open) activeOptionRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active, hits, open]);
+
+  useEffect(() => {
+    function onGlobalKeyDown(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k" || event.repeat)
+        return;
+      // Không mở modal thứ hai bên trên form/menu đang bẫy focus.
+      if (document.querySelector('[aria-modal="true"]:not(#global-search-dialog)')) return;
+      event.preventDefault();
+      setOpen((previous) => !previous);
     }
     window.addEventListener("keydown", onGlobalKeyDown);
     return () => window.removeEventListener("keydown", onGlobalKeyDown);
   }, []);
 
-  // Debounce 250ms & match static modules
   useEffect(() => {
-    const term = q.trim();
-    if (term.length < 2) {
-      const initialModules = STATIC_MODULE_HITS.slice(0, 6);
-      setHits(initialModules);
-      setBusy(false);
-      return;
-    }
-
-    setBusy(true);
     const seq = ++seqRef.current;
-
-    // Filter static modules
-    const matchedModules = STATIC_MODULE_HITS.filter(
-      (m) =>
-        m.title.toLowerCase().includes(term.toLowerCase()) ||
-        m.code.toLowerCase().includes(term.toLowerCase()) ||
-        m.subtitle.toLowerCase().includes(term.toLowerCase()),
+    if (!open) return;
+    const term = q.trim();
+    const local = moduleHits(term.length < 2 ? frequentItems : navigationItems).filter(
+      (hit) =>
+        term.length < 2 || hit.title.toLocaleLowerCase("vi").includes(term.toLocaleLowerCase("vi")),
     );
-
-    const t = setTimeout(async () => {
+    setHits(local);
+    setActive(0);
+    setError("");
+    setBusy(term.length >= 2);
+    if (term.length < 2) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/search?q=${encodeURIComponent(term)}`).catch(() => null);
-        if (seq !== seqRef.current) return;
-        const apiHits: Hit[] = r?.ok ? ((await r.json()).hits ?? []) : [];
-        setHits([...matchedModules, ...apiHits]);
+        const response = await fetch(`/api/search?q=${encodeURIComponent(term)}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("search_failed");
+        const data = await response.json();
+        if (seq !== seqRef.current || controller.signal.aborted) return;
+        setHits([...local, ...enabledShellSearchHits<Hit>(data.hits ?? [], featureFlags)]);
       } catch {
-        if (seq === seqRef.current) setHits(matchedModules);
-      } finally {
-        if (seq === seqRef.current) {
-          setActive(0);
-          setBusy(false);
+        if (seq === seqRef.current && !controller.signal.aborted) {
+          setError("Không tải được kết quả. Bạn có thể thử lại hoặc mở phân hệ bên dưới.");
         }
+      } finally {
+        if (seq === seqRef.current && !controller.signal.aborted) setBusy(false);
       }
     }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [q, open, retry, navigationItems, frequentItems, featureFlags]);
 
-    return () => clearTimeout(t);
-  }, [q]);
-
-  useEffect(() => {
-    function onClick(e: MouseEvent) {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+  function onKeyDown(event: React.KeyboardEvent) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setActive((index) =>
+        Math.max(0, Math.min(index + (event.key === "ArrowDown" ? 1 : -1), hits.length - 1)),
+      );
     }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
-
-  function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActive((a) => Math.min(a + 1, hits.length - 1));
-    }
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActive((a) => Math.max(a - 1, 0));
-    }
-    if (e.key === "Enter" && hits[active]) {
+    if (event.key === "Enter" && hits[active]) {
+      event.preventDefault();
       window.location.href = hitUrl(hits[active]);
     }
-    if (e.key === "Escape") setOpen(false);
   }
 
   return (
-    <div className="relative w-full max-w-md" ref={boxRef}>
-      <div className="relative flex items-center">
-        <Search className="w-4 h-4 absolute left-3 text-zinc-500 pointer-events-none" />
-        <input
-          ref={inputRef}
-          id="global-search"
-          name="q"
-          autoComplete="off"
-          aria-label="Tìm kiếm toàn cục và lệnh điều hướng (Ctrl+K)"
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={onKeyDown}
-          // Không lặp "(Ctrl+K)" trong placeholder — đã có phím tắt hiển thị bằng <kbd>
-          // bên phải ô; trên topbar (ô hẹp) lặp lại chỉ làm chữ bị cắt giữa chừng.
-          placeholder="Tìm kiếm hoặc gõ lệnh..."
-          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-14 py-2.5 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 h-10 transition"
-        />
-        <div className="absolute right-2.5 flex items-center gap-0.5 pointer-events-none">
-          <kbd className="hidden sm:inline-flex items-center rounded border border-zinc-800 bg-zinc-950 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400 shadow-sm">
-            Ctrl+K
-          </kbd>
-        </div>
-      </div>
-
+    <>
+      <Button
+        variant="ghost"
+        aria-label="Mở tìm kiếm toàn cục"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+        icon={Search}
+        className={`min-w-11 min-h-11 shrink-0 px-2 ${compact ? "" : "md:px-3 md:border-zinc-800 md:bg-zinc-900"}`}
+      >
+        {!compact && <span className="hidden md:inline text-zinc-400">Tìm kiếm…</span>}
+        {!compact && <kbd className="hidden lg:inline text-[10px] text-zinc-400">Ctrl+K</kbd>}
+      </Button>
       {open && (
-        <div
-          className={`absolute left-0 right-0 ${
-            placement === "top" ? "top-full mt-2" : "bottom-full mb-2"
-          } bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-md`}
+        <Modal
+          id="global-search-dialog"
+          ariaLabel="Tìm kiếm toàn cục"
+          onClose={() => setOpen(false)}
+          className="max-w-xl"
         >
-          <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-950/60 text-xs text-zinc-400">
-            <span className="flex items-center gap-1.5 font-medium">
-              <Command size={12} className="text-emerald-400" />
-              Tìm kiếm & lệnh nhanh
-            </span>
-            <span className="text-[10px] text-zinc-500">
-              Dùng phím <kbd className="font-mono text-zinc-400">↑</kbd>{" "}
-              <kbd className="font-mono text-zinc-400">↓</kbd> để chọn ·{" "}
-              <kbd className="font-mono text-zinc-400">Enter</kbd> để mở
-            </span>
+          <div className="p-4 border-b border-zinc-800">
+            <div className="flex items-center gap-2 mb-3">
+              <h2 className="flex-1 text-base font-semibold text-zinc-100">
+                Tìm kiếm & điều hướng
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                icon={X}
+                aria-label="Đóng tìm kiếm"
+                onClick={() => setOpen(false)}
+                className="min-h-11 min-w-11"
+              />
+            </div>
+            <label htmlFor="global-search" className="block text-xs font-medium text-zinc-300 mb-2">
+              Công việc, hồ sơ hoặc phân hệ
+            </label>
+            <input
+              ref={inputRef}
+              id="global-search"
+              type="search"
+              autoFocus
+              autoComplete="off"
+              role="combobox"
+              aria-expanded="true"
+              aria-controls="global-search-results"
+              aria-autocomplete="list"
+              aria-activedescendant={hits[active] ? `global-search-hit-${active}` : undefined}
+              value={q}
+              onChange={(event) => setQ(event.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="Nhập ít nhất 2 ký tự để tìm hồ sơ…"
+              className="w-full min-h-11 rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-base text-zinc-100 placeholder:text-zinc-400 outline-none focus:border-emerald-500"
+            />
+            <p className="mt-2 text-xs text-zinc-400">↑ ↓ để chọn · Enter để mở · Esc để đóng</p>
           </div>
-
-          <div className="max-h-96 overflow-y-auto">
-            {busy && (
-              <p className="px-4 py-3 text-sm text-zinc-500 animate-pulse">Đang tìm kiếm...</p>
-            )}
-            {!busy && hits.length === 0 && (
-              <p className="px-4 py-4 text-center text-sm text-zinc-500">
-                Không tìm thấy &ldquo;{q.trim()}&rdquo;
-              </p>
-            )}
-            {hits.map((h, i) => {
-              const meta = metaOf(h.kind, h);
-              const Icon = meta.icon;
-              const showHeader = i === 0 || hits[i - 1].kind !== h.kind;
-              const isSelected = i === active;
-
+          {busy && (
+            <p role="status" className="px-4 py-3 text-sm text-zinc-400">
+              Đang tìm kiếm…
+            </p>
+          )}
+          {error && (
+            <div role="alert" className="px-4 py-3 text-sm text-amber-300">
+              <p>{error}</p>
+              <Button variant="ghost" onClick={() => setRetry((count) => count + 1)}>
+                Thử lại
+              </Button>
+            </div>
+          )}
+          {!busy && !error && hits.length === 0 && (
+            <p role="status" className="p-4 text-sm text-zinc-400">
+              {q.trim().length < 2
+                ? "Nhập từ khoá để tìm công việc hoặc hồ sơ."
+                : `Không tìm thấy “${q.trim()}”.`}
+            </p>
+          )}
+          <div
+            id="global-search-results"
+            role="listbox"
+            aria-label="Kết quả tìm kiếm"
+            className="max-h-[50vh] overflow-y-auto"
+          >
+            {hits.map((hit, index) => {
+              const meta = KIND_META[hit.kind] ?? {
+                label: "Hồ sơ",
+                icon: FileText,
+                color: "text-zinc-300",
+              };
+              const Icon = "icon" in hit ? hit.icon : meta.icon;
+              const title = isWbs(hit) ? hit.name : hit.title;
+              const subtitle = isWbs(hit)
+                ? `${hit.sheetType}${hit.floorLabel ? ` · ${hit.floorLabel}` : ""} · ${Math.round(hit.progress * 100)}%`
+                : hit.subtitle;
               return (
-                <div key={`${h.kind}-${h.id}`}>
-                  {showHeader && (
-                    <div className="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500 bg-zinc-950/30">
+                <a
+                  key={`${hit.kind}-${hit.id}-${index}`}
+                  id={`global-search-hit-${index}`}
+                  ref={index === active ? activeOptionRef : undefined}
+                  href={hitUrl(hit)}
+                  role="option"
+                  aria-selected={index === active}
+                  onMouseEnter={() => setActive(index)}
+                  className={`flex items-center gap-3 min-h-11 px-4 py-3 text-sm border-b border-zinc-800 transition-colors ${index === active ? "bg-emerald-500/10 text-zinc-100" : "text-zinc-300 hover:bg-zinc-800/60"}`}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${meta.color}`} aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">
+                      {hit.code && (
+                        <span className="font-mono text-emerald-400 mr-2">{hit.code}</span>
+                      )}
+                      {title}
+                    </span>
+                    <span className="block truncate text-xs text-zinc-400">
                       {meta.label}
-                    </div>
-                  )}
-                  <a
-                    href={hitUrl(h)}
-                    onMouseEnter={() => setActive(i)}
-                    className={`flex items-center gap-3 px-3 py-2.5 border-b border-zinc-800/40 text-sm transition-colors ${
-                      isSelected ? "bg-zinc-800 text-white" : "text-zinc-300 hover:bg-zinc-800/60"
-                    }`}
-                  >
-                    <div
-                      className={`p-1.5 rounded-md bg-zinc-950 border border-zinc-800 shrink-0 ${meta.color}`}
-                    >
-                      <Icon size={14} />
-                    </div>
-
-                    {h.kind === "module" ? (
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-zinc-100 truncate">{h.title}</span>
-                          <span className="rounded bg-amber-500/20 px-1.5 py-0.2 text-[10px] font-bold text-amber-300 border border-amber-500/30">
-                            {h.code}
-                          </span>
-                        </div>
-                        <p className="text-xs text-zinc-400 truncate mt-0.5">{h.subtitle}</p>
-                      </div>
-                    ) : isWbs(h) ? (
-                      <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                        <div className="truncate">
-                          <span className="font-mono text-emerald-400 text-xs font-bold mr-2">
-                            {h.boqCode ?? h.code}
-                          </span>
-                          <span className="truncate">{h.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0 text-xs">
-                          <span className="text-zinc-500">
-                            {h.sheetType}
-                            {h.floorLabel ? ` · ${h.floorLabel}` : ""}
-                          </span>
-                          <span
-                            className={`w-9 text-right font-mono font-medium ${
-                              h.status === "tre" ? "text-rose-400" : "text-emerald-400"
-                            }`}
-                          >
-                            {Math.round((h.progress ?? 0) * 100)}%
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                        <div className="truncate">
-                          {h.code && (
-                            <span className="font-mono text-emerald-400 text-xs font-bold mr-2">
-                              {h.code}
-                            </span>
-                          )}
-                          <span className="truncate">{h.title}</span>
-                        </div>
-                        {h.subtitle && (
-                          <span className="text-xs text-zinc-500 shrink-0 max-w-[35%] truncate">
-                            {h.subtitle}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </a>
-                </div>
+                      {subtitle ? ` · ${subtitle}` : ""}
+                    </span>
+                  </span>
+                </a>
               );
             })}
           </div>
-        </div>
+        </Modal>
       )}
-    </div>
+    </>
   );
 }

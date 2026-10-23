@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, use, useDeferredValue } from "react";
+import { useEffect, useState, useCallback, use, useDeferredValue, useRef } from "react";
 import {
   Pencil,
   X,
@@ -116,6 +116,8 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
   } | null>(null);
   const [sheetUsers, setSheetUsers] = useState<UserItem[]>([]);
   const [sheetErr, setSheetErr] = useState("");
+  const [sheetSaving, setSheetSaving] = useState(false);
+  const sheetSavingRef = useRef(false);
   const [addPkgModal, setAddPkgModal] = useState<{
     code: string;
     name: string;
@@ -124,6 +126,7 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
   } | null>(null);
   const [addPkgErr, setAddPkgErr] = useState("");
   const [addPkgSaving, setAddPkgSaving] = useState(false);
+  const addPkgSavingRef = useRef(false);
   const [printPanel, setPrintPanel] = useState(false);
   const [printTitle, setPrintTitle] = useState("");
   const [hiddenPrintCols, setHiddenPrintCols] = useState<Set<string>>(new Set());
@@ -252,75 +255,92 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
 
   // Đổi tên / mã / đường dẫn của trang tracking (sheet) — slug đổi thì chuyển sang URL mới.
   async function saveSheet() {
-    if (!sheetModal || !data?.sheet.id) return;
-    const res = await fetch(`/api/sheets/${data.sheet.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: sheetModal.name,
-        code: sheetModal.code,
-        slug: sheetModal.slug,
-        responsible: sheetModal.responsible,
-        managerId: sheetModal.managerId,
-      }),
-    });
-    const j = await res.json().catch(() => null);
-    if (!res.ok) {
-      setSheetErr(j?.error ?? "Không lưu được");
-      return;
+    if (!sheetModal || !data?.sheet.id || sheetSavingRef.current) return;
+    sheetSavingRef.current = true;
+    setSheetSaving(true);
+    setSheetErr("");
+    try {
+      const res = await fetch(`/api/sheets/${data.sheet.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: sheetModal.name,
+          code: sheetModal.code,
+          slug: sheetModal.slug,
+          responsible: sheetModal.responsible,
+          managerId: sheetModal.managerId,
+        }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        setSheetErr(j?.error ?? "Không lưu được thay đổi — vui lòng thử lại");
+        return;
+      }
+      if (j?.sheet?.slug && j.sheet.slug !== sheet) {
+        window.location.href = `/tracking/${j.sheet.slug}`;
+        return;
+      }
+      setSheetModal(null);
+      load();
+    } catch {
+      setSheetErr("Mất kết nối — kiểm tra mạng rồi thử lưu lại. Nội dung đã nhập vẫn được giữ.");
+    } finally {
+      sheetSavingRef.current = false;
+      setSheetSaving(false);
     }
-    if (j.sheet.slug !== sheet) {
-      window.location.href = `/tracking/${j.sheet.slug}`;
-      return;
-    }
-    setSheetModal(null);
-    load();
   }
 
   // Thêm hạng mục (nhóm) mới — tạo trống hoặc sao chép cấu trúc (task + cột checkbox)
   // từ 1 nhóm có sẵn trong cùng trang tracking.
   async function saveAddPkg() {
-    if (!addPkgModal || !data?.sheet.id) return;
+    if (!addPkgModal || !data?.sheet.id || addPkgSavingRef.current) return;
     const code = addPkgModal.code.trim();
     const name = addPkgModal.name.trim();
     if (!code || !name) {
       setAddPkgErr("Thiếu mã hoặc tên nhóm");
       return;
     }
+    addPkgSavingRef.current = true;
     setAddPkgSaving(true);
     setAddPkgErr("");
     const floorLabel = addPkgModal.floorLabel.trim();
-    const res = addPkgModal.copyFromId
-      ? await fetch(`/api/workpackages/${addPkgModal.copyFromId}/copy`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          // floorLabel chỉ gửi khi có nhập — bỏ trống thì giữ nguyên tầng của nhóm gốc
-          // (route /copy coi floorLabel=null như chuỗi "null" nếu ép kiểu String()).
-          body: JSON.stringify({
-            code,
-            name,
-            afterId: addPkgModal.copyFromId,
-            ...(floorLabel ? { floorLabel } : {}),
-          }),
-        })
-      : await fetch(`/api/workpackages`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sheetTypeId: data.sheet.id,
-            code,
-            name,
-            floorLabel: floorLabel || null,
-          }),
-        });
-    setAddPkgSaving(false);
-    const j = await res.json().catch(() => null);
-    if (!res.ok) {
-      setAddPkgErr(j?.error ?? "Không tạo được nhóm");
-      return;
+    try {
+      const res = addPkgModal.copyFromId
+        ? await fetch(`/api/workpackages/${addPkgModal.copyFromId}/copy`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            // floorLabel chỉ gửi khi có nhập — bỏ trống thì giữ nguyên tầng của nhóm gốc
+            // (route /copy coi floorLabel=null như chuỗi "null" nếu ép kiểu String()).
+            body: JSON.stringify({
+              code,
+              name,
+              afterId: addPkgModal.copyFromId,
+              ...(floorLabel ? { floorLabel } : {}),
+            }),
+          })
+        : await fetch(`/api/workpackages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sheetTypeId: data.sheet.id,
+              code,
+              name,
+              floorLabel: floorLabel || null,
+            }),
+          });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        setAddPkgErr(j?.error ?? "Không tạo được nhóm — vui lòng thử lại");
+        return;
+      }
+      setAddPkgModal(null);
+      load();
+    } catch {
+      setAddPkgErr("Mất kết nối — kiểm tra mạng rồi thử lại. Nội dung đã nhập vẫn được giữ.");
+    } finally {
+      addPkgSavingRef.current = false;
+      setAddPkgSaving(false);
     }
-    setAddPkgModal(null);
-    load();
   }
 
   async function deleteSheet() {
@@ -416,7 +436,13 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
         search={false}
         title={
           <>
-            {data?.sheet.name ?? sheet}
+            <span className="min-w-0">
+              <span className="block truncate">{data?.sheet.name ?? sheet}</span>
+              <span className="block truncate text-[11px] leading-none font-normal text-zinc-400">
+                {data?.sheet.code ?? ""}
+                {data?.sheet.responsible ? ` · ${data.sheet.responsible}` : ""}
+              </span>
+            </span>
             {canEdit && editMode && data?.sheet.id && (
               <button
                 onClick={() => {
@@ -434,14 +460,13 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
                 }}
                 title="Đổi tên / đường dẫn trang"
                 aria-label="Đổi tên / đường dẫn trang"
-                className="text-zinc-600 hover:text-amber-400"
+                className="focus-inset min-w-11 min-h-11 shrink-0 flex items-center justify-center rounded-lg text-zinc-400 hover:text-amber-400 hover:bg-zinc-900"
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
             )}
           </>
         }
-        subtitle={`${data?.sheet.code ?? ""} ${data?.sheet.responsible ? `· ${data.sheet.responsible}` : ""}`}
       >
         <Button
           size="sm"
@@ -469,42 +494,52 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
 
       {/* Modal thêm hạng mục (nhóm) mới — tạo trống hoặc sao chép cấu trúc từ nhóm có sẵn */}
       {addPkgModal && (
-        <Modal onClose={() => setAddPkgModal(null)}>
-          <div className="p-5">
+        <Modal onClose={() => !addPkgSavingRef.current && setAddPkgModal(null)}>
+          <fieldset disabled={addPkgSaving} aria-busy={addPkgSaving} className="p-5 min-w-0">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
               <Plus className="w-4 h-4 text-emerald-400" /> Thêm hạng mục mới
             </h3>
-            <label className="block text-xs text-zinc-400 mb-1">Mã nhóm</label>
+            <label htmlFor="add-pkg-code" className="block text-xs text-zinc-400 mb-1">
+              Mã nhóm
+            </label>
             <input
+              id="add-pkg-code"
               autoFocus
               value={addPkgModal.code}
               onChange={(e) => setAddPkgModal((m) => m && { ...m, code: e.target.value })}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600 font-mono"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm mb-3 outline-none focus:border-emerald-600 font-mono"
             />
-            <label className="block text-xs text-zinc-400 mb-1">Tên hạng mục</label>
+            <label htmlFor="add-pkg-name" className="block text-xs text-zinc-400 mb-1">
+              Tên hạng mục
+            </label>
             <input
+              id="add-pkg-name"
               value={addPkgModal.name}
               onChange={(e) => setAddPkgModal((m) => m && { ...m, name: e.target.value })}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm mb-3 outline-none focus:border-emerald-600"
             />
-            <label className="block text-xs text-zinc-400 mb-1">Tầng (tuỳ chọn)</label>
+            <label htmlFor="add-pkg-floor" className="block text-xs text-zinc-400 mb-1">
+              Tầng (tuỳ chọn)
+            </label>
             <input
+              id="add-pkg-floor"
               value={addPkgModal.floorLabel}
               onChange={(e) => setAddPkgModal((m) => m && { ...m, floorLabel: e.target.value })}
               placeholder="vd: 4F"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm mb-3 outline-none focus:border-emerald-600"
             />
-            <label className="block text-xs text-zinc-400 mb-1">
+            <label htmlFor="add-pkg-copy" className="block text-xs text-zinc-400 mb-1">
               Sao chép cấu trúc từ hạng mục có sẵn (tuỳ chọn)
             </label>
             <select
+              id="add-pkg-copy"
               value={addPkgModal.copyFromId}
               onChange={(e) =>
                 setAddPkgModal(
                   (m) => m && { ...m, copyFromId: e.target.value ? Number(e.target.value) : "" },
                 )
               }
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-1 outline-none focus:border-emerald-600"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm mb-1 outline-none focus:border-emerald-600"
             >
               <option value="">— Tạo trống, không sao chép —</option>
               {(data?.packages ?? []).map((p) => (
@@ -517,23 +552,25 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
               Chọn 1 hạng mục để sao chép toàn bộ task và cột checkbox của nó (trạng thái/tiến độ
               reset về chưa làm). Mã BOQ không được sao chép — mỗi hạng mục phải tự gán mã riêng.
             </p>
-            {addPkgErr && <p className="text-xs text-red-400 mb-2">{addPkgErr}</p>}
+            {addPkgErr && (
+              <p role="alert" className="text-sm text-red-400 mb-2">
+                {addPkgErr}
+              </p>
+            )}
             <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setAddPkgModal(null)}
-                className="px-3 py-1.5 text-sm bg-zinc-800 hover:bg-zinc-700 rounded-lg"
-              >
+              <Button onClick={() => setAddPkgModal(null)} className="min-h-11">
                 Huỷ
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
                 onClick={saveAddPkg}
                 disabled={!addPkgModal.code.trim() || !addPkgModal.name.trim() || addPkgSaving}
-                className="px-3 py-1.5 text-sm bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 rounded-lg font-medium text-on-accent"
+                className="min-h-11"
               >
                 {addPkgSaving ? "Đang lưu..." : "Tạo hạng mục"}
-              </button>
+              </Button>
             </div>
-          </div>
+          </fieldset>
         </Modal>
       )}
 
@@ -760,50 +797,62 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
       `}</style>
 
       {sheetModal && (
-        <Modal onClose={() => setSheetModal(null)}>
-          <div className="p-5">
+        <Modal onClose={() => !sheetSavingRef.current && setSheetModal(null)}>
+          <fieldset disabled={sheetSaving} aria-busy={sheetSaving} className="p-5 min-w-0">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
               <Pencil className="w-4 h-4 text-amber-400" />{" "}
               <EditableText tkey="tracking.settings.title">Cài đặt trang tracking</EditableText>
             </h3>
-            <label className="block text-xs text-zinc-400 mb-1">Tên trang</label>
+            <label htmlFor="sheet-name" className="block text-xs text-zinc-400 mb-1">
+              Tên trang
+            </label>
             <input
+              id="sheet-name"
               autoFocus
               value={sheetModal.name}
               onChange={(e) => setSheetModal((m) => m && { ...m, name: e.target.value })}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm mb-3 outline-none focus:border-emerald-600"
             />
-            <label className="block text-xs text-zinc-400 mb-1">
+            <label htmlFor="sheet-code" className="block text-xs text-zinc-400 mb-1">
               Mã sheet (hiển thị trên Dashboard/Excel)
             </label>
             <input
+              id="sheet-code"
               value={sheetModal.code}
               onChange={(e) => setSheetModal((m) => m && { ...m, code: e.target.value })}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm mb-3 outline-none focus:border-emerald-600"
             />
-            <label className="block text-xs text-zinc-400 mb-1">Đường dẫn</label>
+            <label htmlFor="sheet-slug" className="block text-xs text-zinc-400 mb-1">
+              Đường dẫn
+            </label>
             <div className="flex items-center gap-1 mb-1">
               <span className="text-sm text-zinc-500">/tracking/</span>
               <input
+                id="sheet-slug"
                 value={sheetModal.slug}
                 onChange={(e) => setSheetModal((m) => m && { ...m, slug: e.target.value })}
-                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 font-mono"
+                className="flex-1 min-w-0 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm outline-none focus:border-emerald-600 font-mono"
               />
-              <button
+              <Button
+                size="icon"
                 onClick={() => setSheetModal((m) => m && { ...m, slug: toSlug(m.name) })}
+                aria-label="Sinh lại đường dẫn từ tên"
                 title="Sinh lại từ tên"
-                className="text-xs text-zinc-500 hover:text-emerald-400 px-1"
+                className="min-w-11 min-h-11 shrink-0"
               >
                 ↻
-              </button>
+              </Button>
             </div>
             <p className="text-[11px] text-zinc-500 mb-3">
               Chỉ dùng chữ thường a-z, số và gạch nối. Đổi đường dẫn sẽ chuyển trang sang URL mới
               (link cũ hết hiệu lực).
             </p>
-            <label className="block text-xs text-zinc-400 mb-1">Người phụ trách</label>
+            <label htmlFor="sheet-responsible" className="block text-xs text-zinc-400 mb-1">
+              Người phụ trách
+            </label>
             {sheetUsers.length > 0 && (
               <select
+                aria-label="Chọn người phụ trách từ danh sách"
                 value={sheetModal.managerId ?? ""}
                 onChange={(e) => {
                   const id = e.target.value ? Number(e.target.value) : null;
@@ -813,7 +862,7 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
                       m && { ...m, managerId: id, responsible: user ? user.name : m.responsible },
                   );
                 }}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:border-emerald-600"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm mb-2 outline-none focus:border-emerald-600"
               >
                 <option value="">— Chọn từ danh sách người dùng —</option>
                 {sheetUsers.map((u) => (
@@ -824,40 +873,44 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
               </select>
             )}
             <input
+              id="sheet-responsible"
               value={sheetModal.responsible}
               onChange={(e) =>
                 setSheetModal((m) => m && { ...m, responsible: e.target.value, managerId: null })
               }
               placeholder="hoặc nhập tên tự do..."
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm mb-3 outline-none focus:border-emerald-600"
             />
-            {sheetErr && <p className="text-xs text-red-400 mb-2">{sheetErr}</p>}
+            {sheetErr && (
+              <p role="alert" className="text-sm text-red-400 mb-2">
+                {sheetErr}
+              </p>
+            )}
             <div className="flex items-center gap-2">
               {isAdmin && (
-                <button
+                <Button
+                  variant="ghost"
                   onClick={deleteSheet}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-zinc-500 hover:text-red-300 hover:bg-red-950/40 rounded-lg"
+                  className="min-h-11 hover:text-red-300"
                 >
                   <Trash2 className="w-3.5 h-3.5" /> Xoá trang
-                </button>
+                </Button>
               )}
               <div className="ml-auto flex gap-2">
-                <button
-                  onClick={() => setSheetModal(null)}
-                  className="px-3 py-1.5 text-sm bg-zinc-800 hover:bg-zinc-700 rounded-lg"
-                >
+                <Button onClick={() => setSheetModal(null)} className="min-h-11">
                   Huỷ
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary"
                   onClick={saveSheet}
-                  disabled={!sheetModal.name.trim() || !sheetModal.code.trim()}
-                  className="px-3 py-1.5 text-sm bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 rounded-lg font-medium text-on-accent"
+                  disabled={sheetSaving || !sheetModal.name.trim() || !sheetModal.code.trim()}
+                  className="min-h-11"
                 >
-                  Lưu
-                </button>
+                  {sheetSaving ? "Đang lưu..." : "Lưu"}
+                </Button>
               </div>
             </div>
-          </div>
+          </fieldset>
         </Modal>
       )}
     </div>

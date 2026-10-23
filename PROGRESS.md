@@ -2,7 +2,7 @@
 
 ## Đang làm
 
-- (trống — chờ chọn việc tiếp theo)
+- **M136 — nâng cấp trải nghiệm và hiệu năng** (người dùng duyệt 23/10/2026): đã triển khai trên worktree từ `efd31ba0`, bảo toàn checkout gốc có 1.508 tệp xóa. Luồng lưu tracking/dashboard có lỗi/thử lại/rollback, keyboard nhóm, search mobile/menu thường dùng, header 360/393px, dọn copy lỗi thời, poll tab ẩn, kiểm kê chỉ đọc và dashboard tránh tính lặp/tải phụ độc lập. 18/18 cổng static và production build xanh; 25 unit + 4 DB mới, 45 browser mới xanh. Hồi quy shell/dashboard/role/tracking/offline, input mobile và kéo M135 đã qua; full release gate exit 0 (383 file, 5.152 pass, 0 fail, 1 skip đúng allowlist). Cùng fixture, dashboard API p95 giảm 329,60→232,49ms, bản tuần 259,20→129,31ms; hash không đổi. Mobile trang chủ vẫn khoảng 4,1s. Bằng chứng: `docs/ops/evidence/m136/verification.md`; spec/goal ở `docs/nang-cap/M136-trai-nghiem-hieu-nang-tinh-gon.md` và `docs/goals/upgrade-ux-performance-2026-10.md`. Chưa UAT người thật, usage/rollout production hoặc bỏ capability sống.
 
 ## Tiếp theo
 

@@ -41,6 +41,7 @@ function ChipTuan({ delta }: { delta: number }) {
 export default function DieuHanhStats({
   canImport,
   onAddSheet,
+  addSheetDisabled = false,
   pct,
   totalTasks,
   delayedGroups,
@@ -52,6 +53,7 @@ export default function DieuHanhStats({
 }: {
   canImport: boolean;
   onAddSheet: () => void;
+  addSheetDisabled?: boolean;
   /** % tiến độ tổng có trọng số (0..100, đã làm tròn). */
   pct: number;
   totalTasks: number;
@@ -71,7 +73,13 @@ export default function DieuHanhStats({
       actions={
         canImport && (
           // Desktop có nút "Thêm trang" trong thanh công cụ; nút này dành cho màn hẹp.
-          <Button size="sm" icon={Plus} onClick={onAddSheet} className="md:hidden">
+          <Button
+            size="sm"
+            icon={Plus}
+            onClick={onAddSheet}
+            disabled={addSheetDisabled}
+            className="md:hidden"
+          >
             Thêm trang
           </Button>
         )

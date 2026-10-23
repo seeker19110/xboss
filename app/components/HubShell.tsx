@@ -156,9 +156,8 @@ export default function HubShell({
         )}
 
         {/* Tab Navigation & Search Bar */}
-        {/* top = chiều cao topbar (h-12) + vùng an toàn trên: topbar có padding safe-top
-            (PWA standalone trên iPhone tai thỏ) nên neo đúng 3rem sẽ trượt vào dưới nó. */}
-        <div className="sticky top-[calc(3rem+env(safe-area-inset-top,0px))] z-20 bg-background/95 backdrop-blur border-b border-zinc-800/80 -mx-3 px-3 sm:-mx-6 sm:px-6 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-2.5">
+        {/* Dùng cùng chiều cao topbar responsive và vùng an toàn khi chạy PWA. */}
+        <div className="sticky top-[calc(var(--app-header-height)+env(safe-area-inset-top,0px)+1px)] z-20 bg-background/95 backdrop-blur border-b border-zinc-800/80 -mx-3 px-3 sm:-mx-6 sm:px-6 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-2.5">
           {/* Scrollable Tabs */}
           <nav
             role="tablist"

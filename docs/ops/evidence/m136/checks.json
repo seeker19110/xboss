@@ -1,0 +1,88 @@
+{
+  "date": "2026-10-23",
+  "baseCommit": "efd31ba0ca5e04f60a3c9c3704e3bdd0fdeb7344",
+  "candidate": "base + uncommitted M136 changes in this worktree",
+  "checks": [
+    {
+      "command": "npm run gate",
+      "exitCode": 0,
+      "checksPassed": 18
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0
+    },
+    {
+      "command": "npm test -- --release-gate",
+      "exitCode": 0,
+      "files": 383,
+      "passed": 5152,
+      "failed": 0,
+      "skipped": 1,
+      "skipReason": "Existing allowlist: health without DB cannot run in DB-enabled suite"
+    },
+    {
+      "command": "Node test: upgrade units (inventory, notifications, performance dashboard, shell navigation)",
+      "exitCode": 0,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "command": "Node test: upgrade-ops-inventory-db",
+      "exitCode": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "alsoIncludedInFullSuite": true
+    },
+    {
+      "command": "Playwright: upgrade-(field|shell|ops|performance), desktop + mobile",
+      "exitCode": 0,
+      "passed": 45,
+      "failed": 0,
+      "skipped": 0,
+      "includesSetup": true
+    },
+    {
+      "command": "Playwright: appshell/dashboard/home-hien-truong/offline-recovery/tracking/upgrade-field, desktop + mobile",
+      "exitCode": 0,
+      "passed": 62,
+      "failed": 0,
+      "skipped": 1,
+      "skipReason": "Existing platform condition: desktop sidebar collapse button hidden on mobile",
+      "includesSetupAndRepeatFieldTests": true
+    },
+    {
+      "command": "Playwright: input-zoom-mobile, mobile only",
+      "exitCode": 0,
+      "passed": 29,
+      "failed": 0,
+      "skipped": 0,
+      "includesSetup": true
+    },
+    {
+      "command": "Playwright: keo-tha-tracking, desktop only",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "includesSetup": true
+    },
+    {
+      "command": "Responsive/focus probe: 360, 393, 1280px",
+      "exitCode": 0
+    }
+  ],
+  "database": "Disposable PostgreSQL 16; separate test and browser databases; no production connection",
+  "notPerformed": [
+    "Real-user UAT",
+    "Safari/iOS and touch on real devices",
+    "Longitudinal module usage assessment",
+    "20/50 concurrent session load steps",
+    "Production rollout and field Core Web Vitals"
+  ],
+  "git": "Pre-release evidence; owner approved commit, push and deploy after reviewing these results. Follow release record for final GitHub and production status.",
+  "technicalStatus": "VERIFIED",
+  "productGoalStatus": "NOT COMPLETE; operational validation pending"
+}

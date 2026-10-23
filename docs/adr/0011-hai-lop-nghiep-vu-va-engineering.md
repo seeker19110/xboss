@@ -113,30 +113,32 @@ chiếu 0137).
 Hai cặp còn lại (đấu thầu, dòng tiền) **chưa gộp**, và ADR này cố ý không quyết thay. Điều
 kiện để quyết:
 
-1. Đếm số dòng thật của từng bảng `engineering_*` trên **production** (rỗng → "gộp" trở
-   thành "xoá", rẻ hơn nhiều bậc).
-2. Đối chiếu với 12 module đang `thuNghiem: true` trong `lib/nen/modules.ts` — toàn bộ nằm
-   ở lớp này, tức đã tắt mặc định cho mọi dự án.
+1. Kiểm kê số dòng theo đúng tổ chức/dự án, phân biệt rỗng với thiếu quyền, RLS hoặc lỗi đọc.
+2. Đối chiếu caller/UI hiện có, ít nhất một chu kỳ sử dụng phù hợp, nhu cầu lưu hồ sơ và owner.
+   Các module thử nghiệm cũ đã được gỡ; không dùng số đếm lịch sử để lập lại công việc đã xong.
 
-**Công cụ đo (điều kiện 1):** `npm run dem:engineering` — script CHỈ ĐỌC, an toàn chạy thẳng
-trên production:
+**Cập nhật 23/10/2026 (M136, kế hoạch được chủ dự án duyệt):** `npm run dem:engineering`
+dùng `pg.Client` riêng trong transaction READ ONLY, không khởi tạo runtime/schema. Operator cấp
+`INVENTORY_DATABASE_URL` riêng và chỉ rõ org/project; role bị RLS lọc hoặc không đủ quyền nhận
+`unknown`. Không tự dùng `DATABASE_URL` hoặc suy ra dữ liệu toàn hệ từ một project.
 
 ```bash
-DATABASE_URL=<chuỗi kết nối production> npm run dem:engineering
-DATABASE_URL=<...> npm run dem:engineering -- --tat-ca   # liệt kê cả 119 bảng
+INVENTORY_DATABASE_URL='<kết nối kiểm kê chỉ đọc>' npm run dem:engineering -- --org 1 --project 2
+INVENTORY_DATABASE_URL='<kết nối kiểm kê chỉ đọc>' npm run dem:engineering -- --org 1 --project 2 --tat-ca
 ```
 
-Script in ra, cho từng cặp, số dòng bảng gốc ↔ số dòng lớp engineering kèm **kết luận gợi ý**
-theo đúng quy tắc của ADR này:
+Script in số dòng đã kiểm chứng của bảng gốc và engineering; tổng nhóm có bảng chưa kiểm chứng
+là `unknown`, exit code 1. `--tat-ca` chỉ đếm bảng có đường scope được kiểm chứng. Số dòng là
+thông tin kiểm kê, không phải số người dùng hay số thao tác nghiệp vụ.
 
-| Kết quả đo                    | Kết luận                                                     |
-| ----------------------------- | ------------------------------------------------------------ |
-| Lớp eng. = 0 dòng             | **Xoá** lớp engineering của cặp đó — rẻ hơn gộp nhiều bậc    |
-| Lớp eng. < 1/10 bảng gốc      | Gần như không ai dùng → **nghiêng về xoá**, xác nhận với PM  |
-| Cả hai đều có dữ liệu đáng kể | **Phải gộp thật** — cần kế hoạch di trú riêng, không làm vội |
-| Chỉ lớp eng. có dữ liệu       | Xem lại: nghiệp vụ gốc chưa được dùng? Quyết cùng PM         |
+| Kết quả đo               | Hành động                                                                   |
+| ------------------------ | --------------------------------------------------------------------------- |
+| `unknown`/bảng thiếu     | Kiểm quyền, RLS, schema và scope; chưa kết luận dữ liệu rỗng                |
+| 0 dòng                   | Xác nhận chu kỳ nghiệp vụ, caller và nhu cầu tương lai với owner            |
+| Có dữ liệu ở một/hai lớp | Đối soát ý nghĩa thực tế/dự báo, nguồn danh tính, hồ sơ và phương án di trú |
 
-Ghi số đo được vào chính mục này rồi mới quyết từng cặp — **không quyết bằng suy đoán**.
+Ghi số đo, điều kiện và bằng chứng usage rồi mới quyết giữ/gộp/gỡ từng cặp. Mọi quyết định xóa dữ
+liệu có kế hoạch lưu trữ/đối soát/khôi phục và migration riêng qua staging.
 
 Trong lúc chờ, quy tắc danh tính ở trên **vẫn áp cho mọi bảng mới** — cổng CI không cho tập
 vi phạm phình thêm.

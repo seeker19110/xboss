@@ -1,110 +1,49 @@
-// scripts/dem-du-lieu-engineering.ts — Đếm số dòng THẬT của từng bảng `engineering_*` và
-// của bảng nghiệp vụ đối ứng, để quyết 6 cặp stack song song còn lại (ADR-0011 §"Việc CÒN
-// LẠI", audit 2026-08-25 §3.3 / đề xuất #6).
-//
-// VÌ SAO cần script này: quyết định "gộp hai lớp" hay "xoá lớp engineering" phụ thuộc DUY
-// NHẤT vào một dữ kiện mà không đọc được từ mã nguồn — các bảng đó có dữ liệu thật hay rỗng.
-// Bảng rỗng thì "gộp" (migration nhiều tháng) biến thành "xoá" (một PR). Chạy trên chính DB
-// production/staging rồi đọc cột KẾT LUẬN.
-//
-// CHỈ ĐỌC: script không ghi, không xoá, không đổi schema. An toàn chạy trên production.
-//
-// Chạy:  DATABASE_URL=<chuỗi kết nối production> npx tsx scripts/dem-du-lieu-engineering.ts
-//        thêm --tat-ca để liệt kê cả 119 bảng engineering_* chứ không chỉ 6 cặp.
-import "./env";
-import { query } from "@/lib/db";
-
-/**
- * 2 cặp còn treo thật trong ADR-0011 + cặp thầu phụ (đã nối ở 0137, để đối chiếu).
- *
- * 4 cặp còn lại của bảng gốc ADR-0011 (Claim/EOT, HSE, BIM, Rủi ro) đã tự giải quyết qua các
- * đợt audit 2026-09-21/22 (0153, 0155): route/trang `/engineering/*` tương ứng bị xoá, các
- * bảng `engineering_*` mồ côi bị DROP — không còn gì để đo/quyết, nên bỏ khỏi danh sách này.
- * `engineering_fidic_tia_claims` cũng không phải lớp song song với `claims` — lớp lib đọc ghi nó
- * (`lib/tai-chinh/contracts-fidic.ts`) đã bị xoá 2026-09-22 vì không route/UI nào gọi, và bảng đã
- * DROP ở migrations/0155 (xem PROGRESS.md).
- */
-const CAP: { nghiepVu: string; bangGoc: string[]; engineering: string[] }[] = [
-  {
-    nghiepVu: "Đấu thầu",
-    bangGoc: ["tender_packages", "tender_bids"],
-    engineering: ["engineering_bidding_packages", "engineering_bidding_vendor_quotes"],
-  },
-  {
-    nghiepVu: "Dòng tiền",
-    bangGoc: ["invoices"],
-    engineering: ["engineering_cashflow_forecast_runs", "engineering_cashflow_period_projections"],
-  },
-  {
-    nghiepVu: "Thầu phụ (đã nối 0137)",
-    bangGoc: ["subcontractor_profiles"],
-    engineering: ["engineering_subcon_profiles"],
-  },
-];
-
-async function dem(bang: string): Promise<number | null> {
-  try {
-    const r = await query<{ n: number }>(`SELECT COUNT(*)::int AS n FROM ${bang}`);
-    return r[0]?.n ?? 0;
-  } catch {
-    return null; // bảng chưa tồn tại trên DB này
-  }
-}
+// Kiểm kê engineering trong một org/project; không suy ra mức dùng sản phẩm từ số dòng.
+// Cấp riêng INVENTORY_DATABASE_URL cho role kiểm kê chỉ đọc, không dùng DATABASE_URL mặc định.
+// Chạy: npm run dem:engineering -- --org <id> --project <id> [--tat-ca]
+// Role bị RLS lọc/thiếu quyền sẽ nhận unknown, cần operator kiểm quyền đọc trước khi kết luận.
+import { Client } from "pg";
+import {
+  collectEngineeringInventory,
+  ENGINEERING_GROUPS,
+  inventoryErrorReason,
+  inventoryTotal,
+  readInventoryInput,
+} from "./lib/engineering-inventory";
 
 async function main() {
-  const tatCa = process.argv.includes("--tat-ca");
-
-  console.log("=== Mức dùng thật của lớp engineering (chỉ đọc) ===\n");
-  console.log(
-    "Nghiệp vụ".padEnd(26) + "Bảng gốc".padStart(10) + "Lớp eng.".padStart(11) + "   Kết luận",
-  );
-  console.log("-".repeat(84));
-
-  for (const c of CAP) {
-    const goc = (await Promise.all(c.bangGoc.map(dem))).reduce<number>((a, b) => a + (b ?? 0), 0);
-    const engRaw = await Promise.all(c.engineering.map(dem));
-    const eng = engRaw.reduce<number>((a, b) => a + (b ?? 0), 0);
-
-    // Ngưỡng cố ý thô: điều cần biết chỉ là "có ai dùng thật không".
-    const ketLuan =
-      eng === 0
-        ? "XOÁ được lớp eng. (rỗng) — rẻ hơn gộp nhiều bậc"
-        : goc === 0
-          ? "Chỉ lớp eng. có dữ liệu → xem lại: nghiệp vụ gốc chưa dùng?"
-          : eng < goc / 10
-            ? "Lớp eng. gần như không dùng → nghiêng về XOÁ"
-            : "CẢ HAI đang dùng → phải GỘP thật, cần kế hoạch di trú";
-
-    console.log(
-      c.nghiepVu.padEnd(26) + String(goc).padStart(10) + String(eng).padStart(11) + "   " + ketLuan,
-    );
-  }
-
-  if (tatCa) {
-    const bang = await query<{ tableName: string }>(
-      `SELECT table_name AS "tableName" FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name LIKE 'engineering!_%' ESCAPE '!'
-        ORDER BY table_name`,
-    );
-    console.log(`\n=== Toàn bộ ${bang.length} bảng engineering_* ===`);
-    let rong = 0;
-    for (const b of bang) {
-      const n = await dem(b.tableName);
-      if (n === 0) rong++;
-      console.log(`${String(n ?? "-").padStart(8)}  ${b.tableName}`);
+  const input = readInventoryInput(process.argv.slice(2), process.env);
+  const client = new Client({
+    connectionString: input.connectionString,
+    application_name: "xboss-engineering-inventory",
+    connectionTimeoutMillis: 10_000,
+    options: "-c default_transaction_read_only=on -c statement_timeout=30000",
+  });
+  try {
+    await client.connect();
+    const report = await collectEngineeringInventory(client, input.scope, input.all);
+    console.log(`=== Kiểm kê chỉ đọc: org ${input.scope.org}, project ${input.scope.project} ===`);
+    console.log(report.reason);
+    for (const row of report.rows) {
+      console.log(`${row.table}: ${row.count ?? row.state} — ${row.reason}`);
     }
-    console.log(`\nRỗng hoàn toàn: ${rong}/${bang.length} bảng.`);
-  } else {
-    console.log("\n(thêm cờ --tat-ca để liệt kê toàn bộ 119 bảng engineering_*)");
+    console.log("\nTổng theo nhóm (unknown nếu có bảng chưa kiểm chứng):");
+    for (const group of ENGINEERING_GROUPS) {
+      console.log(
+        `${group.name}: gốc ${inventoryTotal(report.rows, group.base)}; engineering ${inventoryTotal(report.rows, group.engineering)}`,
+      );
+    }
+    console.log(
+      "\nSố 0 chỉ có nghĩa không có dòng trong scope/snapshot này. Cần đối chiếu caller, usage, hồ sơ lưu trữ và owner trước quyết định giữ/gộp/gỡ capability.",
+    );
+    if (!report.complete) process.exitCode = 1;
+  } finally {
+    await client.end();
   }
-
-  console.log('\nGhi kết quả vào ADR-0011 mục "Việc CÒN LẠI" rồi mới quyết gộp/xoá từng cặp.');
 }
 
-main().then(
-  () => process.exit(0),
-  (e) => {
-    console.error(e);
-    process.exit(1);
-  },
-);
+main().catch((error: unknown) => {
+  // Không in error gốc: pg/parser có thể chứa URL, credential hoặc thông tin DB.
+  console.error(`unknown — ${inventoryErrorReason(error)}`);
+  process.exitCode = 1;
+});

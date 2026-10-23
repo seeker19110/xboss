@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  --app-header-height: 3rem;
   --background: #0a0a0a;
   --foreground: #ededed;
   /* Trắng CỐ ĐỊNH, không đảo theo theme — dùng cho chữ trên nền màu đặc luôn tự chọn
@@ -271,11 +272,17 @@ body {
   }
 }
 
-/* Neo trong trang (href="#id") phải chừa chiều cao topbar dính (h-12) + chút thở, nếu
+/* Neo trong trang (href="#id") phải chừa chiều cao topbar dính + chút thở, nếu
    không phần tử được nhảy tới sẽ nằm khuất ngay dưới topbar. Áp dụng toàn cục cho mọi
    phần tử là đích của hash — không phải thêm class ở từng trang. */
 :target {
-  scroll-margin-top: 4.5rem;
+  scroll-margin-top: calc(var(--app-header-height) + env(safe-area-inset-top, 0px) + 1.5rem);
+}
+
+@media (max-width: 639px) {
+  :root {
+    --app-header-height: 6rem;
+  }
 }
 
 /* Ẩn scrollbar trên nav cuộn ngang (iOS/Android) */
@@ -292,6 +299,11 @@ body {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+/* Nút trong vùng cắt tiêu đề vẫn giữ trọn viền focus bên trong vùng chạm. */
+.focus-inset:focus-visible {
+  outline-offset: -3px;
 }
 
 /* Ô gõ/ô chọn trên điện thoại tối thiểu 16px — dưới mức đó iOS Safari tự phóng to cả trang khi
