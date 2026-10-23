@@ -31,3 +31,10 @@ test("mọi lệnh ssh dùng StrictHostKeyChecking=yes", () => {
   assert.ok(sshCalls.length >= 3, "Phải có các lệnh ssh trong workflow");
   for (const c of sshCalls) assert.match(c, /StrictHostKeyChecking=yes/, c);
 });
+
+test("VPS_SSH_KNOWN_HOSTS đọc được từ secret HOẶC Actions variable (host key là dữ liệu công khai)", () => {
+  assert.match(
+    prepStep,
+    /VPS_SSH_KNOWN_HOSTS: \$\{\{ secrets\.VPS_SSH_KNOWN_HOSTS \|\| vars\.VPS_SSH_KNOWN_HOSTS \}\}/,
+  );
+});

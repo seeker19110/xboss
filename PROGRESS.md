@@ -2,20 +2,20 @@
 
 ## Đang làm
 
-/autopilot tiếp tục gap A1 API-key write trên codex/autopilot-a1-api-key-write, base main `273a09d2`. Test mới 7/7, regression sáu suite 80/80 pass, 0 skip; typecheck/build, static 18/18 và strict sáu MUST đạt, 0 mở/miễn pass; review độc lập Astra không thấy P1/P2. PLAN/ACCEPTANCE/RESEARCH/QA riêng A1-KEY-WRITE-*.
+- **PR #667** (A1 API-key write hai org, nhánh `codex/autopilot-a1-api-key-write`, test/docs): test mới `tests/a1-api-key-write-org.test.ts` 7/7 pass trên Postgres. CI đỏ vì `docs/nang-cap/AUDIT-2026-09-25/S00-SCOPE-INVENTORY.md` (file sinh) chưa cập nhật cột Test cho route `engineering/agent-sessions` → đã chạy lại `npm run audit:route-scope`; merge `main` (#668–#670) vào nhánh, gộp checkpoint S15 thành §13 (A2-AC10) + §14 (A1 key write). CodeQL báo `js/insufficient-password-hash` ở `hashApiKey` (`lib/bao-mat/api-keys.ts`) — báo sai: key `xbk_` là 256 bit ngẫu nhiên, SHA-256 là đúng (KDF chậm chỉ cho mật khẩu người dùng); nếu còn đỏ cần chủ repo dismiss "False positive" ở Security → Code scanning.
+- A2-AC10 lớp B đã merge ở #668 `6690593`.
 
 ## Tiếp theo
 
-Commit source cuối rồi final verify sáu Gate đã tick trên đúng HEAD/cây sạch; không sửa source khi verifier chạy. Mở một PR test/docs, kiểm toàn CI và review theo đúng HEAD rồi merge-check L1; không lấy local pass thay CI hoặc tự đổi mức quyền.
+- **Deploy to VPS đỏ** (run 39764210485, 39789754927): `VPS_SSH_KNOWN_HOSTS` được khai ở Actions → Variables nhưng workflow chỉ đọc `secrets.*` nên nhận rỗng và dừng fail-closed. Sửa: `deploy.yml` đọc `secrets.VPS_SSH_KNOWN_HOSTS || vars.VPS_SSH_KNOWN_HOSTS` (host key là dữ liệu công khai), vẫn dừng khi cả hai rỗng/không khớp `VPS_HOST`; test hồi quy `tests/deploy-known-hosts.test.ts` (đỏ trước sửa). Sau merge cần xem run deploy kế tiếp qua bước SSH.
+- **npm audit đỏ** (static, PR #670, 22/10): advisory critical mới cho `next` 16.0.0–16.4.0 (GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r, GHSA-673q-mjm6-r5xr). Nâng `next` + `eslint-config-next` 16.3.8 → 16.4.2; `npm audit --omit=dev --audit-level=high` xanh. Còn 5 high chỉ ở chuỗi dev `eslint-config-next`→`braces` (CI chỉ chặn critical cho dev).
+- A2 còn mở: Safari/iOS thiết bị thật (cần người); ảnh mồ côi giữ P/H S06.
+- Chọn lát S15 tiếp theo hoặc audit 1152 MUST/639 SHOULD.
 
 ## Quyết định
 
-#666 đã được người dùng cho phép merge và đã merge `273a09d2` từ head 5f8a8fd5: B 9/9, repeat 13/13, P/H 48/48, 18 cổng tĩnh, strict sáu MUST, bảy Gate PASS STABLE và CI xanh. E2E CI 642 pass/50 skip baseline/0 flaky; không review thread. Observer fetch-clone chỉ chứng minh chức năng, có trì hoãn response tới app.
-
-#663/#664/#665 đã merge trước đó; doctor 0 lỗi/0 cảnh báo, 37 regression cho checker. Quyền merge các PR đã cấp đều được thực hiện. L1 giữ nguyên cho PR mới. A1/S15 tổng thể còn PARTIAL: M, OIDC browser, toàn auth inventory và các route ngoài lát chưa đóng. Chỉ business state bất biến khi deny, không bao gồm last_used_at/rate-limit.
-
-D-001 chọn hai route session/claims, ba nhóm × hai chiều và metadata app role/RLS. D-002 giữ skip chỉ ở dev không TEST_DATABASE_URL theo harness hiện có; Gate/final/CI phải chạy thật bảy ca 0 skip, không thêm allowlist. Source mới không cookie/mock auth/DB/socket HTTP/B; owner chỉ dựng input và làm oracle, setup session qua handler 201.
+D-A2-001 tự duyệt lát B theo QUALITY-FINAL-1 Approved 25/09/2026. D-A2-002 (mức S): vá `OfflineQueueBadge` không mount lại màn phục hồi khi hàng đợi về 0 (RED trước vá ở `.autopilot/runtime/a2-run4.log`). #663 `2adda49d`, #664 `8fc15d89`, #665 `9c13f54a`, #666 `273a09d`, #668 `6690593` đã merge. A2/S15 giữ PARTIAL tổng thể.
 
 ## Bàn giao phiên
 
-Mốc main: `273a09d2`. Không áp dụng AGENTS.md cũ đã được thu hồi; checkout gốc có WIP/file xóa giữ nguyên. Deadline tiếp tục không muộn hơn 01:43:42 UTC ngày 22/10; loop cũ/evidence không reset. PROGRESS-HISTORY-2026-10-22.md giữ SHA256 ce10b14403c8be6fdba16cb755e0b6c919d3552624a3f39b3862d4f95edc8009. Toàn 1152 MUST/639 SHOULD chưa audit; M/O/production/release giữ nguyên.
+Mốc main: `6690593`. Loop một phiên (`docs/autopilot/A2-AC10-PLAN.md`), bằng chứng `.autopilot/evidence/T-00x.json`. Node 24 cục bộ qua `/root/.local/bin/node` (khớp CI; không sửa /opt/node22). Toàn 1152 MUST/639 SHOULD chưa audit; M/O/production/release giữ trạng thái cũ.
