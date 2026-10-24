@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Request } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 test.use({ serviceWorkers: "block" });
@@ -32,9 +32,11 @@ for (const failure of ["http", "network", "invalid"] as const) {
       }
       return route.fulfill({ json: { texts: { "tracking.settings.title": title } } });
     });
-    const settled = page.waitForEvent(failure === "network" ? "requestfailed" : "requestfinished", {
-      predicate: (request) => new URL(request.url()).pathname === "/api/ui-texts",
-    });
+    const predicate = (request: Request) => new URL(request.url()).pathname === "/api/ui-texts";
+    const settled =
+      failure === "network"
+        ? page.waitForEvent("requestfailed", { predicate })
+        : page.waitForEvent("requestfinished", { predicate });
     await page.goto("/tracking/ogtd");
     await page.getByRole("button", { name: /bấm để mở khoá chỉnh sửa/ }).click();
     const trigger = page.getByRole("button", { name: "Đổi tên / đường dẫn trang", exact: true });
