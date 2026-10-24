@@ -1,0 +1,10 @@
+{
+  "label": "baseline",
+  "source": "6a6bc0bd",
+  "scope": "Synthetic GET fixtures; 5 primary selections, no timing/CWV claim",
+  "counts": {
+    "dashboard": 5,
+    "forecast": 5,
+    "systems": 4
+  }
+}

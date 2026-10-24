@@ -1,14 +1,14 @@
 # Nâng cấp trải nghiệm, hiệu năng và tinh gọn XBoss
 
-| Thuộc tính            | Giá trị                                                                                                 |
-| --------------------- | ------------------------------------------------------------------------------------------------------- |
-| Goal ID               | UPGRADE-2026-10                                                                                         |
-| Owner                 | Chủ dự án                                                                                               |
-| State                 | WAITING — M137 DEPLOYED; #678 DEPLOYED; UI #679 DEPLOYED; vòng phục hồi UI VERIFYING; UAT/usage WAITING |
-| Main SHA đã reconcile | `6a6bc0bd32a4efc652d2f31e979e1e9ba57bbe37`                                                              |
-| Bắt đầu               | 2026-10-23                                                                                              |
-| Đối soát              | 2026-10-24                                                                                              |
-| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026                              |
+| Thuộc tính            | Giá trị                                                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Goal ID               | UPGRADE-2026-10                                                                                             |
+| Owner                 | Chủ dự án                                                                                                   |
+| State                 | WAITING — M137 DEPLOYED; #678 DEPLOYED; UI #679 DEPLOYED; vòng phục hồi UI CODE VERIFIED; UAT/usage WAITING |
+| Main SHA đã reconcile | `6a6bc0bd32a4efc652d2f31e979e1e9ba57bbe37`                                                                  |
+| Bắt đầu               | 2026-10-23                                                                                                  |
+| Đối soát              | 2026-10-24                                                                                                  |
+| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026                                  |
 
 ## Outcome và cổng hoàn thành
 
@@ -145,12 +145,12 @@ F2/F3 giữ chờ. Public smoke chỉ đọc trước sửa đạt (login/JS/CSS
 không dùng phiên hay dữ liệu production. Source cùng main phát hiện loading/error thành empty,
 form còn sửa/đóng khi mutation chờ và response bộ lọc cũ ghi đè lựa chọn mới.
 
-Lát đang VERIFYING: chi tiết tầng tải chính độc lập suppliers/giữ draft+tài liệu retry;
+Lát CODE VERIFIED local: chi tiết tầng tải chính độc lập suppliers/giữ draft+tài liệu retry;
 thông báo có retry/mark-all guard; nhãn lỗi GET không khóa cache; album/ảnh và nhật ký giữ
 pending/error; báo cáo giữ đúng system/range/days, forecast độc lập không fetch lặp.
 Giữ API/payload/quyền/precondition nhật ký/offline/export, không schema/dependency/telemetry mới.
 RED baseline và benchmark synthetic cùng fixture có trước sửa; [verification](../ops/evidence/ui-recovery-2026-10/verification.md)
-sẽ đối soát GREEN, regression, CI và phát hành. Không coi technical fixes là UAT/usage.
+ghi GREEN 85/85 mới + 121/121 hồi quy (mỗi lượt gồm setup), gate18/18, build và full unit5.165pass/0fail/1skip allowlist. Benchmark/request-count cùng fixture và hình thức đã kiểm. Kết quả CI/phát hành cuối theo PR của lát này; không coi technical fixes là UAT/usage.
 
 ## Final audit
 

@@ -1,0 +1,10 @@
+{
+  "label": "candidate",
+  "source": "3c48755d",
+  "scope": "Synthetic GET fixtures; 5 primary selections, no timing/CWV claim",
+  "counts": {
+    "dashboard": 5,
+    "forecast": 1,
+    "systems": 1
+  }
+}
