@@ -102,3 +102,10 @@ mới xác nhận Node major24 từ release trước, patch version chưa có b�
 Rollout dùng pipeline hiện hữu, không migration; rollback bằng revert commit release và pipeline cũ.
 
 Đây là checkpoint CODE VERIFIED trước merge. Kết quả CI/merge SHA/deploy/public smoke cuối sẽ nằm ở mục **Kết quả phát hành** của PR bản phục hồi UI; không coi checkpoint local là production.
+
+CI PR đầu trên `79be9544` bắt thêm lỗi UI trùng thông báo offline, chưa phát hành.
+Sửa một dòng ở `251ec883` để chỉ hiện lỗi trong form, giữ toast success/queued;
+không đổi test/assertion cũ. Build mới/format/lint và **33/33** nhật ký/offline/pending/IDB
+abort/receipt/xung đột desktop/mobile đạt, retries0. [Repair và CI RED](ci-offline-repair.md).
+Bổ sung màn hình hẹp360px: **10/10** gồm setup +9 hành vi, hai theme/axe/overflow.
+Các lượt này riêng checkpoint85+121 phía trên, không cộng thành số ca hành vi duy nhất.

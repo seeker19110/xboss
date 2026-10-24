@@ -150,7 +150,7 @@ thông báo có retry/mark-all guard; nhãn lỗi GET không khóa cache; album/
 pending/error; báo cáo giữ đúng system/range/days, forecast độc lập không fetch lặp.
 Giữ API/payload/quyền/precondition nhật ký/offline/export, không schema/dependency/telemetry mới.
 RED baseline và benchmark synthetic cùng fixture có trước sửa; [verification](../ops/evidence/ui-recovery-2026-10/verification.md)
-ghi GREEN 85/85 mới + 121/121 hồi quy (mỗi lượt gồm setup), gate18/18, build và full unit5.165pass/0fail/1skip allowlist. Benchmark/request-count cùng fixture và hình thức đã kiểm. Kết quả CI/phát hành cuối theo PR của lát này; không coi technical fixes là UAT/usage.
+ghi GREEN 85/85 mới + 121/121 hồi quy (mỗi lượt gồm setup), gate18/18, build và full unit5.165pass/0fail/1skip allowlist. Benchmark/request-count cùng fixture và hình thức đã kiểm. PR #680 bắt lỗi trùng lỗi inline/toast offline trong CI đầu; sửa251ec883 giữ một thông báo trong form, không đổi oracle cũ. Build/lint/format và33/33 offline/nhật ký sau sửa đạt,360px10/10 đạt. Kết quả CI/phát hành cuối theo PR của lát này; không coi technical fixes là UAT/usage.
 
 ## Final audit
 
