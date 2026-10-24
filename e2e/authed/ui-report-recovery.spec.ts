@@ -48,6 +48,25 @@ async function fixtures(page: Page) {
   return errors;
 }
 
+test("lookahead: link 7 ngày giữ lựa chọn khi lọc hệ và đổi số ngày", async ({ page }) => {
+  const errors = await fixtures(page);
+  const queries: string[] = [];
+  await page.route("**/api/lookahead?**", (route) => {
+    const url = new URL(route.request().url());
+    queries.push(url.search);
+    return route.fulfill({ json: lookahead(Number(url.searchParams.get("days"))) });
+  });
+  await page.goto("/lookahead?days=7&system=acmv");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("KẾ HOẠCH 7 NGÀY TỚI");
+  await page.getByRole("combobox", { name: "Số ngày xem trước" }).selectOption("21");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("KẾ HOẠCH 21 NGÀY TỚI");
+  const url = new URL(page.url());
+  expect(url.searchParams.get("system")).toBe("acmv");
+  expect(url.searchParams.get("days")).toBe("21");
+  expect(queries).toEqual(["?days=7&system=acmv", "?days=21&system=acmv"]);
+  expect(errors).toEqual([]);
+});
+
 for (const failure of ["http", "network"] as const) {
   test(`lookahead: ${failure} có retry và không in báo cáo chưa tải`, async ({ page }) => {
     const errors = await fixtures(page);
