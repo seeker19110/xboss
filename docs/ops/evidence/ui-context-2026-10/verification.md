@@ -1,6 +1,6 @@
 # Kiểm chứng UI giữ ngữ cảnh và thao tác
 
-Baseline main `d4cb1b7de04ab8d632b9e6338afb98c0cece4f79` (#681). Source kiểm cuối `992bd0c4a7c59853c7bea5a70f90cddb44f33a0b`, build `ZESpfgOuVNTdib35T73lw`; các commit tiếp theo chỉ lưu hồ sơ. Trạng thái: **VERIFY — chưa merge/deploy**. Owner đã ủy quyền merge/deploy sau kiểm tra; F2 UAT/F3 usage giữ **WAITING**.
+Baseline main `d4cb1b7de04ab8d632b9e6338afb98c0cece4f79` (#681). Source kiểm cuối `992bd0c4a7c59853c7bea5a70f90cddb44f33a0b`, build `ZESpfgOuVNTdib35T73lw`; các commit tiếp theo chỉ lưu hồ sơ. [PR#682](https://github.com/seeker19110/xboss/pull/682). Trạng thái: **VERIFY — chưa merge/deploy**. Owner đã ủy quyền merge/deploy sau kiểm tra; F2 UAT/F3 usage giữ **WAITING**.
 
 ## Thay đổi và giới hạn
 
@@ -25,6 +25,15 @@ Không thêm dependency, API, schema, capability hoặc gỡ tính năng đang d
 - Filechooser keyboard kiểm lặp riêng: **20/20 pass**, retries=0; listener đăng ký trước await focus, giữ Enter và mọi assertion.
 - npm audit toàn bộ: 0 vulnerability tại thời điểm kiểm. Không coi đây là bằng chứng đóng mọi GitHub alert lịch sử.
 - Review độc lập source/behavior và metric provenance không còn P1/P2; test mock role/payload không thay UAT/server RBAC.
+
+## Kiểm hình thức trực tiếp
+
+Root và reviewer độc lập đã mở xem bốn ảnh fixture/synthetic dưới đây. Không tràn ngang tại360/1280px, không pageerror; lỗi gần form, title/file/note còn nguyên. Modal thiết bị có cuộn dọc tại360px, nút gửi tiếp cận được bằng cuộn/bàn phím. Metadata và request read-only/mock tại [visual.json](visual.json); đây không phải UAT hay phép đo latency.
+
+- [Chấm công mobile Dark Blue](screenshots/attendance-mobile-dark.png).
+- [Hồ sơ desktop Light, upload lỗi giữ draft](screenshots/documents-desktop-light.png).
+- [Thiết bị mobile Dark Blue, log lỗi giữ draft](screenshots/equipment-mobile-dark.png).
+- [PO desktop Light, KPI và danh sách](screenshots/orders-desktop-light.png).
 
 ## Hiệu năng có thể xác minh
 

@@ -1,14 +1,14 @@
 # Nâng cấp trải nghiệm, hiệu năng và tinh gọn XBoss
 
-| Thuộc tính            | Giá trị                                                                            |
-| --------------------- | ---------------------------------------------------------------------------------- |
-| Goal ID               | UPGRADE-2026-10                                                                    |
-| Owner                 | Chủ dự án                                                                          |
-| State                 | WAITING — #675–#681 DEPLOYED; vòng giữ ngữ cảnh/thao tác VERIFY; UAT/usage WAITING |
-| Main SHA đã reconcile | `d4cb1b7de04ab8d632b9e6338afb98c0cece4f79`                                         |
-| Bắt đầu               | 2026-10-23                                                                         |
-| Đối soát              | 2026-10-24                                                                         |
-| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026         |
+| Thuộc tính            | Giá trị                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| Goal ID               | UPGRADE-2026-10                                                                         |
+| Owner                 | Chủ dự án                                                                               |
+| State                 | WAITING — #675–#681 DEPLOYED; vòng giữ ngữ cảnh/thao tác #682 VERIFY; UAT/usage WAITING |
+| Main SHA đã reconcile | `d4cb1b7de04ab8d632b9e6338afb98c0cece4f79`                                              |
+| Bắt đầu               | 2026-10-23                                                                              |
+| Đối soát              | 2026-10-24                                                                              |
+| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026              |
 
 ## Outcome và cổng hoàn thành
 
@@ -166,7 +166,7 @@ và giới hạn; CI/deploy cuối theo PR follow-up. F2/F3 tiếp tục WAITING
 
 ## Iteration 8 — giữ ngữ cảnh và trạng thái thao tác
 
-Owner tiếp tục ủy quyền rà production, tự triển khai, kiểm kỹ, merge/deploy; F2/F3 giữchờ. Baseline `d4cb1b7d` được đối soát production/main. Lát S theo [scope](../ops/evidence/ui-context-2026-10/scope.md): chấm công dùng đúng snapshot ngày và guard pending; hồ sơ không chờ nguồn phụ; ảnh tracking phân biệt tải/lỗi/rỗng và keyboard; thiết bị giữ draft/lịch sử/modal khi mạng lỗi; bỏ2GET PO không consumer. API/quyền/phép tính/schema/dependency/offline giữ nguyên. RED trước sửa có bằng chứng thật trên build baseline đồng nhất main; build/gate18/18, unit5.165pass/0fail/1skip health, GREEN89/89 và hồi quy44/44 khôngflaky/skip mới đã đạt. [Verification](../ops/evidence/ui-context-2026-10/verification.md); đang chờ CI/merge/deploy, chưa coi là DEPLOYED. Kết quả phát hành cuối đối chiếu tại PR của lát này. Nhân sự waterfall/stale là ứng viên riêng, chưa sửa vòng này.
+Owner tiếp tục ủy quyền rà production, tự triển khai, kiểm kỹ, merge/deploy; F2/F3 giữchờ. Baseline `d4cb1b7d` được đối soát production/main. Lát S theo [scope](../ops/evidence/ui-context-2026-10/scope.md): chấm công dùng đúng snapshot ngày và guard pending; hồ sơ không chờ nguồn phụ; ảnh tracking phân biệt tải/lỗi/rỗng và keyboard; thiết bị giữ draft/lịch sử/modal khi mạng lỗi; bỏ2GET PO không consumer. API/quyền/phép tính/schema/dependency/offline giữ nguyên. RED trước sửa có bằng chứng thật trên build baseline đồng nhất main; build/gate18/18, unit5.165pass/0fail/1skip health, GREEN89/89 và hồi quy44/44 khôngflaky/skip mới đã đạt. [Verification](../ops/evidence/ui-context-2026-10/verification.md); đang chờ CI/merge/deploy, chưa coi là DEPLOYED. Kết quả phát hành cuối đối chiếu tại [PR#682](https://github.com/seeker19110/xboss/pull/682). Nhân sự waterfall/stale là ứng viên riêng, chưa sửa vòng này.
 
 ## Final audit
 
