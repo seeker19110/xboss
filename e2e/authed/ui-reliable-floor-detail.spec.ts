@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { Buffer } from "node:buffer";
 
 // Chỉ dùng fixture qua route: mọi mutation nền bị chặn, không ghi DB hoặc storage.
 test.use({ serviceWorkers: "block" });
