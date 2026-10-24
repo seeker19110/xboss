@@ -142,13 +142,6 @@ export default function ReportPage() {
         if (!controller.signal.aborted) setProjectName(j?.name ?? null);
       })
       .catch(() => {});
-    // Tên hệ dùng cùng danh mục cho mọi lựa chọn trong lần mở trang.
-    void fetch("/api/systems", { signal: controller.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (!controller.signal.aborted && Array.isArray(j?.systems)) setSystems(j.systems);
-      })
-      .catch(() => {});
     return () => controller.abort();
   }, []);
 
@@ -161,6 +154,7 @@ export default function ReportPage() {
             <SystemFilter
               value={system}
               onChange={setSystem}
+              onSystemsLoaded={setSystems}
               selectClassName="min-h-11 min-w-0 max-w-full bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-lg px-3 py-1.5 text-base sm:text-sm outline-none"
             />
             <label className="flex items-center gap-1.5 text-xs text-zinc-400">

@@ -41,12 +41,13 @@ fixture hai công tác, auth disposable thật. Chromium 153.0.8010.12/Node 24.2
 Baseline median bình thường 40,0/41,1ms; suppliers trễ 3s là 3031,6/3026,1ms.
 Không gọi đây là tốc độ trang production/Core Web Vitals. Không đặt timing threshold CI.
 
-Chạy lại [script nguyên bản](floor-benchmark.cjs) (hash trong raw), override đường dẫn theo máy:
+Chạy lại [script nguyên bản](floor-benchmark.cjs.txt) (hash trong raw), override đường dẫn theo máy:
 
 ```bash
+cp docs/ops/evidence/ui-recovery-2026-10/floor-benchmark.cjs.txt /tmp/xboss-floor-benchmark.cjs
 BENCH_WORKTREE="$PWD" BASE_URL=http://127.0.0.1:3148 \
   BENCH_SOURCE_SHA="$(git rev-parse HEAD)" BENCH_LABEL=candidate \
-  node docs/ops/evidence/ui-recovery-2026-10/floor-benchmark.cjs
+  node /tmp/xboss-floor-benchmark.cjs
 ```
 
 Server phải là build tương ứng, auth file `playwright/.auth/admin.json` của DB test disposable.
