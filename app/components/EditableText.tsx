@@ -79,6 +79,7 @@ export default function EditableText({
   const editButtonRef = useRef<HTMLButtonElement>(null);
   const restoreFocus = useRef(false);
   const errorId = useId();
+  const textLabelId = useId();
 
   useEffect(() => {
     ensureLoaded();
@@ -125,7 +126,7 @@ export default function EditableText({
     return (
       <span
         role="group"
-        aria-label="Sửa nhãn giao diện"
+        aria-labelledby={textLabelId}
         className="inline-flex w-full min-w-0 flex-wrap items-center gap-1 align-middle"
         aria-busy={saving}
         onKeyDown={(e) => {
@@ -135,6 +136,9 @@ export default function EditableText({
           }
         }}
       >
+        <span id={textLabelId} data-editable-text-label="" className="sr-only">
+          {value}
+        </span>
         <input
           ref={inputRef}
           autoFocus
@@ -212,9 +216,13 @@ export default function EditableText({
 
   return (
     <span
+      role="group"
+      aria-labelledby={textLabelId}
       className={`group/et inline-flex min-w-0 flex-wrap items-center gap-1 ${className ?? ""}`}
     >
-      <span className="min-w-0 break-words">{value}</span>
+      <span id={textLabelId} data-editable-text-label="" className="min-w-0 break-words">
+        {value}
+      </span>
       {isAdmin && (
         <button
           ref={editButtonRef}

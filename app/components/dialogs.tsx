@@ -109,8 +109,11 @@ export function Modal({
     if (ariaLabel || !panel) return;
     const capNhat = () => {
       const heading = panel.querySelector<HTMLElement>("h1, h2, h3, [data-modal-title]");
-      if (heading && !heading.id) heading.id = autoTitleId;
-      const next = heading?.id || undefined;
+      // Nhãn chỉnh sửa giữ phần chữ đã lưu riêng với các control; chỉ tìm bên trong
+      // heading đã chọn để text ở phần thân không trở thành tên của hộp thoại.
+      const title = heading?.querySelector<HTMLElement>("[data-editable-text-label]") ?? heading;
+      if (title && !title.id) title.id = autoTitleId;
+      const next = title?.id || undefined;
       setLabelledBy((cur) => (cur === next ? cur : next));
     };
     capNhat();
