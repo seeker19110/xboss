@@ -3,32 +3,20 @@
 // Xem docs/nang-cap/M13-hop-rui-ro.md.
 import { query } from "@/lib/db";
 import { nextSeqCode } from "@/lib/ha-tang/seqcode";
+import {
+  RISK_CATEGORIES,
+  type RiskCategory,
+  type RiskStatus,
+} from "@/lib/hien-truong/risks-metadata";
 
-export const RISK_CATEGORIES = [
-  "schedule",
-  "cost",
-  "quality",
-  "safety",
-  "material",
-  "other",
-] as const;
-export type RiskCategory = (typeof RISK_CATEGORIES)[number];
-export const RISK_CATEGORY_LABEL: Record<RiskCategory, string> = {
-  schedule: "Tiến độ",
-  cost: "Chi phí",
-  quality: "Chất lượng",
-  safety: "An toàn",
-  material: "Vật tư",
-  other: "Khác",
-};
-
-export const RISK_STATUSES = ["open", "mitigating", "closed"] as const;
-export type RiskStatus = (typeof RISK_STATUSES)[number];
-export const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
-  open: "Đang mở",
-  mitigating: "Đang giảm thiểu",
-  closed: "Đã đóng",
-};
+export {
+  RISK_CATEGORIES,
+  RISK_CATEGORY_LABEL,
+  RISK_STATUSES,
+  RISK_STATUS_LABEL,
+  type RiskCategory,
+  type RiskStatus,
+} from "@/lib/hien-truong/risks-metadata";
 
 export type RiskInput = {
   title: string;

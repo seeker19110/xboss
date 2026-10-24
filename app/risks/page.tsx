@@ -7,24 +7,12 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-// Nhân bản label từ lib/risks.ts — không import trực tiếp vì lib đó kéo theo
-// lib/db (chỉ chạy server), giống pattern trang HSE.
-type RiskCategory = "schedule" | "cost" | "quality" | "safety" | "material" | "other";
-const RISK_CATEGORY_LABEL: Record<RiskCategory, string> = {
-  schedule: "Tiến độ",
-  cost: "Chi phí",
-  quality: "Chất lượng",
-  safety: "An toàn",
-  material: "Vật tư",
-  other: "Khác",
-};
-
-type RiskStatus = "open" | "mitigating" | "closed";
-const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
-  open: "Đang mở",
-  mitigating: "Đang giảm thiểu",
-  closed: "Đã đóng",
-};
+import {
+  RISK_CATEGORY_LABEL,
+  RISK_STATUS_LABEL,
+  type RiskCategory,
+  type RiskStatus,
+} from "@/lib/hien-truong/risks-metadata";
 
 type Risk = {
   id: number;
