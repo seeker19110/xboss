@@ -156,7 +156,12 @@ test("báo cáo: phản hồi kỳ cũ không ghi đè kỳ mới, forecast khô
   const gate = deferred();
   let gets = 0;
   let forecasts = 0;
+  let systems = 0;
   let oldFinished = false;
+  await page.route("**/api/systems", (route) => {
+    systems++;
+    return route.fulfill({ json: { systems: [{ code: "water", name: "Nước" }] } });
+  });
   await page.route("**/api/dashboard/forecast", (route) => {
     forecasts++;
     return route.fulfill({ json: { forecast: [] } });
@@ -183,6 +188,10 @@ test("báo cáo: phản hồi kỳ cũ không ghi đè kỳ mới, forecast khô
     await expect.poll(() => gets).toBe(3);
     await expect(page.getByRole("button", { name: "In", exact: true })).toBeEnabled();
     expect(forecasts).toBe(1);
+    expect(systems).toBe(1);
+    await expect(
+      page.getByRole("heading", { name: /BÁO CÁO TIẾN ĐỘ THI CÔNG ACMV/ }),
+    ).toContainText("Hệ Nước");
     await expect(page).toHaveURL(/range=week.*system=water/);
     await expect(page.getByRole("link", { name: "Tải PDF", exact: true })).toHaveAttribute(
       "href",
