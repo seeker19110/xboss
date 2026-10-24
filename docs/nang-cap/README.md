@@ -1,6 +1,6 @@
 # Bộ đặc tả nâng cấp XBoss — theo nhóm module (đã triển khai xong M0–M52)
 
-**24/10/2026 — [M137: UI và hiệu năng tiếp theo](M137-ui-hieu-nang-tiep-theo.md): CODE VERIFIED local; tải việc hiện trường độc lập nguồn phụ, form tạo trang tin cậy, modal lồng nhau giữ focus/scroll, nhãn mobile vừa khung và tương phản đổi theme. Gate 18/18, build, 5.152 unit pass, 50 browser mới đạt; [bằng chứng](../ops/evidence/m137/verification.md). Chờ CI/merge/phát hành theo PR; UAT và usage tiếp tục chờ theo quyết định owner.**
+**24/10/2026 — [M137: UI và hiệu năng tiếp theo](M137-ui-hieu-nang-tiep-theo.md): DEPLOYED qua PR #677 tại `6b631f15`; tải việc hiện trường độc lập nguồn phụ, form tạo trang tin cậy, modal lồng nhau giữ focus/scroll, nhãn mobile vừa khung và tương phản đổi theme. Gate 18/18, build, 5.152 unit pass, 50 browser mới đạt; [bằng chứng](../ops/evidence/m137/verification.md). [CI/deploy/public smoke](../ops/evidence/m137/release.md) cùng SHA đạt; UAT và usage tiếp tục chờ theo quyết định owner.**
 
 **23/10/2026 — [M136: trải nghiệm công trường, hiệu năng và tinh gọn](M136-trai-nghiem-hieu-nang-tinh-gon.md): đã triển khai và kiểm chứng mã nguồn theo phê duyệt trong chat; 18/18 gate, build, 5.152 test pass, browser và số đo trước–sau. [Bằng chứng](../ops/evidence/m136/verification.md). Đã merge/deploy qua #675; [CI và public smoke](../ops/evidence/m136/release.md) đã kiểm chứng, đối soát 24/10. UAT và usage còn chờ theo hồ sơ goal; chưa nghiệm thu toàn sản phẩm.**
 

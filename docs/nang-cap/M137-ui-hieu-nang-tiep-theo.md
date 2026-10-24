@@ -119,3 +119,9 @@ mức high, pin riêng bản sửa 8.12.2 và đổi hai manifest; [phạm vi/ki
 Modal chung chỉ sửa giới hạn keyboard/scroll đã mô tả ở C, không đổi pattern/design hoặc API.
 Rollback bằng revert PR. Nhánh `codex/m137-ui-performance`; commit/push, mở PR với
 bằng chứng trên HEAD. Merge/deploy theo quyền người dùng và `xt.yaml`; không thay policy.
+
+## Phát hành 24/10/2026
+
+PR #677 đã merge tại `6b631f15`; CI main 40055784430 và deploy 40056412712 success
+cùng SHA. Public smoke desktop/mobile đạt; [release evidence](../ops/evidence/m137/release.md)
+ghi riêng flaky/skip và giới hạn. M137 DEPLOYED; UAT/usage vẫn WAITING.
