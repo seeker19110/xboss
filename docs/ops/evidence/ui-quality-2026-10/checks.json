@@ -133,5 +133,10 @@
       "stage-error.png": "3a758593d58ba3e9e2bcb0e84d2daca257c95f947515988c9d2d9e5722610eac",
       "editor-error.png": "0ed73826bd6cf0eb5c8aa2408b52d211ed62e9ebf2d96807bd3cf62022222ceb"
     }
+  },
+  "releaseTracking": {
+    "pr": "https://github.com/seeker19110/xboss/pull/679",
+    "checkpoint": "local verified before merge; final CI, merge SHA, deploy and smoke in PR section Kết quả phát hành",
+    "productionAtThisCheckpoint": false
   }
 }

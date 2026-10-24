@@ -116,7 +116,7 @@ gate/build/test và phát hành. Không lấy cleanup nội bộ làm quyết đ
 
 ## Iteration 5 — 2026-10-24
 
-Lát S UI từ main `079e79ef`: implementation đã tích hợp trên nhánh
+Lát S UI từ main `079e79ef`: [PR #679](https://github.com/seeker19110/xboss/pull/679), implementation đã tích hợp trên nhánh
 `codex/ui-reliability-followup`; form/nhãn/mặt bằng giữ draft/error/retry, dùng chung
 metadata HSE/Risks và index ô ma trận. Guard quyền/API/schema giữ nguyên.
 Build, 7 unit index và 38 ca browser mới + setup đạt 39 pass/0 fail/skip; full release
@@ -128,7 +128,9 @@ nguyên assertion cũ. Build mới/gate 18/18 và nhóm browser kết hợp 134 
 
 Microbench synthetic 3200 rows: lookup find 13,71→index gồm build 0,12ms, checksum/object
 identity khớp; không suy ra DOM/CWV hay tốc độ trang thật. Toàn goal tiếp tục WAITING
-F2/F3; không xóa capability và chỉ chốt lát kỹ thuật sau CI/rollout tương ứng.
+F2/F3; không xóa capability. Đây là checkpoint trước merge; bằng chứng CI/merge SHA/
+deploy/public smoke cuối nằm ở mục **Kết quả phát hành** trong PR #679.
+Chỉ tính DEPLOYED khi mục đó xác nhận đủ bằng chứng cùng SHA.
 
 ## Final audit
 
