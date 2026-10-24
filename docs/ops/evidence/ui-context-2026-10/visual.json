@@ -1,0 +1,314 @@
+{
+  "createdAt": "2026-10-24T06:07:45.922Z",
+  "source": "4693a1b02e843d970403fdd565af82021ff28256",
+  "buildSource": "992bd0c4a7c59853c7bea5a70f90cddb44f33a0b",
+  "build": "ZESpfgOuVNTdib35T73lw",
+  "origin": "http://127.0.0.1:3148",
+  "notes": "Synthetic fixture screenshots only; all non-GET API requests mocked as HTTP500. No production or actual mutations. Visual evidence, not performance/CWV measurement.",
+  "scenes": [
+    {
+      "name": "attendance-mobile-dark",
+      "route": "/attendance",
+      "viewport": {
+        "width": 360,
+        "height": 780
+      },
+      "theme": "darkblue",
+      "state": "day and month synthetic attendance ready",
+      "file": "screenshots/attendance-mobile-dark.png",
+      "metrics": {
+        "bodyScrollWidth": 360,
+        "documentScrollWidth": 360,
+        "viewportWidth": 360,
+        "theme": "h-full antialiased darkblue"
+      },
+      "pageErrors": [],
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/attendance",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "GET",
+          "path": "/api/attendance",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/crews",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "GET",
+          "path": "/api/personnel",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "GET",
+          "path": "/api/projects",
+          "mode": "local read only"
+        },
+        {
+          "method": "POST",
+          "path": "/api/presence",
+          "mode": "mocked rejection; never sent"
+        },
+        {
+          "method": "GET",
+          "path": "/api/notifications",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/nav-settings",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/feature-flags",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/presence",
+          "mode": "local read only"
+        }
+      ],
+      "sha256": "4a59581572ca29c2c95ab201c1e6c6fd19b03ef8729626f0b5822199d8ec49d0"
+    },
+    {
+      "name": "documents-desktop-light",
+      "route": "/documents",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "theme": "light",
+      "state": "mocked upload HTTP500 preserves title and file",
+      "file": "screenshots/documents-desktop-light.png",
+      "metrics": {
+        "bodyScrollWidth": 1280,
+        "documentScrollWidth": 1280,
+        "viewportWidth": 1280,
+        "theme": "h-full antialiased light"
+      },
+      "pageErrors": [],
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/documents-hub",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "GET",
+          "path": "/api/systems",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "GET",
+          "path": "/api/projects",
+          "mode": "local read only"
+        },
+        {
+          "method": "POST",
+          "path": "/api/presence",
+          "mode": "mocked rejection; never sent"
+        },
+        {
+          "method": "GET",
+          "path": "/api/notifications",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/nav-settings",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/feature-flags",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/presence",
+          "mode": "local read only"
+        },
+        {
+          "method": "POST",
+          "path": "/api/project-documents",
+          "mode": "mocked rejection; never sent"
+        }
+      ],
+      "sha256": "3cd382bb835f35aec7abc43deda1b3a539f95853bc2f7e7e33777536846bd6d2"
+    },
+    {
+      "name": "equipment-mobile-dark",
+      "route": "/equipment",
+      "viewport": {
+        "width": 360,
+        "height": 780
+      },
+      "theme": "darkblue",
+      "state": "mocked log HTTP500 preserves location, crew, note",
+      "file": "screenshots/equipment-mobile-dark.png",
+      "metrics": {
+        "bodyScrollWidth": 360,
+        "documentScrollWidth": 360,
+        "viewportWidth": 360,
+        "theme": "h-full antialiased darkblue"
+      },
+      "pageErrors": [],
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/equipment",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "GET",
+          "path": "/api/projects",
+          "mode": "local read only"
+        },
+        {
+          "method": "POST",
+          "path": "/api/presence",
+          "mode": "mocked rejection; never sent"
+        },
+        {
+          "method": "GET",
+          "path": "/api/notifications",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/nav-settings",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/feature-flags",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/presence",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/equipment/930001/logs",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "POST",
+          "path": "/api/equipment/930001/logs",
+          "mode": "mocked rejection; never sent"
+        }
+      ],
+      "sha256": "ac7a9d1310bda20530324461f4058a71302a4f9f76136c901ef9ddc8a33b293a"
+    },
+    {
+      "name": "orders-desktop-light",
+      "route": "/procurement?tab=orders",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "theme": "light",
+      "state": "synthetic PO table and KPI ready",
+      "file": "screenshots/orders-desktop-light.png",
+      "metrics": {
+        "bodyScrollWidth": 1280,
+        "documentScrollWidth": 1280,
+        "viewportWidth": 1280,
+        "theme": "h-full antialiased light"
+      },
+      "pageErrors": [],
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/projects",
+          "mode": "local read only"
+        },
+        {
+          "method": "POST",
+          "path": "/api/presence",
+          "mode": "mocked rejection; never sent"
+        },
+        {
+          "method": "GET",
+          "path": "/api/notifications",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/nav-settings",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/feature-flags",
+          "mode": "local read only"
+        },
+        {
+          "method": "GET",
+          "path": "/api/suppliers",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "GET",
+          "path": "/api/materials",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "GET",
+          "path": "/api/purchase-orders",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "GET",
+          "path": "/api/materials",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "GET",
+          "path": "/api/purchase-orders",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "GET",
+          "path": "/api/engineering/logistics/shipments",
+          "mode": "synthetic fixture"
+        },
+        {
+          "method": "GET",
+          "path": "/api/presence",
+          "mode": "local read only"
+        }
+      ],
+      "sha256": "64d417cba9e996128bd69b2b95e8fb99ebe110ec97030bff5b8b04a867371f40"
+    }
+  ]
+}

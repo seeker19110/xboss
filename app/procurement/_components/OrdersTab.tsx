@@ -51,15 +51,6 @@ type POItem = {
 };
 
 type Supplier = { id: number; name: string; avgRating?: number | null };
-type ContractOption = { id: number; code: string; title: string };
-type PRItem = {
-  id: number;
-  prCode: string;
-  materialId: number;
-  materialName: string;
-  unit: string | null;
-  qtyRequested: number;
-};
 
 type Material = {
   id: number;
@@ -180,8 +171,6 @@ export default function OrdersTab() {
   const [orders, setOrders] = useState<PO[]>([]);
   const [requests, setRequests] = useState<PR[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [contracts, setContracts] = useState<ContractOption[]>([]);
-  const [approvedPRs, setApprovedPRs] = useState<PRItem[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
@@ -263,18 +252,10 @@ export default function OrdersTab() {
         setSuppliers(list);
       })
       .catch(() => setSuppliers([]));
-    fetch("/api/purchase-requests?status=approved")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setApprovedPRs(j?.requests ?? []))
-      .catch(() => setApprovedPRs([]));
     fetch("/api/materials")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setMaterials(j?.materials ?? []))
       .catch(() => setMaterials([]));
-    fetch("/api/contracts?kind=ncc")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setContracts(j?.contracts ?? []))
-      .catch(() => setContracts([]));
   }, []);
 
   useEffect(() => {

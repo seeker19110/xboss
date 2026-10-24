@@ -1,0 +1,50 @@
+import { chromium, devices, expect } from "@playwright/test";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
+const docs = [{ id:950001, source:"project", title:"Biên bản công tác tầng T1", category:"Biểu mẫu", systemCode:"SYS_A", systemName:"Hệ kiểm chứng", systemColor:"emerald", floorLabel:"T1", mimeType:"application/pdf", sizeBytes:100, createdAt:"2026-10-24T00:00:00Z", uploaderName:"Người kiểm chứng", viewUrl:"/api/project-documents/950001" }];
+const systems = [{id:950002,code:"SYS_A",name:"Hệ kiểm chứng",color:"emerald"}];
+const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+async function main() {
+  const label = process.argv[2];
+  if (!label || !/^(before|after)$/.test(label)) throw Error("Expected before|after");
+  const browser = await chromium.launch();
+  const rows: object[] = [];
+  try {
+    for (const [profile, device] of [["desktop",devices["Desktop Chrome"]],["mobile",devices["Pixel 5"]]] as const) {
+      for (let pair=0;pair<5;pair++) {
+        for (const delay of pair%2 ? [3000,0] : [0,3000]) {
+          const context = await browser.newContext({...device,baseURL:"http://127.0.0.1:3148",storageState:"playwright/.auth/admin.json",serviceWorkers:"block"});
+          let primaryAt=0;
+          let done=()=>{};
+          const auxiliary = new Promise<void>(resolve=>{done=resolve;});
+          try {
+            const page = await context.newPage();
+            const errors: string[]=[];
+            page.on("pageerror",error=>errors.push(error.message));
+            await page.route("**/api/**",route=>["GET","HEAD","OPTIONS"].includes(route.request().method()) ? route.continue() : route.fulfill({status:403,json:{error:"Mutation ngoài fixture bị chặn"}}));
+            await page.route("**/api/documents-hub",route=>route.fulfill({json:{documents:docs}}));
+            await page.route("**/api/systems",async route=>{
+              if(delay) await new Promise(resolve=>setTimeout(resolve,delay));
+              await route.fulfill({json:{systems}});
+              done();
+            });
+            page.on("response",response=>{if(new URL(response.url()).pathname==="/api/documents-hub") primaryAt=performance.now();});
+            const start=performance.now();
+            await page.goto("/documents");
+            await expect(page.getByRole("link",{name:docs[0].title,exact:true})).toBeVisible();
+            const ready=performance.now();
+            expect(primaryAt).toBeGreaterThan(start);
+            await auxiliary;
+            await expect(page.getByRole("button",{name:"Hệ kiểm chứng",exact:true})).toBeVisible();
+            expect(errors).toEqual([]);
+            rows.push({profile,pair,auxiliaryDelayMs:delay,navigationToPrimaryMs:primaryAt-start,primaryToRowMs:ready-primaryAt,navigationToRowMs:ready-start});
+          } finally {await context.close();}
+        }
+      }
+    }
+    const result={label,checkedAt:new Date().toISOString(),buildId:readFileSync(".next/BUILD_ID","utf8").trim(),scriptSha256:hash(readFileSync(import.meta.filename,"utf8")),fixtureSha256:hash(JSON.stringify({docs,systems})),profiles:"Chromium Desktop Chrome and Pixel 5",pairsPerProfile:5,readOnly:true,rows};
+    writeFileSync(`.autopilot/round3-documents-benchmark-${label}.json`,JSON.stringify(result,null,2)+"\n");
+    console.log(JSON.stringify({label,samples:rows.length,scriptSha256:result.scriptSha256,fixtureSha256:result.fixtureSha256}));
+  } finally {await browser.close();}
+}
+main().catch(error=>{console.error(error);process.exitCode=1;});

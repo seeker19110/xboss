@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, X, Wrench, FileUp, ArrowLeftRight, ShieldCheck, QrCode } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
-import { fetchMe, type Me } from "@/app/lib/me";
+import { fetchMe, invalidateMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { formatDateVN, formatDateTimeVN, todayISO, daysFromTodayISO } from "@/lib/nen/date";
 import { EXPIRY_WARN_DAYS } from "@/lib/nen/han-hieu-luc";
 
@@ -52,6 +52,10 @@ export default function EquipmentPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [items, setItems] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasSnapshot, setHasSnapshot] = useState(false);
+  const [pageError, setPageError] = useState("");
+  const mounted = useRef(false);
+  const request = useRef({ id: 0, controller: null as AbortController | null });
   const [conditionFilter, setConditionFilter] = useState<EquipmentCondition | "">("");
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -76,24 +80,63 @@ export default function EquipmentPage() {
     window.open(`/api/qr/labels?kind=eq&ids=${[...checkedIds].join(",")}`, "_blank");
   }
 
-  function load() {
-    return fetch("/api/equipment").then((r) => (r.ok ? r.json() : null));
-  }
-
-  useEffect(() => {
-    Promise.all([fetchMe(), load()])
-      .then(([meData, e]) => {
-        if (!meData) return;
-        setMe(meData);
-        setItems(e?.equipment ?? []);
-      })
-      .finally(() => setLoading(false));
+  const refresh = useCallback(async () => {
+    const id = ++request.current.id;
+    request.current.controller?.abort();
+    const controller = new AbortController();
+    request.current.controller = controller;
+    const current = () =>
+      mounted.current && request.current.id === id && !controller.signal.aborted;
+    const fallback = "Không tải được danh sách thiết bị. Kiểm tra mạng rồi thử lại.";
+    setLoading(true);
+    setPageError("");
+    try {
+      const [meData, res] = await Promise.all([
+        fetchMe(),
+        fetch("/api/equipment", { signal: controller.signal }),
+      ]);
+      if (!current()) return;
+      if (res.status === 401) {
+        void redirectToLogin();
+        return;
+      }
+      const body = await res.json().catch(() => null);
+      if (!current()) return;
+      if (!meData) invalidateMe();
+      if (!res.ok) {
+        setPageError(typeof body?.error === "string" && body.error.trim() ? body.error : fallback);
+        return;
+      }
+      if (!meData || !Array.isArray(body?.equipment)) {
+        setPageError(fallback);
+        return;
+      }
+      setMe(meData);
+      setItems(body.equipment);
+      setHasSnapshot(true);
+    } catch {
+      if (current()) {
+        invalidateMe();
+        setPageError(fallback);
+      }
+    } finally {
+      if (mounted.current && request.current.id === id) {
+        request.current.controller = null;
+        setLoading(false);
+      }
+    }
   }, []);
 
-  async function refresh() {
-    const e = await load();
-    setItems(e?.equipment ?? []);
-  }
+  useEffect(() => {
+    const active = request.current;
+    mounted.current = true;
+    void refresh();
+    return () => {
+      mounted.current = false;
+      active.id++;
+      active.controller?.abort();
+    };
+  }, [refresh]);
 
   const filtered = useMemo(() => {
     return items.filter((e) => {
@@ -114,7 +157,7 @@ export default function EquipmentPage() {
   const selected = items.find((e) => e.id === selectedId) ?? null;
   const today = todayISO();
 
-  if (loading) return <PageSkeleton />;
+  if (loading && !hasSnapshot && !pageError) return <PageSkeleton />;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -150,6 +193,31 @@ export default function EquipmentPage() {
       />
 
       <main className="p-4 sm:p-6 pb-24 space-y-4">
+        {pageError && (
+          <div className="rounded-xl border border-red-500/40 bg-zinc-900 p-4 space-y-2">
+            <p role="alert" className="text-sm text-red-300">
+              {pageError}
+            </p>
+            {hasSnapshot && (
+              <p className="text-sm text-zinc-400">
+                Đang hiển thị danh sách thiết bị đã tải trước đó.
+              </p>
+            )}
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void refresh()}
+              className="min-h-11 rounded-lg bg-zinc-800 hover:bg-zinc-700 px-3 py-2 text-sm disabled:opacity-50"
+            >
+              Thử lại danh sách
+            </button>
+          </div>
+        )}
+        {loading && hasSnapshot && (
+          <p role="status" className="text-sm text-zinc-400">
+            Đang tải lại danh sách thiết bị…
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Lọc theo tình trạng">
             <button
@@ -185,13 +253,13 @@ export default function EquipmentPage() {
           />
         </div>
 
-        {filtered.length === 0 ? (
+        {hasSnapshot && filtered.length === 0 ? (
           <EmptyState
             icon={Wrench}
             title="Chưa có thiết bị nào"
             message={canManage ? 'Bấm "Thêm thiết bị" để bắt đầu.' : "Chưa có dữ liệu thiết bị."}
           />
-        ) : (
+        ) : hasSnapshot ? (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
             <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Sổ thiết bị">
               <table className="w-full text-sm sm:min-w-[760px]">
@@ -262,7 +330,7 @@ export default function EquipmentPage() {
               </table>
             </div>
           </div>
-        )}
+        ) : null}
       </main>
 
       {selected && (
@@ -272,6 +340,8 @@ export default function EquipmentPage() {
           me={me}
           onClose={() => setSelectedId(null)}
           onSaved={refresh}
+          pageError={pageError}
+          pageLoading={loading}
         />
       )}
       {addOpen && (
@@ -409,128 +479,321 @@ function EquipmentDetailModal({
   me,
   onClose,
   onSaved,
+  pageError,
+  pageLoading,
 }: {
   equipment: Equipment;
   canManage: boolean;
   me: Me | null;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: () => void | Promise<void>;
+  pageError: string;
+  pageLoading: boolean;
 }) {
-  const [logs, setLogs] = useState<EquipmentLog[]>([]);
-  const [action, setAction] = useState<EquipmentLogAction>("issue");
+  const [logs, setLogs] = useState<EquipmentLog[] | null>(null);
+  const [logsLoading, setLogsLoading] = useState(true);
+  const [logsError, setLogsError] = useState("");
+  const [writeError, setWriteError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [action, setAction] = useState<EquipmentLogAction>(canManage ? "issue" : "return");
   const [toLocation, setToLocation] = useState("");
   const [toCrew, setToCrew] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const mounted = useRef(false);
+  const context = useRef({ epoch: 0 });
+  const logRequest = useRef({ id: 0, controller: null as AbortController | null });
+  const writePending = useRef(false);
+  const writeRequest = useRef<AbortController | null>(null);
+  const pending = busy || uploading;
 
   const canLog = canManage || (me?.role === "subcon" && equipment.currentCrew === me.name);
 
-  function loadLogs() {
-    fetch(`/api/equipment/${equipment.id}/logs`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setLogs(j?.logs ?? []));
-  }
-
-  useEffect(() => {
-    loadLogs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const loadLogs = useCallback(async () => {
+    const id = ++logRequest.current.id;
+    logRequest.current.controller?.abort();
+    const controller = new AbortController();
+    logRequest.current.controller = controller;
+    const current = () =>
+      mounted.current && logRequest.current.id === id && !controller.signal.aborted;
+    setLogsLoading(true);
+    setLogsError("");
+    try {
+      const res = await fetch(`/api/equipment/${equipment.id}/logs`, { signal: controller.signal });
+      if (!current()) return;
+      if (res.status === 401) {
+        void redirectToLogin();
+        return;
+      }
+      const body = await res.json().catch(() => null);
+      if (!current()) return;
+      if (!res.ok || !Array.isArray(body?.logs)) {
+        setLogsError(
+          typeof body?.error === "string" && body.error.trim()
+            ? body.error
+            : "Không tải được lịch sử thao tác. Kiểm tra rồi thử lại.",
+        );
+        return;
+      }
+      setLogs(body.logs);
+    } catch {
+      if (current())
+        setLogsError("Mất kết nối — không tải được lịch sử thao tác. Kiểm tra mạng rồi thử lại.");
+    } finally {
+      if (mounted.current && logRequest.current.id === id) {
+        logRequest.current.controller = null;
+        setLogsLoading(false);
+      }
+    }
   }, [equipment.id]);
 
-  async function submitLog() {
-    setBusy(true);
-    const res = await fetch(`/api/equipment/${equipment.id}/logs`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action,
-        toLocation: toLocation.trim() || null,
-        toCrew: toCrew.trim() || null,
-        note: note.trim() || null,
-      }),
-    });
+  useEffect(() => {
+    const active = logRequest.current;
+    const activeContext = context.current;
+    mounted.current = true;
+    activeContext.epoch++;
+    writePending.current = false;
     setBusy(false);
-    if (!res.ok) {
-      showToast((await res.json().catch(() => null))?.error ?? "Ghi log thất bại", "error");
-      return;
+    setUploading(false);
+    setLogs(null);
+    setWriteError("");
+    setNotice("");
+    void loadLogs();
+    return () => {
+      mounted.current = false;
+      activeContext.epoch++;
+      active.id++;
+      active.controller?.abort();
+      writeRequest.current?.abort();
+    };
+  }, [loadLogs]);
+
+  function close() {
+    if (!writePending.current) onClose();
+  }
+
+  async function submitLog() {
+    if (writePending.current) return;
+    writePending.current = true;
+    const epoch = context.current.epoch;
+    const current = () => mounted.current && context.current.epoch === epoch;
+    const controller = new AbortController();
+    writeRequest.current = controller;
+    setBusy(true);
+    setWriteError("");
+    setNotice("");
+    try {
+      const res = await fetch(`/api/equipment/${equipment.id}/logs`, {
+        method: "POST",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          toLocation: toLocation.trim() || null,
+          toCrew: toCrew.trim() || null,
+          note: note.trim() || null,
+        }),
+      });
+      if (!current()) return;
+      if (res.status === 401) {
+        void redirectToLogin();
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        if (current())
+          setWriteError(
+            typeof body?.error === "string"
+              ? body.error
+              : "Ghi log thất bại. Bản nhập được giữ nguyên.",
+          );
+        return;
+      }
+      setToLocation("");
+      setToCrew("");
+      setNote("");
+      setNotice("Đã ghi nhận thao tác vừa gửi.");
+      await loadLogs();
+      if (current()) {
+        try {
+          await onSaved();
+        } catch {
+          if (current())
+            setWriteError(
+              "Đã ghi nhận thao tác, nhưng chưa cập nhật được danh sách thiết bị. Kiểm tra rồi tải lại danh sách.",
+            );
+        }
+      }
+    } catch {
+      if (current())
+        setWriteError(
+          "Mất kết nối — chưa xác nhận ghi log. Bản nhập được giữ nguyên để kiểm tra và thử lại.",
+        );
+    } finally {
+      if (current()) {
+        writePending.current = false;
+        writeRequest.current = null;
+        setBusy(false);
+      }
     }
-    setToLocation("");
-    setToCrew("");
-    setNote("");
-    loadLogs();
-    onSaved();
   }
 
   async function uploadCert(f: File) {
+    if (writePending.current) return;
+    writePending.current = true;
+    const epoch = context.current.epoch;
+    const current = () => mounted.current && context.current.epoch === epoch;
+    const controller = new AbortController();
+    writeRequest.current = controller;
     setUploading(true);
+    setWriteError("");
+    setNotice("");
     try {
       const form = new FormData();
       form.append("file", f);
       const res = await fetch(`/api/equipment/${equipment.id}/cert`, {
         method: "POST",
+        signal: controller.signal,
         body: form,
       });
-      if (!res.ok) {
-        showToast((await res.json().catch(() => null))?.error ?? "Upload thất bại", "error");
+      if (!current()) return;
+      if (res.status === 401) {
+        void redirectToLogin();
         return;
       }
-      onSaved();
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        if (current())
+          setWriteError(
+            typeof body?.error === "string" ? body.error : "Upload giấy kiểm định thất bại.",
+          );
+        return;
+      }
+      setNotice("Đã tải giấy kiểm định vừa gửi.");
+      try {
+        await onSaved();
+      } catch {
+        if (current())
+          setWriteError(
+            "Đã tải giấy kiểm định, nhưng chưa cập nhật được danh sách thiết bị. Kiểm tra rồi tải lại danh sách.",
+          );
+      }
     } catch {
-      showToast("Mất kết nối — kiểm tra mạng rồi thử lại", "error");
+      if (current())
+        setWriteError("Mất kết nối — chưa xác nhận tải giấy kiểm định. Kiểm tra mạng rồi thử lại.");
     } finally {
-      setUploading(false);
+      if (current()) {
+        writePending.current = false;
+        writeRequest.current = null;
+        setUploading(false);
+      }
     }
   }
 
   return (
-    <Modal onClose={onClose} className="max-w-xl">
+    <Modal onClose={close} className="max-w-xl">
       <div className="p-5 space-y-4 max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-semibold font-mono text-sm">{equipment.code}</h2>
             <p className="text-sm text-zinc-300">{equipment.name}</p>
           </div>
-          <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
+          <button
+            type="button"
+            onClick={close}
+            disabled={pending}
+            aria-label="Đóng"
+            className="min-h-11 min-w-11 inline-flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-50"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <dl className="space-y-1 text-sm text-zinc-300">
-          <div>Loại: {equipment.kind}</div>
-          {equipment.serial && <div>Serial: {equipment.serial}</div>}
-          <div>Tình trạng: {EQUIPMENT_CONDITION_LABEL[equipment.condition]}</div>
           <div>
-            Vị trí/tổ đội: {equipment.currentLocation ?? "—"}
-            {equipment.currentCrew ? ` · ${equipment.currentCrew}` : ""}
+            <dt className="inline">Loại:</dt> <dd className="inline">{equipment.kind}</dd>
           </div>
-          <div>Hạn kiểm định: {formatDateVN(equipment.calibrationDue)}</div>
+          {equipment.serial && (
+            <div>
+              <dt className="inline">Serial:</dt> <dd className="inline">{equipment.serial}</dd>
+            </div>
+          )}
           <div>
-            Giấy kiểm định:{" "}
-            {equipment.certFileName ? (
-              <a
-                href={`/api/equipment/${equipment.id}/cert`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sky-300 hover:underline"
-              >
-                Xem file
-              </a>
-            ) : (
-              "—"
-            )}
+            <dt className="inline">Tình trạng:</dt>{" "}
+            <dd className="inline">{EQUIPMENT_CONDITION_LABEL[equipment.condition]}</dd>
           </div>
-          {equipment.note && <div>Ghi chú: {equipment.note}</div>}
+          <div>
+            <dt className="inline">Vị trí/tổ đội:</dt>{" "}
+            <dd className="inline">
+              {equipment.currentLocation ?? "—"}
+              {equipment.currentCrew ? ` · ${equipment.currentCrew}` : ""}
+            </dd>
+          </div>
+          <div>
+            <dt className="inline">Hạn kiểm định:</dt>{" "}
+            <dd className="inline">{formatDateVN(equipment.calibrationDue)}</dd>
+          </div>
+          <div>
+            <dt className="inline">Giấy kiểm định:</dt>{" "}
+            <dd className="inline">
+              {equipment.certFileName ? (
+                <a
+                  href={`/api/equipment/${equipment.id}/cert`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sky-300 hover:underline"
+                >
+                  Xem file
+                </a>
+              ) : (
+                "—"
+              )}
+            </dd>
+          </div>
+          {equipment.note && (
+            <div>
+              <dt className="inline">Ghi chú:</dt> <dd className="inline">{equipment.note}</dd>
+            </div>
+          )}
         </dl>
 
+        {pageLoading && (
+          <p role="status" className="text-sm text-zinc-400">
+            Đang tải lại danh sách thiết bị…
+          </p>
+        )}
+        {pageError && (
+          <div className="space-y-2">
+            <p role="alert" className="text-sm text-red-300">
+              {pageError}
+            </p>
+            <p className="text-sm text-zinc-400">
+              Thông tin thiết bị đang hiển thị là bản đã tải trước đó.
+            </p>
+            <button
+              type="button"
+              disabled={pageLoading || pending}
+              onClick={() => {
+                if (!writePending.current) void onSaved();
+              }}
+              className="min-h-11 rounded-lg bg-zinc-800 hover:bg-zinc-700 px-3 py-2 text-sm disabled:opacity-50"
+            >
+              Thử lại danh sách
+            </button>
+          </div>
+        )}
+
         {canManage && (
-          <label className="inline-flex items-center gap-2 text-sm text-zinc-300 hover:text-white cursor-pointer bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg w-fit">
+          <label className="inline-flex min-h-11 items-center gap-2 text-sm text-zinc-300 hover:text-white cursor-pointer bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg w-fit focus-within:outline-2 focus-within:outline-emerald-400">
             <FileUp className="w-4 h-4" />
             {uploading ? "Đang tải lên…" : "Tải giấy kiểm định"}
             <input
               type="file"
               accept="application/pdf,image/*"
-              className="hidden"
-              disabled={uploading}
+              aria-label="Tải giấy kiểm định"
+              className="sr-only"
+              disabled={pending}
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) uploadCert(f);
@@ -544,31 +807,72 @@ function EquipmentDetailModal({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400 flex items-center gap-1.5">
             <ArrowLeftRight className="w-3.5 h-3.5" /> Lịch sử thao tác
           </h3>
-          {logs.length ? (
+          {logsLoading && (
+            <p role="status" className="text-sm text-zinc-400">
+              Đang tải lịch sử thao tác…
+            </p>
+          )}
+          {logsError && (
+            <div className="space-y-2">
+              <p role="alert" className="text-sm text-red-300">
+                {logsError}
+              </p>
+              {logs !== null && (
+                <p className="text-sm text-zinc-400">Đang hiển thị lịch sử đã tải trước đó.</p>
+              )}
+              <button
+                type="button"
+                disabled={logsLoading || pending}
+                onClick={() => void loadLogs()}
+                className="min-h-11 rounded-lg bg-zinc-800 hover:bg-zinc-700 px-3 py-2 text-sm disabled:opacity-50"
+              >
+                Thử lại lịch sử
+              </button>
+            </div>
+          )}
+          {logs?.length ? (
             <ul className="space-y-1.5">
               {logs.map((l) => (
                 <li key={l.id} className="text-sm border-b border-zinc-800/60 last:border-0 pb-1.5">
                   <span className="font-medium">{EQUIPMENT_LOG_ACTION_LABEL[l.action]}</span>
                   {l.toCrew && <span className="text-zinc-400"> → {l.toCrew}</span>}
                   {l.toLocation && <span className="text-zinc-400"> · {l.toLocation}</span>}
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-zinc-400">
                     {l.loggerName ?? "—"} · {formatDateTimeVN(l.createdAt)}
                   </p>
                   {l.note && <p className="text-xs text-zinc-400">{l.note}</p>}
                 </li>
               ))}
             </ul>
-          ) : (
+          ) : logs !== null && !logsLoading && !logsError ? (
             <EmptyState message="Chưa có lịch sử thao tác." compact />
+          ) : null}
+
+          {writeError && (
+            <p role="alert" className="text-sm text-red-300">
+              {writeError}
+            </p>
+          )}
+          {notice && (
+            <p aria-live="polite" className="text-sm text-emerald-300">
+              {notice}
+            </p>
           )}
 
           {canLog && (
-            <div className="space-y-2 bg-zinc-800/60 rounded-lg p-3">
+            <fieldset
+              disabled={pending}
+              aria-busy={pending}
+              className="space-y-2 bg-zinc-800/60 rounded-lg p-3 min-w-0"
+            >
               <select
                 value={action}
-                onChange={(e) => setAction(e.target.value as EquipmentLogAction)}
+                onChange={(e) => {
+                  setNotice("");
+                  setAction(e.target.value as EquipmentLogAction);
+                }}
                 aria-label="Hành động"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white"
+                className="min-h-11 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base text-white"
               >
                 {(Object.keys(EQUIPMENT_LOG_ACTION_LABEL) as EquipmentLogAction[])
                   .filter((a) => canManage || a === "return")
@@ -582,35 +886,45 @@ function EquipmentDetailModal({
                 <>
                   <input
                     value={toLocation}
-                    onChange={(e) => setToLocation(e.target.value)}
+                    onChange={(e) => {
+                      setNotice("");
+                      setToLocation(e.target.value);
+                    }}
                     placeholder="Vị trí (kho/tầng)"
                     aria-label="Vị trí"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white"
+                    className="min-h-11 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base text-white"
                   />
                   <input
                     value={toCrew}
-                    onChange={(e) => setToCrew(e.target.value)}
+                    onChange={(e) => {
+                      setNotice("");
+                      setToCrew(e.target.value);
+                    }}
                     placeholder="Tổ đội nhận"
                     aria-label="Tổ đội nhận"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white"
+                    className="min-h-11 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base text-white"
                   />
                 </>
               )}
               <input
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={(e) => {
+                  setNotice("");
+                  setNote(e.target.value);
+                }}
                 placeholder="Ghi chú"
                 aria-label="Ghi chú"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white"
+                className="min-h-11 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base text-white"
               />
               <button
+                type="button"
                 onClick={submitLog}
-                disabled={busy}
-                className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
+                disabled={pending}
+                className="min-h-11 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent text-sm font-medium px-3 py-2 rounded-lg"
               >
-                Ghi nhận
+                {busy ? "Đang ghi…" : "Ghi nhận"}
               </button>
-            </div>
+            </fieldset>
           )}
         </section>
       </div>

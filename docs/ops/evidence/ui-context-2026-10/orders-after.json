@@ -1,0 +1,25 @@
+{
+  "source": "992bd0c4a7c59853c7bea5a70f90cddb44f33a0b",
+  "buildId": "ZESpfgOuVNTdib35T73lw",
+  "scope": "Initial mocked PO tab GET fixture, no latency/CWV claim; both purchase-orders requests remain",
+  "results": [
+    {
+      "project": "authed-desktop",
+      "counts": {
+        "approvedPRs": 0,
+        "contracts": 0,
+        "purchaseOrders": 2,
+        "purchaseRequests": 0
+      }
+    },
+    {
+      "project": "authed-mobile",
+      "counts": {
+        "approvedPRs": 0,
+        "contracts": 0,
+        "purchaseOrders": 2,
+        "purchaseRequests": 0
+      }
+    }
+  ]
+}

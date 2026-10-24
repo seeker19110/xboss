@@ -1,12 +1,12 @@
 "use client";
-// Tách nguyên văn khỏi TrackingGrid.tsx (M121 PR1) — không đổi một dòng hành vi nào,
-// chỉ đưa 4 modal ra khỏi file 2424 dòng để mỗi file làm đúng một việc.
+// Gallery ảnh task được tách khỏi TrackingGrid.tsx (M121 PR1).
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Trash2, Upload, WifiOff, X } from "lucide-react";
+import { Camera, RefreshCw, Trash2, Upload, WifiOff, X } from "lucide-react";
 import { Modal, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { enqueuePhoto, offlineQueue } from "@/app/components/offlineQueue";
 import { showToast } from "@/app/components/Toast";
-import { fetchMe } from "@/app/lib/me";
+import { fetchMe, redirectToLogin } from "@/app/lib/me";
+import { Button } from "@/app/components/ui";
 import { formatDateTimeVN } from "@/lib/nen/date";
 import type { GridTask } from "../types";
 
@@ -66,7 +66,10 @@ async function compressImage(file: File): Promise<File> {
 
 // Gallery ảnh hiện trường của task: xem, upload (chụp từ mobile), xoá.
 export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void }) {
-  const [photos, setPhotos] = useState<Photo[] | null>(null);
+  const [result, setResult] = useState<{ taskId: number; photos: Photo[] } | null>(null);
+  const photos = result?.taskId === task.id ? result.photos : null;
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [me, setMe] = useState<{ id: number; role: string } | null>(null);
@@ -76,11 +79,49 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
     { id: string; caption: string; size: number; queuedAt: number; tries: number }[]
   >([]);
   const urlMapRef = useRef<Map<string, string>>(new Map());
+  const mounted = useRef(false);
+  const request = useRef({ id: 0, taskId: task.id, controller: null as AbortController | null });
 
-  const load = useCallback(() => {
-    fetch(`/api/tasks/${task.id}/photos`)
-      .then((r) => r.json())
-      .then((j) => setPhotos(j.photos ?? []));
+  const load = useCallback(async () => {
+    if (!mounted.current || request.current.taskId !== task.id) return;
+    const id = ++request.current.id;
+    request.current.controller?.abort();
+    const controller = new AbortController();
+    request.current.controller = controller;
+    const current = () =>
+      mounted.current && request.current.id === id && !controller.signal.aborted;
+    setLoading(true);
+    setLoadError("");
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/photos`, { signal: controller.signal });
+      if (!current()) return;
+      if (response.status === 401) {
+        void redirectToLogin();
+        return;
+      }
+      const body = await response.json().catch(() => null);
+      if (!current()) return;
+      if (!response.ok) {
+        setLoadError(
+          typeof body?.error === "string" && body.error.trim()
+            ? body.error
+            : "Không tải được ảnh hiện trường. Kiểm tra kết nối rồi thử lại.",
+        );
+        return;
+      }
+      if (!Array.isArray(body?.photos)) {
+        setLoadError("Dữ liệu ảnh chưa hợp lệ. Vui lòng thử lại.");
+        return;
+      }
+      setResult({ taskId: task.id, photos: body.photos });
+    } catch {
+      if (current()) setLoadError("Không tải được ảnh hiện trường. Kiểm tra kết nối rồi thử lại.");
+    } finally {
+      if (mounted.current && request.current.id === id) {
+        request.current.controller = null;
+        setLoading(false);
+      }
+    }
   }, [task.id]);
 
   // Đọc lại danh sách ảnh chờ gửi của task + dựng/thu hồi object URL preview.
@@ -104,8 +145,17 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
   }, [task.id]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    const active = request.current;
+    mounted.current = true;
+    active.taskId = task.id;
+    setViewer(null);
+    void load();
+    return () => {
+      mounted.current = false;
+      active.id++;
+      active.controller?.abort();
+    };
+  }, [load, task.id]);
   useEffect(() => {
     refreshPending();
     // Hàng đợi vừa gửi hết → nạp lại ảnh thật từ server + xoá mục chờ.
@@ -196,20 +246,20 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
   return (
     <Modal onClose={onClose} className="max-w-2xl max-h-[85vh] flex flex-col">
       <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
-        <Camera className="w-4 h-4 text-sky-400" />
-        <div className="min-w-0">
+        <Camera className="w-4 h-4 text-sky-400 shrink-0" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
           <h3 className="font-semibold text-sm truncate">Ảnh hiện trường — {task.name}</h3>
-          <p className="text-xs text-zinc-500 font-mono">
-            {task.code} · {photos?.length ?? 0} ảnh
+          <p className="text-xs text-zinc-400 font-mono break-words">
+            {task.code} · {photos ? `${photos.length} ảnh` : "Chưa tải số ảnh"}
           </p>
         </div>
-        <label className="ml-auto shrink-0 flex items-center gap-1.5 bg-sky-900 hover:bg-sky-800 border border-sky-800 text-sky-200 px-3 py-1.5 rounded-lg text-xs cursor-pointer">
+        <label className="ml-auto shrink-0 min-h-11 flex items-center gap-1.5 bg-sky-900 hover:bg-sky-800 border border-sky-800 text-sky-200 px-3 py-1.5 rounded-lg text-xs cursor-pointer focus-within:ring-2 focus-within:ring-emerald-500 focus-within:ring-offset-2 focus-within:ring-offset-zinc-900">
           <Upload className="w-3.5 h-3.5" /> {uploading ? "Đang tải lên..." : "Thêm ảnh"}
           <input
             type="file"
             accept="image/*"
             capture="environment"
-            className="hidden"
+            className="sr-only"
             disabled={uploading}
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -221,16 +271,40 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
         <button
           aria-label="Đóng"
           onClick={onClose}
-          className="text-zinc-400 hover:text-white shrink-0"
+          className="min-h-11 min-w-11 inline-flex items-center justify-center text-zinc-400 hover:text-white shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
       <div className="overflow-auto p-4">
-        {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
-        {photos === null && <p className="text-sm text-zinc-500">Đang tải...</p>}
-        {photos?.length === 0 && pendingPhotos.length === 0 && (
-          <p className="text-sm text-zinc-500">
+        {error && (
+          <p role="alert" className="text-sm text-red-400 mb-3">
+            {error}
+          </p>
+        )}
+        {loadError && (
+          <div
+            role="alert"
+            className="mb-3 rounded-lg border border-red-800 bg-zinc-900 p-3 space-y-2"
+          >
+            <p className="text-sm text-red-400">{loadError}</p>
+            <Button
+              icon={RefreshCw}
+              disabled={loading}
+              onClick={() => void load()}
+              className="min-h-11"
+            >
+              Thử lại
+            </Button>
+          </div>
+        )}
+        {loading && (
+          <p role="status" className="text-sm text-zinc-400 mb-3">
+            Đang tải ảnh…
+          </p>
+        )}
+        {!loading && !loadError && photos?.length === 0 && pendingPhotos.length === 0 && (
+          <p className="text-sm text-zinc-400">
             Chưa có ảnh nào. Chụp ảnh hiện trường làm bằng chứng thi công/nghiệm thu.
           </p>
         )}
@@ -262,7 +336,7 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
                         {p.caption}
                       </p>
                     )}
-                    <p className="text-[10px] text-zinc-500 truncate">
+                    <p className="text-[10px] text-zinc-400 truncate">
                       Chưa gửi · {formatDateTimeVN(new Date(p.queuedAt).toISOString())}
                     </p>
                   </div>
@@ -274,14 +348,20 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
                 key={p.id}
                 className="bg-zinc-950/60 border border-zinc-800 rounded-lg overflow-hidden group"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/api/photos/${p.id}`}
-                  alt={p.caption ?? p.originalName ?? `Ảnh #${p.id}`}
-                  className="w-full h-32 object-cover cursor-zoom-in"
-                  loading="lazy"
+                <button
+                  type="button"
+                  aria-label={`Xem ảnh: ${p.caption ?? p.originalName ?? `Ảnh #${p.id}`}`}
+                  className="block w-full min-h-11 cursor-zoom-in rounded-lg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-emerald-500"
                   onClick={() => setViewer(p)}
-                />
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/photos/${p.id}`}
+                    alt={p.caption ?? p.originalName ?? `Ảnh #${p.id}`}
+                    className="w-full h-32 object-cover"
+                    loading="lazy"
+                  />
+                </button>
                 <div className="px-2 py-1.5 flex items-start gap-1">
                   <div className="min-w-0 flex-1">
                     {p.caption && (
@@ -289,7 +369,7 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
                         {p.caption}
                       </p>
                     )}
-                    <p className="text-[10px] text-zinc-500 truncate">
+                    <p className="text-[10px] text-zinc-400 truncate">
                       {p.uploaderName ?? "—"} · {formatDateTimeVN(p.createdAt)}
                     </p>
                   </div>
@@ -297,7 +377,8 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
                     <button
                       onClick={() => remove(p)}
                       title="Xoá ảnh"
-                      className="text-zinc-600 hover:text-red-400 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition"
+                      aria-label="Xoá ảnh"
+                      className="min-w-11 min-h-11 inline-flex items-center justify-center rounded-lg text-zinc-400 hover:text-red-400 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition focus-visible:outline-2 focus-visible:outline-offset-2"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -309,21 +390,30 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
         )}
       </div>
       {viewer && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-          style={{ background: "var(--overlay-scrim)" }}
-          onClick={(e) => {
-            e.stopPropagation();
-            setViewer(null);
-          }}
+        <Modal
+          onClose={() => setViewer(null)}
+          ariaLabel={`Xem ảnh: ${viewer.caption ?? viewer.originalName ?? `Ảnh #${viewer.id}`}`}
+          className="max-w-5xl p-4"
+          zIndex="z-[60]"
         >
+          <div className="flex justify-end mb-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Đóng ảnh"
+              onClick={() => setViewer(null)}
+              className="min-w-11 min-h-11"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/api/photos/${viewer.id}`}
-            alt={viewer.caption ?? ""}
-            className="max-w-full max-h-full object-contain rounded-lg"
+            alt={viewer.caption ?? viewer.originalName ?? `Ảnh #${viewer.id}`}
+            className="max-w-full max-h-[70vh] mx-auto object-contain rounded-lg"
           />
-        </div>
+        </Modal>
       )}
     </Modal>
   );

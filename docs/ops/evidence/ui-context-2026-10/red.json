@@ -1,0 +1,103 @@
+{
+  "baselineMain": "d4cb1b7de04ab8d632b9e6338afb98c0cece4f79",
+  "baselineAppContent": "251ec8838195eb19aa4c606cc4d59579f0407609",
+  "buildId": "QTpB20JxOWhybrez898ap",
+  "retries": 0,
+  "readOnlyProduction": true,
+  "mutations": "All browser mutations mocked, disposable-test auth only",
+  "cases": [
+    {
+      "slice": "documents",
+      "stats": {
+        "startTime": "2026-10-24T05:44:16.151Z",
+        "duration": 15379.522,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 3,
+        "flaky": 0
+      },
+      "failures": [
+        {
+          "title": "hồ sơ sẵn sàng khi danh mục hệ còn chờ",
+          "error": "Error: expect(locator).toBeVisible() failed\n\nLocator: getByRole('link', { name: 'Biên bản công tác tầng T1', exact: true })\nExpected: visible\nTimeout: 2500ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toBeVisible\" getByRole('link', { name: 'Biên bản công tác tầng T1', exact: true }) with timeout 2500ms\n  - waiting for getByRole('link', { name: 'Biên bản công tác tầng T1', exact: true })\n"
+        },
+        {
+          "title": "GET hồ sơ http có lỗi và retry, không thành dữ liệu rỗng",
+          "error": "Error: expect(locator).toContainText(expected) failed\n\nLocator: getByRole('main').getByRole('alert')\nExpected pattern: /hồ sơ|kết nối/\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toContainText\" getByRole('main').getByRole('alert') with timeout 5000ms\n  - waiting for getByRole('main').getByRole('alert')\n"
+        },
+        {
+          "title": "upload đang chờ khóa draft và đóng, không gửi hai lần",
+          "error": "Error: expect(locator).toBeDisabled() failed\n\nLocator:  getByRole('dialog', { name: 'Tải lên hồ sơ dự án', exact: true }).getByLabel('Tiêu đề', { exact: true })\nExpected: disabled\nReceived: enabled\nTimeout:  5000ms\n\nCall log:\n  - Expect \"toBeDisabled\" getByRole('dialog', { name: 'Tải lên hồ sơ dự án', exact: true }).getByLabel('Tiêu đề', { exact: true }) with timeout 5000ms\n  - waiting for getByRole('dialog', { name: 'Tải lên hồ sơ dự án', exact: true }).getByLabel('Tiêu đề', { exact: true })\n    14 × locator resolved to <input value=\"Hồ sơ mới phải giữ\" class=\"mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white\"/>\n       - unexpected value \"enabled\"\n"
+        }
+      ],
+      "rawLogSha256": "7f67b5f1e69a7e76c55bc0cd07135d8258b0193d4a17e33f867c4d11f6aecc27"
+    },
+    {
+      "slice": "attendance",
+      "stats": {
+        "startTime": "2026-10-24T05:44:44.663Z",
+        "duration": 17459.137,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 3,
+        "flaky": 0
+      },
+      "failures": [
+        {
+          "title": "đổi ngày đang tải không được PATCH/DELETE bản ghi của ngày cũ",
+          "error": "Error: expect(locator).toBeDisabled() failed\n\nLocator:  getByRole('button', { name: 'Giảm số người tổ Tổ điện kiểm chứng', exact: true })\nExpected: disabled\nReceived: enabled\nTimeout:  5000ms\n\nCall log:\n  - Expect \"toBeDisabled\" getByRole('button', { name: 'Giảm số người tổ Tổ điện kiểm chứng', exact: true }) with timeout 5000ms\n  - waiting for getByRole('button', { name: 'Giảm số người tổ Tổ điện kiểm chứng', exact: true })\n    14 × locator resolved to <button aria-label=\"Giảm số người tổ Tổ điện kiểm chứng\" class=\"w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 disabled:opacity-30 text-zinc-300 transition active:scale-95\">…</button>\n       - unexpected value \"enabled\"\n"
+        },
+        {
+          "title": "ghi pending chặn đồng bộ gửi trùng/đổi ngày; lỗi mạng giữ số và retry dùng đúng payload",
+          "error": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 1\nReceived: 2\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate"
+        },
+        {
+          "title": "chấm theo người pending giữ draft/ngày và không gửi trùng; 422 cho sửa rồi retry",
+          "error": "Error: expect(locator).toBeDisabled() failed\n\nLocator:  getByLabel('Nhân sự', { exact: true })\nExpected: disabled\nReceived: enabled\nTimeout:  5000ms\n\nCall log:\n  - Expect \"toBeDisabled\" getByLabel('Nhân sự', { exact: true }) with timeout 5000ms\n  - waiting for getByLabel('Nhân sự', { exact: true })\n    14 × locator resolved to <select aria-label=\"Nhân sự\" class=\"bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white\">…</select>\n       - unexpected value \"enabled\"\n"
+        }
+      ],
+      "rawLogSha256": "44de2087430d1f9ddb17193def42123ee75a231506a642463d373c710195478b"
+    },
+    {
+      "slice": "equipment-parent",
+      "stats": {
+        "startTime": "2026-10-24T05:50:48.306Z",
+        "duration": 12071.27,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 2,
+        "flaky": 0
+      },
+      "failures": [
+        {
+          "title": "GET danh sách thiết bị lỗi không thành empty; retry chỉ đọc lại để phục hồi",
+          "error": "Error: expect(locator).toContainText(expected) failed\n\nLocator: getByRole('main').getByRole('alert')\nExpected substring: \"Danh sách thiết bị tạm lỗi\"\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toContainText\" getByRole('main').getByRole('alert') with timeout 5000ms\n  - waiting for getByRole('main').getByRole('alert')\n"
+        },
+        {
+          "title": "POST accepted và GET danh sách lỗi giữ modal/notice; retry danh sách không ghi lại",
+          "error": "Error: expect(locator).toBeVisible() failed\n\nLocator: getByRole('dialog', { name: 'EQ-R3-001', exact: true })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toBeVisible\" getByRole('dialog', { name: 'EQ-R3-001', exact: true }) with timeout 5000ms\n  - waiting for getByRole('dialog', { name: 'EQ-R3-001', exact: true })\n"
+        }
+      ],
+      "rawLogSha256": "3309d27e92deb33abf6bf1f08452e1de72a0b2417596596c947df1be46692006"
+    },
+    {
+      "slice": "photos",
+      "failed": 3,
+      "skipped": 0,
+      "flaky": 0,
+      "reporter": "list",
+      "rawLogSha256": "2e6ab5ecaea5ff92a8135a11fabb549a74ae205f2a30bb5b10f2f448a66d8fbe",
+      "reason": "GET failure/refresh failure no alert; file input display:none not focusable"
+    },
+    {
+      "slice": "equipment-and-orders",
+      "failed": 3,
+      "skipped": 0,
+      "flaky": 0,
+      "reporter": "list",
+      "rawLogSha256": "c1023bcdd4260a6dda7913b40f301c597df22f3b95d08d72c2112f5aef77f852",
+      "reason": "loading state missing; POST network missing error; 2 unused PO requests observed"
+    }
+  ],
+  "excluded": "Equipment initial missing browser libs and later --list JSON with28skips are not test-run evidence; representative actual RED preserved from list reporter log"
+}

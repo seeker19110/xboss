@@ -1,0 +1,12 @@
+{
+  "source": "d4cb1b7de04ab8d632b9e6338afb98c0cece4f79",
+  "baselineBuild": "QTpB20JxOWhybrez898ap",
+  "testSource": "0373620c8ab0e30594f7e6ffd18e757bc082ce50",
+  "scope": "Mocked GET fixtures, initial PO tab, real disposable-test auth; no latency/CWV claim",
+  "counts": {
+    "approvedPRs": 1,
+    "contracts": 1,
+    "purchaseOrders": 2,
+    "purchaseRequests": 1
+  }
+}
