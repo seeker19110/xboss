@@ -232,7 +232,7 @@ test("keyboard chọn file, mở ảnh và Escape chỉ đóng viewer rồi tr�
   const chooser = page.waitForEvent("filechooser");
   await page.keyboard.press("Enter");
   await (await chooser).setFiles([]);
-  const target = dialog.locator("label").filter({ has: input });
+  const target = dialog.locator('label:has(input[type="file"])');
   expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await expect(target).not.toHaveCSS("box-shadow", "none");
   await page.keyboard.press("Tab");
@@ -379,9 +379,7 @@ test("360px: lỗi, gallery và viewer đạt axe hai theme, không tràn ngang,
   await expect(dialog.getByRole("alert")).toContainText("Chưa tải được ảnh trên màn hình hẹp");
   const retry = dialog.getByRole("button", { name: "Thử lại", exact: true });
   const close = dialog.getByRole("button", { name: "Đóng", exact: true });
-  const upload = dialog.locator("label").filter({
-    has: dialog.getByLabel("Thêm ảnh", { exact: true }),
-  });
+  const upload = dialog.locator('label:has(input[type="file"])');
   await target44(retry, "Thử lại");
   await target44(close, "Đóng gallery");
   await target44(upload, "Thêm ảnh");
