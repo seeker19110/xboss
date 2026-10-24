@@ -1,0 +1,23 @@
+{
+  "label": "after",
+  "checkedAt": "2026-10-24T05:55:28.985Z",
+  "readOnly": true,
+  "buildId": "XaVyUug-3BxOKAHKlZzp3",
+  "scriptSha256": "1b661105257ac2edb5bae1b5ff9cea07b17454227e8600950c8904319b2ace16",
+  "rows": [
+    {
+      "profile": "desktop",
+      "initialDate": "2026-10-24",
+      "selectedDates": ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"],
+      "dayGets": 6,
+      "monthGets": 1
+    },
+    {
+      "profile": "mobile",
+      "initialDate": "2026-10-24",
+      "selectedDates": ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"],
+      "dayGets": 6,
+      "monthGets": 1
+    }
+  ]
+}

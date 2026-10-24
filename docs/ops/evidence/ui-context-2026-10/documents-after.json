@@ -1,0 +1,172 @@
+{
+  "label": "after",
+  "checkedAt": "2026-10-24T05:55:27.473Z",
+  "buildId": "XaVyUug-3BxOKAHKlZzp3",
+  "scriptSha256": "bab5a34a1034a3a80d8221adcc06506cfb8518c15a9f5001691fdf6c63e0d582",
+  "fixtureSha256": "69a5645a456f926d37a7ea989484d03c00c15fa978b25f30be7a5e71cc75da14",
+  "profiles": "Chromium Desktop Chrome and Pixel 5",
+  "pairsPerProfile": 5,
+  "readOnly": true,
+  "rows": [
+    {
+      "profile": "desktop",
+      "pair": 0,
+      "auxiliaryDelayMs": 0,
+      "navigationToPrimaryMs": 183.02966000000004,
+      "primaryToRowMs": 40.01017200000001,
+      "navigationToRowMs": 223.03983200000005
+    },
+    {
+      "profile": "desktop",
+      "pair": 0,
+      "auxiliaryDelayMs": 3000,
+      "navigationToPrimaryMs": 294.37727600000005,
+      "primaryToRowMs": 68.36445099999992,
+      "navigationToRowMs": 362.74172699999997
+    },
+    {
+      "profile": "desktop",
+      "pair": 1,
+      "auxiliaryDelayMs": 3000,
+      "navigationToPrimaryMs": 115.82954400000017,
+      "primaryToRowMs": 63.79016600000068,
+      "navigationToRowMs": 179.61971000000085
+    },
+    {
+      "profile": "desktop",
+      "pair": 1,
+      "auxiliaryDelayMs": 0,
+      "navigationToPrimaryMs": 124.84851499999968,
+      "primaryToRowMs": 34.00204300000041,
+      "navigationToRowMs": 158.8505580000001
+    },
+    {
+      "profile": "desktop",
+      "pair": 2,
+      "auxiliaryDelayMs": 0,
+      "navigationToPrimaryMs": 129.2525910000004,
+      "primaryToRowMs": 65.028953,
+      "navigationToRowMs": 194.2815440000004
+    },
+    {
+      "profile": "desktop",
+      "pair": 2,
+      "auxiliaryDelayMs": 3000,
+      "navigationToPrimaryMs": 124.81351600000016,
+      "primaryToRowMs": 27.4719640000003,
+      "navigationToRowMs": 152.28548000000046
+    },
+    {
+      "profile": "desktop",
+      "pair": 3,
+      "auxiliaryDelayMs": 3000,
+      "navigationToPrimaryMs": 124.1409679999997,
+      "primaryToRowMs": 25.802596999999878,
+      "navigationToRowMs": 149.94356499999958
+    },
+    {
+      "profile": "desktop",
+      "pair": 3,
+      "auxiliaryDelayMs": 0,
+      "navigationToPrimaryMs": 129.01440699999876,
+      "primaryToRowMs": 25.544389000000592,
+      "navigationToRowMs": 154.55879599999935
+    },
+    {
+      "profile": "desktop",
+      "pair": 4,
+      "auxiliaryDelayMs": 0,
+      "navigationToPrimaryMs": 123.95433000000048,
+      "primaryToRowMs": 43.87007300000005,
+      "navigationToRowMs": 167.82440300000053
+    },
+    {
+      "profile": "desktop",
+      "pair": 4,
+      "auxiliaryDelayMs": 3000,
+      "navigationToPrimaryMs": 156.65728499999932,
+      "primaryToRowMs": 22.43314199999986,
+      "navigationToRowMs": 179.09042699999918
+    },
+    {
+      "profile": "mobile",
+      "pair": 0,
+      "auxiliaryDelayMs": 0,
+      "navigationToPrimaryMs": 123.88031000000046,
+      "primaryToRowMs": 36.684666000001016,
+      "navigationToRowMs": 160.56497600000148
+    },
+    {
+      "profile": "mobile",
+      "pair": 0,
+      "auxiliaryDelayMs": 3000,
+      "navigationToPrimaryMs": 126.25933400000213,
+      "primaryToRowMs": 34.75685099999828,
+      "navigationToRowMs": 161.0161850000004
+    },
+    {
+      "profile": "mobile",
+      "pair": 1,
+      "auxiliaryDelayMs": 3000,
+      "navigationToPrimaryMs": 124.86162400000103,
+      "primaryToRowMs": 42.641648000000714,
+      "navigationToRowMs": 167.50327200000174
+    },
+    {
+      "profile": "mobile",
+      "pair": 1,
+      "auxiliaryDelayMs": 0,
+      "navigationToPrimaryMs": 108.20201499999894,
+      "primaryToRowMs": 39.05291500000021,
+      "navigationToRowMs": 147.25492999999915
+    },
+    {
+      "profile": "mobile",
+      "pair": 2,
+      "auxiliaryDelayMs": 0,
+      "navigationToPrimaryMs": 109.77885199999946,
+      "primaryToRowMs": 41.670891999998275,
+      "navigationToRowMs": 151.44974399999774
+    },
+    {
+      "profile": "mobile",
+      "pair": 2,
+      "auxiliaryDelayMs": 3000,
+      "navigationToPrimaryMs": 102.71899900000062,
+      "primaryToRowMs": 40.20348099999683,
+      "navigationToRowMs": 142.92247999999745
+    },
+    {
+      "profile": "mobile",
+      "pair": 3,
+      "auxiliaryDelayMs": 3000,
+      "navigationToPrimaryMs": 120.34425999999803,
+      "primaryToRowMs": 42.82457300000169,
+      "navigationToRowMs": 163.16883299999972
+    },
+    {
+      "profile": "mobile",
+      "pair": 3,
+      "auxiliaryDelayMs": 0,
+      "navigationToPrimaryMs": 109.92523499999879,
+      "primaryToRowMs": 16.82928600000014,
+      "navigationToRowMs": 126.75452099999893
+    },
+    {
+      "profile": "mobile",
+      "pair": 4,
+      "auxiliaryDelayMs": 0,
+      "navigationToPrimaryMs": 121.26116700000057,
+      "primaryToRowMs": 28.3250369999987,
+      "navigationToRowMs": 149.58620399999927
+    },
+    {
+      "profile": "mobile",
+      "pair": 4,
+      "auxiliaryDelayMs": 3000,
+      "navigationToPrimaryMs": 113.2351099999978,
+      "primaryToRowMs": 17.880886000002647,
+      "navigationToRowMs": 131.11599600000045
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "source": "992bd0c4a7c59853c7bea5a70f90cddb44f33a0b",
+  "buildId": "ZESpfgOuVNTdib35T73lw",
+  "node": "v24.22.1 local only; VPS patch unverified",
+  "browser": "Chromium Desktop Chrome / Pixel 5, local disposable PostgreSQL16; new cases retry=0",
+  "build": "PASS",
+  "gate": "18/18 PASS final source",
+  "unit": {
+    "source": "ac441d453438b28566dd2322bb5668e91f68afc5",
+    "pass": 5165,
+    "fail": 0,
+    "skip": 1,
+    "files": 385,
+    "skipReason": "Existing health no-DB inverse case; DB provided",
+    "provenance": "Remaining changes to final source only EquipmentDetail UI and E2E/docs; Node-unit-reachable code unchanged. CI will verify exact final HEAD."
+  },
+  "npmAudit": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0,
+    "total": 0
+  },
+  "reports": {
+    "green": {
+      "startTime": "2026-10-24T06:02:55.208Z",
+      "duration": 65105.028,
+      "expected": 89,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "regression": {
+      "startTime": "2026-10-24T06:04:00.825Z",
+      "duration": 53545.424,
+      "expected": 44,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "filechooserRepeat": {
+      "startTime": "2026-10-24T06:01:29.964Z",
+      "duration": 21192.147,
+      "expected": 20,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "purchaseOrdersRegression": {
+      "startTime": "2026-10-24T06:05:20.403Z",
+      "duration": 2934.944,
+      "expected": 4,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "newE2E": "44 behavior cases x desktop/mobile + setup = 89; no new skip/flaky",
+  "regressionFiles": [
+    "attendance.spec.ts",
+    "documents.spec.ts",
+    "equipment.spec.ts",
+    "offline-deep.spec.ts",
+    "ui-gallery-recovery.spec.ts",
+    "materials-purchase-orders.spec.ts"
+  ],
+  "rawSha256": {
+    "/tmp/xboss-round3-green-final.json": "f8750cdf7bec062ed1e1cf4157462124a7d35c081af3d6994e3ab9f5f9a8e499",
+    "/tmp/xboss-round3-regression.json": "5fac24d03666a7f57725f9d19f81b22bdaa5fa1ff0c2e30fd38b3d238143c345",
+    "/tmp/xboss-round3-filechooser-repeat.json": "8a6c8c69afb2c6474aa4de11992f72155615332c69a9840584db556a85abddc9",
+    "/tmp/xboss-round3-unit.log": "1d624233129fba788bed90079bcc298c84faca3d139cf72aaf4f2c002cf986ef",
+    "/tmp/xboss-round3-gate-final.log": "bac070ca2234d99dfe8b8a587a36e686962f890a386ac384cbd31178ba49c4aa",
+    "/tmp/xboss-round3-build-final.log": "c4858a3bb78d3b3ebb9262a613b82a3ef65fa658b7a1ed57704a16267968b45e",
+    "/tmp/xboss-round3-po-regression.json": "6fa2ab3a262bb8c12c3e6941ef6bbfae9d7eaaaa30b223d3db7b4bfef2bc2a0c"
+  },
+  "independentReview": {
+    "feature_rationalization": "Final repair diff ac441d45..992bd0c4 static review: no P1/P2; subcon default matches existing roles/options; dt/dd valid; tests preserve oracles",
+    "ux_audit": "Attendance/Orders and metric provenance reviewed independently; no P1/P2; metric limitations retained"
+  },
+  "release": "VERIFY: PR/main CI and production deploy/smoke pending",
+  "UAT": "WAITING",
+  "usage": "WAITING"
+}

@@ -18,7 +18,7 @@ Không thêm capability, API, schema, dependency hoặc chính sách quyền.
   không áp response cũ/unmount. Keyboard chọn file/xem ảnh được, target mobile phù hợp.
   Giữ nguyên contract upload/xóa/nén ảnh và hàng đợi mã hóa/receipt/ownership/object URL.
 - Thiết bị: loader trang giữ danh sách/selection/modal khi refresh lỗi, có retry GET; modal ghi log có guard/finally/error/draft/pending; retry lịch sử chỉ GET sau
-  POST được nhận, giữ API/payload/quyền. Load/error/empty phân biệt, không che lỗi mạng.
+  POST được nhận, giữ API/payload/quyền. Load/error/empty phân biệt, không che lỗi mạng. Mặc định Thu hồi cho subcon khớp option hiện hữu; dl dùng dt/dd hợp lệ.
 - PO: bỏ đúng hai GET/state/type không có consumer (approved PR và contracts) trong
   OrdersTab; giữ loadPRs, KPI, payload PO và mọi hành vi nhập/tính toán/quyền hiện có.
 
