@@ -1,0 +1,108 @@
+{
+  "source": "d902a545",
+  "synthetic": true,
+  "rows": [
+    {
+      "route": "lookahead-error",
+      "theme": "darkblue",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "metrics": {
+        "width": 393,
+        "bodyWidth": 393,
+        "controls": [
+          {
+            "label": "Lọc theo hệ",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "label": "Số ngày xem trước",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "label": "Thử lại",
+            "height": 44,
+            "fontSize": "14px"
+          }
+        ]
+      }
+    },
+    {
+      "route": "gallery-error",
+      "theme": "darkblue",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "metrics": {
+        "width": 393,
+        "bodyWidth": 393,
+        "controls": [
+          {
+            "label": "Đóng",
+            "height": 44
+          },
+          {
+            "label": "Thử lại",
+            "height": 44
+          }
+        ]
+      }
+    },
+    {
+      "route": "lookahead-error",
+      "theme": "light",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "metrics": {
+        "width": 393,
+        "bodyWidth": 393,
+        "controls": [
+          {
+            "label": "Lọc theo hệ",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "label": "Số ngày xem trước",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "label": "Thử lại",
+            "height": 44,
+            "fontSize": "14px"
+          }
+        ]
+      }
+    },
+    {
+      "route": "gallery-error",
+      "theme": "light",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "metrics": {
+        "width": 393,
+        "bodyWidth": 393,
+        "controls": [
+          {
+            "label": "Đóng",
+            "height": 44
+          },
+          {
+            "label": "Thử lại",
+            "height": 44
+          }
+        ]
+      }
+    }
+  ]
+}

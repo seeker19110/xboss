@@ -1,0 +1,168 @@
+{
+  "pr": 679,
+  "url": "https://github.com/seeker19110/xboss/pull/679",
+  "sourceHead": "e17fa94cd7bfa92670670b3510e223e1cd78a3a6",
+  "mainSha": "6a6bc0bd32a4efc652d2f31e979e1e9ba57bbe37",
+  "mergedAt": "2026-10-24T03:49:09Z",
+  "mergeMethod": "squash",
+  "sourceContentEqualsMain": true,
+  "ciPR": {
+    "id": 40059016756,
+    "status": "success",
+    "unit": {
+      "files": 385,
+      "passed": 5173,
+      "failed": 0,
+      "skipped": 1
+    },
+    "e2e": {
+      "passed": 785,
+      "failed": 0,
+      "flaky": 0,
+      "skipped": 51,
+      "shardPassed": [167, 205, 206, 207],
+      "shardSkipped": [42, 4, 3, 2],
+      "setupRepeatedPerShard": true
+    },
+    "coverage": {
+      "files": 560,
+      "lines": 91.7,
+      "branches": 85.06,
+      "functions": 94.87
+    },
+    "mutation": "skipped by PR condition"
+  },
+  "ciMain": {
+    "id": 40059853915,
+    "status": "success",
+    "e2e": {
+      "status": "success",
+      "passed": 785,
+      "failed": 0,
+      "flaky": 0,
+      "skipped": 51,
+      "shardPassed": [167, 205, 206, 207],
+      "shardSkipped": [42, 4, 3, 2],
+      "setupRepeatedPerShard": true
+    },
+    "unit": {
+      "files": 385,
+      "passed": 5173,
+      "failed": 0,
+      "skipped": 1,
+      "skipReason": "health degraded-without-DB allowlist"
+    },
+    "mutation": {
+      "runnable": 52,
+      "total": 52,
+      "survived": 0
+    },
+    "coverage": {
+      "files": 560,
+      "lines": 91.69,
+      "branches": 85.06,
+      "functions": 94.87,
+      "guard": "passed existing 1 percentage-point buffer"
+    },
+    "erd": {
+      "tables": 258,
+      "status": "matched"
+    }
+  },
+  "deploy": {
+    "id": 40060604278,
+    "headSha": "6a6bc0bd32a4efc652d2f31e979e1e9ba57bbe37",
+    "status": "success",
+    "jobId": 120773062528,
+    "completedAt": "2026-10-24T04:04:29Z",
+    "exactBuildShaConfirmed": true,
+    "nodeMajor": 24,
+    "pm2Reload": "success",
+    "healthCheck": "passed"
+  },
+  "publicSmoke": {
+    "checkedAt": "2026-10-24T04:04:41.074Z",
+    "origin": "https://xboss.donghanhcungban.org",
+    "readOnly": true,
+    "browsers": [
+      {
+        "name": "desktop",
+        "loginStatus": 200,
+        "seriousAxeViolations": 0,
+        "pageErrors": [],
+        "failedAssets": [],
+        "cssHashes": [
+          {
+            "path": "/_next/static/chunks/1c-s57h9xygjw.css",
+            "sha256": "1fefceb3033eb8216fc8baf7facf3b6787094ffc54a69e3250f7f9743887526f"
+          }
+        ],
+        "hasResponsiveHeader": true,
+        "hasInsetFocus": true,
+        "protectedApis": [
+          {
+            "endpoint": "/api/dashboard",
+            "status": 401
+          },
+          {
+            "endpoint": "/api/search?q=quality",
+            "status": 401
+          }
+        ]
+      },
+      {
+        "name": "mobile",
+        "loginStatus": 200,
+        "seriousAxeViolations": 0,
+        "pageErrors": [],
+        "failedAssets": [],
+        "cssHashes": [
+          {
+            "path": "/_next/static/chunks/1c-s57h9xygjw.css",
+            "sha256": "1fefceb3033eb8216fc8baf7facf3b6787094ffc54a69e3250f7f9743887526f"
+          }
+        ],
+        "hasResponsiveHeader": true,
+        "hasInsetFocus": true,
+        "protectedApis": [
+          {
+            "endpoint": "/api/dashboard",
+            "status": 401
+          },
+          {
+            "endpoint": "/api/search?q=quality",
+            "status": 401
+          }
+        ]
+      }
+    ],
+    "/api/health": {
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "db": true,
+        "migration": "0171_users_disabled.sql",
+        "uptime_s": 30
+      }
+    },
+    "/api/ready": {
+      "status": 200,
+      "body": {
+        "ready": true,
+        "schema": "ok",
+        "migrationsApplied": 171,
+        "appliedHead": "0171_users_disabled.sql"
+      }
+    },
+    "status": "PASS"
+  },
+  "uat": "WAITING per owner",
+  "usage": "WAITING per owner",
+  "releaseStatus": "DEPLOYED",
+  "githubAlertsStillOpen": 10,
+  "limitations": [
+    "Real UAT and usage remain WAITING per owner; no live capability removed.",
+    "Production Node patch version is unverified; deploy confirms major24 only.",
+    "GitHub alerts still open despite patched lock/SBOM and npm audit0; none manually dismissed."
+  ]
+}

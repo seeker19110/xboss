@@ -1,0 +1,76 @@
+{
+  "source": "d902a54570f03dcc6f0c537804e08b235e4d1eca",
+  "buildId": "Y07byBUqBBE6tY_yxkSpi",
+  "newE2E": {
+    "startTime": "2026-10-24T04:28:25.336Z",
+    "duration": 82580.639,
+    "expected": 85,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "gate": {
+    "passed": 18,
+    "failed": 0
+  },
+  "fullLocalUnit": {
+    "files": 385,
+    "passed": 5165,
+    "failed": 0,
+    "skipped": 1,
+    "allowlist": "tests/health.test.ts: no-DB degraded case cannot run with DB"
+  },
+  "audit": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0,
+    "total": 0
+  },
+  "review": "source reviewed by root + independent UX agent; no unresolved P1/P2 in selected scope",
+  "uat": "WAITING per owner",
+  "usage": "WAITING per owner",
+  "regressionE2E": {
+    "startTime": "2026-10-24T04:30:17.691Z",
+    "duration": 107157.876,
+    "expected": 121,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "selectedBrowserTotals": {
+    "passedIncludingTwoSetupRuns": 206,
+    "failed": 0,
+    "flaky": 0,
+    "skipped": 0,
+    "newBehaviorExecutions": 84,
+    "regressionBehaviorExecutions": 120
+  },
+  "mobile360": {
+    "source": "d902a545",
+    "stats": {
+      "startTime": "2026-10-24T04:37:27.868Z",
+      "duration": 18266.103,
+      "expected": 10,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "offlineRepair": {
+    "source": "251ec8838195eb19aa4c606cc4d59579f0407609",
+    "buildId": "QTpB20JxOWhybrez898ap",
+    "stats": {
+      "startTime": "2026-10-24T04:39:06.406Z",
+      "duration": 50692.67,
+      "expected": 33,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "lintFormat": "pass",
+    "change": "remove duplicate error toast only; old assertions unchanged",
+    "failedCI": 40062755551
+  }
+}

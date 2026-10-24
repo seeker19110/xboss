@@ -1,0 +1,531 @@
+{
+  "scope": "Synthetic primary/suppliers/documents fixtures; real disposable-test auth; first card DOM only, not CWV",
+  "label": "candidate",
+  "sourceCommit": "d902a54570f03dcc6f0c537804e08b235e4d1eca",
+  "node": "24.22.1",
+  "browser": "153.0.8010.12",
+  "scriptSha256": "e55fab789219395eb1af662d0287a023c1fc1af3fd761c999794e3b9757b14e1",
+  "pageSourceSha256": "27fafb43ecd60bed5333cfd79bd2e255b5e9f31a0f6d16d024a1e43768228273",
+  "primaryFixtureSha256": "a79fa89905980ef36ee15156ade9c5a9ea43f9a6007f65833849fe28db46004b",
+  "supplierFixtureSha256": "c7fc49bb6b7fca5c2738e81f4a6dc4efb38b77f76d0ee956ff48dffcda653e45",
+  "rows": [
+    {
+      "profile": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "pair": 0,
+      "delayMs": 0,
+      "primaryResponseAt": 339,
+      "readyAt": 686.5999999996275,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 347.59999999962747,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 1,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "pair": 0,
+      "delayMs": 3000,
+      "primaryResponseAt": 260.6000000014901,
+      "readyAt": 349.80000000074506,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 89.19999999925494,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "pair": 1,
+      "delayMs": 3000,
+      "primaryResponseAt": 160.80000000074506,
+      "readyAt": 300.90000000037253,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 140.09999999962747,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "pair": 1,
+      "delayMs": 0,
+      "primaryResponseAt": 218.09999999962747,
+      "readyAt": 412.40000000037253,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 194.30000000074506,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "pair": 2,
+      "delayMs": 0,
+      "primaryResponseAt": 181.69999999925494,
+      "readyAt": 266.69999999925494,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 85,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "pair": 2,
+      "delayMs": 3000,
+      "primaryResponseAt": 188.19999999925494,
+      "readyAt": 303.8999999985099,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 115.69999999925494,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "pair": 3,
+      "delayMs": 3000,
+      "primaryResponseAt": 163.5,
+      "readyAt": 266.19999999925494,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 102.69999999925494,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "pair": 3,
+      "delayMs": 0,
+      "primaryResponseAt": 208.2999999988824,
+      "readyAt": 372.7999999988824,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 164.5,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "pair": 4,
+      "delayMs": 0,
+      "primaryResponseAt": 203.5,
+      "readyAt": 317.19999999925494,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 113.69999999925494,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "pair": 4,
+      "delayMs": 3000,
+      "primaryResponseAt": 221.30000000074506,
+      "readyAt": 330.80000000074506,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 109.5,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "mobile",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "pair": 0,
+      "delayMs": 0,
+      "primaryResponseAt": 151.09999999962747,
+      "readyAt": 230.09999999962747,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 79,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "mobile",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "pair": 0,
+      "delayMs": 3000,
+      "primaryResponseAt": 138.10000000149012,
+      "readyAt": 209.60000000149012,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 71.5,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "mobile",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "pair": 1,
+      "delayMs": 3000,
+      "primaryResponseAt": 134.40000000037253,
+      "readyAt": 197.90000000037253,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 63.5,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "mobile",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "pair": 1,
+      "delayMs": 0,
+      "primaryResponseAt": 161.90000000037253,
+      "readyAt": 227.7000000011176,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 65.80000000074506,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "mobile",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "pair": 2,
+      "delayMs": 0,
+      "primaryResponseAt": 151.30000000074506,
+      "readyAt": 231.09999999962747,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 79.79999999888241,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "mobile",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "pair": 2,
+      "delayMs": 3000,
+      "primaryResponseAt": 126.30000000074506,
+      "readyAt": 206,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 79.69999999925494,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "mobile",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "pair": 3,
+      "delayMs": 3000,
+      "primaryResponseAt": 137.7999999988824,
+      "readyAt": 204.69999999925494,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 66.90000000037253,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "mobile",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "pair": 3,
+      "delayMs": 0,
+      "primaryResponseAt": 153.60000000149012,
+      "readyAt": 230.2000000011176,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 76.59999999962747,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "mobile",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "pair": 4,
+      "delayMs": 0,
+      "primaryResponseAt": 151,
+      "readyAt": 219.10000000149012,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 68.10000000149012,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    },
+    {
+      "profile": "mobile",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "pair": 4,
+      "delayMs": 3000,
+      "primaryResponseAt": 148.5,
+      "readyAt": 208,
+      "primaryStatus": 200,
+      "waitAfterPrimaryMs": 59.5,
+      "requests": {
+        "/api/projects": 1,
+        "/api/presence": 2,
+        "/api/notifications": 1,
+        "/api/auth/me": 1,
+        "/api/nav-settings": 1,
+        "/api/feature-flags": 1,
+        "/api/floor-stage-fronts": 1,
+        "/api/suppliers": 1,
+        "/api/floor-stage-fronts/920101/documents": 1,
+        "/api/floor-stage-fronts/920102/documents": 1
+      },
+      "errors": []
+    }
+  ]
+}

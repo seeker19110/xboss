@@ -13,6 +13,7 @@ export default function SystemFilter({
   onChange,
   selectClassName,
   labelClassName,
+  onSystemsLoaded,
 }: {
   value: string;
   onChange: (system: string) => void;
@@ -20,15 +21,23 @@ export default function SystemFilter({
    *  (report/lookahead — nền trắng cố định, không theo theme) truyền class riêng. */
   selectClassName?: string;
   labelClassName?: string;
+  /** Trang cha có thể dùng lại danh mục cho tiêu đề, tránh GET cùng dữ liệu lần hai. */
+  onSystemsLoaded?: (systems: SystemOption[]) => void;
 }) {
   const [systems, setSystems] = useState<SystemOption[]>([]);
 
   useEffect(() => {
-    fetch("/api/systems")
+    const controller = new AbortController();
+    void fetch("/api/systems", { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setSystems(j?.systems ?? []))
+      .then((j) => {
+        if (controller.signal.aborted || !Array.isArray(j?.systems)) return;
+        setSystems(j.systems);
+        onSystemsLoaded?.(j.systems);
+      })
       .catch(() => {});
-  }, []);
+    return () => controller.abort();
+  }, [onSystemsLoaded]);
 
   function handleChange(next: string) {
     onChange(next);

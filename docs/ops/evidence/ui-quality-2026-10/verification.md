@@ -107,3 +107,5 @@ Runtime Node trên VPS chưa có bằng chứng patch; không suy ra từ Node m
 Đây là checkpoint local trước merge. Kết quả CI, SHA merge, deploy và public smoke
 sau checkpoint được ghi tại mục **Kết quả phát hành** trong PR liên kết ở goal;
 không coi build local là bằng chứng production.
+
+Đối soát sau phát hành ngày 24/10: #679 DEPLOYED tại `6a6bc0bd`; CI/deploy/public smoke cuối ở [release.json](release.json). Checkpoint local phía trên được giữ riêng.

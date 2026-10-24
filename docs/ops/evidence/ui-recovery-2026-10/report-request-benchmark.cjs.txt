@@ -1,0 +1,24 @@
+const { chromium } = require('playwright');
+const fs = require('node:fs');
+(async () => {
+ const browser = await chromium.launch();
+ try {
+ const context = await browser.newContext({baseURL:'http://127.0.0.1:3148',storageState:'playwright/.auth/admin.json',serviceWorkers:'block'});
+ const page = await context.newPage();
+ const counts = {dashboard:0,forecast:0,systems:0};
+ await page.route('**/api/**',r=>['GET','HEAD','OPTIONS'].includes(r.request().method())?r.continue():r.fulfill({status:403,json:{error:'No benchmark mutations'}}));
+ await page.route('**/api/systems', r=>{counts.systems++;return r.fulfill({json:{systems:[{id:1,code:'acmv',name:'ACMV',color:null},{id:2,code:'water',name:'Nước',color:null}]}});});
+ await page.route('**/api/dashboard/forecast',r=>{counts.forecast++;return r.fulfill({json:{forecast:[]}});});
+ await page.route(/\/api\/dashboard(?:\?.*)?$/,r=>{counts.dashboard++;return r.fulfill({json:{delayedTasks:[],totalDelayed:0,groupProgress:{},kpi:[{sheetType:'fixture-'+counts.dashboard,total:1,avgProgress:.5,delayed:0}]}});});
+ await page.goto('/report?system=acmv&range=week');
+ await page.locator('main').getByText('fixture-1',{exact:true}).first().waitFor();
+ for (const [label,value] of [['Chọn kỳ báo cáo','month'],['Chọn kỳ báo cáo','day'],['Lọc theo hệ','water'],['Lọc theo hệ','acmv']]) {
+ const next = counts.dashboard+1;
+ await page.getByRole('combobox',{name:label}).selectOption(value);
+ await page.locator('main').getByText('fixture-'+next,{exact:true}).first().waitFor();
+ }
+ await page.getByRole('heading',{name:/BÁO CÁO TIẾN ĐỘ THI CÔNG ACMV/}).waitFor();
+ fs.writeFileSync(process.env.REPORT_BENCH_OUTPUT, JSON.stringify({label:process.env.REPORT_BENCH_LABEL,source:process.env.REPORT_BENCH_SOURCE,scope:'Synthetic GET fixtures; 5 primary selections, no timing/CWV claim',counts},null,2)+'\n');
+ await context.close();
+ } finally {await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

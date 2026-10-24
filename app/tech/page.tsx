@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Plus,
   X,
@@ -25,9 +25,11 @@ import {
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
+import { ErrorState } from "@/app/components/ErrorState";
 import { Modal, appConfirm } from "@/app/components/dialogs";
+import { Button } from "@/app/components/ui";
 import { showToast } from "@/app/components/Toast";
-import { fetchMe, type Me } from "@/app/lib/me";
+import { fetchMe, invalidateMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/nen/date";
 
 type TechCategory = "bim" | "schedule" | "camera" | "drone" | "other";
@@ -102,14 +104,88 @@ function formatBytes(n: number): string {
   return `${v.toFixed(1)} ${units[i]}`;
 }
 
+// Danh sách lỗi không phải danh sách rỗng; lần tải mới và unmount huỷ request cũ.
+function useList<T>(url: string, key: string, message: string, enabled = true) {
+  const [items, setItems] = useState<T[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const request = useRef<{ id: number; controller: AbortController | null }>({
+    id: 0,
+    controller: null,
+  });
+  const mounted = useRef(false);
+  const reload = useCallback(async () => {
+    if (!mounted.current) return false;
+    const id = ++request.current.id;
+    request.current.controller?.abort();
+    const controller = new AbortController();
+    request.current.controller = controller;
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!mounted.current || request.current.id !== id || controller.signal.aborted) return false;
+      if (response.status === 401) {
+        void redirectToLogin();
+        return false;
+      }
+      const body = await response.json().catch(() => null);
+      if (!mounted.current || request.current.id !== id || controller.signal.aborted) return false;
+      if (!response.ok) {
+        setError(typeof body?.error === "string" ? body.error : message);
+        return false;
+      }
+      if (!Array.isArray(body?.[key])) {
+        setError(message);
+        return false;
+      }
+      setItems(body[key]);
+      return true;
+    } catch {
+      if (mounted.current && request.current.id === id && !controller.signal.aborted)
+        setError(message);
+      return false;
+    } finally {
+      if (mounted.current && request.current.id === id) {
+        request.current.controller = null;
+        setLoading(false);
+      }
+    }
+  }, [url, key, message]);
+  useEffect(() => {
+    const active = request.current;
+    mounted.current = true;
+    if (enabled) void reload();
+    return () => {
+      mounted.current = false;
+      active.id++;
+      active.controller?.abort();
+      active.controller = null;
+    };
+  }, [enabled, reload]);
+  return { items, loading, error, reload };
+}
+
+function LoadNotice({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div role="alert" className="rounded-xl border border-red-900/50 bg-zinc-900 p-3 space-y-2">
+      <p className="text-sm text-red-400">{message}</p>
+      <Button onClick={onRetry} className="min-h-11" icon={RefreshCw}>
+        Thử lại
+      </Button>
+    </div>
+  );
+}
+
 export default function TechPage() {
   const [me, setMe] = useState<Me | null>(null);
-  const [links, setLinks] = useState<TechLink[]>([]);
-  const [albums, setAlbums] = useState<ProgressAlbum[]>([]);
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [health, setHealth] = useState<HealthCheckReport | null>(null);
   const [healthChecking, setHealthChecking] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState("");
+  const authRequest = useRef(0);
+  const mounted = useRef(false);
   const [tab, setTab] = useState<Tab>("cde");
   const [addLinkOpen, setAddLinkOpen] = useState<TechCategory | null>(null);
   const [editLink, setEditLink] = useState<TechLink | null>(null);
@@ -118,6 +194,22 @@ export default function TechPage() {
 
   const canManage = me?.role === "admin" || me?.role === "pm";
   const isAdmin = me?.role === "admin";
+  const linkList = useList<TechLink>(
+    "/api/tech-links",
+    "links",
+    "Không tải được danh sách liên kết",
+    !!me,
+  );
+  const albumList = useList<ProgressAlbum>(
+    "/api/progress-albums",
+    "albums",
+    "Không tải được danh sách album",
+    !!me,
+  );
+  const links = linkList.items ?? [];
+  const albums = albumList.items ?? [];
+  const refreshLinks = linkList.reload;
+  const refreshAlbums = albumList.reload;
 
   const TABS: { key: Tab; label: string; icon: typeof Cpu }[] = useMemo(() => {
     const base: { key: Tab; label: string; icon: typeof Cpu }[] = [
@@ -130,25 +222,25 @@ export default function TechPage() {
     return base;
   }, [isAdmin]);
 
-  function loadLinks() {
-    return fetch("/api/tech-links").then((r) => (r.ok ? r.json() : null));
-  }
-  function loadAlbums() {
-    return fetch("/api/progress-albums").then((r) => (r.ok ? r.json() : null));
-  }
-
-  useEffect(() => {
-    fetchMe().then((meData) => {
-      if (!meData) return;
-      setMe(meData);
-      Promise.all([loadLinks(), loadAlbums()])
-        .then(([linksRes, albumsRes]) => {
-          setLinks(linksRes?.links ?? []);
-          setAlbums(albumsRes?.albums ?? []);
-        })
-        .finally(() => setLoading(false));
-    });
+  const loadMe = useCallback(async () => {
+    const id = ++authRequest.current;
+    setLoading(true);
+    setAuthError("");
+    const user = await fetchMe();
+    if (!mounted.current || id !== authRequest.current) return;
+    if (!user) {
+      invalidateMe();
+      setAuthError("Không tải được thông tin tài khoản. Vui lòng thử lại.");
+    } else setMe(user);
+    setLoading(false);
   }, []);
+  useEffect(() => {
+    mounted.current = true;
+    void loadMe();
+    return () => {
+      mounted.current = false;
+    };
+  }, [loadMe]);
 
   useEffect(() => {
     if (tab !== "he-thong" || !isAdmin) return;
@@ -179,15 +271,6 @@ export default function TechPage() {
     runHealthCheck();
   }, [tab, isAdmin]);
 
-  async function refreshLinks() {
-    const res = await loadLinks();
-    setLinks(res?.links ?? []);
-  }
-  async function refreshAlbums() {
-    const res = await loadAlbums();
-    setAlbums(res?.albums ?? []);
-  }
-
   async function deleteLink(id: number) {
     if (!(await appConfirm("Xoá link này? Không thể hoàn tác.", { danger: true }))) return;
     const res = await fetch(`/api/tech-links/${id}`, { method: "DELETE" });
@@ -210,6 +293,17 @@ export default function TechPage() {
   }
 
   if (loading) return <PageSkeleton />;
+  if (authError)
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white">
+        <AppHeader title="Chuyển đổi số & Công nghệ" />
+        <main>
+          <div role="alert">
+            <ErrorState message={authError} onRetry={() => void loadMe()} />
+          </div>
+        </main>
+      </div>
+    );
 
   const bimLinks = links.filter((l) => l.category === "bim");
   const scheduleLinks = links.filter((l) => l.category === "schedule");
@@ -224,6 +318,17 @@ export default function TechPage() {
       />
 
       <main className="p-4 sm:p-6 pb-24 space-y-4">
+        {tab !== "cde" && tab !== "he-thong" && linkList.error && (
+          <LoadNotice message={linkList.error} onRetry={() => void refreshLinks()} />
+        )}
+        {tab !== "cde" && tab !== "he-thong" && linkList.loading && (
+          <p role="status" className="text-sm text-zinc-400">
+            Đang tải liên kết…
+          </p>
+        )}
+        {tab === "giam-sat" && albumList.error && (
+          <LoadNotice message={albumList.error} onRetry={() => void refreshAlbums()} />
+        )}
         <div
           className="flex flex-wrap gap-1.5"
           role="tablist"
@@ -273,7 +378,7 @@ export default function TechPage() {
           </div>
         )}
 
-        {tab === "bim" && (
+        {tab === "bim" && linkList.items !== null && (
           <TechLinkSection
             category="bim"
             links={bimLinks}
@@ -286,7 +391,7 @@ export default function TechPage() {
           />
         )}
 
-        {tab === "phan-mem" && (
+        {tab === "phan-mem" && linkList.items !== null && (
           <TechLinkSection
             category="schedule"
             links={scheduleLinks}
@@ -300,16 +405,18 @@ export default function TechPage() {
 
         {tab === "giam-sat" && (
           <div className="space-y-6">
-            <TechLinkSection
-              category="camera"
-              links={[...cameraLinks, ...droneLinks]}
-              canManage={canManage}
-              onAdd={() => setAddLinkOpen("camera")}
-              onEdit={setEditLink}
-              onDelete={deleteLink}
-              emptyMessage="Chưa có link camera/flycam — bấm “Thêm link” để thêm."
-              title="Camera & flycam trực tuyến"
-            />
+            {linkList.items !== null && (
+              <TechLinkSection
+                category="camera"
+                links={[...cameraLinks, ...droneLinks]}
+                canManage={canManage}
+                onAdd={() => setAddLinkOpen("camera")}
+                onEdit={setEditLink}
+                onDelete={deleteLink}
+                emptyMessage="Chưa có link camera/flycam — bấm “Thêm link” để thêm."
+                title="Camera & flycam trực tuyến"
+              />
+            )}
 
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -325,48 +432,54 @@ export default function TechPage() {
                   </button>
                 )}
               </div>
-              {albums.length === 0 ? (
-                <EmptyState
-                  icon={ImageIcon}
-                  title="Chưa có album"
-                  message="Bấm “Thêm album” để tạo mốc tiến độ đầu tiên."
-                  compact
-                />
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {albums.map((a) => (
-                    <div
-                      key={a.id}
-                      className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-medium truncate max-w-[180px]">{a.milestoneLabel}</p>
-                          <p className="text-xs text-zinc-500">
-                            {a.capturedDate ? formatDateVN(a.capturedDate) : "Chưa có ngày"} ·{" "}
-                            {a.photoCount} ảnh
-                          </p>
-                        </div>
-                        {canManage && (
-                          <button
-                            onClick={() => deleteAlbum(a.id)}
-                            aria-label="Xoá album"
-                            className="text-zinc-500 hover:text-rose-400 shrink-0"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => setOpenAlbum(a)}
-                        className="w-full text-xs bg-zinc-800 hover:bg-zinc-700 rounded-lg py-1.5"
-                      >
-                        Xem ảnh
-                      </button>
-                    </div>
-                  ))}
-                </div>
+              {albumList.loading && (
+                <p role="status" className="text-sm text-zinc-400">
+                  Đang tải album…
+                </p>
               )}
+              {albumList.items !== null &&
+                (albums.length === 0 ? (
+                  <EmptyState
+                    icon={ImageIcon}
+                    title="Chưa có album"
+                    message="Bấm “Thêm album” để tạo mốc tiến độ đầu tiên."
+                    compact
+                  />
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {albums.map((a) => (
+                      <div
+                        key={a.id}
+                        className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-medium truncate max-w-[180px]">{a.milestoneLabel}</p>
+                            <p className="text-xs text-zinc-500">
+                              {a.capturedDate ? formatDateVN(a.capturedDate) : "Chưa có ngày"} ·{" "}
+                              {a.photoCount} ảnh
+                            </p>
+                          </div>
+                          {canManage && (
+                            <button
+                              onClick={() => deleteAlbum(a.id)}
+                              aria-label="Xoá album"
+                              className="text-zinc-500 hover:text-rose-400 shrink-0"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setOpenAlbum(a)}
+                          className="w-full text-xs bg-zinc-800 hover:bg-zinc-700 rounded-lg py-1.5"
+                        >
+                          Xem ảnh
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ))}
             </div>
           </div>
         )}
@@ -727,10 +840,25 @@ function AlbumModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
   const [note, setNote] = useState("");
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
+  const pending = useRef(false);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const canSubmit = milestoneLabel.trim().length > 0;
 
-  async function submit() {
+  function close() {
+    if (!pending.current) onClose();
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending.current || !canSubmit) return;
+    pending.current = true;
     setSaving(true);
     setErr("");
     try {
@@ -743,67 +871,84 @@ function AlbumModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
           note: note.trim() || null,
         }),
       });
+      if (!mounted.current) return;
       if (!res.ok) {
-        setErr((await res.json().catch(() => null))?.error ?? "Không tạo được album");
+        const body = await res.json().catch(() => null);
+        if (mounted.current) setErr(body?.error ?? "Không tạo được album");
         return;
       }
       onSaved();
     } catch {
-      setErr("Mất kết nối — kiểm tra mạng rồi thử lại");
+      if (mounted.current) setErr("Mất kết nối — kiểm tra mạng rồi thử lại");
     } finally {
-      setSaving(false);
+      pending.current = false;
+      if (mounted.current) setSaving(false);
     }
   }
 
   return (
-    <Modal onClose={onClose} className="max-w-md">
-      <div className="p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Thêm album mốc tiến độ</h2>
-          <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Modal onClose={close} className="max-w-md">
+      <form className="p-5" onSubmit={submit}>
+        <fieldset disabled={saving} aria-busy={saving} className="min-w-0 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Thêm album mốc tiến độ</h2>
+            <Button
+              onClick={close}
+              aria-label="Đóng"
+              disabled={saving}
+              variant="ghost"
+              size="icon"
+              className="min-w-11 min-h-11"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
 
-        <label className="text-xs text-zinc-400 block">
-          Tên mốc
-          <input
-            value={milestoneLabel}
-            onChange={(e) => setMilestoneLabel(e.target.value)}
-            placeholder="VD: Hoàn thiện tầng 10 — 07/2026"
-            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-          />
-        </label>
+          <label className="text-xs text-zinc-400 block">
+            Tên mốc
+            <input
+              value={milestoneLabel}
+              onChange={(e) => setMilestoneLabel(e.target.value)}
+              placeholder="VD: Hoàn thiện tầng 10 — 07/2026"
+              className="mt-1 w-full min-h-11 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base text-white"
+            />
+          </label>
 
-        <label className="text-xs text-zinc-400 block">
-          Ngày chụp
-          <input
-            type="date"
-            value={capturedDate}
-            onChange={(e) => setCapturedDate(e.target.value)}
-            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-          />
-        </label>
+          <label className="text-xs text-zinc-400 block">
+            Ngày chụp
+            <input
+              type="date"
+              value={capturedDate}
+              onChange={(e) => setCapturedDate(e.target.value)}
+              className="mt-1 w-full min-h-11 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base text-white"
+            />
+          </label>
 
-        <label className="text-xs text-zinc-400 block">
-          Ghi chú
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={2}
-            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
-          />
-        </label>
+          <label className="text-xs text-zinc-400 block">
+            Ghi chú
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              className="mt-1 w-full min-h-11 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base text-white"
+            />
+          </label>
 
-        {err && <p className="text-sm text-rose-300">{err}</p>}
-        <button
-          onClick={submit}
-          disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
-        >
-          {saving ? "Đang lưu…" : "Lưu"}
-        </button>
-      </div>
+          {err && (
+            <p role="alert" className="text-sm text-red-400">
+              {err}
+            </p>
+          )}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={saving || !canSubmit}
+            className="w-full min-h-11 justify-center"
+          >
+            {saving ? "Đang lưu…" : "Lưu"}
+          </Button>
+        </fieldset>
+      </form>
     </Modal>
   );
 }
@@ -819,26 +964,35 @@ function AlbumGalleryModal({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const [photos, setPhotos] = useState<AlbumPhoto[]>([]);
-  const [loading, setLoading] = useState(true);
+  const photoList = useList<AlbumPhoto>(
+    `/api/progress-albums/${album.id}/photos`,
+    "photos",
+    "Không tải được ảnh album. Vui lòng thử lại.",
+  );
+  const photos = photoList.items ?? [];
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [err, setErr] = useState("");
-
-  function load() {
-    return fetch(`/api/progress-albums/${album.id}/photos`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setPhotos(j?.photos ?? []))
-      .finally(() => setLoading(false));
+  const [uploadAccepted, setUploadAccepted] = useState(false);
+  const pending = useRef(false);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const busy = uploading || deleting;
+  function close() {
+    if (!pending.current) onClose();
   }
 
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [album.id]);
-
   async function upload(file: File) {
+    if (pending.current) return;
+    pending.current = true;
     setUploading(true);
     setErr("");
+    setUploadAccepted(false);
     try {
       const form = new FormData();
       form.append("file", file);
@@ -846,32 +1000,51 @@ function AlbumGalleryModal({
         method: "POST",
         body: form,
       });
+      if (!mounted.current) return;
       if (!res.ok) {
-        setErr((await res.json().catch(() => null))?.error ?? "Upload thất bại");
+        const body = await res.json().catch(() => null);
+        if (mounted.current) setErr(body?.error ?? "Upload thất bại");
         return;
       }
-      await load();
+      setUploadAccepted(true);
+      const refreshed = await photoList.reload();
+      if (!mounted.current) return;
+      if (refreshed) setUploadAccepted(false);
       onChanged();
     } catch {
-      setErr("Mất kết nối — kiểm tra mạng rồi thử lại");
+      if (mounted.current) setErr("Mất kết nối — kiểm tra mạng rồi thử lại");
     } finally {
-      setUploading(false);
+      pending.current = false;
+      if (mounted.current) setUploading(false);
     }
   }
 
   async function removePhoto(id: number) {
-    if (!(await appConfirm("Xoá ảnh này?", { danger: true }))) return;
-    const res = await fetch(`/api/photos/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      showToast((await res.json().catch(() => null))?.error ?? "Xoá thất bại", "error");
-      return;
+    if (pending.current) return;
+    pending.current = true;
+    setErr("");
+    try {
+      if (!(await appConfirm("Xoá ảnh này?", { danger: true })) || !mounted.current) return;
+      setDeleting(true);
+      const res = await fetch(`/api/photos/${id}`, { method: "DELETE" });
+      if (!mounted.current) return;
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        if (mounted.current) setErr(body?.error ?? "Xoá thất bại");
+        return;
+      }
+      await photoList.reload();
+      if (mounted.current) onChanged();
+    } catch {
+      if (mounted.current) setErr("Mất kết nối — kiểm tra mạng rồi thử lại");
+    } finally {
+      pending.current = false;
+      if (mounted.current) setDeleting(false);
     }
-    await load();
-    onChanged();
   }
 
   return (
-    <Modal onClose={onClose} className="max-w-2xl">
+    <Modal onClose={close} className="max-w-2xl">
       <div className="p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div>
@@ -880,20 +1053,27 @@ function AlbumGalleryModal({
               <p className="text-xs text-zinc-500">{formatDateVN(album.capturedDate)}</p>
             )}
           </div>
-          <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
+          <Button
+            onClick={close}
+            aria-label="Đóng"
+            disabled={busy}
+            variant="ghost"
+            size="icon"
+            className="min-w-11 min-h-11"
+          >
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         {canManage && (
-          <label className="inline-flex items-center gap-2 text-sm text-zinc-300 hover:text-white cursor-pointer bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg w-fit">
+          <label className="inline-flex items-center gap-2 min-h-11 text-sm text-zinc-300 hover:text-white cursor-pointer bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg w-fit focus-within:ring-2 focus-within:ring-emerald-500">
             <Upload className="w-4 h-4" />
             {uploading ? "Đang tải lên…" : "Thêm ảnh"}
             <input
               type="file"
               accept="image/*"
-              className="hidden"
-              disabled={uploading}
+              className="sr-only"
+              disabled={busy}
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) upload(f);
@@ -902,37 +1082,61 @@ function AlbumGalleryModal({
             />
           </label>
         )}
-        {err && <p className="text-sm text-rose-300">{err}</p>}
-
-        {loading ? (
-          <p className="text-sm text-zinc-400">Đang tải ảnh…</p>
-        ) : photos.length === 0 ? (
-          <EmptyState icon={ImageIcon} message="Album chưa có ảnh nào." compact />
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {photos.map((p) => (
-              <div key={p.id} className="relative group">
-                {/* Ảnh động qua route /api/photos/:id (kiểm quyền server) — grid đơn giản, không lightbox. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/api/photos/${p.id}`}
-                  alt={p.caption ?? p.originalName ?? "Ảnh album"}
-                  loading="lazy"
-                  className="w-full h-28 object-cover rounded-lg border border-zinc-800"
-                />
-                {canManage && (
-                  <button
-                    onClick={() => removePhoto(p.id)}
-                    aria-label="Xoá ảnh"
-                    className="absolute top-1 right-1 bg-zinc-950/80 text-zinc-300 hover:text-rose-400 rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+        {err && (
+          <p role="alert" className="text-sm text-red-400">
+            {err}
+          </p>
         )}
+        {photoList.error && (
+          <LoadNotice
+            message={photoList.error}
+            onRetry={() => {
+              void photoList.reload().then((ok) => {
+                if (ok && mounted.current) setUploadAccepted(false);
+              });
+            }}
+          />
+        )}
+        {uploadAccepted && photoList.error && (
+          <p className="text-sm text-zinc-300">
+            Ảnh đã tải lên; hãy thử lại để cập nhật danh sách.
+          </p>
+        )}
+
+        {photoList.loading && (
+          <p role="status" className="text-sm text-zinc-400">
+            Đang tải ảnh…
+          </p>
+        )}
+        {photoList.items !== null &&
+          (photos.length === 0 ? (
+            <EmptyState icon={ImageIcon} message="Album chưa có ảnh nào." compact />
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {photos.map((p) => (
+                <div key={p.id} className="relative group">
+                  {/* Ảnh động qua route /api/photos/:id (kiểm quyền server) — grid đơn giản, không lightbox. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/photos/${p.id}`}
+                    alt={p.caption ?? p.originalName ?? "Ảnh album"}
+                    loading="lazy"
+                    className="w-full h-28 object-cover rounded-lg border border-zinc-800"
+                  />
+                  {canManage && (
+                    <button
+                      onClick={() => removePhoto(p.id)}
+                      disabled={busy}
+                      aria-label="Xoá ảnh"
+                      className="absolute top-1 right-1 min-w-11 min-h-11 inline-flex items-center justify-center bg-zinc-950/80 text-zinc-300 hover:text-rose-400 rounded-full opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 disabled:opacity-50 transition"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
       </div>
     </Modal>
   );

@@ -1,14 +1,14 @@
 # Nâng cấp trải nghiệm, hiệu năng và tinh gọn XBoss
 
-| Thuộc tính            | Giá trị                                                                     |
-| --------------------- | --------------------------------------------------------------------------- |
-| Goal ID               | UPGRADE-2026-10                                                             |
-| Owner                 | Chủ dự án                                                                   |
-| State                 | WAITING — M137 DEPLOYED; #678 DEPLOYED; UI CODE VERIFIED; UAT/usage WAITING |
-| Main SHA đã reconcile | `079e79efcb4f3ebfb0a0257eb1dbc546f3c830ef`                                  |
-| Bắt đầu               | 2026-10-23                                                                  |
-| Đối soát              | 2026-10-24                                                                  |
-| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026  |
+| Thuộc tính            | Giá trị                                                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Goal ID               | UPGRADE-2026-10                                                                                             |
+| Owner                 | Chủ dự án                                                                                                   |
+| State                 | WAITING — M137 DEPLOYED; #678 DEPLOYED; UI #679 DEPLOYED; vòng phục hồi UI CODE VERIFIED; UAT/usage WAITING |
+| Main SHA đã reconcile | `6a6bc0bd32a4efc652d2f31e979e1e9ba57bbe37`                                                                  |
+| Bắt đầu               | 2026-10-23                                                                                                  |
+| Đối soát              | 2026-10-24                                                                                                  |
+| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026                                  |
 
 ## Outcome và cổng hoàn thành
 
@@ -30,6 +30,12 @@ Hoàn thiện các luồng lưu khi mạng yếu, điều hướng mobile, dashb
 | G   | Tải việc hiện trường và tạo trang tin cậy    | VERIFIED | PR #677; CI/deploy đúng 6b631f15, public smoke đạt          |
 
 ## Current truth
+
+[PR #679](https://github.com/seeker19110/xboss/pull/679) đã squash merge thành main
+`6a6bc0bd32a4efc652d2f31e979e1e9ba57bbe37`. CI main 40059853915 và deploy 40060604278
+success cùng SHA; public smoke 04:04:41Z ngày 24/10 đạt. 5.173 unit/785 E2E pass,
+0 flaky, 1 unit skip allowlist/51 E2E skip cũ; mutation 52/52 runnable, 0 survivor.
+[Release cuối](../ops/evidence/ui-quality-2026-10/release.json) đối soát checkpoint iteration 5.
 
 [PR #677](https://github.com/seeker19110/xboss/pull/677) đã merge thành main `6b631f15`,
 CI main 40055784430 và deploy 40056412712 success cùng SHA ngày 24/10; public smoke
@@ -131,6 +137,20 @@ identity khớp; không suy ra DOM/CWV hay tốc độ trang thật. Toàn goal 
 F2/F3; không xóa capability. Đây là checkpoint trước merge; bằng chứng CI/merge SHA/
 deploy/public smoke cuối nằm ở mục **Kết quả phát hành** trong PR #679.
 Chỉ tính DEPLOYED khi mục đó xác nhận đủ bằng chứng cùng SHA.
+
+## Iteration 6 — 2026-10-24
+
+Owner tiếp tục giao rà production, tự triển khai UI/hiệu năng, ưu tiên chất lượng và đơn giản hóa;
+F2/F3 giữ chờ. Public smoke chỉ đọc trước sửa đạt (login/JS/CSS/axe/health/readiness),
+không dùng phiên hay dữ liệu production. Source cùng main phát hiện loading/error thành empty,
+form còn sửa/đóng khi mutation chờ và response bộ lọc cũ ghi đè lựa chọn mới.
+
+Lát CODE VERIFIED local: chi tiết tầng tải chính độc lập suppliers/giữ draft+tài liệu retry;
+thông báo có retry/mark-all guard; nhãn lỗi GET không khóa cache; album/ảnh và nhật ký giữ
+pending/error; báo cáo giữ đúng system/range/days, forecast độc lập không fetch lặp.
+Giữ API/payload/quyền/precondition nhật ký/offline/export, không schema/dependency/telemetry mới.
+RED baseline và benchmark synthetic cùng fixture có trước sửa; [verification](../ops/evidence/ui-recovery-2026-10/verification.md)
+ghi GREEN 85/85 mới + 121/121 hồi quy (mỗi lượt gồm setup), gate18/18, build và full unit5.165pass/0fail/1skip allowlist. Benchmark/request-count cùng fixture và hình thức đã kiểm. PR #680 bắt lỗi trùng lỗi inline/toast offline trong CI đầu; sửa251ec883 giữ một thông báo trong form, không đổi oracle cũ. Build/lint/format và33/33 offline/nhật ký sau sửa đạt,360px10/10 đạt. Kết quả CI/phát hành cuối theo PR của lát này; không coi technical fixes là UAT/usage.
 
 ## Final audit
 

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   Plus,
   Trash2,
@@ -67,8 +67,9 @@ export default function DiaryEditorModal({
   role: string;
   crewSuggestions: string[];
   onClose: () => void;
-  onChanged: () => void;
+  onChanged: () => void | Promise<void>;
 }) {
+  const fieldId = useId();
   const [loading, setLoading] = useState(true);
   const [diary, setDiary] = useState<Diary>(null);
   const [prefill, setPrefill] = useState<Prefill>({ workDone: "", updatedBy: [], photos: [] });
@@ -80,6 +81,10 @@ export default function DiaryEditorModal({
   const [manpower, setManpower] = useState<ManpowerRow[]>([]);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
+  const pending = useRef(false);
+  const mounted = useRef(false);
+  const [pendingAction, setPendingAction] = useState<"save" | "lock" | "unlock" | null>(null);
+  const [mutationError, setMutationError] = useState("");
   const [hasOfflineDraft, setHasOfflineDraft] = useState(false);
   // Id các bản nháp offline form ĐÃ nạp — lưu online thành công chỉ bỏ đúng những bản này.
   const [nhapDaNap, setNhapDaNap] = useState<string[]>([]);
@@ -97,6 +102,39 @@ export default function DiaryEditorModal({
   const canLock = role === "admin" || role === "pm";
   const canUnlock = role === "admin";
   const isLocked = diary?.status === "locked";
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  function close() {
+    if (!pending.current) onClose();
+  }
+
+  function begin(action: "save" | "lock" | "unlock") {
+    if (pending.current || !mounted.current) return false;
+    pending.current = true;
+    setSaving(true);
+    setPendingAction(action);
+    setMutationError("");
+    return true;
+  }
+
+  function finish() {
+    pending.current = false;
+    if (mounted.current) {
+      setSaving(false);
+      setPendingAction(null);
+    }
+  }
+
+  function reportError(message: string) {
+    if (!mounted.current) return;
+    setMutationError(message);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -190,8 +228,8 @@ export default function DiaryEditorModal({
   // `etagGhiDe`: lưu đè lên bản server vừa tải về để so sánh (sau 412) — gửi If-Match bằng etag
   // MỚI đó, nên vẫn chặn nếu trong lúc so sánh lại có người khác lưu nữa.
   const save = async (etagGhiDe?: string | null) => {
+    if (!begin("save")) return;
     const etagGui = etagGhiDe !== undefined ? etagGhiDe : etag;
-    setSaving(true);
     // Body PUT = toàn bộ trạng thái form (full-replace); dùng chung cho gửi online lẫn xếp offline.
     const body = {
       weatherAm: weatherAm || null,
@@ -213,41 +251,49 @@ export default function DiaryEditorModal({
       // Precondition lấy từ etag form đang dựa vào, CỐ ĐỊNH theo thao tác (S06/S07).
       const queued = await enqueueDiaryNote({ date, ...body }, etagGui);
       if (!queued.ok) {
-        showToast(queued.error, "error");
-        setSaving(false);
+        reportError(queued.error);
         return;
       }
+      if (!mounted.current) return;
       showToast("Đã lưu trên thiết bị (chưa lên máy chủ) — sẽ tự gửi khi có mạng");
-      setSaving(false);
       onClose();
     };
-    if (!navigator.onLine) {
-      await queueOffline();
-      return;
-    }
     try {
-      const r = await fetch(`/api/diaries/${date}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(etagGui ? { "If-Match": etagGui } : { "If-None-Match": "*" }),
-        },
-        body: JSON.stringify(body),
-      });
+      if (!navigator.onLine) {
+        await queueOffline();
+        return;
+      }
+      let r: Response;
+      try {
+        r = await fetch(`/api/diaries/${date}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...(etagGui ? { "If-Match": etagGui } : { "If-None-Match": "*" }),
+          },
+          body: JSON.stringify(body),
+        });
+      } catch {
+        // Chỉ request mất kết nối mới xếp offline; lỗi dọn nháp/refresh sau success không ghi lại.
+        await queueOffline();
+        return;
+      }
       const j = await r.json().catch(() => ({}));
       if (r.ok) {
-        setEtag(typeof j.etag === "string" ? j.etag : null);
         // Đã lưu trực tiếp thành công → xoá nháp offline cũ của ngày này (nếu có) để nó
         // không tự flush sau đó và đè (full-replace) lên bản vừa lưu, gây mất dữ liệu.
         await discardDiaryDraft(date, nhapDaNap);
+        if (!mounted.current) return;
+        setEtag(typeof j.etag === "string" ? j.etag : null);
         setNhapDaNap([]);
         setHasOfflineDraft(false);
         setXungDot(false);
         setBanServer(null);
         showToast("Đã lưu nhật ký");
         setDiary(j.diary ?? diary);
-        onChanged();
+        await onChanged();
       } else if (r.status === 412) {
+        if (!mounted.current) return;
         // Bản server đã đổi (người khác vừa lưu): KHÔNG nạp đè form, KHÔNG tự ghi đè — hiện khung
         // xung đột để người dùng tải bản mới so sánh rồi tự quyết ghi đè (S06).
         setXungDot(true);
@@ -255,12 +301,12 @@ export default function DiaryEditorModal({
       } else {
         // Lỗi nghiệp vụ thật (409 khoá sổ, 422 hợp lệ…) — giữ nguyên dữ liệu trên form, KHÔNG xếp
         // offline, KHÔNG tự đè.
-        showToast(j.error ?? "Lỗi lưu nhật ký", "error");
+        reportError(typeof j.error === "string" ? j.error : "Lỗi lưu nhật ký");
       }
-      setSaving(false);
     } catch {
-      // Mất mạng giữa chừng → fallback xếp hàng đợi offline.
-      await queueOffline();
+      reportError("Chưa hoàn tất lưu nhật ký — vui lòng thử lại");
+    } finally {
+      finish();
     }
   };
 
@@ -299,40 +345,42 @@ export default function DiaryEditorModal({
     await save(banServer.etag);
   };
 
-  const lock = async () => {
-    if (!(await appConfirm("Khoá sổ nhật ký ngày này? Sau khi khoá sẽ KHÔNG sửa được nữa.")))
-      return;
-    const r = await fetch(`/api/diaries/${date}/lock`, { method: "POST" });
-    const j = await r.json().catch(() => ({}));
-    if (r.ok) {
-      showToast("Đã khoá sổ");
-      setDiary((d) => (d ? { ...d, status: "locked" } : d));
-      onChanged();
-    } else {
-      showToast(j.error ?? "Lỗi khoá sổ", "error");
-    }
-  };
-
-  const unlock = async () => {
-    if (!(await appConfirm("Mở khoá nhật ký ngày này để sửa lại?"))) return;
-    const r = await fetch(`/api/diaries/${date}/lock`, { method: "DELETE" });
-    const j = await r.json().catch(() => ({}));
-    if (r.ok) {
-      showToast("Đã mở khoá");
-      setDiary((d) => (d ? { ...d, status: "draft" } : d));
-      // Mở khoá đổi phiên bản trên server — lấy lại etag để lần lưu kế tiếp không bị 412 oan.
-      const moi = await fetch(`/api/diaries/${date}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .catch(() => null);
-      if (moi) setEtag(typeof moi.etag === "string" ? moi.etag : null);
-      onChanged();
-    } else {
-      showToast(j.error ?? "Lỗi mở khoá", "error");
+  const changeLock = async (unlock = false) => {
+    if (!begin(unlock ? "unlock" : "lock")) return;
+    try {
+      const ok = await appConfirm(
+        unlock
+          ? "Mở khoá nhật ký ngày này để sửa lại?"
+          : "Khoá sổ nhật ký ngày này? Sau khi khoá sẽ KHÔNG sửa được nữa.",
+      );
+      if (!ok || !mounted.current) return;
+      const r = await fetch(`/api/diaries/${date}/lock`, { method: unlock ? "DELETE" : "POST" });
+      const j = await r.json().catch(() => ({}));
+      if (!mounted.current) return;
+      if (!r.ok) {
+        reportError(typeof j.error === "string" ? j.error : unlock ? "Lỗi mở khoá" : "Lỗi khoá sổ");
+        return;
+      }
+      if (unlock) {
+        // Mở khoá đổi phiên bản: nạp lại etag như luồng hiện hành trước khi cho lưu tiếp.
+        const moi = await fetch(`/api/diaries/${date}`)
+          .then((res) => (res.ok ? res.json() : null))
+          .catch(() => null);
+        if (!mounted.current) return;
+        if (moi) setEtag(typeof moi.etag === "string" ? moi.etag : null);
+      }
+      showToast(unlock ? "Đã mở khoá" : "Đã khoá sổ");
+      setDiary((d) => (d ? { ...d, status: unlock ? "draft" : "locked" } : d));
+      await onChanged();
+    } catch {
+      reportError("Mất kết nối — kiểm tra mạng rồi thử lại");
+    } finally {
+      finish();
     }
   };
 
   return (
-    <Modal onClose={onClose} className="max-w-2xl">
+    <Modal onClose={close} className="max-w-2xl">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-bold text-lg">Nhật ký ngày {formatDateDMY(date)}</h3>
         <div className="flex items-center gap-2">
@@ -346,7 +394,12 @@ export default function DiaryEditorModal({
               <Download className="w-4 h-4" /> Xuất PDF
             </a>
           )}
-          <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-zinc-100">
+          <button
+            onClick={close}
+            disabled={saving}
+            aria-label="Đóng"
+            className="min-w-11 min-h-11 inline-flex items-center justify-center text-zinc-400 hover:text-zinc-100"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -355,7 +408,24 @@ export default function DiaryEditorModal({
       {loading ? (
         <p className="text-sm text-zinc-400 py-8 text-center">Đang tải…</p>
       ) : (
-        <div className="space-y-4">
+        <fieldset disabled={saving} aria-busy={saving} className="min-w-0 space-y-4">
+          {mutationError && (
+            <p
+              role="alert"
+              className="rounded-lg border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-200"
+            >
+              {mutationError}
+            </p>
+          )}
+          {saving && (
+            <p role="status" className="text-sm text-zinc-400">
+              {pendingAction === "save"
+                ? "Đang lưu nhật ký…"
+                : pendingAction === "unlock"
+                  ? "Đang mở khoá…"
+                  : "Đang khoá sổ…"}
+            </p>
+          )}
           {loadError && (
             <div className="bg-red-950 border border-red-800 rounded-lg px-3 py-2 text-sm text-red-200 flex items-center gap-2">
               <WifiOff className="w-4 h-4 shrink-0" />
@@ -441,12 +511,14 @@ export default function DiaryEditorModal({
           <div className="grid grid-cols-2 gap-3">
             {(
               [
-                ["Thời tiết sáng", weatherAm, setWeatherAm],
-                ["Thời tiết chiều", weatherPm, setWeatherPm],
+                ["weatherAm", "Thời tiết sáng", weatherAm, setWeatherAm],
+                ["weatherPm", "Thời tiết chiều", weatherPm, setWeatherPm],
               ] as const
-            ).map(([label, value, setter]) => (
-              <div key={label}>
-                <label className="text-xs text-zinc-400 mb-1 block">{label}</label>
+            ).map(([name, label, value, setter]) => (
+              <div key={name}>
+                <label htmlFor={`${fieldId}-${name}`} className="text-xs text-zinc-400 mb-1 block">
+                  {label}
+                </label>
                 <div className="flex gap-1.5 mb-1.5 flex-wrap">
                   {WEATHER_CHIPS.map((c) => (
                     <button
@@ -465,10 +537,11 @@ export default function DiaryEditorModal({
                   ))}
                 </div>
                 <input
+                  id={`${fieldId}-${name}`}
                   value={value}
                   disabled={isLocked}
                   onChange={(e) => setter(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+                  className="w-full min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
                 />
               </div>
             ))}
@@ -476,7 +549,9 @@ export default function DiaryEditorModal({
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs text-zinc-400 block">Công việc thực hiện</label>
+              <label htmlFor={`${fieldId}-workDone`} className="text-xs text-zinc-400 block">
+                Công việc thực hiện
+              </label>
               {!isLocked && (
                 <button
                   type="button"
@@ -488,11 +563,12 @@ export default function DiaryEditorModal({
               )}
             </div>
             <textarea
+              id={`${fieldId}-workDone`}
               value={workDone}
               disabled={isLocked}
               onChange={(e) => setWorkDone(e.target.value)}
               rows={4}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+              className="w-full min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
             />
             {prefill.updatedBy.length > 0 && (
               <p className="text-xs text-zinc-400 mt-1">
@@ -514,7 +590,7 @@ export default function DiaryEditorModal({
                 </button>
               )}
             </div>
-            <datalist id="crew-suggestions">
+            <datalist id={`${fieldId}-crew-suggestions`}>
               {crewSuggestions.map((c) => (
                 <option key={c} value={c} />
               ))}
@@ -522,28 +598,40 @@ export default function DiaryEditorModal({
             <div className="space-y-2">
               {manpower.map((row, i) => (
                 <div key={i} className="flex gap-2 items-center">
+                  <label htmlFor={`${fieldId}-crew-${i}`} className="sr-only">
+                    Tổ đội dòng {i + 1}
+                  </label>
                   <input
+                    id={`${fieldId}-crew-${i}`}
                     value={row.crew}
                     disabled={isLocked}
                     onChange={(e) => updateRow(i, { crew: e.target.value })}
-                    list="crew-suggestions"
+                    list={`${fieldId}-crew-suggestions`}
                     placeholder="Tổ đội"
-                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+                    className="min-w-0 flex-1 min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
                   />
+                  <label htmlFor={`${fieldId}-headcount-${i}`} className="sr-only">
+                    Số người dòng {i + 1}
+                  </label>
                   <input
+                    id={`${fieldId}-headcount-${i}`}
                     value={row.headcount}
                     disabled={isLocked}
                     onChange={(e) => updateRow(i, { headcount: e.target.value.replace(/\D/g, "") })}
                     inputMode="numeric"
                     placeholder="Số người"
-                    className="w-24 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+                    className="w-24 min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
                   />
+                  <label htmlFor={`${fieldId}-manpower-note-${i}`} className="sr-only">
+                    Ghi chú nhân lực dòng {i + 1}
+                  </label>
                   <input
+                    id={`${fieldId}-manpower-note-${i}`}
                     value={row.note}
                     disabled={isLocked}
                     onChange={(e) => updateRow(i, { note: e.target.value })}
                     placeholder="Ghi chú"
-                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+                    className="min-w-0 flex-1 min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
                   />
                   {!isLocked && (
                     <button
@@ -564,9 +652,9 @@ export default function DiaryEditorModal({
           </div>
 
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">
+            <p className="text-xs text-zinc-400 mb-1 block">
               Ảnh hiện trường trong ngày ({prefill.photos.length})
-            </label>
+            </p>
             {prefill.photos.length === 0 ? (
               <EmptyState message="Không có ảnh nào chụp trong ngày" compact />
             ) : (
@@ -604,24 +692,30 @@ export default function DiaryEditorModal({
           </div>
 
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Vướng mắc / chỉ đạo</label>
+            <label htmlFor={`${fieldId}-obstacles`} className="text-xs text-zinc-400 mb-1 block">
+              Vướng mắc / chỉ đạo
+            </label>
             <textarea
+              id={`${fieldId}-obstacles`}
               value={obstacles}
               disabled={isLocked}
               onChange={(e) => setObstacles(e.target.value)}
               rows={2}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+              className="w-full min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
             />
           </div>
 
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">An toàn lao động</label>
+            <label htmlFor={`${fieldId}-safetyNote`} className="text-xs text-zinc-400 mb-1 block">
+              An toàn lao động
+            </label>
             <textarea
+              id={`${fieldId}-safetyNote`}
               value={safetyNote}
               disabled={isLocked}
               onChange={(e) => setSafetyNote(e.target.value)}
               rows={2}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+              className="w-full min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
             />
           </div>
 
@@ -632,12 +726,12 @@ export default function DiaryEditorModal({
                 disabled={saving}
                 className="flex-1 min-w-[120px] bg-sky-700 hover:bg-sky-800 disabled:opacity-50 py-2.5 rounded-lg text-sm font-medium text-on-accent"
               >
-                {saving ? "Đang lưu…" : "Lưu nháp"}
+                {saving && pendingAction === "save" ? "Đang lưu…" : "Lưu nháp"}
               </button>
             )}
             {!isLocked && canLock && diary?.id && (
               <button
-                onClick={lock}
+                onClick={() => void changeLock()}
                 className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-emerald-700 hover:bg-emerald-800 text-on-accent"
               >
                 <Lock className="w-4 h-4" /> Khoá sổ
@@ -645,14 +739,14 @@ export default function DiaryEditorModal({
             )}
             {isLocked && canUnlock && (
               <button
-                onClick={unlock}
+                onClick={() => void changeLock(true)}
                 className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-amber-800 hover:bg-amber-700 text-on-accent"
               >
                 <Unlock className="w-4 h-4" /> Mở khoá
               </button>
             )}
           </div>
-        </div>
+        </fieldset>
       )}
     </Modal>
   );
