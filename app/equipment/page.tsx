@@ -495,7 +495,7 @@ function EquipmentDetailModal({
   const [logsError, setLogsError] = useState("");
   const [writeError, setWriteError] = useState("");
   const [notice, setNotice] = useState("");
-  const [action, setAction] = useState<EquipmentLogAction>("issue");
+  const [action, setAction] = useState<EquipmentLogAction>(canManage ? "issue" : "return");
   const [toLocation, setToLocation] = useState("");
   const [toCrew, setToCrew] = useState("");
   const [note, setNote] = useState("");
