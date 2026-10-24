@@ -168,7 +168,7 @@ function useList<T>(url: string, key: string, message: string, enabled = true) {
 
 function LoadNotice({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div role="alert" className="rounded-xl border border-red-900/50 bg-red-950/20 p-3 space-y-2">
+    <div role="alert" className="rounded-xl border border-red-900/50 bg-zinc-900 p-3 space-y-2">
       <p className="text-sm text-red-400">{message}</p>
       <Button onClick={onRetry} className="min-h-11" icon={RefreshCw}>
         Thử lại

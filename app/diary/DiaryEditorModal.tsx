@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   Plus,
   Trash2,
@@ -69,6 +69,7 @@ export default function DiaryEditorModal({
   onClose: () => void;
   onChanged: () => void | Promise<void>;
 }) {
+  const fieldId = useId();
   const [loading, setLoading] = useState(true);
   const [diary, setDiary] = useState<Diary>(null);
   const [prefill, setPrefill] = useState<Prefill>({ workDone: "", updatedBy: [], photos: [] });
@@ -511,12 +512,14 @@ export default function DiaryEditorModal({
           <div className="grid grid-cols-2 gap-3">
             {(
               [
-                ["Thời tiết sáng", weatherAm, setWeatherAm],
-                ["Thời tiết chiều", weatherPm, setWeatherPm],
+                ["weatherAm", "Thời tiết sáng", weatherAm, setWeatherAm],
+                ["weatherPm", "Thời tiết chiều", weatherPm, setWeatherPm],
               ] as const
-            ).map(([label, value, setter]) => (
-              <div key={label}>
-                <label className="text-xs text-zinc-400 mb-1 block">{label}</label>
+            ).map(([name, label, value, setter]) => (
+              <div key={name}>
+                <label htmlFor={`${fieldId}-${name}`} className="text-xs text-zinc-400 mb-1 block">
+                  {label}
+                </label>
                 <div className="flex gap-1.5 mb-1.5 flex-wrap">
                   {WEATHER_CHIPS.map((c) => (
                     <button
@@ -535,10 +538,11 @@ export default function DiaryEditorModal({
                   ))}
                 </div>
                 <input
+                  id={`${fieldId}-${name}`}
                   value={value}
                   disabled={isLocked}
                   onChange={(e) => setter(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+                  className="w-full min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
                 />
               </div>
             ))}
@@ -546,7 +550,9 @@ export default function DiaryEditorModal({
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs text-zinc-400 block">Công việc thực hiện</label>
+              <label htmlFor={`${fieldId}-workDone`} className="text-xs text-zinc-400 block">
+                Công việc thực hiện
+              </label>
               {!isLocked && (
                 <button
                   type="button"
@@ -558,11 +564,12 @@ export default function DiaryEditorModal({
               )}
             </div>
             <textarea
+              id={`${fieldId}-workDone`}
               value={workDone}
               disabled={isLocked}
               onChange={(e) => setWorkDone(e.target.value)}
               rows={4}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+              className="w-full min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
             />
             {prefill.updatedBy.length > 0 && (
               <p className="text-xs text-zinc-400 mt-1">
@@ -584,7 +591,7 @@ export default function DiaryEditorModal({
                 </button>
               )}
             </div>
-            <datalist id="crew-suggestions">
+            <datalist id={`${fieldId}-crew-suggestions`}>
               {crewSuggestions.map((c) => (
                 <option key={c} value={c} />
               ))}
@@ -592,28 +599,40 @@ export default function DiaryEditorModal({
             <div className="space-y-2">
               {manpower.map((row, i) => (
                 <div key={i} className="flex gap-2 items-center">
+                  <label htmlFor={`${fieldId}-crew-${i}`} className="sr-only">
+                    Tổ đội dòng {i + 1}
+                  </label>
                   <input
+                    id={`${fieldId}-crew-${i}`}
                     value={row.crew}
                     disabled={isLocked}
                     onChange={(e) => updateRow(i, { crew: e.target.value })}
-                    list="crew-suggestions"
+                    list={`${fieldId}-crew-suggestions`}
                     placeholder="Tổ đội"
-                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+                    className="min-w-0 flex-1 min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
                   />
+                  <label htmlFor={`${fieldId}-headcount-${i}`} className="sr-only">
+                    Số người dòng {i + 1}
+                  </label>
                   <input
+                    id={`${fieldId}-headcount-${i}`}
                     value={row.headcount}
                     disabled={isLocked}
                     onChange={(e) => updateRow(i, { headcount: e.target.value.replace(/\D/g, "") })}
                     inputMode="numeric"
                     placeholder="Số người"
-                    className="w-24 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+                    className="w-24 min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
                   />
+                  <label htmlFor={`${fieldId}-manpower-note-${i}`} className="sr-only">
+                    Ghi chú nhân lực dòng {i + 1}
+                  </label>
                   <input
+                    id={`${fieldId}-manpower-note-${i}`}
                     value={row.note}
                     disabled={isLocked}
                     onChange={(e) => updateRow(i, { note: e.target.value })}
                     placeholder="Ghi chú"
-                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+                    className="min-w-0 flex-1 min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
                   />
                   {!isLocked && (
                     <button
@@ -634,9 +653,9 @@ export default function DiaryEditorModal({
           </div>
 
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">
+            <p className="text-xs text-zinc-400 mb-1 block">
               Ảnh hiện trường trong ngày ({prefill.photos.length})
-            </label>
+            </p>
             {prefill.photos.length === 0 ? (
               <EmptyState message="Không có ảnh nào chụp trong ngày" compact />
             ) : (
@@ -674,24 +693,30 @@ export default function DiaryEditorModal({
           </div>
 
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Vướng mắc / chỉ đạo</label>
+            <label htmlFor={`${fieldId}-obstacles`} className="text-xs text-zinc-400 mb-1 block">
+              Vướng mắc / chỉ đạo
+            </label>
             <textarea
+              id={`${fieldId}-obstacles`}
               value={obstacles}
               disabled={isLocked}
               onChange={(e) => setObstacles(e.target.value)}
               rows={2}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+              className="w-full min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
             />
           </div>
 
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">An toàn lao động</label>
+            <label htmlFor={`${fieldId}-safetyNote`} className="text-xs text-zinc-400 mb-1 block">
+              An toàn lao động
+            </label>
             <textarea
+              id={`${fieldId}-safetyNote`}
               value={safetyNote}
               disabled={isLocked}
               onChange={(e) => setSafetyNote(e.target.value)}
               rows={2}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60"
+              className="w-full min-h-11 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-base outline-none focus:border-sky-500 disabled:opacity-60"
             />
           </div>
 
