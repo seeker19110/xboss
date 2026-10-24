@@ -11,5 +11,18 @@
   "failures": "6 contract executions: exact getByLabel Hệ missed native select despite ARIA snapshot containing options; unfiltered role=alert also matched Next route announcer. Changed to accessible combobox name and alert text filter, preserved all option/payload/count/error oracles.",
   "gateFirst": "17/18; TS event overload union in test helper. Use typed Request callback with separate event registrations. No application failure or environment failure hidden.",
   "sourceReview": "Personnel child modal/cert/write functions byte-identical to baseline. AddContractModal/ContractDocument unchanged; taiDanhSach/refresh/CAN/money expressions unchanged. Small added correction: empty only after valid matching snapshot; copy reflects active filter/viewer.",
-  "limits": "No assertion/threshold/timeout weakening, no skip. Final GREEN/build/gate still pending."
+  "limits": "No assertion/threshold/timeout weakening, no skip; final rebuild/GREEN/gate required.",
+  "secondGreen": {
+    "stats": {
+      "startTime": "2026-10-24T08:25:25.767Z",
+      "duration": 35308.536,
+      "expected": 33,
+      "skipped": 0,
+      "unexpected": 2,
+      "flaky": 0
+    },
+    "rawSha256": "6203d3313f8cab1d25f6241f2517b9fbd2566a0f08962488cac2cf238c6f17ce",
+    "sourceFailure": "Two executions: after retry, swapping loading Modal to AddContractModal captured detached retry button instead of original trigger. Parent restores the captured create trigger after modal cleanup; guard inert/connected prevents stealing focus. Assertions unchanged.",
+    "sourceRepairAttempt": 1
+  }
 }

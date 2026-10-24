@@ -70,6 +70,16 @@ function ContractsInner() {
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState<Set<ContractKind>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
+  const createTrigger = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (addOpen || !createTrigger.current) return;
+    const trigger = createTrigger.current;
+    // Sau cleanup của modal tải/form, trả focus về nút mở ban đầu (kể cả sau retry).
+    queueMicrotask(() => {
+      if (trigger.isConnected && !trigger.closest("[inert]"))
+        trigger.focus({ preventScroll: true });
+    });
+  }, [addOpen]);
   const [showDeleted, setShowDeleted] = useState(false);
   const [restoringId, setRestoringId] = useState<number | null>(null);
 
@@ -308,7 +318,10 @@ function ContractsInner() {
               variant="primary"
               className="ml-auto"
               aria-label="Thêm hợp đồng"
-              onClick={() => setAddOpen(true)}
+              onClick={(event) => {
+                createTrigger.current = event.currentTarget;
+                setAddOpen(true);
+              }}
             >
               Thêm hợp đồng
             </Button>
