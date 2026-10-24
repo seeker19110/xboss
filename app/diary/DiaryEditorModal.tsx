@@ -134,7 +134,6 @@ export default function DiaryEditorModal({
   function reportError(message: string) {
     if (!mounted.current) return;
     setMutationError(message);
-    showToast(message, "error");
   }
 
   useEffect(() => {
