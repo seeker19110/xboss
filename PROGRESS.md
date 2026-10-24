@@ -2,7 +2,7 @@
 
 ## Đang làm
 
-- **UI tải đúng nhu cầu — VERIFY** từ main `e52b4937`: Nhân sự tải primary độc lập danh mục, giữ snapshot khi lỗi và bỏ response filter cũ; bộ lọc/chi tiết keyboard và mobile rõ hơn. Hợp đồng chỉ tải hai nguồn option khi mở form, cache trong trang và retry nguồn lỗi. RED baseline đã tái hiện, đang kiểm GREEN/build/gate/unit; [scope](docs/ops/evidence/ui-request-2026-10/scope.md). UAT/usage WAITING.
+- **UI tải đúng nhu cầu — VERIFY** từ main `e52b4937`: Nhân sự tải primary độc lập danh mục, giữ snapshot khi lỗi và bỏ response filter cũ; bộ lọc/chi tiết keyboard và mobile rõ hơn. Hợp đồng chỉ tải hai nguồn option khi mở form, cache trong trang và retry nguồn lỗi. RED baseline đã tái hiện; build/gate18/18, unit5.165pass/0fail/1skip health, GREEN37/37 và hồi quy16/16 khôngfail/flaky/skip mới; đang chờ PR CI/merge/deploy; [scope](docs/ops/evidence/ui-request-2026-10/scope.md). UAT/usage WAITING.
 
 - **Giữ ngữ cảnh #682 — DEPLOYED**: main `e52b4937c8e46936adba15bf4ed7d62d11d7add3`; PR CI40069017902/mainCI40069723355 success, unit5.173pass/0fail/1skip health, E2E957pass/0fail/0flaky/51skip cũ, mutation52/52/0survivor, ERD258 bảng. Deploy40070456619 success cùng SHA lúc13:34:19 UTC+7 ngày24/10; public smoke06:34:37Z desktop/393/360px chỉ đọc đạt. [Kết quả cuối](https://github.com/seeker19110/xboss/pull/682); [checkpoint trước CI](docs/ops/evidence/ui-context-2026-10/verification.md). Giữ UAT/usage WAITING.
 

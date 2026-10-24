@@ -11,7 +11,7 @@
   "failures": "6 contract executions: exact getByLabel Hệ missed native select despite ARIA snapshot containing options; unfiltered role=alert also matched Next route announcer. Changed to accessible combobox name and alert text filter, preserved all option/payload/count/error oracles.",
   "gateFirst": "17/18; TS event overload union in test helper. Use typed Request callback with separate event registrations. No application failure or environment failure hidden.",
   "sourceReview": "Personnel child modal/cert/write functions byte-identical to baseline. AddContractModal/ContractDocument unchanged; taiDanhSach/refresh/CAN/money expressions unchanged. Small added correction: empty only after valid matching snapshot; copy reflects active filter/viewer.",
-  "limits": "No assertion/threshold/timeout weakening, no skip; final rebuild/GREEN/gate required.",
+  "limits": "All final source checks PASS locally; exact HEAD CI/deploy still pending. No gate/assertion/timeout/skip weakening.",
   "secondGreen": {
     "stats": {
       "startTime": "2026-10-24T08:25:25.767Z",
@@ -57,5 +57,23 @@
     "rawSha256": "516c1078313d4777afbefb477f2e5c61b0917d03602defacda2383921092e7a7",
     "issue": "Visual inspection caught whitespace-nowrap inherited through shared Button Inner span. Text rect exceeded button rect. Keep shared Button, give text child explicit normal wrapping/max width; assertion and keyboard open remain.",
     "sourceRepairAttempt": 1
+  },
+  "finalGreen": {
+    "green": {
+      "startTime": "2026-10-24T08:30:27.701Z",
+      "duration": 19263.4,
+      "expected": 37,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "regression": {
+      "startTime": "2026-10-24T08:30:47.543Z",
+      "duration": 11722.878999999999,
+      "expected": 16,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
   }
 }

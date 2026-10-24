@@ -1,0 +1,94 @@
+{
+  "checkedAt": "2026-10-24T08:33:05.410Z",
+  "build": "f3CrbGyCOuvYItJ6CnbTp",
+  "source": "6a636c75b6188b5bf237fd4359e252618f3d5227",
+  "synthetic": true,
+  "readOnlyOutsideMockedRoutes": true,
+  "scenes": [
+    {
+      "profile": "desktop",
+      "theme": "light",
+      "file": "screenshots/personnel-desktop-light-stable.png",
+      "widths": {
+        "body": 1280,
+        "viewport": 1280,
+        "padding": "256px",
+        "main": {
+          "x": 256,
+          "y": 49,
+          "width": 1024,
+          "height": 259,
+          "top": 49,
+          "right": 1280,
+          "bottom": 308,
+          "left": 256
+        },
+        "bodyRect": {
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 823,
+          "top": 0,
+          "right": 1280,
+          "bottom": 823,
+          "left": 0
+        },
+        "scrollX": 0,
+        "scrollY": 0
+      },
+      "pageErrors": [],
+      "sha256": "321501f2a1e7848e5f6a476cf7175ffc457c0bc0fac6b12282a06c2b35aa81b9"
+    },
+    {
+      "profile": "mobile",
+      "theme": "darkblue",
+      "file": "screenshots/personnel-mobile-darkblue-stable.png",
+      "widths": {
+        "body": 360,
+        "viewport": 360,
+        "padding": "0px",
+        "main": {
+          "x": 0,
+          "y": 97,
+          "width": 360,
+          "height": 437,
+          "top": 97,
+          "right": 360,
+          "bottom": 534,
+          "left": 0
+        },
+        "bodyRect": {
+          "x": 0,
+          "y": 0,
+          "width": 360,
+          "height": 899,
+          "top": 0,
+          "right": 360,
+          "bottom": 899,
+          "left": 0
+        },
+        "scrollX": 0,
+        "scrollY": 0
+      },
+      "pageErrors": [],
+      "sha256": "0b67a97d41518f96611a7e8d96f898dc02d08fb84594a3a72c884b901c427e98"
+    },
+    {
+      "theme": "light",
+      "profile": "mobile360",
+      "file": "screenshots/contracts-option-error-light.png",
+      "source": "6a636c75b6188b5bf237fd4359e252618f3d5227",
+      "provenance": "Final Playwright option-error axe test; body width360, serious/critical0",
+      "sha256": "2824be3d82ee371ac89deb36c89c43c3aaa13b2a06cf166aad837853895f7e72"
+    },
+    {
+      "theme": "darkblue",
+      "profile": "mobile360",
+      "file": "screenshots/contracts-option-error-darkblue.png",
+      "source": "6a636c75b6188b5bf237fd4359e252618f3d5227",
+      "provenance": "Final Playwright option-error axe test; body width360, serious/critical0",
+      "sha256": "071cfe3670defdb4c5d26d01a5d9c1829a04be1aaeff5b62706d2de5bee51396"
+    }
+  ],
+  "captureNote": "Viewport screenshots after final sidebar padding; finite animation fast-forward applies only to screenshot capture, all axe/behavior tests use default motion."
+}
