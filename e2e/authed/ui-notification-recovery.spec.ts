@@ -195,6 +195,8 @@ test("chuông: đọc tất cả chặn gửi lặp, báo abort/403/500 và ch�
     expect(posts).toBe(4);
     expect(gets).toBe(2);
     expect(errors).toEqual([]);
+    // Feed đã đọc có màu chữ riêng; vẫn kiểm cả timestamp và nội dung ở hai theme.
+    await axeThemes(page, panel);
   } finally {
     held.release();
   }
