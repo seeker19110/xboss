@@ -126,10 +126,12 @@ test("GET bị ngắt có retry; chỉ response thành công rỗng mới hiện
   expect(errors).toEqual([]);
 });
 
-for (const failure of ["http", "network"] as const) {
-  test(`tài khoản lỗi ${failure} lần đầu được fetch lại khi retry tải mặt bằng`, async ({
-    page,
-  }) => {
+for (const failure of ["http", "network", "both-network"] as const) {
+  const title =
+    failure === "both-network"
+      ? "tài khoản và ma trận cùng mất mạng: một lần retry phục hồi cả hai"
+      : `tài khoản lỗi ${failure} lần đầu được fetch lại khi retry tải mặt bằng`;
+  test(title, async ({ page }) => {
     let authGets = 0;
     let matrixGets = 0;
     const errors: string[] = [];
@@ -137,7 +139,7 @@ for (const failure of ["http", "network"] as const) {
     await page.route("**/api/auth/me", async (route) => {
       authGets++;
       if (authGets === 1) {
-        if (failure === "network") return route.abort("failed");
+        if (failure !== "http") return route.abort("failed");
         return route.fulfill({ status: 500, json: { error: "Tạm lỗi thông tin tài khoản" } });
       }
       // Giữ user/binding thật của phiên test; chỉ lỗi đọc đầu tiên được giả lập.
@@ -147,13 +149,15 @@ for (const failure of ["http", "network"] as const) {
     });
     await page.route(MATRIX_URL, async (route) => {
       matrixGets++;
+      if (failure === "both-network" && matrixGets === 1) return route.abort("failed");
       await route.fulfill({ json: matrix() });
     });
     await page.goto("/work-fronts");
     const main = page.getByRole("main");
     await expect(main.getByRole("alert")).toContainText("Không tải được mặt bằng thi công");
     await expect(region(page)).toHaveCount(0);
-    expect(authGets).toBe(1);
+    await expect.poll(() => authGets).toBe(1);
+    expect(matrixGets).toBe(1);
     await main.getByRole("button", { name: "Thử lại", exact: true }).click();
     await expect(region(page).getByRole("columnheader", { name: STAGE_NAME })).toBeVisible();
     await expect(main.getByRole("alert")).toHaveCount(0);
@@ -487,6 +491,9 @@ test("form thêm và lỗi tại chỗ không có vi phạm axe nghiêm trọng 
         );
         await expect(title).toHaveValue("Công tác kiểm chứng axe");
         await expect(days).toHaveValue("3");
+        const submit = dialog.getByRole("button", { name: "Thêm công tác", exact: true });
+        await expect(submit).toBeEnabled();
+        await expect(submit).toHaveCSS("opacity", "1");
       }
       const result = await new AxeBuilder({ page })
         .include('[role="dialog"]')

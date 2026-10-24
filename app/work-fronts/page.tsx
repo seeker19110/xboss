@@ -278,8 +278,10 @@ export default function WorkFrontsPage() {
         fronts: body.fronts,
       });
     } catch {
-      if (mounted.current && request.current.id === id && !controller.signal.aborted)
+      if (mounted.current && request.current.id === id && !controller.signal.aborted) {
+        invalidateMe();
         setError(LOAD_ERROR);
+      }
     } finally {
       if (mounted.current && request.current.id === id) {
         request.current.controller = null;
