@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { Plus, Download, Pencil } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { TableSkeleton } from "@/app/components/Skeleton";
@@ -9,6 +9,7 @@ import { showToast } from "@/app/components/Toast";
 import { fetchMe, invalidateMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/nen/date";
 import { sortFloorsDesc } from "@/lib/nen/floors";
+import { buildWorkFrontIndex } from "@/lib/hien-truong/work-front-index";
 
 type Stage = { id: number; name: string; sortOrder: number; active: boolean; durationDays: number };
 type Front = {
@@ -233,6 +234,7 @@ export default function WorkFrontsPage() {
   });
   const mounted = useRef(false);
   const { floors = [], stages = [], fronts = [] } = data ?? {};
+  const frontIndex = useMemo(() => buildWorkFrontIndex(fronts), [fronts]);
 
   const canManage = me?.role === "admin" || me?.role === "pm";
   const canExportReport = me?.role === "admin" || me?.role === "pm";
@@ -409,9 +411,7 @@ export default function WorkFrontsPage() {
                           </a>
                         </td>
                         {stages.map((stage) => {
-                          const front = fronts.find(
-                            (f) => f.floorLabel === floor && f.stageId === stage.id,
-                          );
+                          const front = frontIndex.get(floor)?.get(stage.id);
                           return (
                             <td key={stage.id} className="p-2 text-center">
                               <FrontCell front={front} />
