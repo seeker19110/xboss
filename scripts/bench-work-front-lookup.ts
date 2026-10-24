@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { cpus } from "node:os";
 import { performance } from "node:perf_hooks";
-import { buildWorkFrontIndex } from "../lib/hien-truong/work-front-index";
+import { buildWorkFrontIndex } from "@/lib/hien-truong/work-front-index";
 
 const SAMPLE_COUNT = 31;
 const WARMUP_COUNT = 30;

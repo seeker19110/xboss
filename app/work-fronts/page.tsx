@@ -233,8 +233,8 @@ export default function WorkFrontsPage() {
     controller: null,
   });
   const mounted = useRef(false);
-  const { floors = [], stages = [], fronts = [] } = data ?? {};
-  const frontIndex = useMemo(() => buildWorkFrontIndex(fronts), [fronts]);
+  const { floors = [], stages = [] } = data ?? {};
+  const frontIndex = useMemo(() => buildWorkFrontIndex(data?.fronts ?? []), [data?.fronts]);
 
   const canManage = me?.role === "admin" || me?.role === "pm";
   const canExportReport = me?.role === "admin" || me?.role === "pm";
