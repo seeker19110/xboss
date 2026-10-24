@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { LogIn, KeyRound } from "lucide-react";
+import { HardHat, LogIn, KeyRound } from "lucide-react";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import {
   authenticateAfterCacheClear,
@@ -8,12 +8,16 @@ import {
   clearServiceWorkerCache,
 } from "@/app/lib/serviceWorkerCache";
 
-const DEMO = [
-  { role: "Admin", email: "admin@xboss.vn", pw: "admin123" },
-  { role: "PM", email: "pm@xboss.vn", pw: "pm123" },
-  { role: "Engineer", email: "engineer@xboss.vn", pw: "eng123" },
-  { role: "Sub-con", email: "subcon@xboss.vn", pw: "sub123" },
-];
+// Chỉ gợi ý tài khoản mẫu khi chạy development; bản production dùng thông tin người dùng nhập.
+const DEMO =
+  process.env.NODE_ENV === "development"
+    ? [
+        { role: "Admin", email: "admin@xboss.vn", pw: "admin123" },
+        { role: "PM", email: "pm@xboss.vn", pw: "pm123" },
+        { role: "Engineer", email: "engineer@xboss.vn", pw: "eng123" },
+        { role: "Sub-con", email: "subcon@xboss.vn", pw: "sub123" },
+      ]
+    : [];
 
 // Thông điệp tiếng Việt cho các mã lỗi ?error=oidc_* mà callback trả về.
 const OIDC_ERRORS: Record<string, string> = {
@@ -27,8 +31,8 @@ const CACHE_PURGE_ERROR =
   "Chưa xác nhận được việc dọn bộ nhớ đệm của XBoss. Yêu cầu đăng nhập chưa được gửi; hãy thử lại khi service worker sẵn sàng.";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("admin@xboss.vn");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState(DEMO[0]?.email ?? "");
+  const [password, setPassword] = useState(DEMO[0]?.pw ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [projectName, setProjectName] = useState<string | null>(null);
@@ -154,7 +158,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 text-2xl shadow-inner mb-3">
-            🏗️
+            <HardHat className="w-7 h-7" aria-hidden="true" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-100">XBoss Platform</h1>
           <p className="text-xs text-zinc-400 mt-1 font-medium">
@@ -221,6 +225,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 type="email"
+                autoComplete="username"
                 required
                 className="w-full bg-zinc-800/90 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition text-zinc-100"
               />
@@ -237,6 +242,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 type="password"
+                autoComplete="current-password"
                 required
                 className="w-full bg-zinc-800/90 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition text-zinc-100"
               />
@@ -269,7 +275,7 @@ export default function LoginPage() {
             </button>
           </div>
         )}
-        {!pending && (
+        {!pending && process.env.NODE_ENV === "development" && (
           <div className="mt-6 text-xs text-zinc-400">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
               Tài khoản mặc định (bấm để điền nhanh):

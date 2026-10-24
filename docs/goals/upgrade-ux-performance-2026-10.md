@@ -172,7 +172,16 @@ Owner tiếp tục ủy quyền rà production, tự triển khai, kiểm kỹ, 
 
 Owner tiếp tục ủy quyền rà/sửa/kiểm kỹ/merge/deploy ngày24/10; baseline e52b4937 đã phát hành qua#682 (PRCI40069017902/mainCI40069723355/deploy40070456619 success, publicsmoke06:34:37Z đạt). Trạng thái iteration8 đối soát DEPLOYED theo [PR#682](https://github.com/seeker19110/xboss/pull/682); checkpoint cũ giữ provenance tại commit trước CI.
 
-Lát S theo [scope](../ops/evidence/ui-request-2026-10/scope.md): primary Nhân sự không chờ nguồn phụ, guard response/filter, lỗi/retry giữ snapshot; Hợp đồng bỏ2GET option lúc chỉ đọc và tải đúng lúc mở form. Giữ API/quyền/payload/tính tiền/schema/dependency; không sửa form/chứng chỉ/tổ đội, không gỡ capability. RED baseline đã lưu, hiện [PR#683](https://github.com/seeker19110/xboss/pull/683) VERIFY chưa deploy. F2/F3 WAITING.
+Lát S theo [scope](../ops/evidence/ui-request-2026-10/scope.md): primary Nhân sự không chờ nguồn phụ, guard response/filter, lỗi/retry giữ snapshot; Hợp đồng bỏ2GET option lúc chỉ đọc và tải đúng lúc mở form. Giữ API/quyền/payload/tính tiền/schema/dependency; không sửa form/chứng chỉ/tổ đội, không gỡ capability. RED baseline đã lưu, [PR#683](https://github.com/seeker19110/xboss/pull/683) đã deploy tại `d8454b1e` lúc16:09:42 UTC+7 ngày24/10; PR/mainCI và public smoke đạt,0flaky ở CI cuối. F2/F3 WAITING.
+
+## Iteration 10 — trang đăng nhập production
+
+Owner yêu cầu tự kiểm tra truy cập và hoàn thiện. Root/login/HTTPS/health/readiness được kiểm
+trực tiếp, không đăng nhập hay ghi production. RED desktop/mobile bắt form tự điền demo.
+Lát S: demo chỉ development, form production trống với autocomplete đúng mục đích, icon Lucide
+không phụ thuộc emoji. API/auth/SSO/2FA/cache/backend giữ nguyên. Gate/build19/19, E2E10/10,
+unit liên quan40/40 và visual hai theme desktop/360px + axe đạt; đang VERIFY trước CI;
+F2/F3 tiếp tục WAITING. Không gỡ capability nghiệp vụ.
 
 ## Final audit
 
