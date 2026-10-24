@@ -374,6 +374,34 @@ test("đóng rồi mở thiết bị lại không áp lỗi lịch sử cũ đ�
   }
 });
 
+test("subcon mở thiết bị đang giữ và ghi Thu hồi mà không đổi select", async ({ page }) => {
+  const errors = await setup(page, "subcon");
+  const payloads: unknown[] = [];
+  await page.route(LOGS, (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: { logs: [oldLog] } });
+    payloads.push(route.request().postDataJSON());
+    return route.fulfill({ status: 201, json: { id: 930_003 } });
+  });
+  const dialog = await open(page);
+  await expect(
+    dialog.getByRole("combobox", { name: "Hành động", exact: true }).locator("option"),
+  ).toHaveText(["Thu hồi"]);
+  await dialog
+    .getByRole("textbox", { name: "Ghi chú", exact: true })
+    .fill("Thu hồi thiết bị đúng ngữ cảnh");
+  await dialog.getByRole("button", { name: "Ghi nhận", exact: true }).click();
+  await expect.poll(() => payloads.length).toBe(1);
+  expect(payloads[0]).toEqual({
+    action: "return",
+    toLocation: null,
+    toCrew: null,
+    note: "Thu hồi thiết bị đúng ngữ cảnh",
+  });
+  await expect(dialog.getByText("Đã ghi nhận thao tác vừa gửi.", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Ghi nhận", exact: true })).toBeEnabled();
+  expect(errors).toEqual([]);
+});
+
 for (const role of ["viewer", "engineer", "subcon"] as const) {
   test(`giữ quyền ghi log hiện có cho ${role}`, async ({ page }) => {
     await setup(page, role);
