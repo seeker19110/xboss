@@ -2,6 +2,13 @@ import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 test.use({ serviceWorkers: "block" });
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/**", (route) =>
+    ["GET", "HEAD", "OPTIONS"].includes(route.request().method())
+      ? route.continue()
+      : route.fulfill({ status: 500, json: { error: "Không ghi dữ liệu trong ca tải nhãn" } }),
+  );
+});
 
 for (const failure of ["http", "network", "invalid"] as const) {
   test(`nhãn: GET đầu ${failure} không khóa cache, mở lại phục hồi override mà không PATCH`, async ({

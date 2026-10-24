@@ -2,6 +2,13 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 test.use({ serviceWorkers: "block" });
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/**", (route) =>
+    ["GET", "HEAD", "OPTIONS"].includes(route.request().method())
+      ? route.continue()
+      : route.fulfill({ status: 500, json: { error: "Không ghi dữ liệu ngoài ca thông báo" } }),
+  );
+});
 
 const MESSAGE = "Thông báo kiểm chứng phục hồi";
 function feed(read = false) {

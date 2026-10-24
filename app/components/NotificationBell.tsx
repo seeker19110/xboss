@@ -15,6 +15,7 @@ import {
 import { formatDateTimeVN, todayISO, daysFromTodayISO } from "@/lib/nen/date";
 import { trackingUrl } from "@/app/lib/trackingUrl";
 import { createVisiblePoll } from "@/app/lib/visiblePoll";
+import { Button } from "@/app/components/ui";
 
 type Notif = {
   id: number;
@@ -201,6 +202,11 @@ export default function NotificationBell() {
   const router = useRouter();
   const [items, setItems] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [markError, setMarkError] = useState("");
+  const [markingAll, setMarkingAll] = useState(false);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("all");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -208,6 +214,8 @@ export default function NotificationBell() {
   const keyRef = useRef<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof createVisiblePoll> | null>(null);
+  const markingAllRef = useRef(false);
+  const mounted = useRef(false);
 
   // Kiểm tra khả năng Web Push: cần SW đã đăng ký (production) + VAPID key trên server.
   useEffect(() => {
@@ -273,10 +281,12 @@ export default function NotificationBell() {
   }
 
   useEffect(() => {
+    mounted.current = true;
     const poll = createVisiblePoll({
       visibility: document,
       everyMs: POLL_MS,
       load: async (signal) => {
+        setLoading(true);
         const r = await fetch("/api/notifications", { signal });
         if (!r.ok) throw new Error(`Không tải được thông báo (${r.status})`);
         return (await r.json()) as { notifications?: Notif[]; unread?: number };
@@ -284,11 +294,19 @@ export default function NotificationBell() {
       onData: (data) => {
         setItems(data.notifications ?? []);
         setUnread(data.unread ?? 0);
+        setLoaded(true);
+        setLoading(false);
+        setLoadError("");
+        if (!data.unread) setMarkError("");
       },
-      // Lỗi tải giữ danh sách hiện có; lượt poll sau tự thử lại.
+      onError: () => {
+        setLoading(false);
+        setLoadError("Không tải được thông báo. Kiểm tra kết nối rồi thử lại.");
+      },
     });
     pollRef.current = poll;
     return () => {
+      mounted.current = false;
       pollRef.current = null;
       poll.dispose();
     };
@@ -303,12 +321,32 @@ export default function NotificationBell() {
   }, []);
 
   async function markAll() {
-    await fetch("/api/notifications", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ markAllRead: true }),
-    });
-    load();
+    if (markingAllRef.current) return;
+    markingAllRef.current = true;
+    setMarkingAll(true);
+    setMarkError("");
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markAllRead: true }),
+      }).catch(() => {
+        throw new Error("Mất kết nối — chưa đánh dấu được thông báo.");
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(
+          typeof data?.error === "string" ? data.error : "Chưa đánh dấu được thông báo.",
+        );
+      }
+      if (mounted.current) load();
+    } catch (error) {
+      if (mounted.current)
+        setMarkError(error instanceof Error ? error.message : "Chưa đánh dấu được thông báo.");
+    } finally {
+      markingAllRef.current = false;
+      if (mounted.current) setMarkingAll(false);
+    }
   }
 
   // Click-through: đánh dấu đã đọc rồi điều hướng tới task liên quan (nếu dựng được URL);
@@ -372,17 +410,25 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-96 max-w-[90vw] bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800">
+        <div
+          role="region"
+          aria-label="Thông báo gần đây"
+          className="absolute right-0 mt-2 w-96 max-w-[90vw] bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden"
+        >
+          <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-zinc-800">
             <span className="text-sm font-semibold">
               Thông báo {unread > 0 && <span className="text-red-400">({unread} mới)</span>}
             </span>
             {unread > 0 && (
               <button
                 onClick={markAll}
-                className="flex items-center gap-1 text-xs text-emerald-400 hover:underline"
+                disabled={markingAll}
+                aria-label="Đọc tất cả"
+                aria-busy={markingAll}
+                className="min-h-11 flex items-center gap-1 px-2 text-xs text-emerald-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <CheckCheck className="w-3.5 h-3.5" /> Đọc tất cả
+                <CheckCheck className="w-3.5 h-3.5 shrink-0" />
+                {markingAll ? "Đang đánh dấu…" : "Đọc tất cả"}
               </button>
             )}
           </div>
@@ -401,8 +447,32 @@ export default function NotificationBell() {
               </button>
             ))}
           </div>
+          {loading && !loaded && (
+            <p role="status" className="px-4 py-3 text-sm text-zinc-400">
+              Đang tải thông báo…
+            </p>
+          )}
+          {(loadError || markError) && (
+            <div role="alert" className="px-4 py-3 text-sm text-red-400 space-y-2">
+              {loadError && (
+                <>
+                  <p>{loadError}</p>
+                  <Button
+                    variant="ghost"
+                    disabled={loading}
+                    aria-busy={loading}
+                    onClick={load}
+                    className="min-h-11"
+                  >
+                    Thử lại
+                  </Button>
+                </>
+              )}
+              {markError && <p>{markError} Bấm “Đọc tất cả” để thử lại.</p>}
+            </div>
+          )}
           <div className="max-h-80 overflow-auto">
-            {visibleItems.length === 0 && (
+            {loaded && !loadError && visibleItems.length === 0 && (
               <p className="p-6 text-center text-sm text-zinc-500">Không có thông báo</p>
             )}
             {buckets.map(({ bucket, rows }) => (

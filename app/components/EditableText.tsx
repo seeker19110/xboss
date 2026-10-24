@@ -18,15 +18,31 @@ const emit = () => listeners.forEach((l) => l());
 function ensureLoaded() {
   if (cache || loading) return;
   loading = Promise.all([
-    fetch("/api/ui-texts")
-      .then((r) => (r.ok ? r.json() : { texts: {} }))
-      .catch(() => ({ texts: {} })),
+    fetch("/api/ui-texts").then((r) => {
+      if (!r.ok) throw new Error("Không tải được nhãn giao diện");
+      return r.json();
+    }),
     fetchMe(),
-  ]).then(([t, me]) => {
-    cache = t && typeof t.texts === "object" && t.texts ? t.texts : {};
-    isAdmin = me?.role === "admin";
-    emit();
-  });
+  ])
+    .then(([t, me]) => {
+      if (
+        !t?.texts ||
+        typeof t.texts !== "object" ||
+        Array.isArray(t.texts) ||
+        !Object.values(t.texts).every((value) => typeof value === "string")
+      )
+        throw new Error("Dữ liệu nhãn giao diện không hợp lệ");
+      cache = t.texts;
+      isAdmin = me?.role === "admin";
+      emit();
+    })
+    .catch(() => {
+      // Giữ text mặc định; lỗi không trở thành cache rỗng thành công. Lần mount tiếp
+      // theo (vd mở lại settings) được thử lại, không tạo vòng retry nền.
+    })
+    .finally(() => {
+      loading = null;
+    });
 }
 
 function subscribe(cb: () => void) {
