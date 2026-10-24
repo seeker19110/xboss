@@ -152,6 +152,16 @@ Giữ API/payload/quyền/precondition nhật ký/offline/export, không schema/
 RED baseline và benchmark synthetic cùng fixture có trước sửa; [verification](../ops/evidence/ui-recovery-2026-10/verification.md)
 ghi GREEN 85/85 mới + 121/121 hồi quy (mỗi lượt gồm setup), gate18/18, build và full unit5.165pass/0fail/1skip allowlist. Benchmark/request-count cùng fixture và hình thức đã kiểm. PR #680 bắt lỗi trùng lỗi inline/toast offline trong CI đầu; sửa251ec883 giữ một thông báo trong form, không đổi oracle cũ. Build/lint/format và33/33 offline/nhật ký sau sửa đạt,360px10/10 đạt. Kết quả CI/phát hành cuối theo PR của lát này; không coi technical fixes là UAT/usage.
 
+## Iteration 7 — ổn định fixture sau #680
+
+#680 đã merge thành `3a678381`; PR CI `40063268763` success trên HEAD cuối. CI main
+`40063910943` ghi E2E 868 pass/0 fail/1 flaky/51 skip cũ. Ca 401 lỗi trong proxy auth
+của fixture (`apiResponse.json: Response has been disposed`), retry đạt; chưa có bằng chứng
+lỗi auth ứng dụng. Follow-up hẹp chỉ proxy khi test đổi role, không đổi app hoặc assertion.
+Toàn file local 37/37 và lặp ca 401 40/40 đạt desktop/mobile, retries=0; đang chốt các cổng.
+[Bằng chứng](../ops/evidence/ui-recovery-2026-10/auth-fixture-repair.md) tách kết quả PR/main
+và giới hạn; CI/deploy cuối theo PR follow-up. F2/F3 tiếp tục WAITING.
+
 ## Final audit
 
 - [x] A–E có test và bằng chứng kỹ thuật.

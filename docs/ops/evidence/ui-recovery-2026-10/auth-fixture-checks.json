@@ -1,0 +1,41 @@
+{
+  "source": "dc890515495cb44e316c41098c681b2e80646f2f",
+  "appContent": "3a678381ecc2b4314cbe7eed76a6835c1a367848",
+  "buildId": "QTpB20JxOWhybrez898ap",
+  "retries": 0,
+  "profiles": ["Desktop Chrome", "Pixel 5"],
+  "database": "PostgreSQL16 disposable",
+  "full": {
+    "stats": {
+      "startTime": "2026-10-24T04:58:53.167Z",
+      "duration": 18236.671000000002,
+      "expected": 37,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "errors": []
+  },
+  "repeat401": {
+    "repeatEach": 20,
+    "noDeps": true,
+    "stats": {
+      "startTime": "2026-10-24T04:59:19.753Z",
+      "duration": 37761.972,
+      "expected": 40,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "errors": []
+  },
+  "red": {
+    "run": 40063910943,
+    "job": 120783020920,
+    "test": "primary 401 dùng flow hết phiên hiện hữu",
+    "error": "apiResponse.json: Response has been disposed",
+    "location": "setup helper, response.json after route.fetch auth"
+  },
+  "uat": "WAITING per owner",
+  "usage": "WAITING per owner"
+}
