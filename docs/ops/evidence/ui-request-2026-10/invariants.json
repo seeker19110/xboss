@@ -1,6 +1,6 @@
 {
   "base": "e52b4937c8e46936adba15bf4ed7d62d11d7add3",
-  "source": "6a636c75b6188b5bf237fd4359e252618f3d5227",
+  "source": "ed8c35e73296ef85dd14a5518d5081f227a1fc19",
   "checks": [
     {
       "path": "app/personnel/page.tsx",
@@ -68,11 +68,27 @@
       "unchanged": true
     },
     {
-      "path": "app/contracts/_components/AddContractModal.tsx",
+      "path": "app/contracts/_components/ContractDocument.tsx",
       "unchanged": true
     },
     {
-      "path": "app/contracts/_components/ContractDocument.tsx",
+      "path": "app/contracts/_components/AddContractModal.tsx",
+      "symbol": "submit",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/_components/AddContractModal.tsx",
+      "symbol": "canSubmit",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/_components/AddContractModal.tsx",
+      "symbol": "needsSupplier",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/_components/AddContractModal.tsx",
+      "symbol": "all useState initializers",
       "unchanged": true
     }
   ]

@@ -1,12 +1,12 @@
 # Kiểm chứng UI tải đúng nhu cầu
 
-Baseline main `e52b4937c8e46936adba15bf4ed7d62d11d7add3` (#682). Source cuối `6a636c75b6188b5bf237fd4359e252618f3d5227`; commit tiếp theo chỉ ghi evidence/docs. **VERIFY: checkpoint trước CI/merge/deploy**; kết quả phát hành cuối đối soát tại [PR#683](https://github.com/seeker19110/xboss/pull/683). Owner đã ủy quyền thực hiện và phát hành; UAT/usage F2/F3 vẫn WAITING.
+Baseline main `e52b4937c8e46936adba15bf4ed7d62d11d7add3` (#682). Source cuối `ed8c35e73296ef85dd14a5518d5081f227a1fc19`; commit tiếp theo chỉ ghi evidence/docs. **VERIFY: checkpoint trước CI/merge/deploy**; kết quả phát hành cuối đối soát tại [PR#683](https://github.com/seeker19110/xboss/pull/683). Owner đã ủy quyền thực hiện và phát hành; UAT/usage F2/F3 vẫn WAITING.
 
 ## Kết quả chức năng
 
 Nhân sự tải danh sách song song, độc lập auth/tổ đội/nhà thầu phụ. Response cũ không ghi đè filter mới; lỗi giữ snapshot chỉ xem và có retry riêng từng nguồn; không hiện empty khi chưa có snapshot hợp lệ. Tên nhân sự là nút mở chi tiết bằng bàn phím; tên dài ngắt dòng, target44px; filter có nhãn, input16px dưới sm và bảng cuộn trong vùng giữ cột.
 
-Hợp đồng chỉ tải suppliers/systems khi mở tạo mới; cache trong vòng đời trang, retry chỉ nguồn lỗi. Form chưa mở khi chưa đủ option; đang tải/lỗi vẫn đóng được. Sau retry và đóng form, focus trở lại nút mở ban đầu. Không đổi logic ghi/state/payload AddContractModal hoặc source ContractDocument, payload/header decimal-string, quyền hoặc tính tiền.
+Hợp đồng chỉ tải suppliers/systems khi mở tạo mới; cache trong vòng đời trang, retry chỉ nguồn lỗi. Form chưa mở khi chưa đủ option; đang tải/lỗi vẫn đóng được. Cùng một Modal tồn tại xuyên suốt tải/lỗi/form; sau retry và đóng, focus trở lại nút mở ban đầu. CI đầu có một ca focus chỉ qua retry; bản sửa không chấp nhận kết quả đó để phát hành, kiểm lặp20/20 với retries0 và chạy lại mọi ca. Không đổi logic ghi/state/payload AddContractModal hoặc source ContractDocument, payload/header decimal-string, quyền hoặc tính tiền.
 
 [Invariants](invariants.json) đối chiếu 18 điểm AST/text: PersonnelModal/DetailModal/CertificationModal/certBadge, taiDanhSach/HangHopDong/CAN/refresh và phép tính mSumTien/mulRatio; ContractDocument giữ byte-identical; AddContractModal chỉ thêm nội dung tải/lỗi trước form, chung một Modal; submit/canSubmit/needsSupplier/state giữ nguyên. Backend/API/schema/dependency và offline giữ nguyên. Không gỡ capability.
 
@@ -16,7 +16,7 @@ Hợp đồng chỉ tải suppliers/systems khi mở tạo mới; cache trong v�
 
 [Repair](repair.json) phân biệt lỗi fixture/typecheck, lỗi focus sau retry, lỗi tên dài phát hiện bằng ảnh rồi có RED đo text rect. Mỗi lỗi source sửa lần đầu; không hạ assertion/threshold/timeout hoặc thêm skip. Source cuối dùng build mới, toàn ca mới và hồi quy đạt theo [checks](checks.json).
 
-- Gate18/18, format/lint/typecheck và build đạt; full local unit Postgres16: 385 file, 5.165 pass/0 fail/1 skip health nghịch đảo có sẵn. Unit chạy trước các sửa thuần UI; Node-unit-reachable code không đổi, CI kiểm lại exact HEAD.
+- Focus repeat20/20, retries0; gate18/18, format/lint/typecheck và build đạt; full local unit Postgres16: 385 file, 5.165 pass/0 fail/1 skip health nghịch đảo có sẵn. Unit chạy trước các sửa thuần UI; Node-unit-reachable code không đổi, CI kiểm lại exact HEAD.
 - 18 behavior case × desktop/mobile + setup: 37 pass, không fail/flaky/skip, retries=0. HTTP/network/retry/stale/pending option/đóng/mở lại/keyboard/role/401, nhãn và tên dài được kiểm.
 - Hồi quy personnel/contracts/subcontractors: 16 pass, không fail/flaky/skip.
 - Axe Light và Dark Blue với motion mặc định tại360px: primary Nhân sự và dialog option lỗi; input16px/body không tràn ngang. Không coi Chromium mobile emulation là Safari/cảm ứng người thật.

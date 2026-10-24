@@ -84,5 +84,37 @@
     "observed": "Expected create trigger focused, inactive after Escape; passed retry. Not accepted as clean release.",
     "repairAttemptForFocus": 2,
     "repair": "Keep one Modal in AddContractModal while preparation content switches to form; remove page manual focus recovery and Modal swap. Only optional presentation slot added; submit/fields/state unchanged. Add explicit dialog closed assertion. Repeat with retries0, full GREEN/gate/build and exact HEAD CI required."
+  },
+  "finalAfterSingleModal": {
+    "source": "ed8c35e73296ef85dd14a5518d5081f227a1fc19",
+    "build": "Z55AmGwQiXklUw6Dpia5b",
+    "reports": {
+      "focus-repeat": {
+        "startTime": "2026-10-24T08:44:30.291Z",
+        "duration": 19300.334,
+        "expected": 20,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "green-modal": {
+        "startTime": "2026-10-24T08:44:50.164Z",
+        "duration": 17516.374,
+        "expected": 37,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "regression-modal": {
+        "startTime": "2026-10-24T08:45:08.184Z",
+        "duration": 10553.64,
+        "expected": 16,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    "gate": "18/18",
+    "sameFocusFailureRepairCount": 2
   }
 }

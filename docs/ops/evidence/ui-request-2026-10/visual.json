@@ -1,7 +1,7 @@
 {
-  "checkedAt": "2026-10-24T08:33:05.410Z",
-  "build": "f3CrbGyCOuvYItJ6CnbTp",
-  "source": "6a636c75b6188b5bf237fd4359e252618f3d5227",
+  "checkedAt": "2026-10-24T08:44:57.712Z",
+  "build": "Z55AmGwQiXklUw6Dpia5b",
+  "source": "ed8c35e73296ef85dd14a5518d5081f227a1fc19",
   "synthetic": true,
   "readOnlyOutsideMockedRoutes": true,
   "scenes": [
@@ -37,7 +37,7 @@
         "scrollY": 0
       },
       "pageErrors": [],
-      "sha256": "321501f2a1e7848e5f6a476cf7175ffc457c0bc0fac6b12282a06c2b35aa81b9"
+      "sha256": "90fc70102743eac76d39a47e627b3f6d11741147fae178f57b858abd38664f2d"
     },
     {
       "profile": "mobile",
@@ -71,24 +71,24 @@
         "scrollY": 0
       },
       "pageErrors": [],
-      "sha256": "0b67a97d41518f96611a7e8d96f898dc02d08fb84594a3a72c884b901c427e98"
+      "sha256": "8000b9a6956f3dd3a000405022b7c7431dff72eea232fce66156d78e70eedb8b"
     },
     {
-      "theme": "light",
       "profile": "mobile360",
+      "theme": "light",
       "file": "screenshots/contracts-option-error-light.png",
-      "source": "6a636c75b6188b5bf237fd4359e252618f3d5227",
-      "provenance": "Final Playwright option-error axe test; body width360, serious/critical0",
+      "source": "ed8c35e73296ef85dd14a5518d5081f227a1fc19",
+      "provenance": "Final option-error axe test",
       "sha256": "2824be3d82ee371ac89deb36c89c43c3aaa13b2a06cf166aad837853895f7e72"
     },
     {
-      "theme": "darkblue",
       "profile": "mobile360",
+      "theme": "darkblue",
       "file": "screenshots/contracts-option-error-darkblue.png",
-      "source": "6a636c75b6188b5bf237fd4359e252618f3d5227",
-      "provenance": "Final Playwright option-error axe test; body width360, serious/critical0",
+      "source": "ed8c35e73296ef85dd14a5518d5081f227a1fc19",
+      "provenance": "Final option-error axe test",
       "sha256": "071cfe3670defdb4c5d26d01a5d9c1829a04be1aaeff5b62706d2de5bee51396"
     }
   ],
-  "captureNote": "Viewport screenshots after final sidebar padding; finite animation fast-forward applies only to screenshot capture, all axe/behavior tests use default motion."
+  "captureNote": "Stable viewport screenshot; finite animations disabled only during screenshot, axe/behavior use default motion. Rendered option-error UI unchanged by single-Modal presentation repair."
 }
