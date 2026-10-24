@@ -70,6 +70,74 @@ async function open(page: Page) {
   return dialog;
 }
 
+test("GET danh sách thiết bị lỗi không thành empty; retry chỉ đọc lại để phục hồi", async ({
+  page,
+}) => {
+  const errors = await setup(page);
+  let gets = 0;
+  await page.route("**/api/equipment", (route) =>
+    ++gets === 1
+      ? route.fulfill({ status: 500, json: { error: "Danh sách thiết bị tạm lỗi" } })
+      : route.fulfill({ json: { equipment: [equipment] } }),
+  );
+  await page.goto("/equipment");
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "Danh sách thiết bị tạm lỗi",
+  );
+  await expect(page.getByText("Chưa có thiết bị nào", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Thử lại danh sách", exact: true }).click();
+  await expect(page.getByText(CODE, { exact: true })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
+  expect(gets).toBe(2);
+  expect(errors).toEqual([]);
+});
+
+test("POST accepted và GET danh sách lỗi giữ modal/notice; retry danh sách không ghi lại", async ({
+  page,
+}) => {
+  const errors = await setup(page);
+  let gets = 0;
+  let posts = 0;
+  await page.route("**/api/equipment", (route) =>
+    ++gets === 2
+      ? route.fulfill({
+          status: 500,
+          json: { error: "Danh sách chưa cập nhật sau thao tác đã nhận" },
+        })
+      : route.fulfill({ json: { equipment: [equipment] } }),
+  );
+  await page.route(LOGS, (route) => {
+    if (route.request().method() === "POST") {
+      posts++;
+      return route.fulfill({ status: 201, json: { id: 930_003 } });
+    }
+    return route.fulfill({ json: { logs: [oldLog] } });
+  });
+  const dialog = await open(page);
+  await dialog
+    .getByRole("textbox", { name: "Ghi chú", exact: true })
+    .fill("Thao tác chỉ gửi một lần");
+  const failedRefresh = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/equipment" && response.status() === 500,
+  );
+  await dialog.getByRole("button", { name: "Ghi nhận", exact: true }).click();
+  await (await failedRefresh).finished();
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Danh sách chưa cập nhật sau thao tác đã nhận",
+  );
+  await expect(dialog.getByText("Đã ghi nhận thao tác vừa gửi.", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Ghi nhận", exact: true })).toBeEnabled();
+  await dialog.getByRole("button", { name: "Thử lại danh sách", exact: true }).click();
+  await expect(dialog.getByRole("status")).toHaveCount(0);
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
+  expect(gets).toBe(3);
+  expect(posts).toBe(1);
+  expect(errors).toEqual([]);
+});
+
 test("lịch sử chờ/lỗi có retry, chỉ GET 200 rỗng mới hiện empty", async ({ page }) => {
   const errors = await setup(page);
   const waiting = deferred();
