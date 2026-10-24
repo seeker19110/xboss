@@ -1,0 +1,672 @@
+{
+  "recordedAt": "2026-10-24T03:17:17.745Z",
+  "environment": {
+    "node": "24.22.1",
+    "v8": "13.6.233.17-node.58",
+    "arch": "x64",
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13800H",
+    "logicalCpus": 6
+  },
+  "sources": {
+    "helperSha256": "a231d4a4254cd78e9cbaf4169e38702f15fdad2b035261ef9104ee14cbb82013",
+    "scriptSha256": "8df85287aa8a013a4f1db66333cf9d97f6e2a7f2263fe2f7fdad557a0b32cc8a"
+  },
+  "method": {
+    "samples": 31,
+    "warmupsPerVariant": 30,
+    "pairedAlternatingOrder": true,
+    "unit": "ms mỗi lượt lookup toàn ma trận",
+    "buildAndLookupIncludesIndexCreation": true,
+    "percentile": "nearest rank"
+  },
+  "limitations": [
+    "Fixture synthetic hợp lệ theo schema, không phải kích thước dự án production đã quan sát.",
+    "Chỉ đo lookup; không đo DOM, React render, API, DB hoặc Core Web Vitals.",
+    "Không đặt threshold thời gian vào test hoặc gate."
+  ],
+  "scenarios": [
+    {
+      "floorCount": 30,
+      "activeStageCount": 7,
+      "hiddenStageCount": 0,
+      "returnedFronts": 210,
+      "renderedCells": 210,
+      "inputSha256": "73fb5525b36262490ff770e9fb30de45041bc5b1d89ece1c29a530bf5a23a373",
+      "identicalRowReferences": true,
+      "checksumBefore": 1451490522,
+      "checksumAfter": 1451490522,
+      "selectedBeforeSha256": "c8072ed8604348056dc2e2f668d6d2639532922890372666d6d399583a0e63c7",
+      "selectedAfterSha256": "c8072ed8604348056dc2e2f668d6d2639532922890372666d6d399583a0e63c7",
+      "iterationsPerSample": 126,
+      "find": {
+        "p50Ms": 0.050016,
+        "p95Ms": 0.052103
+      },
+      "buildAndLookup": {
+        "p50Ms": 0.007108,
+        "p95Ms": 0.009684
+      },
+      "memoizedLookup": {
+        "p50Ms": 0.001807,
+        "p95Ms": 0.004618
+      },
+      "rawSamples": [
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.13396119047619046,
+          "buildAndLookupMs": 0.017747158730158738,
+          "memoizedLookupMs": 0.0065632142857142955
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.050256793650793684,
+          "buildAndLookupMs": 0.009683650793650798,
+          "memoizedLookupMs": 0.0046181428571428354
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.05060000000000005,
+          "buildAndLookupMs": 0.007232587301587497,
+          "memoizedLookupMs": 0.0019021190476190253
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.050158023809523736,
+          "buildAndLookupMs": 0.009192380952381002,
+          "memoizedLookupMs": 0.0021377142857142684
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.05178756349206361,
+          "buildAndLookupMs": 0.007712515873015897,
+          "memoizedLookupMs": 0.0018642142857143223
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.05032066666666672,
+          "buildAndLookupMs": 0.00829612698412695,
+          "memoizedLookupMs": 0.0017765793650793753
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.05046005555555557,
+          "buildAndLookupMs": 0.008372365079364973,
+          "memoizedLookupMs": 0.0018454920634919996
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.05210307142857144,
+          "buildAndLookupMs": 0.008229944444444583,
+          "memoizedLookupMs": 0.0018069285714286509
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.0499136190476191,
+          "buildAndLookupMs": 0.006866992063492044,
+          "memoizedLookupMs": 0.0017781825396825626
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.051341341269841266,
+          "buildAndLookupMs": 0.006637476190476381,
+          "memoizedLookupMs": 0.0017768333333331536
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.050024912698412596,
+          "buildAndLookupMs": 0.007338333333333394,
+          "memoizedLookupMs": 0.0018181428571428194
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.05153415873015869,
+          "buildAndLookupMs": 0.006306309523809419,
+          "memoizedLookupMs": 0.0018787857142857295
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.04918716666666673,
+          "buildAndLookupMs": 0.007742015873015855,
+          "memoizedLookupMs": 0.0019022619047617474
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.049824841269841255,
+          "buildAndLookupMs": 0.0066342936507935305,
+          "memoizedLookupMs": 0.00200519047619053
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.05003742857142868,
+          "buildAndLookupMs": 0.0089944920634921,
+          "memoizedLookupMs": 0.002021142857143012
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.04982272222222214,
+          "buildAndLookupMs": 0.008414365079365176,
+          "memoizedLookupMs": 0.0023794444444445073
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.05001565873015876,
+          "buildAndLookupMs": 0.007078857142857265,
+          "memoizedLookupMs": 0.0017953095238096145
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.05030576984126983,
+          "buildAndLookupMs": 0.0064022380952380555,
+          "memoizedLookupMs": 0.0018328888888888399
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.05030094444444444,
+          "buildAndLookupMs": 0.0077348412698413195,
+          "memoizedLookupMs": 0.0017996111111113942
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.049295134920634885,
+          "buildAndLookupMs": 0.006609722222222333,
+          "memoizedLookupMs": 0.0016930476190476196
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.04971412698412701,
+          "buildAndLookupMs": 0.007108142857142801,
+          "memoizedLookupMs": 0.001692238095238335
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.04908071428571424,
+          "buildAndLookupMs": 0.006261492063492102,
+          "memoizedLookupMs": 0.001685325396825495
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.049348531746031786,
+          "buildAndLookupMs": 0.006380031746032057,
+          "memoizedLookupMs": 0.0017882698412698855
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.048890214285714294,
+          "buildAndLookupMs": 0.007877976190476447,
+          "memoizedLookupMs": 0.0018530634920637112
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.050268626984126916,
+          "buildAndLookupMs": 0.006313722222222125,
+          "memoizedLookupMs": 0.0017254523809522233
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.049460992063491936,
+          "buildAndLookupMs": 0.007123976190476311,
+          "memoizedLookupMs": 0.0017122380952379163
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.04917342857142859,
+          "buildAndLookupMs": 0.006621619047618896,
+          "memoizedLookupMs": 0.0017494126984124994
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.049096888888888614,
+          "buildAndLookupMs": 0.007018071428571858,
+          "memoizedLookupMs": 0.0017851349206352105
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.04929538888888866,
+          "buildAndLookupMs": 0.006101507936508128,
+          "memoizedLookupMs": 0.0019289682539685659
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 0.04910441269841283,
+          "buildAndLookupMs": 0.006803428571428654,
+          "memoizedLookupMs": 0.001701682539682845
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 0.04888654761904741,
+          "buildAndLookupMs": 0.006649642857142781,
+          "memoizedLookupMs": 0.0017558174603173318
+        }
+      ]
+    },
+    {
+      "floorCount": 80,
+      "activeStageCount": 40,
+      "hiddenStageCount": 0,
+      "returnedFronts": 3200,
+      "renderedCells": 3200,
+      "inputSha256": "539ecfe52865654f1911e4af9250d613b77d6446cacdad17dd95e001e57a0c7a",
+      "identicalRowReferences": true,
+      "checksumBefore": 4073226309,
+      "checksumAfter": 4073226309,
+      "selectedBeforeSha256": "62f6a439e2294d25384cec0d0ab099b4e0367393120f0c65f87c8ad427fa2379",
+      "selectedAfterSha256": "62f6a439e2294d25384cec0d0ab099b4e0367393120f0c65f87c8ad427fa2379",
+      "iterationsPerSample": 1,
+      "find": {
+        "p50Ms": 13.712814,
+        "p95Ms": 34.853977
+      },
+      "buildAndLookup": {
+        "p50Ms": 0.122587,
+        "p95Ms": 0.312723
+      },
+      "memoizedLookup": {
+        "p50Ms": 0.034045,
+        "p95Ms": 0.050373
+      },
+      "rawSamples": [
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 28.998127000000068,
+          "buildAndLookupMs": 0.11756800000000567,
+          "memoizedLookupMs": 0.03506700000002638
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 28.875128000000018,
+          "buildAndLookupMs": 0.10844799999995303,
+          "memoizedLookupMs": 0.02974400000005062
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 29.42330400000003,
+          "buildAndLookupMs": 0.12859800000001087,
+          "memoizedLookupMs": 0.04237100000000282
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 31.96878300000003,
+          "buildAndLookupMs": 0.3127230000000054,
+          "memoizedLookupMs": 0.03253299999994397
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 49.61117200000001,
+          "buildAndLookupMs": 0.17211500000007618,
+          "memoizedLookupMs": 0.05715199999985998
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 34.853976999999986,
+          "buildAndLookupMs": 0.16561299999989387,
+          "memoizedLookupMs": 0.04232899999988149
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 29.307731999999987,
+          "buildAndLookupMs": 0.12089800000012474,
+          "memoizedLookupMs": 0.035853000000088286
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 28.66961900000001,
+          "buildAndLookupMs": 0.10856799999987743,
+          "memoizedLookupMs": 0.029669000000012602
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 28.74547400000006,
+          "buildAndLookupMs": 0.12258699999983946,
+          "memoizedLookupMs": 0.034967000000051485
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 28.630574999999908,
+          "buildAndLookupMs": 0.10881999999992331,
+          "memoizedLookupMs": 0.029295000000047366
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 13.081586000000016,
+          "buildAndLookupMs": 0.12138700000014069,
+          "memoizedLookupMs": 0.03369799999995848
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 12.991488000000118,
+          "buildAndLookupMs": 0.10625600000003033,
+          "memoizedLookupMs": 0.03509600000006685
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 12.536525999999867,
+          "buildAndLookupMs": 0.11229699999989862,
+          "memoizedLookupMs": 0.03287599999998747
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 12.717353000000003,
+          "buildAndLookupMs": 0.10657799999989948,
+          "memoizedLookupMs": 0.02751100000000406
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 12.641460999999936,
+          "buildAndLookupMs": 0.12653599999998733,
+          "memoizedLookupMs": 0.03573099999994156
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 13.71281399999998,
+          "buildAndLookupMs": 0.11946999999986474,
+          "memoizedLookupMs": 0.029615999999805354
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 12.81309199999987,
+          "buildAndLookupMs": 0.13326699999993252,
+          "memoizedLookupMs": 0.03582600000004277
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 12.783755000000156,
+          "buildAndLookupMs": 0.12474700000007033,
+          "memoizedLookupMs": 0.030774000000064916
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 12.797067999999854,
+          "buildAndLookupMs": 0.10954900000001544,
+          "memoizedLookupMs": 0.031397000000197295
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 12.660482000000002,
+          "buildAndLookupMs": 0.11924100000010185,
+          "memoizedLookupMs": 0.027745999999979176
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 12.760851000000002,
+          "buildAndLookupMs": 0.4905020000001059,
+          "memoizedLookupMs": 0.04073300000004565
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 12.806511999999884,
+          "buildAndLookupMs": 0.12773999999990338,
+          "memoizedLookupMs": 0.03367700000012519
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 12.563801000000012,
+          "buildAndLookupMs": 0.12308299999995143,
+          "memoizedLookupMs": 0.0340449999998782
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 13.11170100000004,
+          "buildAndLookupMs": 0.11466700000005403,
+          "memoizedLookupMs": 0.03008799999997791
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 14.262115999999878,
+          "buildAndLookupMs": 0.1453270000001794,
+          "memoizedLookupMs": 0.044630999999981213
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 14.665578000000096,
+          "buildAndLookupMs": 0.15949999999998,
+          "memoizedLookupMs": 0.05037300000003597
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 14.879171000000042,
+          "buildAndLookupMs": 0.13149999999995998,
+          "memoizedLookupMs": 0.03967499999998836
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 14.132927999999993,
+          "buildAndLookupMs": 0.11596899999995003,
+          "memoizedLookupMs": 0.030513000000155444
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 14.098230999999942,
+          "buildAndLookupMs": 0.14766899999995076,
+          "memoizedLookupMs": 0.03956300000004376
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 13.500336999999945,
+          "buildAndLookupMs": 0.11443800000006377,
+          "memoizedLookupMs": 0.031619999999975335
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 13.578559999999925,
+          "buildAndLookupMs": 0.14678400000002512,
+          "memoizedLookupMs": 0.038459000000102606
+        }
+      ]
+    },
+    {
+      "floorCount": 80,
+      "activeStageCount": 40,
+      "hiddenStageCount": 20,
+      "returnedFronts": 4800,
+      "renderedCells": 3200,
+      "inputSha256": "811b1d0e8bbf5cbe07f41a1cf1683e237bd7ab00d327464004e5dca9edd9f39d",
+      "identicalRowReferences": true,
+      "checksumBefore": 1497942725,
+      "checksumAfter": 1497942725,
+      "selectedBeforeSha256": "86547114a63a1e4a745fe468af44d42a6fd877dd7d6ce51ae833e3bcb55a9c17",
+      "selectedAfterSha256": "86547114a63a1e4a745fe468af44d42a6fd877dd7d6ce51ae833e3bcb55a9c17",
+      "iterationsPerSample": 1,
+      "find": {
+        "p50Ms": 20.95483,
+        "p95Ms": 22.213717
+      },
+      "buildAndLookup": {
+        "p50Ms": 0.165198,
+        "p95Ms": 0.434579
+      },
+      "memoizedLookup": {
+        "p50Ms": 0.041418,
+        "p95Ms": 0.061263
+      },
+      "rawSamples": [
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 20.964547999999922,
+          "buildAndLookupMs": 0.19326799999998912,
+          "memoizedLookupMs": 0.05098500000030981
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 21.2697119999998,
+          "buildAndLookupMs": 0.15849600000001374,
+          "memoizedLookupMs": 0.035706000000118365
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 20.986169999999674,
+          "buildAndLookupMs": 0.17184399999996458,
+          "memoizedLookupMs": 0.04248199999983626
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 20.22746099999995,
+          "buildAndLookupMs": 0.2982310000002144,
+          "memoizedLookupMs": 0.033206000000063796
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 22.19685299999992,
+          "buildAndLookupMs": 0.16488900000013018,
+          "memoizedLookupMs": 0.04324099999985265
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 21.59375399999999,
+          "buildAndLookupMs": 0.4345789999997578,
+          "memoizedLookupMs": 0.03944899999987683
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 20.104331000000002,
+          "buildAndLookupMs": 0.16519800000014584,
+          "memoizedLookupMs": 0.044147999999950116
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 20.00517899999977,
+          "buildAndLookupMs": 0.1370270000002165,
+          "memoizedLookupMs": 0.03164999999989959
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 19.982817000000068,
+          "buildAndLookupMs": 0.16641600000002654,
+          "memoizedLookupMs": 0.041538999999829684
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 20.023967999999968,
+          "buildAndLookupMs": 0.14078699999981836,
+          "memoizedLookupMs": 0.03205499999967287
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 19.963239000000158,
+          "buildAndLookupMs": 0.15398000000004686,
+          "memoizedLookupMs": 0.03908199999978024
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 20.102923999999803,
+          "buildAndLookupMs": 0.13971099999980652,
+          "memoizedLookupMs": 0.031358999999611115
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 20.786454999999933,
+          "buildAndLookupMs": 0.17673400000012407,
+          "memoizedLookupMs": 0.05261100000006991
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 21.536192000000028,
+          "buildAndLookupMs": 0.15081999999983964,
+          "memoizedLookupMs": 0.03497399999969275
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 22.746939999999995,
+          "buildAndLookupMs": 0.32912800000030984,
+          "memoizedLookupMs": 0.06126300000005358
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 21.346939999999904,
+          "buildAndLookupMs": 0.17656899999974485,
+          "memoizedLookupMs": 0.039820000000418077
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 21.49664699999994,
+          "buildAndLookupMs": 0.45299999999997453,
+          "memoizedLookupMs": 0.04554000000007363
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 20.95483000000013,
+          "buildAndLookupMs": 0.1520740000000842,
+          "memoizedLookupMs": 0.03352499999982683
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 21.214278999999806,
+          "buildAndLookupMs": 0.15228699999988748,
+          "memoizedLookupMs": 0.04141799999979412
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 20.935303000000204,
+          "buildAndLookupMs": 0.13163900000017748,
+          "memoizedLookupMs": 0.03296099999988655
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 20.466785000000073,
+          "buildAndLookupMs": 0.22216400000024805,
+          "memoizedLookupMs": 0.04446299999972325
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 21.699274999999943,
+          "buildAndLookupMs": 0.258534999999938,
+          "memoizedLookupMs": 0.2070659999999407
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 20.17836800000032,
+          "buildAndLookupMs": 0.15993500000013228,
+          "memoizedLookupMs": 0.043382999999721505
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 20.67708300000004,
+          "buildAndLookupMs": 0.1350969999998597,
+          "memoizedLookupMs": 0.03271499999982552
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 20.482886000000235,
+          "buildAndLookupMs": 0.16167300000006435,
+          "memoizedLookupMs": 0.043369999999868014
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 22.12008999999989,
+          "buildAndLookupMs": 0.13946800000030635,
+          "memoizedLookupMs": 0.03273699999999735
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 21.689830999999685,
+          "buildAndLookupMs": 0.1796479999998155,
+          "memoizedLookupMs": 0.05305799999996452
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 22.213717000000088,
+          "buildAndLookupMs": 0.16788299999961964,
+          "memoizedLookupMs": 0.036436000000321656
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 20.78143799999998,
+          "buildAndLookupMs": 0.16703899999993155,
+          "memoizedLookupMs": 0.043840999999702035
+        },
+        {
+          "order": ["memoizedLookupMs", "buildAndLookupMs", "findMs"],
+          "findMs": 20.33437399999957,
+          "buildAndLookupMs": 0.1447520000001532,
+          "memoizedLookupMs": 0.03205100000013772
+        },
+        {
+          "order": ["findMs", "buildAndLookupMs", "memoizedLookupMs"],
+          "findMs": 21.251134000000093,
+          "buildAndLookupMs": 0.39761900000030437,
+          "memoizedLookupMs": 0.048435000000154105
+        }
+      ]
+    }
+  ],
+  "checksumSink": 3490398994
+}

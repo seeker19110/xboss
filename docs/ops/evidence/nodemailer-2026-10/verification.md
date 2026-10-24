@@ -63,3 +63,20 @@ và kiểm message hợp lệ đạt, message sai bị chặn; validateConfig nh
 từ chối `{ extends: 123 }`; gate chạy lại trên lock cuối.
 Trên Node 24.22.1/lock cuối, 27 ca mail/webhook/inbound/tenant/push-SSRF đạt, 0 fail/skip. Build và full unit ở trên
 là checkpoint trước thay đổi dev-only này; CI chạy lại toàn bộ, không gộp chứng cứ.
+
+## Đối soát phát hành #678
+
+Đã squash merge thành main `079e79ef` từ source `caf010ec`. CI main
+[40057819385](https://github.com/seeker19110/xboss/actions/runs/40057819385) success:
+5.166 unit pass/0 fail/1 skip allowlist; 743 E2E pass/0 flaky/51 skip cũ,
+mutation 52/52 runnable/0 survivor. Đây là lượt khác local/PR, không gộp số.
+[release.json](release.json) ghi chi tiết CI/deploy/public smoke đã đối soát.
+
+Audit lock hiện tại toàn bộ 0 vulnerability; SBOM GitHub cũng ghi Undici 8.12.2,
+Nodemailer 10.1.4 và fast-uri 4.2.3. API alerts vẫn trả 10 open với khoảng ảnh hưởng
+kết thúc trước các phiên bản này. Chưa coi alerts đã đóng và không dismiss thủ công.
+
+Deploy [40058602986](https://github.com/seeker19110/xboss/actions/runs/40058602986)
+success trên cùng SHA, hoàn tất 10:34:45 UTC+7 ngày 24/10. Public smoke sau deploy
+đạt login desktop/mobile, JS/CSS, axe 0 serious/critical, API bảo vệ 401,
+health/readiness 200 và schema OK. Chỉ đọc, không đăng nhập/ghi production.

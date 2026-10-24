@@ -1,14 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { Plus, Download, Pencil } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
-import { PageSkeleton } from "@/app/components/Skeleton";
-import { Modal, appPrompt, appConfirm } from "@/app/components/dialogs";
+import { TableSkeleton } from "@/app/components/Skeleton";
+import { Modal, appConfirm } from "@/app/components/dialogs";
 import { Button } from "@/app/components/ui";
 import { showToast } from "@/app/components/Toast";
-import { fetchMe, type Me } from "@/app/lib/me";
+import { fetchMe, invalidateMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/nen/date";
 import { sortFloorsDesc } from "@/lib/nen/floors";
+import { buildWorkFrontIndex } from "@/lib/hien-truong/work-front-index";
 
 type Stage = { id: number; name: string; sortOrder: number; active: boolean; durationDays: number };
 type Front = {
@@ -22,6 +23,9 @@ type Front = {
   note: string | null;
   updatedAt: string;
 };
+type Matrix = { floors: string[]; stages: Stage[]; fronts: Front[] };
+
+const LOAD_ERROR = "Không tải được mặt bằng thi công. Vui lòng thử lại.";
 
 // Ô lưới hiện 2 dòng: ngày nhận mặt bằng / ngày bàn giao mặt bằng. Chưa có thực tế → hiện
 // ngày kế hoạch (tính nối tiếp từ duration_days) màu nhạt, không tích; đã ghi nhận thực tế
@@ -48,186 +52,257 @@ function FrontCell({ front }: { front: Front | undefined }) {
   );
 }
 
-// Modal sửa tên/số ngày thi công hoặc ẩn hẳn 1 công tác khỏi ma trận (Admin/PM; công tác
+// Cùng form thêm/sửa giữ bản nhập khi API lỗi (Admin/PM; công tác
 // dùng chung project_id NULL chỉ Admin sửa được — route trả lỗi, hiện đúng error).
-function EditStageModal({
+function StageFormModal({
   stage,
   onClose,
   onSaved,
 }: {
-  stage: Stage;
+  stage: Stage | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [name, setName] = useState(stage.name);
-  const [durationDays, setDurationDays] = useState(String(stage.durationDays));
+  const [name, setName] = useState(stage?.name ?? "");
+  const [durationDays, setDurationDays] = useState(String(stage?.durationDays ?? 1));
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
+  const pending = useRef(false);
+  const mounted = useRef(false);
+  const formId = useId();
 
-  async function save() {
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  function close() {
+    if (!pending.current) onClose();
+  }
+
+  async function save(hide = false) {
+    // Guard đồng bộ: submit/Enter liên tiếp có thể đến trước lượt render disabled.
+    if (pending.current) return;
     const trimmed = name.trim();
     const duration = Number(durationDays);
-    if (!trimmed) {
+    setErr("");
+    if (!hide && !trimmed) {
       setErr("Tên công tác không được để trống");
       return;
     }
-    if (!Number.isInteger(duration) || duration <= 0) {
+    if (!hide && (!Number.isInteger(duration) || duration <= 0)) {
       setErr("Số ngày thi công phải là số nguyên dương");
       return;
     }
-    setSaving(true);
+    pending.current = true;
     try {
-      const res = await fetch(`/api/construction-stages/${stage.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed, durationDays: duration }),
-      });
+      if (hide) {
+        if (!stage) return;
+        const ok = await appConfirm(
+          `Ẩn công tác "${stage.name}" khỏi ma trận? Dữ liệu mặt trận đã ghi vẫn giữ trong hệ thống.`,
+          { danger: true, confirmLabel: "Ẩn công tác" },
+        );
+        if (!ok || !mounted.current) return;
+      }
+      setSaving(true);
+      const res = await fetch(
+        stage ? `/api/construction-stages/${stage.id}` : "/api/construction-stages",
+        {
+          method: stage ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            hide ? { active: false } : { name: trimmed, durationDays: duration },
+          ),
+        },
+      );
       const j = await res.json().catch(() => null);
+      if (!mounted.current) return;
       if (!res.ok) {
-        setErr(j?.error ?? "Lưu công tác thất bại");
+        setErr(
+          typeof j?.error === "string"
+            ? j.error
+            : hide
+              ? "Ẩn công tác thất bại"
+              : stage
+                ? "Lưu công tác thất bại"
+                : "Thêm công tác thất bại",
+        );
         return;
       }
-      showToast("Đã lưu công tác", "success");
+      showToast(
+        hide ? "Đã ẩn công tác" : stage ? "Đã lưu công tác" : "Đã thêm công tác",
+        "success",
+      );
       onSaved();
       onClose();
     } catch {
-      setErr("Lỗi mạng — thử lại");
+      if (mounted.current) setErr("Lỗi mạng — thử lại");
     } finally {
-      setSaving(false);
+      pending.current = false;
+      if (mounted.current) setSaving(false);
     }
   }
 
-  async function hide() {
-    const ok = await appConfirm(
-      `Ẩn công tác "${stage.name}" khỏi ma trận? Dữ liệu mặt trận đã ghi vẫn giữ trong hệ thống.`,
-      { danger: true, confirmLabel: "Ẩn công tác" },
-    );
-    if (!ok) return;
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/construction-stages/${stage.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ active: false }),
-      });
-      const j = await res.json().catch(() => null);
-      if (!res.ok) {
-        showToast(j?.error ?? "Ẩn công tác thất bại", "error");
-        return;
-      }
-      showToast("Đã ẩn công tác", "success");
-      onSaved();
-      onClose();
-    } catch {
-      showToast("Lỗi mạng — thử lại", "error");
-    } finally {
-      setSaving(false);
-    }
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void save();
   }
 
   const field =
-    "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 transition";
+    "w-full min-h-11 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base outline-none focus:border-emerald-600 transition";
 
   return (
-    <Modal onClose={onClose}>
-      <div className="p-5">
-        <h3 className="font-semibold mb-4">Sửa công tác thi công</h3>
-        <div className="space-y-3">
+    <Modal onClose={close}>
+      <form
+        className="p-5"
+        onSubmit={submit}
+        noValidate
+        aria-describedby={err ? `${formId}-error` : undefined}
+      >
+        <h3 className="font-semibold mb-4">{stage ? "Sửa" : "Thêm"} công tác thi công</h3>
+        <fieldset disabled={saving} aria-busy={saving} className="min-w-0 space-y-3">
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Tên công tác</label>
+            <label htmlFor={`${formId}-name`} className="block text-xs text-zinc-400 mb-1">
+              Tên công tác
+            </label>
             <input
+              id={`${formId}-name`}
               autoFocus
+              required
               value={name}
               onChange={(e) => setName(e.target.value)}
               className={field}
             />
           </div>
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Số ngày thi công</label>
+            <label htmlFor={`${formId}-duration`} className="block text-xs text-zinc-400 mb-1">
+              Số ngày thi công
+            </label>
             <input
+              id={`${formId}-duration`}
               type="number"
+              inputMode="numeric"
               min={1}
+              step={1}
+              required
               value={durationDays}
               onChange={(e) => setDurationDays(e.target.value)}
               className={field}
             />
           </div>
-        </div>
-        {err && <p className="text-xs text-red-400 mt-3">{err}</p>}
-        <div className="flex items-center justify-between gap-2 mt-5">
-          <Button variant="danger" onClick={hide} disabled={saving}>
-            Ẩn công tác
-          </Button>
-          <div className="flex gap-2">
-            <Button onClick={onClose} disabled={saving}>
+          {err && (
+            <p id={`${formId}-error`} role="alert" className="text-sm text-red-400">
+              {err}
+            </p>
+          )}
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+            {stage && (
+              <Button
+                variant="danger"
+                onClick={() => void save(true)}
+                className="min-h-11 mr-auto"
+                disabled={saving}
+              >
+                Ẩn công tác
+              </Button>
+            )}
+            <Button onClick={close} className="min-h-11" disabled={saving}>
               Huỷ
             </Button>
-            <Button variant="primary" onClick={save} disabled={saving || !name.trim()}>
-              Lưu
+            <Button variant="primary" type="submit" className="min-h-11" disabled={saving}>
+              {saving ? "Đang lưu..." : stage ? "Lưu" : "Thêm công tác"}
             </Button>
           </div>
-        </div>
-      </div>
+        </fieldset>
+      </form>
     </Modal>
   );
 }
 
 export default function WorkFrontsPage() {
   const [me, setMe] = useState<Me | null>(null);
-  const [floors, setFloors] = useState<string[]>([]);
-  const [stages, setStages] = useState<Stage[]>([]);
-  const [fronts, setFronts] = useState<Front[]>([]);
+  const [data, setData] = useState<Matrix | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [addingStage, setAddingStage] = useState(false);
   const [editingStage, setEditingStage] = useState<Stage | null>(null);
+  const request = useRef<{ id: number; controller: AbortController | null }>({
+    id: 0,
+    controller: null,
+  });
+  const mounted = useRef(false);
+  const { floors = [], stages = [] } = data ?? {};
+  const frontIndex = useMemo(() => buildWorkFrontIndex(data?.fronts ?? []), [data?.fronts]);
 
   const canManage = me?.role === "admin" || me?.role === "pm";
   const canExportReport = me?.role === "admin" || me?.role === "pm";
 
-  function load() {
-    return fetch("/api/floor-stage-fronts").then((r) => (r.ok ? r.json() : null));
-  }
-
-  useEffect(() => {
-    Promise.all([fetchMe(), load()])
-      .then(([meData, data]) => {
-        if (!meData) return;
-        setMe(meData);
-        setFloors((data?.floors ?? []).slice().sort(sortFloorsDesc));
-        setStages(data?.stages ?? []);
-        setFronts(data?.fronts ?? []);
-      })
-      .finally(() => setLoading(false));
+  const refresh = useCallback(async () => {
+    const id = ++request.current.id;
+    request.current.controller?.abort();
+    const controller = new AbortController();
+    request.current.controller = controller;
+    setLoading(true);
+    setError("");
+    try {
+      const [meData, response] = await Promise.all([
+        fetchMe(),
+        fetch("/api/floor-stage-fronts", { signal: controller.signal }),
+      ]);
+      if (!mounted.current || request.current.id !== id || controller.signal.aborted) return;
+      if (response.status === 401) {
+        void redirectToLogin();
+        return;
+      }
+      const body = await response.json().catch(() => null);
+      if (!mounted.current || request.current.id !== id || controller.signal.aborted) return;
+      // fetchMe giữ cả Promise<null>: bỏ cache lỗi để nút retry có thể xác minh lại tài khoản.
+      if (!meData) invalidateMe();
+      if (!response.ok) {
+        setError(typeof body?.error === "string" ? body.error : LOAD_ERROR);
+        return;
+      }
+      if (
+        !meData ||
+        !Array.isArray(body?.floors) ||
+        !Array.isArray(body?.stages) ||
+        !Array.isArray(body?.fronts)
+      ) {
+        setError(LOAD_ERROR);
+        return;
+      }
+      setMe(meData);
+      setData({
+        floors: body.floors.slice().sort(sortFloorsDesc),
+        stages: body.stages,
+        fronts: body.fronts,
+      });
+    } catch {
+      if (mounted.current && request.current.id === id && !controller.signal.aborted) {
+        invalidateMe();
+        setError(LOAD_ERROR);
+      }
+    } finally {
+      if (mounted.current && request.current.id === id) {
+        request.current.controller = null;
+        setLoading(false);
+      }
+    }
   }, []);
 
-  async function refresh() {
-    const data = await load();
-    setFloors((data?.floors ?? []).slice().sort(sortFloorsDesc));
-    setStages(data?.stages ?? []);
-    setFronts(data?.fronts ?? []);
-  }
-
-  async function addStage() {
-    const name = await appPrompt("Tên công tác mới:");
-    if (!name?.trim()) return;
-    const durationStr = await appPrompt("Số ngày thi công (số nguyên dương):", "1");
-    const durationDays = Number(durationStr);
-    if (!Number.isInteger(durationDays) || durationDays <= 0) {
-      showToast("Số ngày thi công phải là số nguyên dương", "error");
-      return;
-    }
-    const res = await fetch("/api/construction-stages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), durationDays }),
-    });
-    if (!res.ok) {
-      showToast((await res.json().catch(() => null))?.error ?? "Thêm công tác thất bại", "error");
-      return;
-    }
-    refresh();
-  }
-
-  if (loading) return <PageSkeleton />;
+  useEffect(() => {
+    const activeRequest = request.current;
+    mounted.current = true;
+    void refresh();
+    return () => {
+      mounted.current = false;
+      activeRequest.id++;
+      activeRequest.controller?.abort();
+      activeRequest.controller = null;
+    };
+  }, [refresh]);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -251,94 +326,116 @@ export default function WorkFrontsPage() {
       />
 
       <main className="p-4 sm:p-6 pb-24 space-y-4">
-        {floors.length === 0 ? (
-          <p className="text-sm text-zinc-400">Chưa có dữ liệu tầng.</p>
-        ) : (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-            <div
-              className="overflow-x-auto"
-              tabIndex={0}
-              role="region"
-              aria-label="Ma trận mặt bằng thi công"
-            >
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs text-zinc-400 border-b border-zinc-800">
-                    <th className="text-right p-2 sticky left-0 z-10 bg-zinc-900">TẦNG</th>
-                    {stages.map((s) => (
-                      <th key={s.id} className="text-center p-2 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1">
-                          {s.name}
-                          {canManage && (
-                            <button
-                              onClick={() => setEditingStage(s)}
-                              aria-label={`Sửa công tác ${s.name}`}
-                              title={`Sửa công tác ${s.name}`}
-                              className="inline-flex items-center justify-center w-6 h-6 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 shrink-0"
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                          )}
-                        </span>
-                      </th>
-                    ))}
-                    {canManage && (
-                      <th className="text-center p-2">
-                        <button
-                          onClick={addStage}
-                          aria-label="Thêm công tác mới"
-                          title="Thêm công tác mới"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {floors.map((floor) => (
-                    <tr
-                      key={floor}
-                      className="border-b border-zinc-800/60 last:border-0 cursor-pointer hover:bg-zinc-800/40"
-                      onClick={() => {
-                        window.location.href = `/work-fronts/${encodeURIComponent(floor)}`;
-                      }}
-                    >
-                      <td className="p-2 font-mono text-xs text-right sticky left-0 z-10 bg-zinc-900 tabular-nums">
-                        <a
-                          href={`/work-fronts/${encodeURIComponent(floor)}`}
-                          className="hover:text-emerald-400"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {floor}
-                        </a>
-                      </td>
-                      {stages.map((stage) => {
-                        const front = fronts.find(
-                          (f) => f.floorLabel === floor && f.stageId === stage.id,
-                        );
-                        return (
-                          <td key={stage.id} className="p-2 text-center">
-                            <FrontCell front={front} />
-                          </td>
-                        );
-                      })}
-                      {canManage && <td />}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        {loading && (
+          <p role="status" className="text-sm text-zinc-400">
+            Đang tải mặt bằng thi công...
+          </p>
+        )}
+        {error && (
+          <div
+            role="alert"
+            className="rounded-xl border border-red-900/50 bg-red-950/20 p-4 space-y-3"
+          >
+            <p className="text-sm text-red-400">{error}</p>
+            {data && (
+              <p className="text-xs text-zinc-400">Đang hiển thị ma trận đã tải trước đó.</p>
+            )}
+            <Button onClick={() => void refresh()} className="min-h-11">
+              Thử lại
+            </Button>
           </div>
         )}
+        {!data && loading && <TableSkeleton cols={4} />}
+        {data &&
+          (floors.length === 0 ? (
+            <p className="text-sm text-zinc-400">Chưa có dữ liệu tầng.</p>
+          ) : (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+              <div
+                className="overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-label="Ma trận mặt bằng thi công"
+              >
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-zinc-400 border-b border-zinc-800">
+                      <th className="text-right p-2 sticky left-0 z-10 bg-zinc-900">TẦNG</th>
+                      {stages.map((s) => (
+                        <th key={s.id} className="text-center p-2 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1">
+                            {s.name}
+                            {canManage && (
+                              <button
+                                onClick={() => setEditingStage(s)}
+                                aria-label={`Sửa công tác ${s.name}`}
+                                title={`Sửa công tác ${s.name}`}
+                                className="inline-flex items-center justify-center min-w-11 min-h-11 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 shrink-0"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            )}
+                          </span>
+                        </th>
+                      ))}
+                      {canManage && (
+                        <th className="text-center p-2">
+                          <button
+                            onClick={() => setAddingStage(true)}
+                            aria-label="Thêm công tác mới"
+                            title="Thêm công tác mới"
+                            className="inline-flex items-center justify-center min-w-11 min-h-11 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {floors.map((floor) => (
+                      <tr
+                        key={floor}
+                        className="border-b border-zinc-800/60 last:border-0 cursor-pointer hover:bg-zinc-800/40"
+                        onClick={() => {
+                          window.location.href = `/work-fronts/${encodeURIComponent(floor)}`;
+                        }}
+                      >
+                        <td className="p-2 font-mono text-xs text-right sticky left-0 z-10 bg-zinc-900 tabular-nums">
+                          <a
+                            href={`/work-fronts/${encodeURIComponent(floor)}`}
+                            className="hover:text-emerald-400"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {floor}
+                          </a>
+                        </td>
+                        {stages.map((stage) => {
+                          const front = frontIndex.get(floor)?.get(stage.id);
+                          return (
+                            <td key={stage.id} className="p-2 text-center">
+                              <FrontCell front={front} />
+                            </td>
+                          );
+                        })}
+                        {canManage && <td />}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
       </main>
 
-      {editingStage && (
-        <EditStageModal
+      {(addingStage || editingStage) && (
+        <StageFormModal
           stage={editingStage}
-          onClose={() => setEditingStage(null)}
-          onSaved={refresh}
+          onClose={() => {
+            setAddingStage(false);
+            setEditingStage(null);
+          }}
+          onSaved={() => void refresh()}
         />
       )}
     </div>

@@ -1,5 +1,5 @@
 "use client";
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   ChevronRight,
@@ -12,6 +12,7 @@ import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
+import { Button } from "@/app/components/ui";
 import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { toSlug } from "@/lib/nen/sheets";
 import SCurveChart from "@/app/components/SCurveChart";
@@ -99,6 +100,8 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
   const [addingSheet, setAddingSheet] = useState(false);
   const [creatingSheet, setCreatingSheet] = useState(false);
   const [createSheetErr, setCreateSheetErr] = useState("");
+  const creatingSheetRef = useRef(false);
+  const createSheetId = useId();
 
   const validSystem = Object.prototype.hasOwnProperty.call(SYSTEM_LABEL, system);
 
@@ -174,10 +177,17 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
 
   const canManage = me?.role === "admin" || me?.role === "pm";
 
-  async function createSheet() {
-    if (!newSheetName.trim() || !summary) return;
+  function closeCreateSheet() {
+    if (!creatingSheetRef.current) setAddingSheet(false);
+  }
+
+  async function createSheet(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (creatingSheetRef.current || !newSheetName.trim() || !summary) return;
+    creatingSheetRef.current = true;
     setCreatingSheet(true);
     setCreateSheetErr("");
+    let redirecting = false;
     try {
       const res = await fetch("/api/sheets", {
         method: "POST",
@@ -190,10 +200,14 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
         return;
       }
       window.location.href = `/tracking/${j.sheet.slug}`;
+      redirecting = true;
     } catch {
       setCreateSheetErr("Mất kết nối — kiểm tra mạng rồi thử lại");
     } finally {
-      setCreatingSheet(false);
+      if (!redirecting) {
+        creatingSheetRef.current = false;
+        setCreatingSheet(false);
+      }
     }
   }
 
@@ -258,7 +272,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
                   setNewSheetName("");
                   setAddingSheet(true);
                 }}
-                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-emerald-400 transition"
+                className="flex items-center gap-1.5 min-h-11 text-xs text-zinc-400 hover:text-emerald-400 transition"
               >
                 <Plus className="w-3.5 h-3.5" /> Thêm hạng mục
               </button>
@@ -457,44 +471,53 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
       {/* Modal tạo hạng mục (sheet tracking) mới trong hệ này — cùng field tối thiểu với
           form ở /system/[code] khi hệ chưa có sheet nào, chỉ khác đã gán sẵn systemId hiện tại. */}
       {addingSheet && (
-        <Modal onClose={() => setAddingSheet(false)}>
-          <div className="p-5">
+        <Modal onClose={closeCreateSheet}>
+          <form className="p-5" onSubmit={createSheet} aria-busy={creatingSheet}>
             <h3 className="font-semibold mb-4 flex items-center gap-2">
               <Plus className="w-4 h-4 text-emerald-400" /> Thêm hạng mục cho hệ {label}
             </h3>
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Tên hạng mục</label>
+              <label htmlFor={createSheetId} className="block text-xs text-zinc-400 mb-1">
+                Tên hạng mục
+              </label>
               <input
+                id={createSheetId}
                 autoFocus
+                readOnly={creatingSheet}
+                aria-describedby={`${createSheetId}-description`}
                 value={newSheetName}
                 onChange={(e) => setNewSheetName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") createSheet();
-                }}
                 placeholder="VD: ACMV Zone 3"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 transition"
+                className="w-full min-w-0 min-h-11 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-base sm:text-sm outline-none focus:border-emerald-600 transition"
               />
-              <p className="text-[11px] text-zinc-400 mt-1">
+              <p id={`${createSheetId}-description`} className="text-[11px] text-zinc-400 mt-1">
                 Đường dẫn tracking tự sinh từ tên: /tracking/{toSlug(newSheetName) || "…"}
               </p>
             </div>
-            {createSheetErr && <p className="text-xs text-red-400 mt-3">{createSheetErr}</p>}
+            {createSheetErr && (
+              <p role="alert" className="text-xs text-red-400 mt-3">
+                {createSheetErr}
+              </p>
+            )}
+            {creatingSheet && (
+              <p role="status" className="text-xs text-zinc-400 mt-3">
+                Đang tạo hạng mục. Vui lòng chờ trước khi đóng.
+              </p>
+            )}
             <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => setAddingSheet(false)}
-                className="px-4 py-2 text-sm bg-zinc-800 hover:bg-zinc-700 rounded-lg transition"
-              >
+              <Button onClick={closeCreateSheet} disabled={creatingSheet} className="min-h-11">
                 Huỷ
-              </button>
-              <button
-                onClick={createSheet}
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
                 disabled={creatingSheet || !newSheetName.trim()}
-                className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 rounded-lg font-semibold transition text-on-accent"
+                className="min-h-11"
               >
                 {creatingSheet ? "Đang tạo…" : "Tạo hạng mục"}
-              </button>
+              </Button>
             </div>
-          </div>
+          </form>
         </Modal>
       )}
     </div>

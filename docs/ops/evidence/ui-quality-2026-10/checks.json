@@ -1,0 +1,142 @@
+{
+  "baseMain": "079e79efcb4f3ebfb0a0257eb1dbc546f3c830ef",
+  "sourceCommit": "b76fcc44",
+  "node": "24.22.1",
+  "build": {
+    "status": "passed",
+    "sourceCommit": "b76fcc44",
+    "buildId": "94XkSgVA6qu3knRaR1QKN"
+  },
+  "sourceSha256": {
+    "app/components/EditableText.tsx": "d0b9a524eba5ac30f56daf48458ddeeba2c7b6b0b627203d6ef2d16c5fae61bf",
+    "app/progress/[system]/page.tsx": "f1bc43650f1daebb9636e58a7ee5fda15a560168a5cf27dab7b1a1e13dec091b",
+    "app/work-fronts/page.tsx": "ff6a7cc6f41b7d12d92d5e0e479c42764f96f2a9a70d5b9321720bc7415b0eb2",
+    "lib/hien-truong/work-front-index.ts": "a231d4a4254cd78e9cbaf4169e38702f15fdad2b035261ef9104ee14cbb82013",
+    "lib/hien-truong/hse-metadata.ts": "a0c3f9ad9d75b9c8a247731444c18ac47a7b63a0c431238ce12cd8605f3d98cb",
+    "lib/hien-truong/risks-metadata.ts": "6e5045013d2d4ad0a642cf9bbf52fced70b04e2b7e93f200877f822bbe354829",
+    "scripts/bench-work-front-lookup.ts": "8df85287aa8a013a4f1db66333cf9d97f6e2a7f2263fe2f7fdad557a0b32cc8a",
+    "e2e/authed/ui-reliable-edits.spec.ts": "44a78c9551a16e98a55bdfbcbca5188d8f83572c4de0c72664c1739bf2775392",
+    "e2e/authed/ui-reliable-work-fronts.spec.ts": "c267e6c379dd625f3af2c6620c8a4ffa10e86e33739287f8497c113e63ab8400",
+    "tests/work-front-index.test.ts": "f74d6a9017d169e1fc47b92c7114fc73d733470fa1d25132360077d98b82b795",
+    "package-lock.json": "5123b85a15184cb101babef0c076613794de00d9917272d3a9926203c8529346",
+    "app/components/dialogs.tsx": "41960cc2ca3971fe164e44bfe8b672098dd7a095ec45cee19af35c0c58a03655",
+    "e2e/authed/ui-editable-heading-name.spec.ts": "0d36b475805bfb6b3b4d2148975db27b8b306a2d8aac88ec7f2fa12539c13836"
+  },
+  "indexUnit": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+  },
+  "fullReleaseGate": {
+    "sourceCommit": "f83a1fe944f0974b70a275d0a9b4dd67c6e6d183",
+    "files": 385,
+    "passed": 5165,
+    "failed": 0,
+    "skipped": 1,
+    "skipReason": "tests/health.test.ts allowlist: degraded-without-DB case when disposable DB is present",
+    "status": "passed"
+  },
+  "staticGate": {
+    "passed": 18,
+    "total": 18,
+    "sourceCommit": "612ba825",
+    "initialProgressFreshnessFailure": "Resolved after committing PROGRESS; all checks rerun successfully."
+  },
+  "benchmarkSha256": "f04399f1ed9ede532d8a0680dfc134813bd74d5e15b8711359fe1cc576bc8081",
+  "limitations": [
+    "Microbenchmark synthetic lookup only; no DOM/page/CWV speed claim.",
+    "Browser tests on Chromium emulation and disposable DB; real UAT/usage remain WAITING.",
+    "No server schema/API/auth/role/capability change."
+  ],
+  "benchmarkProvenance": {
+    "originalRawSha256": "3df7a841f60c04c5ba506b8a4ff0de9ee34184fbd1c67697311defcc3b1c6b82",
+    "committedFormatting": "Prettier; parsed JSON deeply equal to original raw, all timings/inputs/hashes retained"
+  },
+  "modalTargeted": {
+    "passed": 15,
+    "failed": 0,
+    "skipped": 0,
+    "retries": 0,
+    "newBehaviorCases": 4,
+    "originalM137BehaviorCases": 10,
+    "setupCases": 1
+  },
+  "auditAll": {
+    "total": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0
+  },
+  "initialNewE2E": {
+    "passed": 39,
+    "behaviorCases": 38,
+    "setupCases": 1,
+    "failed": 0,
+    "skipped": 0,
+    "retries": 0,
+    "projects": ["authed-desktop", "authed-mobile"],
+    "casesPerProject": {
+      "reliableEdits": 5,
+      "workFronts": 14
+    },
+    "sourceCommit": "f83a1fe9",
+    "scope": "separate initial suite before Modal naming repair"
+  },
+  "newE2E": {
+    "sourceCommit": "b76fcc44",
+    "behaviorPassed": 42,
+    "failed": 0,
+    "skipped": 0,
+    "retries": 0,
+    "runScope": "part of final combined E2E suite, shared setup counted in combined suite only",
+    "casesPerProject": {
+      "reliableEdits": 5,
+      "workFronts": 14,
+      "editableHeadingName": 2
+    }
+  },
+  "regressionBeforeModalRepair": {
+    "status": "failed_before_repair",
+    "passed": 34,
+    "failed": 3,
+    "notRunAfterFailFast": 56,
+    "outsideTestErrors": 1,
+    "failure": "EditableText pencil aria-label changes inferred Modal name after admin state loads; repair in progress; original M137 assertions retained",
+    "repairStatus": "Targeted new and original modal cases 15/15 passed; full combined rerun in progress."
+  },
+  "combinedE2E": {
+    "sourceCommit": "b76fcc44",
+    "scheduled": 135,
+    "passed": 134,
+    "failed": 0,
+    "skipped": 1,
+    "retries": 0,
+    "durationSecondsApprox": 138,
+    "newBehaviorPassed": 42,
+    "existingBehaviorPassed": 91,
+    "setupPassed": 1,
+    "oldSkip": "e2e/authed/keo-tha-tracking.spec.ts mobile: mouse drag only; real touch remains UAT",
+    "projects": ["authed-desktop", "authed-mobile"],
+    "originalTestsAndConfigUnchanged": true
+  },
+  "independentReview": {
+    "workFrontsIndexMetadata": "No additional P1/P2 found at f83a1fe9",
+    "modalRepair": "No additional P1/P2 found at b76fcc44; all current Modal EditableText titles use entire text"
+  },
+  "visualReview": {
+    "sourceCommit": "b76fcc44",
+    "status": "passed",
+    "allWritesMocked": true,
+    "realUat": false,
+    "files": {
+      "stage-error.png": "3a758593d58ba3e9e2bcb0e84d2daca257c95f947515988c9d2d9e5722610eac",
+      "editor-error.png": "0ed73826bd6cf0eb5c8aa2408b52d211ed62e9ebf2d96807bd3cf62022222ceb"
+    }
+  },
+  "releaseTracking": {
+    "pr": "https://github.com/seeker19110/xboss/pull/679",
+    "checkpoint": "local verified before merge; final CI, merge SHA, deploy and smoke in PR section Kết quả phát hành",
+    "productionAtThisCheckpoint": false
+  }
+}
