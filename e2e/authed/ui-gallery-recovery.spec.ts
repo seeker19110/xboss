@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 test.use({ serviceWorkers: "block" });
 
@@ -51,6 +52,54 @@ async function openGallery(page: Page) {
   return dialog;
 }
 
+async function checkDialogAccessibility(page: Page) {
+  for (const theme of ["darkblue", "light"]) {
+    await page.evaluate((value) => {
+      document.documentElement.classList.remove("light", "darkblue");
+      document.documentElement.classList.add(value);
+    }, theme);
+    await page.evaluate(async () => {
+      await Promise.all(
+        document
+          .getAnimations()
+          .filter((animation) =>
+            Number.isFinite(Number(animation.effect?.getComputedTiming().endTime)),
+          )
+          .map((animation) => animation.finished.catch(() => undefined)),
+      );
+    });
+    const result = await new AxeBuilder({ page })
+      .include('[role="dialog"]')
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    const serious = result.violations.filter(
+      (item) => item.impact === "serious" || item.impact === "critical",
+    );
+    expect(serious, JSON.stringify({ theme, violations: serious }, null, 2)).toEqual([]);
+    const layout = await page.getByRole("dialog").evaluate((dialog) => {
+      const rect = dialog.getBoundingClientRect();
+      return {
+        viewport: window.innerWidth,
+        pageWidth: document.documentElement.scrollWidth,
+        panelWidth: dialog.clientWidth,
+        contentWidth: dialog.scrollWidth,
+        left: rect.left,
+        right: rect.right,
+      };
+    });
+    expect(layout.pageWidth, `${theme}: trang không tràn ngang`).toBeLessThanOrEqual(
+      layout.viewport + 1,
+    );
+    expect(layout.contentWidth, `${theme}: nội dung modal không tràn ngang`).toBeLessThanOrEqual(
+      layout.panelWidth + 1,
+    );
+    expect(layout.left, `${theme}: cạnh trái modal trong viewport`).toBeGreaterThanOrEqual(-1);
+    expect(layout.right, `${theme}: cạnh phải modal trong viewport`).toBeLessThanOrEqual(
+      layout.viewport + 1,
+    );
+  }
+}
+
 for (const failure of ["http", "network"] as const) {
   test(`gallery ${failure}: lỗi có retry/loading, không hiện album rỗng giả`, async ({ page }) => {
     await mockPage(page);
@@ -74,6 +123,7 @@ for (const failure of ["http", "network"] as const) {
         failure === "http" ? "Tạm lỗi đọc ảnh kiểm chứng" : "Không tải được ảnh album",
       );
       await expect(dialog.getByText("Album chưa có ảnh nào.", { exact: true })).toHaveCount(0);
+      if (failure === "http") await checkDialogAccessibility(page);
       await dialog.getByRole("button", { name: "Thử lại", exact: true }).click();
       await expect.poll(() => gets).toBe(2);
       await expect(dialog.getByRole("status")).toContainText("Đang tải");

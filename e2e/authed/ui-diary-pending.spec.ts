@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 // Chỉ kiểm UI serialization; mọi PUT/lock/vault đều mock trong context, không ghi DB/queue.
 test.use({ serviceWorkers: "block" });
@@ -54,6 +55,54 @@ async function openDiary(page: Page) {
   const dialog = page.getByRole("dialog", { name: /^Nhật ký ngày / });
   await expect(dialog.locator("textarea").first()).toBeVisible();
   return dialog;
+}
+
+async function checkDialogAccessibility(page: Page) {
+  for (const theme of ["darkblue", "light"]) {
+    await page.evaluate((value) => {
+      document.documentElement.classList.remove("light", "darkblue");
+      document.documentElement.classList.add(value);
+    }, theme);
+    await page.evaluate(async () => {
+      await Promise.all(
+        document
+          .getAnimations()
+          .filter((animation) =>
+            Number.isFinite(Number(animation.effect?.getComputedTiming().endTime)),
+          )
+          .map((animation) => animation.finished.catch(() => undefined)),
+      );
+    });
+    const result = await new AxeBuilder({ page })
+      .include('[role="dialog"]')
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    const serious = result.violations.filter(
+      (item) => item.impact === "serious" || item.impact === "critical",
+    );
+    expect(serious, JSON.stringify({ theme, violations: serious }, null, 2)).toEqual([]);
+    const layout = await page.getByRole("dialog").evaluate((dialog) => {
+      const rect = dialog.getBoundingClientRect();
+      return {
+        viewport: window.innerWidth,
+        pageWidth: document.documentElement.scrollWidth,
+        panelWidth: dialog.clientWidth,
+        contentWidth: dialog.scrollWidth,
+        left: rect.left,
+        right: rect.right,
+      };
+    });
+    expect(layout.pageWidth, `${theme}: trang không tràn ngang`).toBeLessThanOrEqual(
+      layout.viewport + 1,
+    );
+    expect(layout.contentWidth, `${theme}: nội dung modal không tràn ngang`).toBeLessThanOrEqual(
+      layout.panelWidth + 1,
+    );
+    expect(layout.left, `${theme}: cạnh trái modal trong viewport`).toBeGreaterThanOrEqual(-1);
+    expect(layout.right, `${theme}: cạnh phải modal trong viewport`).toBeLessThanOrEqual(
+      layout.viewport + 1,
+    );
+  }
 }
 
 test("lưu pending khóa fields/đóng/khoá sổ, chỉ sau success mới cho khoá sổ", async ({ page }) => {
@@ -206,6 +255,10 @@ test("tạo nhật ký vẫn gửi If-None-Match; 422 giữ bản nhập và 412
   await dialog.getByRole("button", { name: "Lưu nháp", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText("Nội dung cần sửa kiểm chứng");
   await expect(work).toHaveValue("Bản nhập không được xoá");
+  const save = dialog.getByRole("button", { name: "Lưu nháp", exact: true });
+  await expect(save).toBeEnabled();
+  await expect(save).toHaveCSS("opacity", "1");
+  await checkDialogAccessibility(page);
   await dialog.getByRole("button", { name: "Lưu nháp", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText("Nhật ký vừa được người khác cập nhật");
   await expect(work).toHaveValue("Bản nhập không được xoá");
