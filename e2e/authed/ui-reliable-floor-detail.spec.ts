@@ -48,19 +48,23 @@ function card(page: Page, index = 0) {
   return page.getByRole("heading", { level: 2, name, exact: true }).locator("..");
 }
 
-async function setup(page: Page, role = "admin") {
+async function setup(page: Page, role?: string) {
   const state = { data: fixture(), primaryGets: 0, supplierGets: 0, errors: [] as string[] };
   page.on("pageerror", (error) => state.errors.push(error.message));
   await page.route("**/api/**", (route) => {
     if (["GET", "HEAD", "OPTIONS"].includes(route.request().method())) return route.continue();
     return route.fulfill({ status: 403, json: { error: "Mutation ngoài fixture bị chặn" } });
   });
-  await page.route("**/api/auth/me", async (route) => {
-    const response = await route.fetch();
-    expect(response.ok()).toBe(true);
-    const body = await response.json();
-    await route.fulfill({ response, json: { ...body, user: { ...body.user, role } } });
-  });
+  // Phiên admin mặc định đi thẳng qua auth thật; chỉ proxy khi cần đổi role hiển thị.
+  // Ca 401 có thể redirect trước auth xong, nên không giữ APIResponse fixture khi teardown.
+  if (role !== undefined) {
+    await page.route("**/api/auth/me", async (route) => {
+      const response = await route.fetch();
+      expect(response.ok()).toBe(true);
+      const body = await response.json();
+      await route.fulfill({ response, json: { ...body, user: { ...body.user, role } } });
+    });
+  }
   await page.route(PRIMARY, (route) => {
     state.primaryGets++;
     return route.fulfill({ json: state.data });
