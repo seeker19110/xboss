@@ -6,7 +6,7 @@ import { TableSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { Button } from "@/app/components/ui";
 import { showToast } from "@/app/components/Toast";
-import { fetchMe, type Me } from "@/app/lib/me";
+import { fetchMe, invalidateMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/nen/date";
 import { sortFloorsDesc } from "@/lib/nen/floors";
 
@@ -249,8 +249,15 @@ export default function WorkFrontsPage() {
         fetchMe(),
         fetch("/api/floor-stage-fronts", { signal: controller.signal }),
       ]);
+      if (!mounted.current || request.current.id !== id || controller.signal.aborted) return;
+      if (response.status === 401) {
+        void redirectToLogin();
+        return;
+      }
       const body = await response.json().catch(() => null);
       if (!mounted.current || request.current.id !== id || controller.signal.aborted) return;
+      // fetchMe giữ cả Promise<null>: bỏ cache lỗi để nút retry có thể xác minh lại tài khoản.
+      if (!meData) invalidateMe();
       if (!response.ok) {
         setError(typeof body?.error === "string" ? body.error : LOAD_ERROR);
         return;

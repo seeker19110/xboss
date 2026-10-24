@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 // Mọi ghi công tác trong file này đều bị chặn tại context; không đổi công tác dùng chung
 // hoặc cần cleanup DB. Tắt SW để lỗi mạng/HTTP thật sự đi qua handler kiểm chứng.
@@ -123,6 +124,93 @@ test("GET bị ngắt có retry; chỉ response thành công rỗng mới hiện
   await expect(main.getByRole("alert")).toHaveCount(0);
   expect(gets).toBe(2);
   expect(errors).toEqual([]);
+});
+
+for (const failure of ["http", "network"] as const) {
+  test(`tài khoản lỗi ${failure} lần đầu được fetch lại khi retry tải mặt bằng`, async ({
+    page,
+  }) => {
+    let authGets = 0;
+    let matrixGets = 0;
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.route("**/api/auth/me", async (route) => {
+      authGets++;
+      if (authGets === 1) {
+        if (failure === "network") return route.abort("failed");
+        return route.fulfill({ status: 500, json: { error: "Tạm lỗi thông tin tài khoản" } });
+      }
+      // Giữ user/binding thật của phiên test; chỉ lỗi đọc đầu tiên được giả lập.
+      const response = await route.fetch();
+      expect(response.ok()).toBe(true);
+      await route.fulfill({ response });
+    });
+    await page.route(MATRIX_URL, async (route) => {
+      matrixGets++;
+      await route.fulfill({ json: matrix() });
+    });
+    await page.goto("/work-fronts");
+    const main = page.getByRole("main");
+    await expect(main.getByRole("alert")).toContainText("Không tải được mặt bằng thi công");
+    await expect(region(page)).toHaveCount(0);
+    expect(authGets).toBe(1);
+    await main.getByRole("button", { name: "Thử lại", exact: true }).click();
+    await expect(region(page).getByRole("columnheader", { name: STAGE_NAME })).toBeVisible();
+    await expect(main.getByRole("alert")).toHaveCount(0);
+    expect(authGets).toBe(2);
+    expect(matrixGets).toBe(2);
+    expect(errors).toEqual([]);
+  });
+}
+
+test("matrix 401 chuyển về đăng nhập qua flow hết phiên thay vì lỗi retry thông thường", async ({
+  page,
+}) => {
+  let matrixGets = 0;
+  let authGets = 0;
+  await page.route("**/api/auth/me", async (route) => {
+    authGets++;
+    const response = await route.fetch();
+    expect(response.ok()).toBe(true);
+    await route.fulfill({ response });
+  });
+  await page.route(MATRIX_URL, async (route) => {
+    matrixGets++;
+    await route.fulfill({ status: 401, json: { error: "Phiên kiểm chứng đã hết hạn" } });
+  });
+  await page.goto("/work-fronts");
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("button", { name: "Đăng nhập hệ thống", exact: true })).toBeVisible();
+  expect(matrixGets).toBe(1);
+  expect(authGets).toBe(1);
+});
+
+test("vai trò chỉ đọc vẫn xem ma trận nhưng không thấy thêm, sửa và xuất báo cáo", async ({
+  page,
+}) => {
+  let authGets = 0;
+  let matrixGets = 0;
+  await page.route("**/api/auth/me", async (route) => {
+    authGets++;
+    const response = await route.fetch();
+    expect(response.ok()).toBe(true);
+    const body = await response.json();
+    // Chỉ đổi role hiển thị, không thay session hoặc quyền thật ở server.
+    await route.fulfill({ response, json: { ...body, user: { ...body.user, role: "viewer" } } });
+  });
+  await page.route(MATRIX_URL, async (route) => {
+    matrixGets++;
+    await route.fulfill({ json: matrix() });
+  });
+  await openMatrix(page);
+  await expect(page.getByRole("button", { name: "Thêm công tác mới", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Sửa công tác / })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Báo cáo mặt bằng (EOT)", exact: true })).toHaveCount(
+    0,
+  );
+  await expect(region(page).getByRole("link", { name: "T2", exact: true })).toBeVisible();
+  expect(authGets).toBe(1);
+  expect(matrixGets).toBe(1);
 });
 
 for (const failure of ["http", "network"] as const) {
@@ -355,4 +443,65 @@ test("hủy xác nhận ẩn giữ bản nhập sửa; xác nhận vẫn gửi P
   await expect(region(page).getByRole("columnheader", { name: STAGE_NAME })).toHaveCount(0);
   expect(patches).toEqual([{ active: false }]);
   expect(gets).toBe(2);
+});
+
+test("form thêm và lỗi tại chỗ không có vi phạm axe nghiêm trọng ở theme tối/sáng", async ({
+  page,
+}) => {
+  let gets = 0;
+  let posts = 0;
+  await page.route(MATRIX_URL, async (route) => {
+    gets++;
+    await route.fulfill({ json: matrix() });
+  });
+  await page.route("**/api/construction-stages", async (route) => {
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().postDataJSON()).toEqual({
+      name: "Công tác kiểm chứng axe",
+      durationDays: 3,
+    });
+    posts++;
+    await route.fulfill({
+      status: 422,
+      json: { error: "Tên công tác đã tồn tại. Hãy chọn tên khác." },
+    });
+  });
+  await openMatrix(page);
+  for (const light of [false, true]) {
+    await page.evaluate(
+      (value) => document.documentElement.classList.toggle("light", value),
+      light,
+    );
+    await page.getByRole("button", { name: "Thêm công tác mới", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Thêm công tác thi công", exact: true });
+    const title = dialog.getByRole("textbox", { name: "Tên công tác", exact: true });
+    const days = dialog.getByRole("spinbutton", { name: "Số ngày thi công", exact: true });
+    await expect(title).toBeFocused();
+    for (const withError of [false, true]) {
+      if (withError) {
+        await title.fill("Công tác kiểm chứng axe");
+        await days.fill("3");
+        await dialog.getByRole("button", { name: "Thêm công tác", exact: true }).click();
+        await expect(dialog.getByRole("alert")).toHaveText(
+          "Tên công tác đã tồn tại. Hãy chọn tên khác.",
+        );
+        await expect(title).toHaveValue("Công tác kiểm chứng axe");
+        await expect(days).toHaveValue("3");
+      }
+      const result = await new AxeBuilder({ page })
+        .include('[role="dialog"]')
+        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+        .analyze();
+      const serious = result.violations.filter(
+        (item) => item.impact === "serious" || item.impact === "critical",
+      );
+      expect(serious, JSON.stringify({ light, withError, violations: serious }, null, 2)).toEqual(
+        [],
+      );
+    }
+    await dialog.getByRole("button", { name: "Huỷ", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+  }
+  expect(gets).toBe(1);
+  expect(posts).toBe(2);
 });
