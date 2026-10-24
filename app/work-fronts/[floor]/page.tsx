@@ -536,7 +536,7 @@ function StageCard({
       </h2>
 
       {showPlannedLine && (
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-zinc-400">
           Kế hoạch: nhận {formatDateVN(front?.plannedReceivedAt)} → bàn giao{" "}
           {formatDateVN(front?.plannedHandedOverAt)}
         </p>

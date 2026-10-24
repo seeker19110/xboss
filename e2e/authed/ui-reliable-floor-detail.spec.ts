@@ -310,9 +310,20 @@ test("refresh sau PUT lỗi giữ công tác và mọi draft, retry GET không g
   );
   await expect(card(page).getByRole("button", { name: "Lưu", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Thử lại", exact: true }).click();
+  // Alert biến mất ngay khi bắt đầu retry; đợi cả auth/GET kết thúc trước teardown.
+  await expect(
+    page.getByRole("status", { name: "Đang tải chi tiết mặt bằng", exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
+  await expect(card(page).getByRole("textbox", { name: "Ghi chú", exact: true })).toHaveValue(
+    "Draft vừa gửi",
+  );
+  await expect(card(page, 1).getByRole("textbox", { name: "Ghi chú", exact: true })).toHaveValue(
+    "Draft khác phải còn",
+  );
   expect(puts).toBe(1);
   expect(gets).toBe(3);
+  expect(state.errors).toEqual([]);
 });
 
 test("tài liệu đang tải hoặc lỗi không giả thành chưa có file; retry riêng mới xác nhận empty", async ({
