@@ -1,0 +1,15 @@
+{
+  "firstGreen": {
+    "startTime": "2026-10-24T08:22:02.996Z",
+    "duration": 89914.012,
+    "expected": 17,
+    "skipped": 0,
+    "unexpected": 6,
+    "flaky": 0
+  },
+  "rawSha256": "050711a5c4f0a40b520c0ca5326e8035a680cde4ece74c622b148686f0be3f94",
+  "failures": "6 contract executions: exact getByLabel Hệ missed native select despite ARIA snapshot containing options; unfiltered role=alert also matched Next route announcer. Changed to accessible combobox name and alert text filter, preserved all option/payload/count/error oracles.",
+  "gateFirst": "17/18; TS event overload union in test helper. Use typed Request callback with separate event registrations. No application failure or environment failure hidden.",
+  "sourceReview": "Personnel child modal/cert/write functions byte-identical to baseline. AddContractModal/ContractDocument unchanged; taiDanhSach/refresh/CAN/money expressions unchanged. Small added correction: empty only after valid matching snapshot; copy reflects active filter/viewer.",
+  "limits": "No assertion/threshold/timeout weakening, no skip. Final GREEN/build/gate still pending."
+}

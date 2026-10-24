@@ -1,13 +1,12 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, X, Users, Trash2, Pencil, AlertTriangle, Upload, Paperclip } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
-import { ErrorState } from "@/app/components/ErrorState";
-import { PageSkeleton } from "@/app/components/Skeleton";
+import { Button } from "@/app/components/ui";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
-import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
+import { fetchMe, invalidateMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/nen/date";
 import { trangThaiHanTheoNgay, type TrangThaiHan } from "@/lib/nen/han-hieu-luc";
 import CrewsModal from "@/app/personnel/_components/CrewsModal";
@@ -51,72 +50,112 @@ function certBadge(c: Certification): { label: string; className: string } | nul
   return CERT_BADGE[trangThaiHanTheoNgay(c.expiryDate)];
 }
 
+// Mỗi nguồn tải độc lập; chỉ response của URL/request hiện tại được áp dụng.
+function usePersonnelList<T>(url: string, field: string, label: string) {
+  const [snapshot, setSnapshot] = useState<{ url: string; items: T[] } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const activeUrl = useRef(url);
+  activeUrl.current = url;
+  const request = useRef<AbortController | null>(null);
+  const reload = useCallback(async () => {
+    if (activeUrl.current !== url) return;
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    const current = () =>
+      !controller.signal.aborted && request.current === controller && activeUrl.current === url;
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!current()) return;
+      if (response.status === 401) {
+        void redirectToLogin();
+        return;
+      }
+      const body = await response.json().catch(() => null);
+      if (!response.ok || !Array.isArray(body?.[field]))
+        throw new Error(
+          typeof body?.error === "string" ? body.error : `Không tải được ${label}. Hãy thử lại.`,
+        );
+      if (current()) setSnapshot({ url, items: body[field] });
+    } catch (err) {
+      if (current())
+        setError(
+          err instanceof Error && err.name !== "TypeError"
+            ? err.message
+            : `Mất kết nối — không tải được ${label}. Hãy thử lại.`,
+        );
+    } finally {
+      if (current()) setLoading(false);
+    }
+  }, [url, field, label]);
+  useEffect(() => {
+    void reload();
+    return () => {
+      request.current?.abort();
+    };
+  }, [reload]);
+  return { snapshot, loading, error, reload };
+}
+
+function SourceError({ message, retry }: { message: string; retry: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="rounded-xl border border-rose-800 bg-rose-950/30 p-3 text-sm text-rose-300 flex flex-wrap items-center gap-3"
+    >
+      <p className="flex-1">{message}</p>
+      <Button variant="secondary" className="min-h-11" onClick={retry}>
+        Thử lại
+      </Button>
+    </div>
+  );
+}
+
 export default function PersonnelPage() {
   const [me, setMe] = useState<Me | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [personnel, setPersonnel] = useState<Personnel[]>([]);
-  const [crews, setCrews] = useState<Crew[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [meError, setMeError] = useState("");
   const [crewFilter, setCrewFilter] = useState<number | "">("");
   const [supplierFilter, setSupplierFilter] = useState<number | "">("");
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Personnel | null>(null);
   const [detail, setDetail] = useState<Personnel | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [crewsOpen, setCrewsOpen] = useState(false);
 
-  async function loadCrews() {
-    const res = await fetch("/api/crews").catch(() => null);
-    if (!res?.ok) return;
-    const j = await res.json().catch(() => null);
-    setCrews(j?.crews ?? []);
-  }
-
+  const params = new URLSearchParams();
+  if (crewFilter !== "") params.set("crewId", String(crewFilter));
+  if (supplierFilter !== "") params.set("supplierId", String(supplierFilter));
+  const url = `/api/personnel?${params.toString()}`;
+  const peopleSource = usePersonnelList<Personnel>(url, "personnel", "danh sách nhân sự");
+  const crewSource = usePersonnelList<Crew>("/api/crews", "crews", "tổ đội");
+  const supplierSource = usePersonnelList<Supplier>("/api/suppliers", "suppliers", "nhà thầu phụ");
+  const personnel = peopleSource.snapshot?.items ?? [];
+  const crews = crewSource.snapshot?.items ?? [];
+  const suppliers = supplierSource.snapshot?.items ?? [];
+  const loadPersonnel = peopleSource.reload;
+  const loadCrews = crewSource.reload;
   const canManage = me?.role === "admin" || me?.role === "pm";
-
-  async function loadPersonnel() {
-    const sp = new URLSearchParams();
-    if (crewFilter !== "") sp.set("crewId", String(crewFilter));
-    if (supplierFilter !== "") sp.set("supplierId", String(supplierFilter));
-    const res = await fetch(`/api/personnel?${sp.toString()}`).catch(() => null);
-    if (!res) {
-      setLoadError("Mất kết nối mạng — không tải được danh sách nhân sự");
-      return;
-    }
-    if (res.status === 401) {
-      await redirectToLogin();
-      return;
-    }
-    if (!res.ok) {
-      // Lỗi thật từ server (403/500...) — không được nuốt thành danh sách rỗng.
-      const j = await res.json().catch(() => null);
-      setLoadError(j?.error ?? `Lỗi tải danh sách nhân sự (${res.status})`);
-      return;
-    }
-    const j = await res.json().catch(() => null);
-    setPersonnel(j?.personnel ?? []);
-    setLoadError(null);
-  }
-
-  useEffect(() => {
-    Promise.all([
-      fetchMe(),
-      fetch("/api/crews").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/suppliers").then((r) => (r.ok ? r.json() : null)),
-    ])
-      .then(([meData, crewsRes, suppliersRes]) => {
-        if (!meData) return;
-        setMe(meData);
-        setCrews(crewsRes?.crews ?? []);
-        setSuppliers(suppliersRes?.suppliers ?? []);
-      })
-      .finally(() => setLoading(false));
+  const canUseRows =
+    peopleSource.snapshot?.url === url && !peopleSource.loading && !peopleSource.error;
+  const authRequest = useRef({ id: 0 });
+  const loadMe = useCallback(async (retry = false) => {
+    const id = ++authRequest.current.id;
+    if (retry) invalidateMe();
+    setMeError("");
+    const user = await fetchMe();
+    if (id !== authRequest.current.id) return;
+    setMe(user);
+    if (!user) setMeError("Chưa xác minh được quyền quản lý nhân sự. Hãy thử lại.");
   }, []);
-
   useEffect(() => {
-    if (!loading) loadPersonnel();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [crewFilter, supplierFilter, loading]);
+    const active = authRequest.current;
+    void loadMe();
+    return () => {
+      active.id++;
+    };
+  }, [loadMe]);
 
   async function deletePersonnel(id: number) {
     if (!(await appConfirm("Xoá nhân sự này? Không thể hoàn tác.", { danger: true }))) return;
@@ -128,8 +167,6 @@ export default function PersonnelPage() {
     loadPersonnel();
   }
 
-  if (loading) return <PageSkeleton />;
-
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <AppHeader
@@ -140,7 +177,7 @@ export default function PersonnelPage() {
             <button
               onClick={() => setCrewsOpen(true)}
               aria-label="Quản lý tổ đội"
-              className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition shrink-0 text-zinc-100 min-h-10"
+              className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition shrink-0 text-zinc-100 min-h-11"
             >
               <Users className="w-4 h-4" /> <span className="hidden sm:inline">Tổ đội</span>
             </button>
@@ -148,7 +185,8 @@ export default function PersonnelPage() {
               <button
                 onClick={() => setAddOpen(true)}
                 aria-label="Thêm nhân sự"
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent min-h-10"
+                disabled={supplierSource.loading || !!supplierSource.error}
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent min-h-11"
               >
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm nhân sự</span>
               </button>
@@ -158,44 +196,81 @@ export default function PersonnelPage() {
       />
 
       <main className="p-4 sm:p-6 pb-24 space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <select
-            value={crewFilter}
-            onChange={(e) => setCrewFilter(e.target.value ? Number(e.target.value) : "")}
-            aria-label="Lọc theo tổ đội"
-            className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white"
-          >
-            <option value="">Mọi tổ đội</option>
-            {crews.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={supplierFilter}
-            onChange={(e) => setSupplierFilter(e.target.value ? Number(e.target.value) : "")}
-            aria-label="Lọc theo nhà thầu phụ"
-            className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white"
-          >
-            <option value="">Mọi nhà thầu phụ</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+        {meError && <SourceError message={meError} retry={() => void loadMe(true)} />}
+        {crewSource.error && (
+          <SourceError message={crewSource.error} retry={() => void loadCrews()} />
+        )}
+        {supplierSource.error && (
+          <SourceError message={supplierSource.error} retry={() => void supplierSource.reload()} />
+        )}
+        <div className="flex flex-wrap gap-3">
+          <label className="grid gap-1 text-sm text-zinc-400">
+            Tổ đội
+            <select
+              value={crewFilter}
+              onChange={(e) => setCrewFilter(e.target.value ? Number(e.target.value) : "")}
+              aria-label="Lọc theo tổ đội"
+              disabled={crewSource.loading || !!crewSource.error}
+              className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 min-h-11 text-base sm:text-sm text-white"
+            >
+              <option value="">Mọi tổ đội</option>
+              {crews.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm text-zinc-400">
+            Nhà thầu phụ
+            <select
+              value={supplierFilter}
+              onChange={(e) => setSupplierFilter(e.target.value ? Number(e.target.value) : "")}
+              aria-label="Lọc theo nhà thầu phụ"
+              disabled={supplierSource.loading || !!supplierSource.error}
+              className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 min-h-11 text-base sm:text-sm text-white"
+            >
+              <option value="">Mọi nhà thầu phụ</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
-        {loadError ? (
-          <ErrorState message={loadError} onRetry={loadPersonnel} />
-        ) : personnel.length === 0 ? (
+        {peopleSource.loading && (
+          <p role="status" className="text-sm text-zinc-400">
+            Đang tải danh sách nhân sự…
+          </p>
+        )}
+        {peopleSource.error && (
+          <SourceError message={peopleSource.error} retry={() => void loadPersonnel()} />
+        )}
+        {peopleSource.snapshot && !canUseRows && (
+          <p className="text-sm text-zinc-400">
+            Đang hiển thị kết quả tải trước đó (chỉ xem). Hãy đợi hoặc thử tải lại trước khi thao
+            tác.
+          </p>
+        )}
+        {canUseRows && personnel.length === 0 ? (
           <EmptyState
             icon={Users}
-            title="Chưa có nhân sự"
-            message="Bấm “Thêm nhân sự” để bắt đầu quản lý nhân sự công trường."
+            title={
+              crewFilter !== "" || supplierFilter !== ""
+                ? "Không có nhân sự phù hợp"
+                : "Chưa có nhân sự"
+            }
+            message={
+              crewFilter !== "" || supplierFilter !== ""
+                ? "Thử đổi bộ lọc tổ đội hoặc nhà thầu phụ."
+                : canManage
+                  ? "Bấm “Thêm nhân sự” để bắt đầu quản lý nhân sự công trường."
+                  : "Chưa có nhân sự được ghi nhận trong dự án."
+            }
           />
-        ) : (
+        ) : personnel.length > 0 ? (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
             <div
               className="overflow-x-auto"
@@ -203,7 +278,7 @@ export default function PersonnelPage() {
               role="region"
               aria-label="Danh sách nhân sự"
             >
-              <table className="w-full text-sm sm:min-w-[720px]">
+              <table className="w-full text-sm min-w-[720px]">
                 <thead>
                   <tr className="text-xs text-zinc-400 border-b border-zinc-800">
                     <th className="text-left p-3">HỌ TÊN</th>
@@ -219,10 +294,19 @@ export default function PersonnelPage() {
                     <tr
                       key={p.id}
                       className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/40 cursor-pointer"
-                      onClick={() => setDetail(p)}
+                      onClick={() => {
+                        if (canUseRows) setDetail(p);
+                      }}
                     >
                       <td className="p-3">
-                        <p className="truncate max-w-[200px]">{p.fullName}</p>
+                        <Button
+                          variant="ghost"
+                          className="min-h-11 max-w-60 px-0 text-left justify-start whitespace-normal break-words"
+                          disabled={!canUseRows}
+                          onClick={() => setDetail(p)}
+                        >
+                          {p.fullName}
+                        </Button>
                         {p.code && <p className="text-xs text-zinc-500">{p.code}</p>}
                       </td>
                       <td className="p-3 text-xs text-zinc-400">{p.roleTitle ?? "—"}</td>
@@ -246,17 +330,19 @@ export default function PersonnelPage() {
                             onClick={(e) => e.stopPropagation()}
                           >
                             <button
+                              disabled={!canUseRows}
                               onClick={() => setEditing(p)}
                               aria-label="Sửa nhân sự"
-                              className="text-zinc-400 hover:text-white"
+                              className="min-h-11 min-w-11 grid place-items-center rounded-lg text-zinc-400 hover:text-white focus-visible:outline-2 focus-visible:outline-emerald-500 disabled:opacity-50"
                               title="Sửa"
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
                             <button
+                              disabled={!canUseRows}
                               onClick={() => deletePersonnel(p.id)}
                               aria-label="Xoá nhân sự"
-                              className="text-zinc-400 hover:text-rose-400"
+                              className="min-h-11 min-w-11 grid place-items-center rounded-lg text-zinc-400 hover:text-rose-400 focus-visible:outline-2 focus-visible:outline-emerald-500 disabled:opacity-50"
                               title="Xoá"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -270,7 +356,7 @@ export default function PersonnelPage() {
               </table>
             </div>
           </div>
-        )}
+        ) : null}
       </main>
 
       {(addOpen || editing) && (
