@@ -1,6 +1,6 @@
 # Kiểm chứng UI tải đúng nhu cầu
 
-Baseline main `e52b4937c8e46936adba15bf4ed7d62d11d7add3` (#682). Source cuối `6a636c75b6188b5bf237fd4359e252618f3d5227`; commit tiếp theo chỉ ghi evidence/docs. **VERIFY: checkpoint trước CI/merge/deploy**; kết quả phát hành cuối đối soát tại PR của lát này. Owner đã ủy quyền thực hiện và phát hành; UAT/usage F2/F3 vẫn WAITING.
+Baseline main `e52b4937c8e46936adba15bf4ed7d62d11d7add3` (#682). Source cuối `6a636c75b6188b5bf237fd4359e252618f3d5227`; commit tiếp theo chỉ ghi evidence/docs. **VERIFY: checkpoint trước CI/merge/deploy**; kết quả phát hành cuối đối soát tại [PR#683](https://github.com/seeker19110/xboss/pull/683). Owner đã ủy quyền thực hiện và phát hành; UAT/usage F2/F3 vẫn WAITING.
 
 ## Kết quả chức năng
 

@@ -1,14 +1,14 @@
 # Nâng cấp trải nghiệm, hiệu năng và tinh gọn XBoss
 
-| Thuộc tính            | Giá trị                                                                       |
-| --------------------- | ----------------------------------------------------------------------------- |
-| Goal ID               | UPGRADE-2026-10                                                               |
-| Owner                 | Chủ dự án                                                                     |
-| State                 | WAITING — #675–#682 DEPLOYED; vòng tải đúng nhu cầu VERIFY; UAT/usage WAITING |
-| Main SHA đã reconcile | `d4cb1b7de04ab8d632b9e6338afb98c0cece4f79`                                    |
-| Bắt đầu               | 2026-10-23                                                                    |
-| Đối soát              | 2026-10-24                                                                    |
-| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026    |
+| Thuộc tính            | Giá trị                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| Goal ID               | UPGRADE-2026-10                                                                    |
+| Owner                 | Chủ dự án                                                                          |
+| State                 | WAITING — #675–#682 DEPLOYED; vòng tải đúng nhu cầu #683 VERIFY; UAT/usage WAITING |
+| Main SHA đã reconcile | `d4cb1b7de04ab8d632b9e6338afb98c0cece4f79`                                         |
+| Bắt đầu               | 2026-10-23                                                                         |
+| Đối soát              | 2026-10-24                                                                         |
+| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026         |
 
 ## Outcome và cổng hoàn thành
 
@@ -172,7 +172,7 @@ Owner tiếp tục ủy quyền rà production, tự triển khai, kiểm kỹ, 
 
 Owner tiếp tục ủy quyền rà/sửa/kiểm kỹ/merge/deploy ngày24/10; baseline e52b4937 đã phát hành qua#682 (PRCI40069017902/mainCI40069723355/deploy40070456619 success, publicsmoke06:34:37Z đạt). Trạng thái iteration8 đối soát DEPLOYED theo [PR#682](https://github.com/seeker19110/xboss/pull/682); checkpoint cũ giữ provenance tại commit trước CI.
 
-Lát S theo [scope](../ops/evidence/ui-request-2026-10/scope.md): primary Nhân sự không chờ nguồn phụ, guard response/filter, lỗi/retry giữ snapshot; Hợp đồng bỏ2GET option lúc chỉ đọc và tải đúng lúc mở form. Giữ API/quyền/payload/tính tiền/schema/dependency; không sửa form/chứng chỉ/tổ đội, không gỡ capability. RED baseline đã lưu, hiện VERIFY chưa deploy. F2/F3 WAITING.
+Lát S theo [scope](../ops/evidence/ui-request-2026-10/scope.md): primary Nhân sự không chờ nguồn phụ, guard response/filter, lỗi/retry giữ snapshot; Hợp đồng bỏ2GET option lúc chỉ đọc và tải đúng lúc mở form. Giữ API/quyền/payload/tính tiền/schema/dependency; không sửa form/chứng chỉ/tổ đội, không gỡ capability. RED baseline đã lưu, hiện [PR#683](https://github.com/seeker19110/xboss/pull/683) VERIFY chưa deploy. F2/F3 WAITING.
 
 ## Final audit
 
