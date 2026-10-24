@@ -140,6 +140,96 @@ test("đổi ngày đang tải không được PATCH/DELETE bản ghi của ngà
   }
 });
 
+test("xóa trắng ngày khóa mọi ghi, không GET ngày rỗng; chọn lại ngày đợi đúng snapshot", async ({
+  page,
+}) => {
+  await mockSources(page);
+  const gate = barrier();
+  const emptyReads: string[] = [];
+  const writes: string[] = [];
+  let dayBStarted = false;
+  await page.route(API, async (route) => {
+    if (route.request().method() !== "GET") {
+      writes.push(route.request().url());
+      return route.fulfill({ status: 403, json: { error: "Không ghi trong ca ngày rỗng" } });
+    }
+    const url = new URL(route.request().url());
+    const date = url.searchParams.get("from");
+    if (!date || !url.searchParams.get("to")) emptyReads.push(url.toString());
+    if (url.searchParams.get("view") === "byDate") return route.fulfill({ json: { byDate: [] } });
+    if (date === DAY_B) {
+      dayBStarted = true;
+      await gate.promise;
+    }
+    const group = item(date ?? "", date === DAY_B ? 4 : 1, date === DAY_B ? NEXT_ID : INITIAL_ID);
+    await route
+      .fulfill({
+        json: {
+          items: [
+            group,
+            {
+              ...group,
+              id: group.id + 20,
+              personnelId: PERSON.id,
+              personnelName: PERSON.fullName,
+              headcount: null,
+              present: true,
+              hours: 8,
+            },
+          ],
+        },
+      })
+      .catch(() => {});
+  });
+  try {
+    await open(page);
+    await expect(count(page)).toHaveText("1");
+    const date = page.getByLabel("Chọn ngày chấm công");
+    const submit = page.getByRole("button", { name: "Chấm công", exact: true });
+    const remove = page.getByRole("button", { name: "Xoá bản ghi", exact: true });
+    await expect(plus(page)).toBeEnabled();
+    await expect(remove).toBeEnabled();
+    await date.clear();
+    await expect(date).toHaveValue("");
+    await expect(page.getByRole("main").getByRole("alert")).toContainText(
+      "Chọn ngày chấm công hợp lệ",
+    );
+    await expect(plus(page)).toBeDisabled();
+    await expect(minus(page)).toBeDisabled();
+    await expect(submit).toBeDisabled();
+    await expect(remove).toBeDisabled();
+    await expect(page.getByLabel("Nhân sự", { exact: true })).toBeDisabled();
+    await expect(count(page)).toHaveText("1");
+    await plus(page).evaluate((button: HTMLButtonElement) => button.click());
+    await remove.evaluate((button: HTMLButtonElement) => button.click());
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    expect(emptyReads).toEqual([]);
+    expect(writes).toEqual([]);
+    await date.fill(DAY_B);
+    await expect.poll(() => dayBStarted).toBe(true);
+    await expect(plus(page)).toBeDisabled();
+    await expect(minus(page)).toBeDisabled();
+    await expect(submit).toBeDisabled();
+    await expect(remove).toBeDisabled();
+    await expect(count(page)).toHaveText("1");
+    gate.release();
+    await expect(count(page)).toHaveText("4");
+    await expect(plus(page)).toBeEnabled();
+    await expect(minus(page)).toBeEnabled();
+    await expect(submit).toBeEnabled();
+    await expect(remove).toBeEnabled();
+    expect(emptyReads).toEqual([]);
+    expect(writes).toEqual([]);
+  } finally {
+    gate.release();
+  }
+});
+
 test("response ngày cũ về muộn không thay snapshot mới; chọn trong tháng không tải lại tổng tháng", async ({
   page,
 }) => {
