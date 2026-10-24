@@ -184,7 +184,7 @@ async function main() {
       samples,
       fixture: "E2E PostgreSQL disposable; seed-sample",
       conditions: {
-        viewport: "Pixel 5 (393×851)",
+        viewport: `Pixel 5 (${devices["Pixel 5"].viewport.width}×${devices["Pixel 5"].viewport.height})`,
         latencyMs: 150,
         downloadBytesPerSecond: 200_000,
         uploadBytesPerSecond: 93_750,

@@ -1,0 +1,798 @@
+{
+  "scope": "local read-only UI diagnostic; no production request or persistence",
+  "target": "Nghiệm thu, menu option inactive, 14px normal",
+  "measured": [
+    {
+      "trial": 0,
+      "light": false,
+      "samples": [
+        {
+          "requestedMs": 0,
+          "actualMs": 0,
+          "foreground": "oklab(0.43726 -0.00324082 -0.0266253)",
+          "optionForeground": "oklab(0.43726 -0.00324082 -0.0266253)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased"
+        },
+        {
+          "requestedMs": 50,
+          "actualMs": 50,
+          "foreground": "oklab(0.513551 -0.00237484 -0.0229552)",
+          "optionForeground": "oklab(0.513551 -0.00237484 -0.0229552)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased"
+        },
+        {
+          "requestedMs": 150,
+          "actualMs": 149.4,
+          "foreground": "oklab(0.867967 0.00164816 -0.00590517)",
+          "optionForeground": "oklab(0.867967 0.00164816 -0.00590517)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased"
+        },
+        {
+          "requestedMs": 300,
+          "actualMs": 299.8,
+          "foreground": "oklch(0.871 0.006 286.286)",
+          "optionForeground": "oklch(0.871 0.006 286.286)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased"
+        },
+        {
+          "requestedMs": 500,
+          "actualMs": 500.2,
+          "foreground": "oklch(0.871 0.006 286.286)",
+          "optionForeground": "oklch(0.871 0.006 286.286)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased"
+        }
+      ],
+      "stableAxe": []
+    },
+    {
+      "trial": 0,
+      "light": true,
+      "samples": [
+        {
+          "requestedMs": 0,
+          "actualMs": 0,
+          "foreground": "oklab(0.871 0.00168259 -0.00575924)",
+          "optionForeground": "oklab(0.871 0.00168259 -0.00575924)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased light"
+        },
+        {
+          "requestedMs": 50,
+          "actualMs": 51.5,
+          "foreground": "oklab(0.672103 -0.000575104 -0.0153277)",
+          "optionForeground": "oklab(0.672103 -0.000575104 -0.0153277)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased light"
+        },
+        {
+          "requestedMs": 150,
+          "actualMs": 149.8,
+          "foreground": "rgb(74, 82, 97)",
+          "optionForeground": "rgb(74, 82, 97)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased light"
+        },
+        {
+          "requestedMs": 300,
+          "actualMs": 300,
+          "foreground": "rgb(74, 82, 97)",
+          "optionForeground": "rgb(74, 82, 97)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased light"
+        },
+        {
+          "requestedMs": 500,
+          "actualMs": 499.5,
+          "foreground": "rgb(74, 82, 97)",
+          "optionForeground": "rgb(74, 82, 97)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased light"
+        }
+      ],
+      "stableAxe": []
+    },
+    {
+      "trial": 1,
+      "light": false,
+      "samples": [
+        {
+          "requestedMs": 0,
+          "actualMs": 0.1,
+          "foreground": "oklab(0.43726 -0.00324082 -0.0266253)",
+          "optionForeground": "oklab(0.43726 -0.00324082 -0.0266253)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased"
+        },
+        {
+          "requestedMs": 50,
+          "actualMs": 50,
+          "foreground": "oklab(0.636157 -0.000983125 -0.0170569)",
+          "optionForeground": "oklab(0.636157 -0.000983125 -0.0170569)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased"
+        },
+        {
+          "requestedMs": 150,
+          "actualMs": 151.3,
+          "foreground": "oklch(0.871 0.006 286.286)",
+          "optionForeground": "oklch(0.871 0.006 286.286)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased"
+        },
+        {
+          "requestedMs": 300,
+          "actualMs": 299.5,
+          "foreground": "oklch(0.871 0.006 286.286)",
+          "optionForeground": "oklch(0.871 0.006 286.286)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased"
+        },
+        {
+          "requestedMs": 500,
+          "actualMs": 500,
+          "foreground": "oklch(0.871 0.006 286.286)",
+          "optionForeground": "oklch(0.871 0.006 286.286)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased"
+        }
+      ],
+      "stableAxe": []
+    },
+    {
+      "trial": 1,
+      "light": true,
+      "samples": [
+        {
+          "requestedMs": 0,
+          "actualMs": 0,
+          "foreground": "oklab(0.871 0.00168259 -0.00575924)",
+          "optionForeground": "oklab(0.871 0.00168259 -0.00575924)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased light"
+        },
+        {
+          "requestedMs": 50,
+          "actualMs": 49.8,
+          "foreground": "oklab(0.794569 0.000815017 -0.00943614)",
+          "optionForeground": "oklab(0.794569 0.000815017 -0.00943614)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased light"
+        },
+        {
+          "requestedMs": 150,
+          "actualMs": 150.1,
+          "foreground": "oklab(0.440285 -0.0032065 -0.0264798)",
+          "optionForeground": "oklab(0.440285 -0.0032065 -0.0264798)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased light"
+        },
+        {
+          "requestedMs": 300,
+          "actualMs": 299.7,
+          "foreground": "rgb(74, 82, 97)",
+          "optionForeground": "rgb(74, 82, 97)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased light"
+        },
+        {
+          "requestedMs": 500,
+          "actualMs": 500.2,
+          "foreground": "rgb(74, 82, 97)",
+          "optionForeground": "rgb(74, 82, 97)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased light"
+        }
+      ],
+      "stableAxe": []
+    },
+    {
+      "trial": 2,
+      "light": false,
+      "samples": [
+        {
+          "requestedMs": 0,
+          "actualMs": 0.1,
+          "foreground": "oklab(0.43726 -0.00324082 -0.0266253)",
+          "optionForeground": "oklab(0.43726 -0.00324082 -0.0266253)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased"
+        },
+        {
+          "requestedMs": 50,
+          "actualMs": 49.8,
+          "foreground": "oklab(0.636173 -0.000982953 -0.0170562)",
+          "optionForeground": "oklab(0.636173 -0.000982953 -0.0170562)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased"
+        },
+        {
+          "requestedMs": 150,
+          "actualMs": 149.6,
+          "foreground": "oklch(0.871 0.006 286.286)",
+          "optionForeground": "oklch(0.871 0.006 286.286)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased"
+        },
+        {
+          "requestedMs": 300,
+          "actualMs": 299.9,
+          "foreground": "oklch(0.871 0.006 286.286)",
+          "optionForeground": "oklch(0.871 0.006 286.286)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased"
+        },
+        {
+          "requestedMs": 500,
+          "actualMs": 500.2,
+          "foreground": "oklch(0.871 0.006 286.286)",
+          "optionForeground": "oklch(0.871 0.006 286.286)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "oklch(0.21 0.006 285.885)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased"
+        }
+      ],
+      "stableAxe": []
+    },
+    {
+      "trial": 2,
+      "light": true,
+      "samples": [
+        {
+          "requestedMs": 0,
+          "actualMs": 0.1,
+          "foreground": "oklab(0.871 0.00168259 -0.00575924)",
+          "optionForeground": "oklab(0.871 0.00168259 -0.00575924)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased light"
+        },
+        {
+          "requestedMs": 50,
+          "actualMs": 50.2,
+          "foreground": "oklab(0.672088 -0.000575276 -0.0153284)",
+          "optionForeground": "oklab(0.672088 -0.000575276 -0.0153284)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 5,
+          "htmlClasses": "h-full antialiased light"
+        },
+        {
+          "requestedMs": 150,
+          "actualMs": 150.6,
+          "foreground": "rgb(74, 82, 97)",
+          "optionForeground": "rgb(74, 82, 97)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased light"
+        },
+        {
+          "requestedMs": 300,
+          "actualMs": 299.8,
+          "foreground": "rgb(74, 82, 97)",
+          "optionForeground": "rgb(74, 82, 97)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased light"
+        },
+        {
+          "requestedMs": 500,
+          "actualMs": 500.2,
+          "foreground": "rgb(74, 82, 97)",
+          "optionForeground": "rgb(74, 82, 97)",
+          "optionBackground": "rgba(0, 0, 0, 0)",
+          "panelBackground": "rgb(255, 255, 255)",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "transitionProperty": "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to",
+          "transitionDuration": "0.15s",
+          "transitionTimingFunction": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "runningAnimations": 0,
+          "htmlClasses": "h-full antialiased light"
+        }
+      ],
+      "stableAxe": []
+    }
+  ],
+  "immediate": [
+    {
+      "trial": 0,
+      "light": false,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            {
+              "target": ["#global-search-hit-0 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#7b7e86",
+                  "bgColor": "#162825",
+                  "contrastRatio": 3.78,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "axeDurationMs": 297.00127000000066
+    },
+    {
+      "trial": 0,
+      "light": true,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            {
+              "target": ["#global-search-hit-1 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#717784",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 4.49,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": ["#global-search-hit-2 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#717784",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 4.49,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": ["#global-search-hit-3 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#717784",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 4.49,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": ["#global-search-hit-4 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#717784",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 4.49,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": ["#global-search-hit-5 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#717784",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 4.49,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "axeDurationMs": 324.7670740000003
+    },
+    {
+      "trial": 1,
+      "light": false,
+      "violations": [],
+      "axeDurationMs": 306.4730179999997
+    },
+    {
+      "trial": 1,
+      "light": true,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            {
+              "target": ["#global-search-hit-0 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#8c8f96",
+                  "bgColor": "#e5f8f2",
+                  "contrastRatio": 2.93,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": ["#global-search-hit-1 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#9296a0",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 2.96,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": ["#global-search-hit-2 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#9296a0",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 2.96,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": ["#global-search-hit-3 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#9296a0",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 2.96,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": ["#global-search-hit-4 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#9296a0",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 2.96,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": ["#global-search-hit-5 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#9296a0",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 2.96,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "axeDurationMs": 330.6582380000009
+    },
+    {
+      "trial": 2,
+      "light": false,
+      "violations": [],
+      "axeDurationMs": 333.45851700000003
+    },
+    {
+      "trial": 2,
+      "light": true,
+      "violations": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            {
+              "target": ["#global-search-hit-1 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#717784",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 4.49,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": ["#global-search-hit-2 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#717784",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 4.49,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": ["#global-search-hit-3 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#717784",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 4.49,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": ["#global-search-hit-4 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#717784",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 4.49,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": ["#global-search-hit-5 > .min-w-0.flex-1 > .block.truncate:nth-child(1)"],
+              "data": [
+                {
+                  "fgColor": "#717784",
+                  "bgColor": "#ffffff",
+                  "contrastRatio": 4.49,
+                  "fontSize": "10.5pt (14px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "axeDurationMs": 325.3093949999993
+    }
+  ]
+}

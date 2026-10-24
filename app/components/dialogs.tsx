@@ -12,12 +12,59 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 const khongDangKy = () => () => {};
-/**
- * Phần tử nhận được focus bằng Tab. Bỏ control `disabled`: trình duyệt bỏ qua chúng khi Tab, nên
- * tính chúng là "phần tử cuối" làm trap hở — Tab từ phần tử bật cuối cùng thoát khỏi hộp aria-modal.
- */
-const FOCUSABLE =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE = "button, [href], input, select, textarea, [tabindex]";
+
+// Modal có thể nằm ở các nhánh React khác nhau: host confirm ở layout được mount trước form,
+// còn portal confirm được thêm sau và có z-index cao hơn. Thứ tự effect không phải thứ tự nổi.
+const cacModalDangMo = new Set<HTMLDivElement>();
+let overflowTruocModal: string | undefined;
+let nutMoDauTien: HTMLElement | null = null;
+
+function modalTrenCung(): HTMLDivElement | undefined {
+  let trenCung: HTMLDivElement | undefined;
+  let zTrenCung = -Infinity;
+  for (const panel of cacModalDangMo) {
+    if (!panel.isConnected) continue;
+    const overlay = panel.parentElement;
+    const z = Number(overlay ? getComputedStyle(overlay).zIndex : 0) || 0;
+    if (
+      !trenCung ||
+      z > zTrenCung ||
+      (z === zTrenCung &&
+        !!(trenCung.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING))
+    ) {
+      trenCung = panel;
+      zTrenCung = z;
+    }
+  }
+  return trenCung;
+}
+
+function coTheNhanFocus(control: HTMLElement): boolean {
+  if (
+    !control.isConnected ||
+    control.matches(":disabled") ||
+    control.closest('[hidden], [inert], [aria-hidden="true"]')
+  )
+    return false;
+  const style = getComputedStyle(control);
+  return (
+    style.visibility === "visible" &&
+    Array.from(control.getClientRects()).some((rect) => rect.width > 0 && rect.height > 0)
+  );
+}
+
+function cacControlNhanTab(panel: HTMLDivElement): HTMLElement[] {
+  // :disabled tính cả disabled kế thừa từ fieldset; client rect/visibility loại cả control
+  // bị ẩn bởi tổ tiên. Không chỉ kiểm thuộc tính disabled trực tiếp hoặc selector cuối cùng.
+  return Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (control) => control.tabIndex >= 0 && coTheNhanFocus(control),
+  );
+}
+
+function focusTrongModal(panel: HTMLDivElement) {
+  (cacControlNhanTab(panel)[0] ?? panel).focus({ preventScroll: true });
+}
 
 // ── Modal nền tảng: overlay + Escape để đóng + khoá scroll nền ──────────────
 // Dùng chung cho mọi modal trong app thay vì tự dựng overlay từng nơi.
@@ -88,28 +135,26 @@ export function Modal({
       : null,
   );
 
-  // Khoá scroll nền + focus phần tử đầu tiên — CHỈ chạy 1 lần lúc mount. Đóng modal thì
-  // trả focus về phần tử đã mở nó — không thì focus rơi về <body>, người dùng bàn phím/
-  // trình đọc màn hình mất vị trí và phải Tab lại từ đầu trang.
+  // Khoá scroll theo toàn bộ stack, không khôi phục overflow của từng modal riêng lẻ:
+  // cha có thể unmount trước con, trong khi confirm của layout vẫn còn mở.
   useEffect(() => {
-    const prev = document.body.style.overflow;
+    const panel = panelRef.current;
+    if (!panel) return;
+    if (!cacModalDangMo.size) {
+      overflowTruocModal = document.body.style.overflow;
+      nutMoDauTien = opener;
+    }
+    cacModalDangMo.add(panel);
     document.body.style.overflow = "hidden";
     const t = setTimeout(() => {
-      // Không cướp focus nếu người dùng đã focus sẵn vào phần tử trong modal.
-      if (panelRef.current?.contains(document.activeElement)) return;
-      const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
-      first?.focus();
+      // Không cướp focus khỏi input đang gõ hoặc modal con vừa mở.
+      if (modalTrenCung() !== panel || panel.contains(document.activeElement)) return;
+      focusTrongModal(panel);
     }, 50);
-    return () => {
-      document.body.style.overflow = prev;
-      clearTimeout(t);
-      if (opener?.isConnected) opener.focus();
-    };
-  }, [opener]);
-
-  // Listener Escape + Tab-trap — đăng ký 1 lần, đọc onClose qua ref.
-  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // defaultPrevented cũng chặn listener khác xử lý lại cùng phím nếu onClose vừa
+      // unmount modal trên cùng đồng bộ. onClose inline vẫn được đọc qua ref ổn định.
+      if (e.defaultPrevented || modalTrenCung() !== panel) return;
       if (e.key === "Escape") {
         // Đánh dấu "đã xử lý": listener Esc ở window của trang phía sau (vd CertDocument) kiểm
         // e.defaultPrevented thay vì dò [role=dialog] — Modal đóng đồng bộ nên DOM đã mất dialog.
@@ -117,30 +162,62 @@ export function Modal({
         onCloseRef.current();
         return;
       }
-      if (e.key === "Tab" && panelRef.current) {
-        const focusable = panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE);
+      if (e.key === "Tab") {
+        const focusable = cacControlNhanTab(panel);
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
         if (!focusable.length) {
           e.preventDefault();
+          panel.focus({ preventScroll: true });
+          return;
+        }
+        // Khi pending làm mất focus ở control disabled, đưa focus trở lại stack thay vì
+        // để Tab đi vào header hoặc form phía sau. Panel dự phòng cũng theo quy tắc này.
+        if (!focusable.includes(document.activeElement as HTMLElement)) {
+          e.preventDefault();
+          (e.shiftKey ? last : first).focus({ preventScroll: true });
           return;
         }
         if (e.shiftKey) {
           if (document.activeElement === first) {
             e.preventDefault();
-            last.focus();
+            last.focus({ preventScroll: true });
           }
         } else {
           if (document.activeElement === last) {
             e.preventDefault();
-            first.focus();
+            first.focus({ preventScroll: true });
           }
         }
       }
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("keydown", onKey);
+      cacModalDangMo.delete(panel);
+      const modalConLai = modalTrenCung();
+      let traFocus = modalConLai?.contains(opener) ? opener : null;
+      if (!cacModalDangMo.size) {
+        document.body.style.overflow = overflowTruocModal ?? "";
+        overflowTruocModal = undefined;
+        traFocus = nutMoDauTien?.isConnected ? nutMoDauTien : opener;
+        nutMoDauTien = null;
+      }
+      // Đợi các cleanup/setup cùng commit (kể cả StrictMode) xong. Modal mới hoặc con còn
+      // mở phải giữ focus; chỉ trả về trigger khi stack thực sự đã đóng hết.
+      queueMicrotask(() => {
+        if (modalTrenCung() !== modalConLai) return;
+        if (modalConLai) {
+          if (modalConLai.contains(document.activeElement)) return;
+          if (traFocus && coTheNhanFocus(traFocus)) traFocus.focus({ preventScroll: true });
+          else focusTrongModal(modalConLai);
+        } else if (!cacModalDangMo.size && traFocus && coTheNhanFocus(traFocus)) {
+          traFocus.focus({ preventScroll: true });
+        }
+      });
+    };
+  }, [opener, laClient]);
 
   const lop = (
     <div
@@ -154,6 +231,7 @@ export function Modal({
         ref={panelRef}
         id={id}
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-label={ariaLabel}
         aria-labelledby={ariaLabel ? undefined : labelledBy}

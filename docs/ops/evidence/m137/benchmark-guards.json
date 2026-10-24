@@ -1,0 +1,42 @@
+[
+  {
+    "case": "external URL",
+    "exitCode": 1,
+    "PASS": true
+  },
+  {
+    "case": "non-root URL",
+    "exitCode": 1,
+    "PASS": true
+  },
+  {
+    "case": "zero samples",
+    "exitCode": 1,
+    "PASS": true
+  },
+  {
+    "case": "too many samples",
+    "exitCode": 1,
+    "PASS": true
+  },
+  {
+    "case": "missing DB",
+    "exitCode": 1,
+    "PASS": true
+  },
+  {
+    "case": "external DB",
+    "exitCode": 1,
+    "PASS": true
+  },
+  {
+    "case": "wrong DB protocol",
+    "exitCode": 1,
+    "PASS": true
+  },
+  {
+    "case": "login does not follow HTTP307",
+    "redirectedPosts": 0,
+    "PASS": true
+  }
+]

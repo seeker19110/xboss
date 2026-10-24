@@ -1,14 +1,14 @@
 # Nâng cấp trải nghiệm, hiệu năng và tinh gọn XBoss
 
-| Thuộc tính            | Giá trị                                                                    |
-| --------------------- | -------------------------------------------------------------------------- |
-| Goal ID               | UPGRADE-2026-10                                                            |
-| Owner                 | Chủ dự án                                                                  |
-| State                 | WAITING — CI/merge bản vá Zod, UAT và usage                                |
-| Main SHA đã reconcile | `d413650c567fa9a515eae5081e612eea53ea8913`                                 |
-| Bắt đầu               | 2026-10-23                                                                 |
-| Đối soát              | 2026-10-24                                                                 |
-| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026 |
+| Thuộc tính            | Giá trị                                                                     |
+| --------------------- | --------------------------------------------------------------------------- |
+| Goal ID               | UPGRADE-2026-10                                                             |
+| Owner                 | Chủ dự án                                                                   |
+| State                 | WAITING — M137 đã kiểm local, chờ CI/rollout; UAT và usage tiếp tục WAITING |
+| Main SHA đã reconcile | `9afb984d46d5e2e0f0d14e6f65e3186b836a2800`                                  |
+| Bắt đầu               | 2026-10-23                                                                  |
+| Đối soát              | 2026-10-24                                                                  |
+| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026  |
 
 ## Outcome và cổng hoàn thành
 
@@ -26,7 +26,8 @@ Hoàn thiện các luồng lưu khi mạng yếu, điều hướng mobile, dashb
 | F1  | Phát hành production và public smoke         | VERIFIED | PR #675, CI/deploy cùng SHA, release.md và release.json     |
 | F2  | UAT 3–5 người, Safari/cảm ứng thật           | WAITING  | Chưa có người/thiết bị và kết quả nghiệm thu                |
 | F3  | Usage và quyết định giữ/gộp/gỡ capability    | WAITING  | Chưa xác nhận nguồn/coverage/thời điểm thu và cửa sổ đủ dài |
-| F4  | Vá Zod mới phát hiện trong CI và phát hành   | WAITING  | PR #676, chưa merge/deploy; chi tiết zod-repair.md          |
+| F4  | Vá Zod mới phát hiện trong CI và phát hành   | VERIFIED | PR #676, CI/deploy đúng `9afb984d`, public smoke đạt        |
+| G   | Tải việc hiện trường và tạo trang tin cậy    | WAITING  | M137 CODE VERIFIED local; CI/merge/rollout theo PR          |
 
 ## Current truth
 
@@ -36,6 +37,13 @@ Hoàn thiện các luồng lưu khi mạng yếu, điều hướng mobile, dashb
 Public smoke desktop/mobile ngày 23/10, kiểm lại 24/10 đều PASS; health/readiness tốt.
 Bằng chứng và giới hạn: [release.md](../ops/evidence/m136/release.md),
 [release.json](../ops/evidence/m136/release.json). Không thử ghi dữ liệu production.
+
+[PR #676](https://github.com/seeker19110/xboss/pull/676) đã squash merge thành main
+`9afb984d`, pin Zod 4.6.6. [CI main](https://github.com/seeker19110/xboss/actions/runs/40039658290)
+và [deploy](https://github.com/seeker19110/xboss/actions/runs/40040711272) thành công trên
+cùng SHA; deploy xác nhận Node 24/PM2/health-check, hoàn tất 06:41:16 ngày 24/10 UTC+7.
+Public smoke sau deploy đạt desktop/mobile login, JS/CSS, axe, API bảo vệ, health/readiness;
+chỉ đọc, không đăng nhập hoặc ghi dữ liệu production. F4 VERIFIED; kết quả cuối ở PR.
 
 Checkout gốc tại `/mnt/c/Users/liend/xboss` giữ nguyên 1.508 tệp xóa từ trước. Benchmark vẫn
 so baseline `efd31ba0` với candidate M136 trên cùng fixture: dashboard p95 giảm khoảng 29%,
@@ -57,13 +65,34 @@ chưa chứng minh đạt Core Web Vitals ngoài thực địa.
 - Đối soát main/GitHub/production, lưu evidence phát hành vào repo và sửa trạng thái rollout.
 - Không tìm thấy lỗi app mới từ public smoke. CI sau đó phát hiện dependency Zod high:
   D-002 bổ sung riêng bản vá 4.6.5→4.6.6 trong #676, không mở capability hoặc nới gate.
-  [Hồ sơ và giới hạn](../ops/evidence/m136/zod-repair.md); bản vá chưa merge/deploy.
-- Plan: [M136-RELEASE-PLAN.md](../autopilot/M136-RELEASE-PLAN.md). [PR đối soát #676](https://github.com/seeker19110/xboss/pull/676) chờ merge theo L1; bản cập nhật hồ sơ này chưa nằm trên main trước khi PR được merge.
+  [Hồ sơ và giới hạn](../ops/evidence/m136/zod-repair.md) giữ checkpoint trước merge;
+  bản vá sau đó đã qua CI, merge/deploy và kiểm chứng F4 như Current truth.
+- Plan: [M136-RELEASE-PLAN.md](../autopilot/M136-RELEASE-PLAN.md); T-006 merge #676 đã
+  được người dùng duyệt rõ và hoàn thành. Owner xác nhận “Chưa có; giữ hai mục này chờ”
+  ngày 24/10, áp dụng cho F2 UAT và F3 usage, không miễn trừ tiêu chí.
 - F2: owner bố trí 3–5 người đại diện theo bảng tác vụ trong runbook, gồm thiết bị Safari/
   cảm ứng thật; ghi thời gian, trợ giúp, lỗi và kết luận. Không thay người thật bằng agent.
 - F3: owner/operator xác nhận nguồn, scope và coverage đo trước pilot; ghi ngày bắt đầu thu
   thực, theo đủ chu kỳ nghiệp vụ rồi quyết định giữ/gộp/gỡ. Ngày deploy chưa phải ngày bắt đầu đo.
 - Không xóa capability sống hoặc dữ liệu thật trước khi có usage/caller/hồ sơ và owner quyết định.
+
+## Iteration 3 — 2026-10-24
+
+Người dùng yêu cầu triển khai tiếp cải tiến UI/hiệu năng không phụ thuộc UAT/usage.
+[M137](../nang-cap/M137-ui-hieu-nang-tiep-theo.md) sửa form Thêm trang thiếu guard/catch/label,
+trang Hiện trường chờ ba nguồn phụ mới hiện việc chính, modal lồng nhau/focus/scroll,
+nhãn mobile tràn/cắt và tương phản chuyển theme trong tìm kiếm. Không mở capability,
+xóa module, đổi schema/auth hoặc triển khai telemetry.
+
+CODE VERIFIED local: browser RED/GREEN, 50 ca mới đạt; tổng hồi quy 128 pass/0 fail/
+1 skip nền tảng có sẵn; gate 18/18, build, full unit 383 file/5.152 pass/0 fail/1 skip
+đúng allowlist. Cùng fixture ba việc và 40 hash khớp: nguồn phụ trễ 3s, median ready
+5,95→3,36s; normal gần như không đổi. [Bằng chứng và giới hạn](../ops/evidence/m137/verification.md).
+PR #677 bổ sung [M137-R1](../ops/evidence/m137/undici-repair.md): pin riêng Undici có sẵn
+8.10.2→8.12.2 để sửa audit high; 21 ca webhook/SSRF và build mới đạt, audit còn một
+package moderate có sẵn, 0 high/critical.
+G WAITING CI trên HEAD mới và merge/phát hành theo PR #677;
+chưa triển khai M137 lên production. F2/F3 tiếp tục chờ theo quyết định owner.
 
 ## Final audit
 
@@ -73,6 +102,8 @@ chưa chứng minh đạt Core Web Vitals ngoài thực địa.
 - [x] Rollout F1 được kiểm chứng; kết quả và giới hạn được lưu trong repo.
 - [ ] F2 có UAT người thật và thiết bị thực.
 - [ ] F3 có cửa sổ usage phù hợp và quyết định owner về capability.
-- [ ] F4 bản vá Zod qua CI, được merge/phát hành và kiểm chứng.
+- [x] F4 bản vá Zod qua CI, được merge/phát hành và kiểm chứng.
+- [ ] G/M137 có bằng chứng kỹ thuật và phát hành tương ứng.
 
-**Kết luận:** M136 CODE VERIFIED và DEPLOYED; toàn mục tiêu NOT COMPLETE vì F2–F4 còn mở.
+**Kết luận:** M136 và bản vá Zod CODE VERIFIED, DEPLOYED; toàn mục tiêu NOT COMPLETE vì
+F2/F3 đang chờ theo quyết định owner; M137 đã kiểm local, chờ CI và phát hành tương ứng.

@@ -1,0 +1,37 @@
+{
+  "comparisonBase": "9afb984d46d5e2e0f0d14e6f65e3186b836a2800",
+  "samplesPerBuild": 20,
+  "primaryTaskCount": 3,
+  "primaryHash": "1a05d0f9e6bbe5497a39184b74d241acf28f54d1a870a7756c29af0a53a417ac",
+  "summary": [
+    {
+      "scenario": "normal",
+      "baselineMedianReadyMs": 3368,
+      "candidateMedianReadyMs": 3347,
+      "baselineMedianWaitAfterPrimaryMs": 424,
+      "candidateMedianWaitAfterPrimaryMs": 412
+    },
+    {
+      "scenario": "slow-notifications",
+      "baselineMedianReadyMs": 5956,
+      "candidateMedianReadyMs": 3364,
+      "baselineMedianWaitAfterPrimaryMs": 3010,
+      "candidateMedianWaitAfterPrimaryMs": 419
+    },
+    {
+      "scenario": "slow-sheets",
+      "baselineMedianReadyMs": 5958,
+      "candidateMedianReadyMs": 3358,
+      "baselineMedianWaitAfterPrimaryMs": 3026,
+      "candidateMedianWaitAfterPrimaryMs": 403
+    },
+    {
+      "scenario": "slow-project",
+      "baselineMedianReadyMs": 5950,
+      "candidateMedianReadyMs": 3357,
+      "baselineMedianWaitAfterPrimaryMs": 3023,
+      "candidateMedianWaitAfterPrimaryMs": 429
+    }
+  ],
+  "candidate": "candidate-undici.json"
+}
