@@ -227,6 +227,7 @@ export default function EditableText({
             setEditing(true);
           }}
           title="Sửa text (Admin)"
+          aria-label="Sửa text (Admin)"
           className="min-w-11 min-h-11 sm:min-w-6 sm:min-h-6 inline-flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover/et:opacity-100 sm:focus-visible:opacity-100 transition-opacity text-zinc-500 hover:text-emerald-400 shrink-0"
         >
           <Pencil className="w-3 h-3" aria-hidden="true" />
