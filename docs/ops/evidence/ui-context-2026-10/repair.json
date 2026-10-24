@@ -1,0 +1,69 @@
+{
+  "firstGreen": {
+    "source": "ac441d453438b28566dd2322bb5668e91f68afc5",
+    "buildId": "XaVyUug-3BxOKAHKlZzp3",
+    "stats": {
+      "startTime": "2026-10-24T05:55:46.502Z",
+      "duration": 183373.25199999998,
+      "expected": 76,
+      "skipped": 0,
+      "unexpected": 11,
+      "flaky": 0
+    },
+    "sourceFailure": "EquipmentDetail invalid definition-list (6 executions)",
+    "fixtureFailures": "2 note locators matched stale notice as well, 2 PR filter locators expected select instead of existing buttons, 1 filechooser interception race",
+    "repairs": "Valid dt/dd groups; exact note locator and actual PR filter button; filechooser event subscription starts before awaited focus. No WCAG/assertion/timeout/skip weakening."
+  },
+  "subconRed": {
+    "provenance": {
+      "baselineSource": "ac441d453438b28566dd2322bb5668e91f68afc5",
+      "baselineBuildId": "XaVyUug-3BxOKAHKlZzp3",
+      "equipmentSourceSha256": "868c2f22f2525df27e19589eab4bfa984f4756823f7dc4b3731530c660234451",
+      "testSource": "740e16f824b0674f55d28c61d7a0640627ef5667",
+      "recordedBeforeRun": "2026-10-24T05:57:00.211Z",
+      "baseURL": "http://127.0.0.1:3148",
+      "fixtures": "Equipment/list/logs and POST mocked; real test auth with role-only override",
+      "workers": 1,
+      "retries": 0
+    },
+    "stats": {
+      "startTime": "2026-10-24T05:57:05.234Z",
+      "duration": 3465.056,
+      "expected": 0,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "failure": "Default UI offered return but POST carried issue; fixed only state initializer by existing canManage role"
+  },
+  "filechooserSynchronization": {
+    "method": "20 fresh-browser checks, 5 per profile/order, current documents app unchanged. Start filechooser listener before awaited focus to synchronize interception; Enter behavior and assertions unchanged.",
+    "groups": [
+      {
+        "profile": "desktop",
+        "mode": "Enter",
+        "samples": 5,
+        "chooserOpened": 4
+      },
+      {
+        "profile": "desktop",
+        "mode": "fixedEnter",
+        "samples": 5,
+        "chooserOpened": 5
+      },
+      {
+        "profile": "mobile",
+        "mode": "Enter",
+        "samples": 5,
+        "chooserOpened": 4
+      },
+      {
+        "profile": "mobile",
+        "mode": "fixedEnter",
+        "samples": 5,
+        "chooserOpened": 5
+      }
+    ]
+  },
+  "pending": "Final build/GREEN/gates still required"
+}

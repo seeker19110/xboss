@@ -241,11 +241,16 @@ test("chọn file qua bàn phím mở filechooser và giữ accept", async ({ pa
   await page.getByRole("button", { name: "Tải lên hồ sơ dự án", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Tải lên hồ sơ dự án", exact: true });
   const choose = dialog.getByRole("button", { name: "Chọn file", exact: true });
-  await choose.focus();
-  await expect(choose).toBeFocused();
-  const filechooser = page.waitForEvent("filechooser");
-  await page.keyboard.press("Enter");
-  await (await filechooser).setFiles(file);
+  // Đăng ký interception trước RPC focus; keyboard.press không auto-wait như click.
+  const [filechooser] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    (async () => {
+      await choose.focus();
+      await expect(choose).toBeFocused();
+      await page.keyboard.press("Enter");
+    })(),
+  ]);
+  await filechooser.setFiles(file);
   await expect(dialog.locator('input[type="file"]')).toHaveAttribute(
     "accept",
     "application/pdf,image/*",

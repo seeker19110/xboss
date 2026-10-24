@@ -228,10 +228,14 @@ test("keyboard chọn file, mở ảnh và Escape chỉ đóng viewer rồi tr�
   // Tab từ panel phải tới control chọn file thật, không dùng click vào label bằng chuột.
   await dialog.focus();
   await page.keyboard.press("Tab");
-  await expect(input).toBeFocused();
-  const chooser = page.waitForEvent("filechooser");
-  await page.keyboard.press("Enter");
-  await (await chooser).setFiles([]);
+  const [chooser] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    (async () => {
+      await expect(input).toBeFocused();
+      await page.keyboard.press("Enter");
+    })(),
+  ]);
+  await chooser.setFiles([]);
   const target = dialog.locator('label:has(input[type="file"])');
   expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await expect(target).not.toHaveCSS("box-shadow", "none");
