@@ -1,0 +1,195 @@
+{
+  "origin": "http://127.0.0.1:3148",
+  "device": "Pixel 5 (Chromium emulation)",
+  "allWritesMocked": true,
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/presence"
+    },
+    {
+      "method": "POST",
+      "path": "/api/construction-stages"
+    },
+    {
+      "method": "POST",
+      "path": "/api/presence"
+    },
+    {
+      "method": "POST",
+      "path": "/api/offline/context"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/ui-texts"
+    }
+  ],
+  "blockedExternal": [],
+  "pageErrors": [],
+  "stage": {
+    "dialog": {
+      "x": 16,
+      "y": 194.5,
+      "width": 361,
+      "height": 338
+    },
+    "viewport": {
+      "width": 393,
+      "height": 727
+    },
+    "bodyWidth": 393,
+    "controls": [
+      {
+        "name": "",
+        "width": 319,
+        "height": 44,
+        "fontSize": "16px",
+        "opacity": "1"
+      },
+      {
+        "name": "",
+        "width": 319,
+        "height": 44,
+        "fontSize": "16px",
+        "opacity": "1"
+      },
+      {
+        "name": "Huỷ",
+        "width": 57.6875,
+        "height": 44,
+        "fontSize": "14px",
+        "opacity": "1"
+      },
+      {
+        "name": "Thêm công tác",
+        "width": 145.703125,
+        "height": 44,
+        "fontSize": "14px",
+        "opacity": "1"
+      }
+    ],
+    "alert": {
+      "text": "Tên công tác đã tồn tại. Hãy chọn tên khác rồi thử lại.",
+      "x": 37,
+      "y": 407.5,
+      "width": 319,
+      "height": 40,
+      "color": "rgb(196, 29, 29)",
+      "whiteSpace": "normal"
+    },
+    "focus": {
+      "tag": "INPUT",
+      "name": null,
+      "id": "_r_0_-name"
+    }
+  },
+  "editor": {
+    "dialog": {
+      "x": 16,
+      "y": 67.5,
+      "width": 361,
+      "height": 592
+    },
+    "viewport": {
+      "width": 393,
+      "height": 727
+    },
+    "bodyWidth": 393,
+    "controls": [
+      {
+        "name": "Nội dung nhãn",
+        "width": 296.140625,
+        "height": 44,
+        "fontSize": "16px",
+        "opacity": "1"
+      },
+      {
+        "name": "Lưu",
+        "width": 44,
+        "height": 44,
+        "fontSize": "16px",
+        "opacity": "1"
+      },
+      {
+        "name": "Huỷ",
+        "width": 44,
+        "height": 44,
+        "fontSize": "16px",
+        "opacity": "1"
+      },
+      {
+        "name": "",
+        "width": 319,
+        "height": 42,
+        "fontSize": "16px",
+        "opacity": "1"
+      },
+      {
+        "name": "",
+        "width": 319,
+        "height": 42,
+        "fontSize": "16px",
+        "opacity": "1"
+      },
+      {
+        "name": "",
+        "width": 200.28125,
+        "height": 42,
+        "fontSize": "16px",
+        "opacity": "1"
+      },
+      {
+        "name": "Sinh lại đường dẫn từ tên",
+        "width": 44,
+        "height": 44,
+        "fontSize": "16px",
+        "opacity": "1"
+      },
+      {
+        "name": "",
+        "width": 319,
+        "height": 42,
+        "fontSize": "16px",
+        "opacity": "1"
+      },
+      {
+        "name": "Xoá trang",
+        "width": 98.78125,
+        "height": 44,
+        "fontSize": "14px",
+        "opacity": "1"
+      },
+      {
+        "name": "Huỷ",
+        "width": 57.6875,
+        "height": 44,
+        "fontSize": "14px",
+        "opacity": "1"
+      },
+      {
+        "name": "Lưu",
+        "width": 58.859375,
+        "height": 44,
+        "fontSize": "14px",
+        "opacity": "1"
+      }
+    ],
+    "alert": {
+      "text": "Chưa lưu được nhãn. Kiểm tra kết nối rồi thử lại.",
+      "x": 59.859375,
+      "y": 184.5,
+      "width": 296.140625,
+      "height": 16,
+      "color": "rgb(196, 29, 29)",
+      "whiteSpace": "normal"
+    },
+    "focus": {
+      "tag": "INPUT",
+      "name": "Nội dung nhãn",
+      "id": ""
+    }
+  },
+  "sourceCommit": "b76fcc44",
+  "buildId": "94XkSgVA6qu3knRaR1QKN",
+  "scope": "Local disposable fixture; Chromium emulation; all writes mocked; visual review, not real UAT."
+}

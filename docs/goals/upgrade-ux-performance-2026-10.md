@@ -1,14 +1,14 @@
 # Nâng cấp trải nghiệm, hiệu năng và tinh gọn XBoss
 
-| Thuộc tính            | Giá trị                                                                    |
-| --------------------- | -------------------------------------------------------------------------- |
-| Goal ID               | UPGRADE-2026-10                                                            |
-| Owner                 | Chủ dự án                                                                  |
-| State                 | WAITING — M137 DEPLOYED; #678 merged; UI đang VERIFY; UAT/usage WAITING    |
-| Main SHA đã reconcile | `079e79efcb4f3ebfb0a0257eb1dbc546f3c830ef`                                 |
-| Bắt đầu               | 2026-10-23                                                                 |
-| Đối soát              | 2026-10-24                                                                 |
-| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026 |
+| Thuộc tính            | Giá trị                                                                     |
+| --------------------- | --------------------------------------------------------------------------- |
+| Goal ID               | UPGRADE-2026-10                                                             |
+| Owner                 | Chủ dự án                                                                   |
+| State                 | WAITING — M137 DEPLOYED; #678 DEPLOYED; UI CODE VERIFIED; UAT/usage WAITING |
+| Main SHA đã reconcile | `079e79efcb4f3ebfb0a0257eb1dbc546f3c830ef`                                  |
+| Bắt đầu               | 2026-10-23                                                                  |
+| Đối soát              | 2026-10-24                                                                  |
+| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026  |
 
 ## Outcome và cổng hoàn thành
 
@@ -105,8 +105,9 @@ Owner duyệt #677 và giao tiếp: “rồi làm tất cả các việc còn l�
 advisory moderate, không đổi route/SMTP/auth. Local RED 3 PoC, GREEN 6 ca; audit 0 vulnerability,
 gate/build/full unit đạt, xem [bằng chứng](../ops/evidence/nodemailer-2026-10/verification.md).
 PR #678 bổ sung transitive dev-only fast-uri 4.2.1→4.2.3: full audit 0 vulnerability;
-gate cuối/CI tiếp tục chạy. CI PR 40057066123 trên caf010ec success (5.166 unit, 743 E2E, 0 flaky); đã merge
-#678 tại `079e79ef`. CI main 40057819385/phát hành đang chạy; chưa coi là production.
+gate cuối 18/18. CI PR 40057066123 trên caf010ec success (5.166 unit, 743 E2E, 0 flaky); đã merge
+#678 tại `079e79ef`. CI main 40057819385 và deploy 40058602986 success cùng SHA; public smoke sau deploy
+đạt desktop/mobile và health/readiness. [Release](../ops/evidence/nodemailer-2026-10/release.json).
 
 Lát S kế tiếp Ready từ audit source: form tạo hạng mục chống Enter lặp; sửa nhãn chỉ
 commit sau lưu thật; mặt bằng phân biệt lỗi/empty, retry và giữ bản nhập; gom danh mục
@@ -120,8 +121,9 @@ Lát S UI từ main `079e79ef`: implementation đã tích hợp trên nhánh
 metadata HSE/Risks và index ô ma trận. Guard quyền/API/schema giữ nguyên.
 Build, 7 unit index và 38 ca browser mới + setup đạt 39 pass/0 fail/skip; full release
 gate đạt 385 file/5.165 pass/0 fail/1 skip allowlist trên checkpoint `f83a1fe9`. Hồi quy
-phát hiện tên hộp thoại chứa cả tên nút sửa sau tải admin; đang sửa semantics và giữ
-nguyên assertion cũ. Gate tĩnh chờ commit PROGRESS rồi chạy lại. RED mất mạng kép trên checkpoint `f370190e` và trace một GET auth/hai GET matrix
+phát hiện tên hộp thoại chứa cả tên nút sửa sau tải admin; sửa semantics và giữ
+nguyên assertion cũ. Build mới/gate 18/18 và nhóm browser kết hợp 134 pass/0 fail/
+1 skip M135 mobile có sẵn đạt; 42 ca hành vi mới nằm trong nhóm này. RED mất mạng kép trên checkpoint `f370190e` và trace một GET auth/hai GET matrix
 đã có trước sửa catch; GREEN cả desktop/mobile. [Bằng chứng](../ops/evidence/ui-quality-2026-10/verification.md).
 
 Microbench synthetic 3200 rows: lookup find 13,71→index gồm build 0,12ms, checksum/object

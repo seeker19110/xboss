@@ -1,0 +1,132 @@
+{
+  "pr": "https://github.com/seeker19110/xboss/pull/678",
+  "sourceHead": "caf010ec92f5ac255683fbeb80bd07ecfabde043",
+  "mainSha": "079e79efcb4f3ebfb0a0257eb1dbc546f3c830ef",
+  "ciMain": {
+    "runId": 40057819385,
+    "status": "success",
+    "unit": {
+      "passed": 5166,
+      "failed": 0,
+      "skipped": 1,
+      "skip": "health degraded-without-DB allowlist"
+    },
+    "e2e": {
+      "passed": 743,
+      "flaky": 0,
+      "skipped": 51,
+      "shardPassed": [157, 195, 195, 196],
+      "shardSkipped": [42, 4, 3, 2],
+      "setupRepeatedPerShard": true
+    },
+    "mutation": {
+      "runnable": 52,
+      "survived": 0
+    },
+    "coverage": {
+      "files": 557,
+      "linesPercent": 91.68,
+      "branchesPercent": 85.01,
+      "functionsPercent": 94.84
+    }
+  },
+  "deploy": {
+    "runId": 40058602986,
+    "jobId": 120766986111,
+    "status": "success",
+    "headSha": "079e79efcb4f3ebfb0a0257eb1dbc546f3c830ef",
+    "completedAt": "2026-10-24T03:34:45Z"
+  },
+  "publicSmoke": {
+    "checkedAt": "2026-10-24T03:35:38.110Z",
+    "origin": "https://xboss.donghanhcungban.org",
+    "readOnly": true,
+    "browsers": [
+      {
+        "name": "desktop",
+        "loginStatus": 200,
+        "seriousAxeViolations": 0,
+        "pageErrors": [],
+        "failedAssets": [],
+        "cssHashes": [
+          {
+            "path": "/_next/static/chunks/3w2o4njic1z7q.css",
+            "sha256": "022754e063f6ab8675064ff2743da3ac607159684b4a50f202f6c272ceb96ae6"
+          }
+        ],
+        "hasResponsiveHeader": true,
+        "hasInsetFocus": true,
+        "protectedApis": [
+          {
+            "endpoint": "/api/dashboard",
+            "status": 401
+          },
+          {
+            "endpoint": "/api/search?q=quality",
+            "status": 401
+          }
+        ]
+      },
+      {
+        "name": "mobile",
+        "loginStatus": 200,
+        "seriousAxeViolations": 0,
+        "pageErrors": [],
+        "failedAssets": [],
+        "cssHashes": [
+          {
+            "path": "/_next/static/chunks/3w2o4njic1z7q.css",
+            "sha256": "022754e063f6ab8675064ff2743da3ac607159684b4a50f202f6c272ceb96ae6"
+          }
+        ],
+        "hasResponsiveHeader": true,
+        "hasInsetFocus": true,
+        "protectedApis": [
+          {
+            "endpoint": "/api/dashboard",
+            "status": 401
+          },
+          {
+            "endpoint": "/api/search?q=quality",
+            "status": 401
+          }
+        ]
+      }
+    ],
+    "/api/health": {
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "db": true,
+        "migration": "0171_users_disabled.sql",
+        "uptime_s": 72
+      }
+    },
+    "/api/ready": {
+      "status": 200,
+      "body": {
+        "ready": true,
+        "schema": "ok",
+        "migrationsApplied": 171,
+        "appliedHead": "0171_users_disabled.sql"
+      }
+    },
+    "status": "PASS"
+  },
+  "dependencyState": {
+    "npmAuditAll": 0,
+    "sbomVersions": {
+      "undici": "8.12.2",
+      "nodemailer": "10.1.4",
+      "fast-uri": "4.2.3"
+    },
+    "githubAlertsStillOpen": 10,
+    "openAlertRangesEndBeforeInstalledVersions": true,
+    "alertsManuallyDismissed": false
+  },
+  "limitations": [
+    "No live email sent; SMTP regression uses loopback.",
+    "Deployment checks Node major only; production patch version remains unverified.",
+    "Real UAT and usage remain WAITING."
+  ]
+}

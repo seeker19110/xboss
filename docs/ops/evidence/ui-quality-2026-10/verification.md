@@ -37,18 +37,28 @@ Sau sửa catch hiện hành, ca này đạt trên cả desktop/mobile.
 [red-summary.json](red-summary.json) ghi riêng checkpoint/build/hash và giới hạn.
 Trace/raw log test local giữ ignored, không commit cookie hoặc nội dung trace.
 
-- 38 ca browser mới + 1 setup: **39 pass, 0 fail/skip, retries 0**. Gồm Enter/pending,
-  abort/403/500/retry, cache sau hủy lỗi, reset, focus, mobile 360/393px, viewer/PM,
-  auth lỗi đơn/kép, 401, stale response, thêm/sửa/ẩn và axe hai theme.
+- Trước sửa Modal, 38 ca browser mới + 1 setup đạt 39 pass/0 fail/skip.
+- Bản cuối `b76fcc44`: nhóm kết hợp 135 ca trên desktop/mobile, **134 pass, 0 fail,
+  1 skip cũ, retries 0**. Gồm 42 ca hành vi mới, 91 ca hành vi cũ và một setup đạt;
+  skip là ca kéo bằng chuột M135 trên mobile có sẵn. Bao gồm abort/403/500/retry,
+  pending/Enter, reset/focus, 401/cache auth lỗi kép, stale response, PM/viewer,
+  mobile 360/393px, tạo sheet qua API test thật và axe hai theme.
+- Rà tên Modal tái hiện RED trên bản trước: tên chứa cả “Sửa text (Admin)”. Sửa nhỏ
+  tách span chữ đã lưu khỏi control, giữ nhãn đã tùy chỉnh và tên khi edit/pending/lỗi;
+  chỉ đổi sau PATCH thành công. Targeted 15/15 mới/cũ đạt, sau đó toàn nhóm trên đạt.
+  Assertion M137 cũ giữ nguyên. Xem lịch sử RED và kết quả ở JSON.
 - 7 unit index đạt: empty, missing, duplicate-first, identity/DTO, free-text/Unicode,
   nhãn phân biệt hoa/thường và cặp khóa không nhập nhằng.
-- Production build trên Node 24.22.1 đạt. Full release gate trên `f83a1fe9`: 385 file,
-  5.165 pass, 0 fail, 1 skip health có sẵn trong allowlist.
-- Hồi quy trên checkpoint trên: 34 pass, 3 fail ở tên truy cập của settings Modal,
-  56 chưa chạy sau fail-fast và 1 lỗi ngoài test. Pencil aria-label bị tính vào tên
-  heading; đang sửa ứng dụng, giữ nguyên assertion cũ. Gate tĩnh: 17/18 đạt,
-  freshness chờ commit PROGRESS; cần chạy lại cả hai trước phát hành.
-  Số cuối cập nhật ở [checks.json](checks.json).
+- Full release gate trên `f83a1fe9`: 385 file, **5.165 pass, 0 fail, 1 skip health**
+  có sẵn trong allowlist. Lượt này trước sửa hai file UI Modal/EditableText; các domain,
+  metadata/index/lock không đổi; browser cuối kiểm lại UI, CI sẽ chạy lại toàn bộ.
+- Production build trên Node 24.22.1 tại `b76fcc44` đạt; gate tĩnh trên `612ba825`
+  đạt **18/18**. Freshness ban đầu fail vì PROGRESS chưa commit, đã commit và chạy lại.
+  Audit toàn bộ **0 vulnerability**. Hai review độc lập không tìm thêm P1/P2 trong
+  phạm vi workfront/index/metadata và sửa Modal.
+
+Số liệu/checkpoint/hash trong [checks.json](checks.json); không gộp các lượt riêng
+thành số pass giả. Đây là nghiệm thu local trước PR/CI/phát hành.
 
 Form/states dùng lại Modal/Button và token hiện hữu. Không hạ threshold, thêm skip,
 thay timeout/assertion hoặc đổi cấu hình test/CI để làm xanh. Ca cũ costs-recovery
@@ -77,6 +87,15 @@ npx tsx scripts/bench-work-front-lookup.ts > /tmp/work-front-lookup.json
 không chứng minh tốc độ DOM/React/API, thời gian trang hoặc Core Web Vitals. Lợi ích
 normal nhỏ; chủ yếu giảm lookup lặp ở ma trận lớn. Không đặt timing threshold vào test.
 
+## Kiểm tra hình thức
+
+Ảnh cuối trên Pixel 5 mô phỏng, viewport thực 393×727, source `b76fcc44`:
+[form công tác báo lỗi](stage-error.png), [editor nhãn báo lỗi](editor-error.png).
+Đã xem ảnh trực tiếp: draft còn nguyên, error đọc được, form trong viewport, body
+không cuộn ngang; controls mới 44px, input mới 16px. Các input settings cha có sẵn
+42px/16px, không thay trong lát này. [Metrics](visual-checks.json) ghi rõ nguồn;
+mọi mutation khi chụp đều mock, không phải UAT người thật.
+
 ## Phát hành và giới hạn
 
 Qua PR, CI đầy đủ và deploy hiện hữu; health-check/rollback giữ nguyên. Không migration,
@@ -84,3 +103,7 @@ không đổi payload/quyền, không gửi email thật hoặc ghi production t
 Các form-error browser phần lớn mock lỗi; tạo hạng mục retry cuối có kiểm DB disposable.
 UAT Safari/cảm ứng thật, usage và quyết định bỏ capability tiếp tục WAITING theo owner.
 Runtime Node trên VPS chưa có bằng chứng patch; không suy ra từ Node major của deploy.
+
+Đây là checkpoint local trước merge. Kết quả CI, SHA merge, deploy và public smoke
+sau checkpoint được ghi tại mục **Kết quả phát hành** trong PR liên kết ở goal;
+không coi build local là bằng chứng production.
