@@ -231,13 +231,11 @@ test("giấy kiểm định đang upload cũng khóa đóng và ghi log, giữ d
   try {
     const dialog = await open(page);
     await dialog.getByRole("textbox", { name: "Ghi chú", exact: true }).fill("Log chưa gửi");
-    await dialog
-      .locator('input[type="file"]')
-      .setInputFiles({
-        name: "kiem-dinh.pdf",
-        mimeType: "application/pdf",
-        buffer: Buffer.from("%PDF-1.4 fixture"),
-      });
+    await dialog.locator('input[type="file"]').setInputFiles({
+      name: "kiem-dinh.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4 fixture"),
+    });
     await expect.poll(() => uploads).toBe(1);
     await expect(dialog.getByRole("button", { name: "Ghi nhận", exact: true })).toBeDisabled();
     await expect(dialog.getByRole("button", { name: "Đóng", exact: true })).toBeDisabled();

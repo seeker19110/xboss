@@ -90,12 +90,10 @@ test("mở PO không tải hai nguồn không consumer; PR approved vẫn lọc 
   await expect(page.getByRole("button", { name: "Lập Đơn Hàng PO", exact: true })).toBeVisible();
   await expect(page.getByText("1 Mục", { exact: true })).toBeVisible();
   await expect(page.getByText("1 Đơn", { exact: true })).toBeVisible();
-  await test
-    .info()
-    .attach("initial-orders-request-counts", {
-      body: JSON.stringify(state.counts),
-      contentType: "application/json",
-    });
+  await test.info().attach("initial-orders-request-counts", {
+    body: JSON.stringify(state.counts),
+    contentType: "application/json",
+  });
   expect({ approvedPRs: state.counts.approvedPRs, contracts: state.counts.contracts }).toEqual({
     approvedPRs: 0,
     contracts: 0,
