@@ -711,30 +711,51 @@ function EquipmentDetailModal({
         </div>
 
         <dl className="space-y-1 text-sm text-zinc-300">
-          <div>Loại: {equipment.kind}</div>
-          {equipment.serial && <div>Serial: {equipment.serial}</div>}
-          <div>Tình trạng: {EQUIPMENT_CONDITION_LABEL[equipment.condition]}</div>
           <div>
-            Vị trí/tổ đội: {equipment.currentLocation ?? "—"}
-            {equipment.currentCrew ? ` · ${equipment.currentCrew}` : ""}
+            <dt className="inline">Loại:</dt> <dd className="inline">{equipment.kind}</dd>
           </div>
-          <div>Hạn kiểm định: {formatDateVN(equipment.calibrationDue)}</div>
+          {equipment.serial && (
+            <div>
+              <dt className="inline">Serial:</dt> <dd className="inline">{equipment.serial}</dd>
+            </div>
+          )}
           <div>
-            Giấy kiểm định:{" "}
-            {equipment.certFileName ? (
-              <a
-                href={`/api/equipment/${equipment.id}/cert`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sky-300 hover:underline"
-              >
-                Xem file
-              </a>
-            ) : (
-              "—"
-            )}
+            <dt className="inline">Tình trạng:</dt>{" "}
+            <dd className="inline">{EQUIPMENT_CONDITION_LABEL[equipment.condition]}</dd>
           </div>
-          {equipment.note && <div>Ghi chú: {equipment.note}</div>}
+          <div>
+            <dt className="inline">Vị trí/tổ đội:</dt>{" "}
+            <dd className="inline">
+              {equipment.currentLocation ?? "—"}
+              {equipment.currentCrew ? ` · ${equipment.currentCrew}` : ""}
+            </dd>
+          </div>
+          <div>
+            <dt className="inline">Hạn kiểm định:</dt>{" "}
+            <dd className="inline">{formatDateVN(equipment.calibrationDue)}</dd>
+          </div>
+          <div>
+            <dt className="inline">Giấy kiểm định:</dt>{" "}
+            <dd className="inline">
+              {equipment.certFileName ? (
+                <a
+                  href={`/api/equipment/${equipment.id}/cert`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sky-300 hover:underline"
+                >
+                  Xem file
+                </a>
+              ) : (
+                "—"
+              )}
+            </dd>
+          </div>
+          {equipment.note && (
+            <div>
+              <dt className="inline">Ghi chú:</dt> <dd className="inline">{equipment.note}</dd>
+            </div>
+          )}
         </dl>
 
         {pageLoading && (

@@ -259,7 +259,7 @@ test("POST/refresh pending chặn gửi lặp, sửa, đóng và tương tác gi
   });
   try {
     const dialog = await open(page);
-    await expect(dialog.getByText(oldLog.note)).toBeVisible();
+    await expect(dialog.getByText(oldLog.note, { exact: true })).toBeVisible();
     await dialog.getByRole("textbox", { name: "Ghi chú", exact: true }).fill("Ghi đúng một lần");
     await dialog.getByRole("button", { name: "Ghi nhận", exact: true }).evaluate((button) => {
       if (!(button instanceof HTMLButtonElement)) throw new Error("Không có nút ghi nhận");
@@ -301,11 +301,11 @@ test("POST được nhận nhưng GET lỗi giữ lịch sử; retry chỉ GET k
     return route.fulfill({ json: { logs: [oldLog] } });
   });
   const dialog = await open(page);
-  await expect(dialog.getByText(oldLog.note)).toBeVisible();
+  await expect(dialog.getByText(oldLog.note, { exact: true })).toBeVisible();
   await dialog.getByRole("textbox", { name: "Ghi chú", exact: true }).fill("Nội dung đã được nhận");
   await dialog.getByRole("button", { name: "Ghi nhận", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText("Chưa đọc lại được lịch sử sau ghi");
-  await expect(dialog.getByText(oldLog.note)).toBeVisible();
+  await expect(dialog.getByText(oldLog.note, { exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Ghi nhận", exact: true })).toBeEnabled();
   await dialog.getByRole("button", { name: "Thử lại lịch sử", exact: true }).click();
   await expect(dialog.getByRole("status")).toHaveCount(0);
@@ -365,7 +365,7 @@ test("đóng rồi mở thiết bị lại không áp lỗi lịch sử cũ đ�
     await dialog.getByRole("button", { name: "Đóng", exact: true }).click();
     await expect(dialog).toHaveCount(0);
     await page.getByText(CODE, { exact: true }).click();
-    await expect(dialog.getByText(oldLog.note)).toBeVisible();
+    await expect(dialog.getByText(oldLog.note, { exact: true })).toBeVisible();
     old.release();
     await expect(dialog.getByText("Lỗi modal đã đóng", { exact: true })).toHaveCount(0);
     expect(errors).toEqual([]);
@@ -406,7 +406,7 @@ for (const role of ["viewer", "engineer", "subcon"] as const) {
   test(`giữ quyền ghi log hiện có cho ${role}`, async ({ page }) => {
     await setup(page, role);
     const dialog = await open(page);
-    await expect(dialog.getByText(oldLog.note)).toBeVisible();
+    await expect(dialog.getByText(oldLog.note, { exact: true })).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Ghi nhận", exact: true })).toHaveCount(
       role === "viewer" ? 0 : 1,
     );

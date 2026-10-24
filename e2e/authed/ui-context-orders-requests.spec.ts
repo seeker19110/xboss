@@ -100,11 +100,7 @@ test("mở PO không tải hai nguồn không consumer; PR approved vẫn lọc 
   });
   await page.getByRole("button", { name: /Yêu Cầu Mua Sắm \(PR\)/ }).click();
   await expect(page.getByText(request.prCode, { exact: true })).toBeVisible();
-  // Chọn theo option để giữ nguyên selector chạy được trên cả baseline và candidate.
-  const status = page
-    .getByRole("combobox")
-    .filter({ has: page.locator('option[value="approved"]') });
-  await status.selectOption("approved");
+  await page.getByRole("button", { name: "Đã duyệt", exact: true }).click();
   await expect.poll(() => state.counts.approvedPRs).toBe(1);
   await expect(page.getByText(request.prCode, { exact: true })).toBeVisible();
   expect(state.counts.contracts).toBe(0);
