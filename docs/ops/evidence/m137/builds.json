@@ -1,0 +1,20 @@
+{
+  "baseline": {
+    "commit": "9afb984d46d5e2e0f0d14e6f65e3186b836a2800",
+    "buildId": "AsbmoVPBqJL6QCUaLOr2V",
+    "tasksAssigned": 3,
+    "rows": 20
+  },
+  "candidate": {
+    "base": "9afb984d46d5e2e0f0d14e6f65e3186b836a2800",
+    "buildId": "MJfVxgEpBKG6oW-OeaYsN",
+    "sourceFileSha256": {
+      "app/components/NewSheetModal.tsx": "d56d03b0add9b09029ae381bf1b8f49def3e6042eeb804cbe8c1225495f97c76",
+      "app/components/dialogs.tsx": "413a8f077edafc4bbb7c04ab46a86ce8477388cdeb90f2adfcad8ad37dfc9e26",
+      "app/components/home/HomeHienTruong.tsx": "16cf59551c4227a969b1831a7e663436c053a8f9be4922546569132b2aad638d",
+      "app/components/home/HomeHienTruongData.ts": "2a756e08ef10d46be88ca55bafd83d155233cc7af1e31266d5c744af7d26df92",
+      "app/components/GlobalSearch.tsx": "789724bb22e56352d0ecc26934e197a2fe5c5b8677687c6e6b3473f6e8c63243",
+      "scripts/bench-field-loading.ts": "24ea0388ca8cab6fd0a49127dbac9c02409be2f17d0d82bcf6b0c20ccaa3975c"
+    }
+  }
+}

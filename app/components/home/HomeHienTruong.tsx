@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import {
   AlertTriangle,
   Bell,
@@ -17,11 +17,14 @@ import ProgressRow from "@/app/components/ProgressRow";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Button, ButtonLink, Card, Chip, Section, StatCard } from "@/app/components/ui";
 import type { Me } from "@/app/lib/me";
-import { redirectToLogin } from "@/app/lib/me";
-import { taiJson } from "@/app/lib/taiDuLieu";
 import { trackingUrl } from "@/app/lib/trackingUrl";
 import { useIsCompact } from "@/app/lib/useIsCompact";
 import { daysFromTodayISO, daysOverdue, todayISO } from "@/lib/nen/date";
+import {
+  useHomeHienTruongData,
+  type FieldSource,
+  type MyTask,
+} from "@/app/components/home/HomeHienTruongData";
 
 // Chế độ "Hiện trường" của trang chủ (M127 FR8–FR13) — trả lời đúng câu hỏi của người thi
 // công: "hôm nay tôi làm gì, cái gì sắp trễ, tick ở đâu". Mặc định cho kỹ sư, bắt buộc với
@@ -32,35 +35,12 @@ import { daysFromTodayISO, daysOverdue, todayISO } from "@/lib/nen/date";
 // /api/project. Không gọi /api/dashboard và không import panel nặng (recharts) — trang phải
 // mở nhanh trên điện thoại sóng yếu ngoài công trường.
 
-type MyTask = {
-  id: number;
-  code: string;
-  name: string;
-  status: string;
-  endDate: string | null;
-  progressPercent: number;
-  floorLabel: string | null;
-  sheetType: string;
-  sheetSlug?: string | null;
+const SOURCE_LABELS: Record<FieldSource, string> = {
+  notifications: "Thông báo",
+  sheets: "Danh sách trang",
+  project: "Tên dự án",
 };
-type Summary = {
-  total: number;
-  delayed: number;
-  done: number;
-  /** Số việc sắp đến hạn theo ngưỡng `alert_rules` của dự án (server tính — FR9/§10). */
-  dueSoon: number;
-  dueSoonDays: number;
-};
-type Notif = {
-  id: number;
-  taskId: number | null;
-  message: string;
-  isRead: number;
-  sheetSlug: string | null;
-  floorLabel: string | null;
-  projectId: number | null;
-};
-type SheetNav = { id: number; code: string; name: string; slug: string };
+const SOURCES = Object.keys(SOURCE_LABELS) as FieldSource[];
 
 /** Số việc hiện lên đầu trang — dài hơn thì xem ở /my-tasks. */
 const MAX_VIEC = 8;
@@ -92,54 +72,21 @@ export default function HomeHienTruong({
   onSwitchMode?: (luu?: boolean) => void;
 }) {
   const compact = useIsCompact();
-  const [tasks, setTasks] = useState<MyTask[]>([]);
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [notifs, setNotifs] = useState<Notif[]>([]);
-  const [unread, setUnread] = useState(0);
-  const [sheets, setSheets] = useState<SheetNav[]>([]);
-  const [tenDuAn, setTenDuAn] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loi, setLoi] = useState<string | null>(null);
-  // Phân hệ "field" bị tắt cho dự án này (/api/my-tasks trả 404) — kỹ sư rơi về Điều hành,
-  // thầu phụ thấy thông báo rõ thay vì danh sách rỗng khó hiểu.
-  const [moduleTat, setModuleTat] = useState(false);
-
-  const tai = useCallback(async () => {
-    setLoading(true);
-    setLoi(null);
-    setModuleTat(false);
-    // /api/my-tasks đi bằng fetch trần (không qua taiJson) vì cần PHÂN BIỆT 404 "phân hệ
-    // đang tắt" với lỗi tải thật — taiJson chỉ trả thông điệp, không trả mã HTTP.
-    const [res, tb, sh, da] = await Promise.all([
-      fetch("/api/my-tasks").catch(() => null),
-      taiJson<{ notifications: Notif[]; unread: number }>("/api/notifications?limit=20"),
-      taiJson<{ sheets: SheetNav[] }>("/api/sheets"),
-      taiJson<{ name: string | null }>("/api/project"),
-    ]);
-    setSheets(sh.ok ? (sh.data.sheets ?? []) : []);
-    setTenDuAn(da.ok ? (da.data.name ?? null) : null);
-    setNotifs(tb.ok ? (tb.data.notifications ?? []) : []);
-    setUnread(tb.ok ? (tb.data.unread ?? 0) : 0);
-    if (!res) {
-      setLoi("Mất kết nối — kiểm tra mạng rồi thử lại");
-    } else if (res.status === 401) {
-      await redirectToLogin();
-    } else if (res.status === 404) {
-      setModuleTat(true);
-    } else if (!res.ok) {
-      const j = await res.json().catch(() => null);
-      setLoi(j?.error ?? `Không tải được việc của tôi (lỗi ${res.status})`);
-    } else {
-      const j = (await res.json()) as { tasks: MyTask[]; summary: Summary };
-      setTasks(j.tasks ?? []);
-      setSummary(j.summary ?? null);
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    void tai();
-  }, [tai]);
+  const {
+    tasks,
+    summary,
+    notifs,
+    unread,
+    sheets,
+    tenDuAn,
+    loading,
+    loi,
+    moduleTat,
+    secondaryLoading,
+    secondaryErrors,
+    retrySecondary,
+    tai,
+  } = useHomeHienTruongData();
 
   // Phân hệ tắt: kỹ sư có bố cục khác để dùng → chuyển luôn, không bắt họ nhìn trang cụt.
   useEffect(() => {
@@ -161,42 +108,52 @@ export default function HomeHienTruong({
 
   const tbChuaDoc = useMemo(() => notifs.filter((n) => !n.isRead).slice(0, 3), [notifs]);
   const dangLam = summary ? Math.max(0, summary.total - summary.done - summary.delayed) : 0;
-  const slugDau = sheets[0]?.slug ?? null;
+  const slugDau = sheets?.[0]?.slug ?? null;
+  const notificationsReady =
+    !secondaryLoading.notifications && !secondaryErrors.notifications && unread !== null;
+  const projectReady = !secondaryLoading.project && !secondaryErrors.project;
+  const pendingSources = SOURCES.filter((source) => secondaryLoading[source]);
 
   // 3 hành động nhanh — cũng là thanh đáy trên điện thoại (thay Import/Excel/PDF vốn kỹ sư
   // và thầu phụ không có quyền dùng).
+  // Nhãn tối đa hai dòng trên mobile; control 44px + padding/viền thanh đáy = 61px,
+  // nằm trong khoảng chừa 62px của body (globals.css), kể cả badge 99+.
+  const quickActionClass = "min-h-11 min-w-0 justify-center [&>span]:min-w-0";
+  const quickLabelClass = "block min-w-0 whitespace-normal leading-5";
   const hanhDongNhanh = (
     <>
       <ButtonLink
         href={slugDau ? `/tracking/${slugDau}` : "/schedule"}
         variant="primary"
-        icon={Table2}
-        className="min-h-12 justify-center"
+        icon={compact ? undefined : Table2}
+        className={quickActionClass}
       >
-        Lưới tracking
+        <span className={quickLabelClass}>Lưới tracking</span>
       </ButtonLink>
       <ButtonLink
         href="/site?tab=tasks-diary"
-        icon={NotebookPen}
-        className="min-h-12 justify-center"
+        icon={compact ? undefined : NotebookPen}
+        className={quickActionClass}
       >
-        Nhật ký hôm nay
+        <span className={quickLabelClass}>Nhật ký hôm nay</span>
       </ButtonLink>
       <ButtonLink
         href="/notifications"
-        icon={Bell}
-        className="min-h-12 justify-center"
-        aria-label={`Thông báo${unread > 0 ? ` — ${unread} chưa đọc` : ""}`}
+        icon={compact ? undefined : Bell}
+        className={quickActionClass}
+        aria-label={`Thông báo${notificationsReady && unread > 0 ? ` — ${unread} chưa đọc` : ""}`}
       >
-        Thông báo
-        {unread > 0 && (
-          <span
-            className="ml-1.5 bg-red-600 text-on-accent text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center tabular-nums"
-            aria-label={`${unread} thông báo chưa đọc`}
-          >
-            {unread > 99 ? "99+" : unread}
-          </span>
-        )}
+        <span className="flex min-w-0 flex-wrap items-center justify-center gap-x-1 whitespace-normal leading-5">
+          <span>Thông báo</span>
+          {notificationsReady && unread > 0 && (
+            <span
+              className="bg-red-600 text-on-accent text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center shrink-0 tabular-nums"
+              aria-label={`${unread} thông báo chưa đọc`}
+            >
+              {unread > 99 ? "99+" : unread}
+            </span>
+          )}
+        </span>
       </ButtonLink>
     </>
   );
@@ -222,7 +179,7 @@ export default function HomeHienTruong({
       <main className="px-4 sm:px-6 py-6 space-y-6 max-w-screen-md mx-auto">
         <Section
           title={`Xin chào, ${me.name}`}
-          description={`${nhanNgayHomNay()}${tenDuAn ? ` · ${tenDuAn}` : ""}`}
+          description={`${nhanNgayHomNay()}${projectReady ? ` · ${tenDuAn || "Chưa đặt tên dự án"}` : ""}`}
           actions={
             onSwitchMode && (
               <Button variant="ghost" icon={LayoutDashboard} onClick={() => onSwitchMode()}>
@@ -242,18 +199,27 @@ export default function HomeHienTruong({
           ) : (
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
               <StatCard
-                label={`Đến hạn ≤${dueSoonDays} ngày`}
+                label={
+                  <span className="block whitespace-normal leading-4">
+                    Đến hạn ≤{dueSoonDays} ngày
+                  </span>
+                }
                 value={summary?.dueSoon ?? 0}
                 tone={(summary?.dueSoon ?? 0) > 0 ? "warning" : "neutral"}
-                icon={Timer}
+                icon={compact ? undefined : Timer}
               />
               <StatCard
-                label="Trễ"
+                label={<span className="block whitespace-normal leading-4">Trễ</span>}
                 value={summary?.delayed ?? 0}
                 tone={(summary?.delayed ?? 0) > 0 ? "danger" : "success"}
-                icon={TrendingDown}
+                icon={compact ? undefined : TrendingDown}
               />
-              <StatCard label="Đang làm" value={dangLam} tone="info" icon={ClipboardList} />
+              <StatCard
+                label={<span className="block whitespace-normal leading-4">Đang làm</span>}
+                value={dangLam}
+                tone="info"
+                icon={compact ? undefined : ClipboardList}
+              />
             </div>
           )}
         </Section>
@@ -316,11 +282,50 @@ export default function HomeHienTruong({
           </Section>
         )}
 
+        {(pendingSources.length > 0 || Object.keys(secondaryErrors).length > 0) && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-sm space-y-3">
+            {pendingSources.length > 0 && (
+              <p role="status" className="text-zinc-400">
+                Đang tải dữ liệu phụ:{" "}
+                {pendingSources.map((source) => SOURCE_LABELS[source].toLowerCase()).join(", ")}.
+              </p>
+            )}
+            {(Object.entries(secondaryErrors) as [FieldSource, string][]).map(
+              ([source, message]) => (
+                <div key={source} className="flex flex-wrap items-center gap-2">
+                  <p role="alert" className="text-amber-300 flex-1 min-w-0">
+                    {SOURCE_LABELS[source]}: {message}
+                  </p>
+                  <Button
+                    size="sm"
+                    className="min-h-11"
+                    aria-label={`Thử lại ${SOURCE_LABELS[source].toLowerCase()}`}
+                    disabled={secondaryLoading[source]}
+                    onClick={() => retrySecondary(source)}
+                  >
+                    {secondaryLoading[source]
+                      ? "Đang tải lại..."
+                      : `Thử lại ${SOURCE_LABELS[source].toLowerCase()}`}
+                  </Button>
+                </div>
+              ),
+            )}
+          </div>
+        )}
+
         {/* 3 hành động nhanh trong luồng trang (FR11) — trên điện thoại bộ nút này còn được
             lặp ở thanh đáy cố định để ngón tay với tới ngay, không phải cuộn. */}
         <div className="grid grid-cols-3 gap-2">{hanhDongNhanh}</div>
 
-        {tbChuaDoc.length > 0 && (
+        {!secondaryLoading.sheets && !secondaryErrors.sheets && sheets?.length === 0 && (
+          <p className="text-sm text-zinc-400">
+            Chưa có trang tracking. Bạn có thể mở kế hoạch để tiếp tục.
+          </p>
+        )}
+        {notificationsReady && unread === 0 && (
+          <p className="text-sm text-zinc-400">Không có thông báo chưa đọc.</p>
+        )}
+        {notificationsReady && tbChuaDoc.length > 0 && (
           <Section title="Thông báo mới" description={`${unread} thông báo chưa đọc`}>
             <Card tone="sunken" pad="sm">
               <ul className="space-y-1">

@@ -1,0 +1,53 @@
+{
+  "baseline": "9afb984d46d5e2e0f0d14e6f65e3186b836a2800",
+  "evidence": [
+    {
+      "scope": "form-and-primary",
+      "logSha256": "2f988999b09f310d33e02441eeadbdc55588c8cfbe1ebd04f1957a472dba4131",
+      "failureSummary": [
+        "  8 failed",
+        "    [authed-mobile] › e2e/authed/ui-performance-field-loading.spec.ts:39:7 › hiện trường không chờ nguồn phụ thông báo để hiện việc chính ",
+        "    [authed-mobile] › e2e/authed/ui-performance-field-loading.spec.ts:39:7 › hiện trường không chờ nguồn phụ danh sách trang để hiện việc chính ",
+        "    [authed-mobile] › e2e/authed/ui-performance-field-loading.spec.ts:39:7 › hiện trường không chờ nguồn phụ tên dự án để hiện việc chính ",
+        "    [authed-mobile] › e2e/authed/ui-performance-field-loading.spec.ts:68:5 › hiện trường báo lỗi chính ngay khi cả ba nguồn phụ chưa phản hồi ",
+        "    [authed-mobile] › e2e/authed/ui-performance-sheet-create.spec.ts:26:5 › tạo trang: POST chậm không gửi lặp; abort/403/500 giữ bốn trường và retry lưu đúng ",
+        "    [authed-mobile] › e2e/authed/ui-performance-sheet-create.spec.ts:136:5 › Enter submit form một lần, giữ payload bỏ trống tuỳ chọn và redirect API thật ",
+        "    [authed-mobile] › e2e/authed/ui-performance-sheet-create.spec.ts:170:7 › form tạo trang viewport dự án: nhãn/focus/nguồn mặc định, vùng chạm và axe ",
+        "    [authed-mobile] › e2e/authed/ui-performance-sheet-create.spec.ts:170:7 › form tạo trang 360px: nhãn/focus/nguồn mặc định, vùng chạm và axe "
+      ]
+    },
+    {
+      "scope": "modal",
+      "logSha256": "e62ac212a8bb6dd9b1e5f02728b96d8020d90943a915ae341aef46965077e9f1",
+      "failureSummary": [
+        "  5 failed",
+        "    [authed-mobile] › e2e/authed/ui-performance-modal-keyboard.spec.ts:69:1 › M137: Escape chỉ hủy xác nhận trên cùng, giữ form và bản nhập, không gửi DELETE ",
+        "    [authed-mobile] › e2e/authed/ui-performance-modal-keyboard.spec.ts:101:1 › M137: Tab và Shift+Tab chỉ luân chuyển trong confirm, bỏ control bị ẩn ",
+        "    [authed-mobile] › e2e/authed/ui-performance-modal-keyboard.spec.ts:131:1 › M137: fieldset đang lưu không làm Tab thoát modal, focus panel khi mọi control disabled ",
+        "    [authed-mobile] › e2e/authed/ui-performance-modal-keyboard.spec.ts:171:1 › M137: confirm không còn control nhìn thấy dùng panel dự phòng cho Tab hai chiều ",
+        "    [authed-mobile] › e2e/authed/ui-performance-modal-keyboard.spec.ts:191:1 › M137: unmount cha trước confirm giữ khóa scroll, đóng hết trả focus về trigger còn tồn tại "
+      ],
+      "note": "One original fieldset matcher failure was an oracle issue; see corrected-oracle RED rerun. Remaining failures are application behavior."
+    },
+    {
+      "scope": "modal-pending-corrected-oracle",
+      "logSha256": "14a9b62ff3dda86deb5e1e15d8866297799b5db0b48e1dd80a1c660fed29dc9b",
+      "failureSummary": [
+        "  1 failed",
+        "    [authed-mobile] › e2e/authed/ui-performance-modal-keyboard.spec.ts:131:1 › M137: fieldset đang lưu không làm Tab thoát modal, focus panel khi mọi control disabled "
+      ]
+    },
+    {
+      "scope": "responsive",
+      "logSha256": "71d417d4617a91be336a0dcd62d31baaf7b40c600d63115101139b79e560b12d",
+      "failureSummary": [
+        "  4 failed",
+        "    [authed-desktop] › e2e/authed/ui-performance-field-loading.spec.ts:394:7 › hiện trường 360px: nhãn KPI và hành động nhanh không tràn, badge 99+ và chừa thanh đáy ",
+        "    [authed-desktop] › e2e/authed/ui-performance-field-loading.spec.ts:394:7 › hiện trường 393px: nhãn KPI và hành động nhanh không tràn, badge 99+ và chừa thanh đáy ",
+        "    [authed-mobile] › e2e/authed/ui-performance-field-loading.spec.ts:394:7 › hiện trường 360px: nhãn KPI và hành động nhanh không tràn, badge 99+ và chừa thanh đáy ",
+        "    [authed-mobile] › e2e/authed/ui-performance-field-loading.spec.ts:394:7 › hiện trường 393px: nhãn KPI và hành động nhanh không tràn, badge 99+ và chừa thanh đáy ",
+        "  2 passed (29.9s)"
+      ]
+    }
+  ]
+}

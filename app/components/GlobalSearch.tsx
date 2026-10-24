@@ -280,7 +280,7 @@ export default function GlobalSearch({
                   role="option"
                   aria-selected={index === active}
                   onMouseEnter={() => setActive(index)}
-                  className={`flex items-center gap-3 min-h-11 px-4 py-3 text-sm border-b border-zinc-800 transition-colors ${index === active ? "bg-emerald-500/10 text-zinc-100" : "text-zinc-300 hover:bg-zinc-800/60"}`}
+                  className={`flex items-center gap-3 min-h-11 px-4 py-3 text-sm border-b border-zinc-800 ${index === active ? "bg-emerald-500/10 text-zinc-100" : "text-zinc-300 hover:bg-zinc-800/60"}`}
                 >
                   <Icon className={`w-4 h-4 shrink-0 ${meta.color}`} aria-hidden="true" />
                   <span className="min-w-0 flex-1">

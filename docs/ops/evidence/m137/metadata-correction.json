@@ -1,0 +1,23 @@
+{
+  "scope": "Correction of viewport label only; raw JSON and 40 timing samples unchanged.",
+  "recordedAt": "2026-10-24T02:09:38.926Z",
+  "actualProfile": {
+    "device": "Pixel 5",
+    "viewport": {
+      "width": 393,
+      "height": 727
+    },
+    "screen": {
+      "width": 393,
+      "height": 851
+    },
+    "deviceScaleFactor": 2.75
+  },
+  "rawLabel": "Pixel 5 393x851",
+  "scriptAtMeasurementSha256": "24ea0388ca8cab6fd0a49127dbac9c02409be2f17d0d82bcf6b0c20ccaa3975c",
+  "scriptAfterLabelFixSha256": "4774e84b4611da3babfadbaaf8523a1b51042fb0ff701b56257683985a5904d5",
+  "rawEvidenceSha256": {
+    "baseline": "0d06dbe69a672acca4a22991986f84e920f31cfa3b942947e603b0b433b15af0",
+    "candidate": "a98031da4bfbe0672f90306397338bfa1fb1db20f7d2dd0b0f4fabe1ed396482"
+  }
+}

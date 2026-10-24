@@ -55,10 +55,15 @@ Baseline là production build `efd31ba0`; candidate là base đó cộng diff M1
 khác không nằm trong scope. Kích thước và SHA-256 response của cả ba API khớp tuyệt đối.
 
 Node 24.21.0, Chromium 153.0.8010.12, PostgreSQL 16, server loopback. Mỗi API warmup rồi
-25 request, concurrency 5. Mỗi trang có 5 context mới, Pixel 5 393×851, latency 150ms,
+25 request, concurrency 5. Mỗi trang có 5 context mới, Pixel 5 393×727, latency 150ms,
 download 200.000 byte/s, upload 93.750 byte/s, CPU chậm 4 lần, service worker bị chặn.
 Không chạy build/test nặng đồng thời với phép đo. Hai bản dùng cùng cấu hình benchmark,
 không bật vault bằng cờ E2E; kiểm thử vault chạy riêng với `XBOSS_E2E=1`.
+
+Đính chính 24/10 khi kiểm M137: nhãn raw `Pixel 5 (393×851)` trước đây lấy kích thước
+screen; profile Playwright thực tế có viewport **393×727**, screen 393×851 và DPR 2,75.
+Giữ nguyên JSON raw và các số đo. `bench-app.ts` nay xuất nhãn từ viewport của profile;
+[hồ sơ đính chính M137](../m137/metadata-correction.json) ghi profile pin đã đối soát.
 
 | API                         | p50 trước → sau   | p95 trước → sau   | Thay đổi p95 |
 | --------------------------- | ----------------- | ----------------- | ------------ |
