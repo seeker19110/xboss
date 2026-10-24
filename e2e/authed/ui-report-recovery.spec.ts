@@ -50,10 +50,17 @@ async function fixtures(page: Page) {
 
 async function axeThemes(page: Page) {
   for (const light of [false, true]) {
-    await page.evaluate(
-      (value) => document.documentElement.classList.toggle("light", value),
-      light,
-    );
+    await page.evaluate(async (value) => {
+      document.documentElement.classList.remove("light", "darkblue");
+      document.documentElement.classList.add(value ? "light" : "darkblue");
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await Promise.all(
+        document
+          .getAnimations()
+          .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+          .map((animation) => animation.finished.catch(() => {})),
+      );
+    }, light);
     const result = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
       .analyze();
@@ -76,6 +83,7 @@ test("lookahead: link 7 ngày giữ lựa chọn khi lọc hệ và đổi số 
   });
   await page.goto("/lookahead?days=7&system=acmv");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("KẾ HOẠCH 7 NGÀY TỚI");
+  await expect(page.getByText(/Không có công việc nào bắt đầu/)).toBeVisible();
   await page.getByRole("combobox", { name: "Số ngày xem trước" }).selectOption("21");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("KẾ HOẠCH 21 NGÀY TỚI");
   const url = new URL(page.url());
@@ -130,14 +138,19 @@ test("lookahead: phản hồi 14 ngày đến muộn không ghi đè lựa chọ
   const errors = await fixtures(page);
   const gate = deferred();
   let oldFinished = false;
+  let oldStarted = false;
   await page.route("**/api/lookahead?**", async (route) => {
     const days = Number(new URL(route.request().url()).searchParams.get("days"));
-    if (days === 14) await gate.promise;
+    if (days === 14) {
+      oldStarted = true;
+      await gate.promise;
+    }
     await route.fulfill({ json: lookahead(days) }).catch(() => {});
     if (days === 14) oldFinished = true;
   });
   try {
     await page.goto("/lookahead");
+    await expect.poll(() => oldStarted).toBe(true);
     await page.getByRole("combobox", { name: "Số ngày xem trước" }).selectOption("7");
     await expect(page.getByText(/Không có công việc nào bắt đầu/)).toBeVisible();
     gate.release();
@@ -208,6 +221,7 @@ test("báo cáo: lỗi cũ không che dữ liệu mới; forecast lỗi có retr
   const gate = deferred();
   let forecasts = 0;
   let oldFinished = false;
+  let oldStarted = false;
   await page.route("**/api/dashboard/forecast", (route) => {
     forecasts++;
     return forecasts === 1
@@ -216,6 +230,7 @@ test("báo cáo: lỗi cũ không che dữ liệu mới; forecast lỗi có retr
   });
   await page.route(/\/api\/dashboard(?:\?.*)?$/, async (route) => {
     if (!new URL(route.request().url()).searchParams.has("range")) {
+      oldStarted = true;
       await gate.promise;
       await route.fulfill({ status: 500, json: { error: "Lỗi từ kỳ cũ" } }).catch(() => {});
       oldFinished = true;
@@ -225,6 +240,7 @@ test("báo cáo: lỗi cũ không che dữ liệu mới; forecast lỗi có retr
   });
   try {
     await page.goto("/report");
+    await expect.poll(() => oldStarted).toBe(true);
     await page.getByRole("combobox", { name: "Chọn kỳ báo cáo" }).selectOption("month");
     await expect(page.locator("main")).toContainText("KPI tháng hiện tại");
     gate.release();
@@ -233,6 +249,8 @@ test("báo cáo: lỗi cũ không che dữ liệu mới; forecast lỗi có retr
     const alert = page.getByRole("main").getByRole("alert");
     await expect(alert).toContainText(/dự báo/);
     await alert.getByRole("button", { name: "Thử lại", exact: true }).click();
+    await expect.poll(() => forecasts).toBe(2);
+    await expect(page.getByRole("main").getByRole("status")).toHaveCount(0);
     await expect(alert).toHaveCount(0);
     expect(forecasts).toBe(2);
     expect(errors).toEqual([]);
