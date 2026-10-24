@@ -1,0 +1,64 @@
+{
+  "baselineUiSource": "6b631f15708817824ba511c06abee57f6168cb54",
+  "baselineDependencyNote": "UI baseline built with Nodemailer10.1.4 already patched; page/component sources unchanged from6b631f15. These are behavior tests, not a page-speed comparison.",
+  "cases": [
+    {
+      "case": "Enter while sheet POST pending",
+      "observedPosts": 3,
+      "expectedPosts": 1,
+      "testFailed": true,
+      "log": "/tmp/xboss-ui-edits-red-2.log"
+    },
+    {
+      "case": "EditableText save pending",
+      "observed": "Editor textbox disappeared before PATCH success",
+      "testFailed": true,
+      "log": "/tmp/xboss-ui-text-red.log"
+    },
+    {
+      "case": "Matrix GET500/abort",
+      "observed": "Error/retry absent in browser; baseline source substituted empty data",
+      "failedCases": 2,
+      "log": "/tmp/xboss-work-fronts-red.log"
+    },
+    {
+      "case": "Add-stage touch target",
+      "observed": "Existing32pxbutton has computed min-height0 vs required44px",
+      "testFailed": true,
+      "log": "/tmp/xboss-work-fronts-red.log"
+    }
+  ],
+  "bothOfflineRepair": {
+    "sourceCommit": "f370190e",
+    "buildId": "5eIW3uZglrGUO0BfEQNoe",
+    "pageSha256": "924336c1c44977d5b30a63deca5e0121c1951b39b08d432755deefd53b3ab633",
+    "testSha256": "c267e6c379dd625f3af2c6620c8a4ffa10e86e33739287f8497c113e63ab8400",
+    "packageLockSha256": "5123b85a15184cb101babef0c076613794de00d9917272d3a9926203c8529346",
+    "node": "24.22.1",
+    "bothOfflineRedExit": 1,
+    "redBrowserCasesFailed": 1
+  },
+  "bothOfflineTraceCounts": {
+    "browserAuthMeGets": 1,
+    "browserMatrixGets": 2,
+    "expectedAfterOneRetry": {
+      "browserAuthMeGets": 2,
+      "browserMatrixGets": 2
+    }
+  },
+  "bothOfflineTraceSha256": "5053d498c6f7da5b263e48c105788987f496578032c4cf8305d88b52812040e8",
+  "rawTraceScope": "Local disposable E2E only; trace kept ignored, not committed.",
+  "modalNameRegression": {
+    "applicationSource": "f83a1fe944f0974b70a275d0a9b4dd67c6e6d183",
+    "testCommit": "ebce2d34",
+    "buildId": "GYh-3UnLDP18SFhrWnV_s",
+    "expected": "Cài đặt trang tracking",
+    "received": "Cài đặt trang tracking Sửa text (Admin)",
+    "failed": 1,
+    "setupPassed": 1,
+    "notRunAfterFailFast": 1,
+    "outsideTestErrors": 1,
+    "log": "/tmp/xboss-ui-modal-name-red.log",
+    "originalM137TestsUnchanged": true
+  }
+}
