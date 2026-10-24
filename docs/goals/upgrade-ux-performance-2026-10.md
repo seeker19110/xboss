@@ -1,14 +1,14 @@
 # Nâng cấp trải nghiệm, hiệu năng và tinh gọn XBoss
 
-| Thuộc tính            | Giá trị                                                                                                     |
-| --------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Goal ID               | UPGRADE-2026-10                                                                                             |
-| Owner                 | Chủ dự án                                                                                                   |
-| State                 | WAITING — M137 DEPLOYED; #678 DEPLOYED; UI #679 DEPLOYED; vòng phục hồi UI CODE VERIFIED; UAT/usage WAITING |
-| Main SHA đã reconcile | `6a6bc0bd32a4efc652d2f31e979e1e9ba57bbe37`                                                                  |
-| Bắt đầu               | 2026-10-23                                                                                                  |
-| Đối soát              | 2026-10-24                                                                                                  |
-| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026                                  |
+| Thuộc tính            | Giá trị                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| Goal ID               | UPGRADE-2026-10                                                                    |
+| Owner                 | Chủ dự án                                                                          |
+| State                 | WAITING — #675–#681 DEPLOYED; vòng giữ ngữ cảnh/thao tác VERIFY; UAT/usage WAITING |
+| Main SHA đã reconcile | `d4cb1b7de04ab8d632b9e6338afb98c0cece4f79`                                         |
+| Bắt đầu               | 2026-10-23                                                                         |
+| Đối soát              | 2026-10-24                                                                         |
+| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026         |
 
 ## Outcome và cổng hoàn thành
 
@@ -60,6 +60,8 @@ so baseline `efd31ba0` với candidate M136 trên cùng fixture: dashboard p95 g
 bản tuần khoảng 50%; ba response hash khớp. Mobile trang chủ khoảng 4,1 giây tới dữ liệu chính;
 chưa chứng minh đạt Core Web Vitals ngoài thực địa.
 [Bằng chứng lab](../ops/evidence/m136/verification.md).
+
+#680/#681 đã DEPLOYED; bản cuối `d4cb1b7d`, main CI40065226953/deploy40065861880 success cùng SHA lúc12:24:37 UTC+7. Public smoke desktop/393px/360px05:25:06Z đạt. Unit5.173pass/0fail/1skip, E2E869pass/0fail/0flaky/51skip cũ, mutation52/52/0survivor,ERD258bảng. [Release680](https://github.com/seeker19110/xboss/pull/680), [release681](https://github.com/seeker19110/xboss/pull/681) ghi riêng CI main680 có1fixtureflaky đã sửa ở681; không gộp local/PR/main.
 
 ## Iteration 1 — 2026-10-23
 
@@ -161,6 +163,10 @@ lỗi auth ứng dụng. Follow-up hẹp chỉ proxy khi test đổi role, khôn
 Toàn file local 37/37 và lặp ca 401 40/40 đạt desktop/mobile, retries=0; đang chốt các cổng.
 [Bằng chứng](../ops/evidence/ui-recovery-2026-10/auth-fixture-repair.md) tách kết quả PR/main
 và giới hạn; CI/deploy cuối theo PR follow-up. F2/F3 tiếp tục WAITING.
+
+## Iteration 8 — giữ ngữ cảnh và trạng thái thao tác
+
+Owner tiếp tục ủy quyền rà production, tự triển khai, kiểm kỹ, merge/deploy; F2/F3 giữchờ. Baseline `d4cb1b7d` được đối soát production/main. Lát S theo [scope](../ops/evidence/ui-context-2026-10/scope.md): chấm công dùng đúng snapshot ngày và guard pending; hồ sơ không chờ nguồn phụ; ảnh tracking phân biệt tải/lỗi/rỗng và keyboard; thiết bị giữ draft/lịch sử/modal khi mạng lỗi; bỏ2GET PO không consumer. API/quyền/phép tính/schema/dependency/offline giữ nguyên. RED trước sửa có bằng chứng thật trên build baseline đồng nhất main; đang chốt GREEN/build/gates, chưa coi là DEPLOYED. Kết quả phát hành cuối đối chiếu tại PR của lát này. Nhân sự waterfall/stale là ứng viên riêng, chưa sửa vòng này.
 
 ## Final audit
 

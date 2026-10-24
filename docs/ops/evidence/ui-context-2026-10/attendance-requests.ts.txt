@@ -1,0 +1,31 @@
+import { chromium, devices, expect } from "@playwright/test";
+import { readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+async function main() {
+  const label=process.argv[2];if(!/^(before|after)$/.test(label??"")) throw Error("Expected before|after");
+  const browser=await chromium.launch();const rows=[];
+  try {
+    for(const [profile,device] of [["desktop",devices["Desktop Chrome"]],["mobile",devices["Pixel 5"]]] as const) {
+      const context=await browser.newContext({...device,baseURL:"http://127.0.0.1:3148",storageState:"playwright/.auth/admin.json",serviceWorkers:"block"});
+      try {
+        const page=await context.newPage();let dayGets=0,monthGets=0;
+        await page.route("**/api/**",route=>["GET","HEAD","OPTIONS"].includes(route.request().method())?route.continue():route.fulfill({status:403,json:{error:"Mutation ngoài fixture bị chặn"}}));
+        await page.route("**/api/crews",route=>route.fulfill({json:{crews:[{id:960001,name:"Tổ kiểm chứng"}]}}));
+        await page.route("**/api/personnel",route=>route.fulfill({json:{personnel:[]}}));
+        await page.route("**/api/attendance?**",route=>{const p=new URL(route.request().url()).searchParams;if(p.get("view")==="list"){dayGets++;return route.fulfill({json:{items:[]}});}monthGets++;return route.fulfill({json:{byDate:[]}});});
+        await page.goto("/attendance");
+        const date=page.getByLabel("Chọn ngày chấm công",{exact:true});
+        const plus=page.getByRole("button",{name:"Tăng số người tổ Tổ kiểm chứng",exact:true});
+        await expect(plus).toBeEnabled();
+        const initialDate=await date.inputValue();const prefix=initialDate.slice(0,8);
+        const dates=["01","02","03","04","05"].map(day=>prefix+day).filter(d=>d!==initialDate);
+        for(const value of dates){const response=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/attendance"&&new URL(r.url()).searchParams.get("view")==="list"&&new URL(r.url()).searchParams.get("from")===value);await date.fill(value);await response;await expect(plus).toBeEnabled();}
+        await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+        rows.push({profile,initialDate,selectedDates:dates,dayGets,monthGets});
+      } finally {await context.close();}
+    }
+    writeFileSync(`.autopilot/round3-attendance-requests-${label}.json`,JSON.stringify({label,checkedAt:new Date().toISOString(),readOnly:true,buildId:readFileSync(".next/BUILD_ID","utf8").trim(),scriptSha256:createHash("sha256").update(readFileSync(import.meta.filename)).digest("hex"),rows},null,2)+"\n");
+    console.log(JSON.stringify({label,rows}));
+  } finally {await browser.close();}
+}
+main().catch(error=>{console.error(error);process.exitCode=1;});

@@ -256,6 +256,7 @@ test("chọn file qua bàn phím mở filechooser và giữ accept", async ({ pa
 for (const light of [true, false]) {
   test(`hồ sơ và modal lỗi axe/target ở ${light ? "Light" : "Dark Blue"}`, async ({ page }) => {
     await setup(page);
+    await page.setViewportSize({ width: 360, height: 740 });
     await page.route("**/api/project-documents", (route) =>
       route.fulfill({ status: 422, json: { error: "Tệp kiểm chứng chưa hợp lệ" } }),
     );
@@ -265,7 +266,6 @@ for (const light of [true, false]) {
       document.documentElement.classList.remove("light", "darkblue");
       document.documentElement.classList.add(isLight ? "light" : "darkblue");
     }, light);
-    await page.emulateMedia({ reducedMotion: "reduce" });
     const dialog = await openUpload(page);
     await dialog.getByRole("button", { name: "Tải lên", exact: true }).click();
     await expect(dialog.getByRole("alert")).toContainText("Tệp kiểm chứng chưa hợp lệ");
@@ -281,6 +281,7 @@ for (const light of [true, false]) {
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
       .analyze();
+    await expect(page.locator("body")).toHaveJSProperty("scrollWidth", page.viewportSize()!.width);
     expect(
       results.violations.filter((v) => ["serious", "critical"].includes(v.impact ?? "")),
     ).toEqual([]);
