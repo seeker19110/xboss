@@ -11,6 +11,18 @@ test.describe("Trang đăng nhập", () => {
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(page.getByRole("button", { name: /Đăng nhập/ })).toBeVisible();
+    // Bản production không gợi ý tài khoản demo hoặc điền sẵn thông tin sai của người dùng.
+    await expect(page.getByLabel("Email đăng nhập", { exact: true })).toHaveValue("");
+    await expect(page.getByLabel("Mật khẩu", { exact: true })).toHaveValue("");
+    await expect(page.getByText("Tài khoản mặc định", { exact: false })).toHaveCount(0);
+    await expect(page.getByLabel("Email đăng nhập", { exact: true })).toHaveAttribute(
+      "autoComplete",
+      "username",
+    );
+    await expect(page.getByLabel("Mật khẩu", { exact: true })).toHaveAttribute(
+      "autoComplete",
+      "current-password",
+    );
   });
 
   test("không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
