@@ -1,0 +1,76 @@
+{
+  "checkedAt": "2026-10-24T04:09:40.470Z",
+  "origin": "https://xboss.donghanhcungban.org",
+  "readOnly": true,
+  "browsers": [
+    {
+      "name": "desktop",
+      "loginStatus": 200,
+      "seriousAxeViolations": 0,
+      "pageErrors": [],
+      "failedAssets": [],
+      "cssHashes": [
+        {
+          "path": "/_next/static/chunks/1c-s57h9xygjw.css",
+          "sha256": "1fefceb3033eb8216fc8baf7facf3b6787094ffc54a69e3250f7f9743887526f"
+        }
+      ],
+      "hasResponsiveHeader": true,
+      "hasInsetFocus": true,
+      "protectedApis": [
+        {
+          "endpoint": "/api/dashboard",
+          "status": 401
+        },
+        {
+          "endpoint": "/api/search?q=quality",
+          "status": 401
+        }
+      ]
+    },
+    {
+      "name": "mobile",
+      "loginStatus": 200,
+      "seriousAxeViolations": 0,
+      "pageErrors": [],
+      "failedAssets": [],
+      "cssHashes": [
+        {
+          "path": "/_next/static/chunks/1c-s57h9xygjw.css",
+          "sha256": "1fefceb3033eb8216fc8baf7facf3b6787094ffc54a69e3250f7f9743887526f"
+        }
+      ],
+      "hasResponsiveHeader": true,
+      "hasInsetFocus": true,
+      "protectedApis": [
+        {
+          "endpoint": "/api/dashboard",
+          "status": 401
+        },
+        {
+          "endpoint": "/api/search?q=quality",
+          "status": 401
+        }
+      ]
+    }
+  ],
+  "/api/health": {
+    "status": 200,
+    "body": {
+      "status": "ok",
+      "db": true,
+      "migration": "0171_users_disabled.sql",
+      "uptime_s": 329
+    }
+  },
+  "/api/ready": {
+    "status": 200,
+    "body": {
+      "ready": true,
+      "schema": "ok",
+      "migrationsApplied": 171,
+      "appliedHead": "0171_users_disabled.sql"
+    }
+  },
+  "status": "PASS"
+}

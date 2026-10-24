@@ -1,0 +1,153 @@
+{
+  "baselineSource": "6a6bc0bd32a4efc652d2f31e979e1e9ba57bbe37",
+  "baselineBuild": "b76fcc44 (app/lib/package content identical to baselineSource)",
+  "runs": [
+    {
+      "run": "xboss-next-red",
+      "stats": {
+        "startTime": "2026-10-24T04:14:44.559Z",
+        "duration": 49551.007,
+        "expected": 2,
+        "skipped": 4,
+        "unexpected": 8,
+        "flaky": 0
+      },
+      "tests": [
+        {
+          "name": "đăng nhập admin → lưu storageState",
+          "status": "expected",
+          "message": ""
+        },
+        {
+          "name": "tạo nhật ký vẫn gửi If-None-Match; 422 giữ bản nhập và 412 giữ form để so sánh",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('dialog', { name: /^Nhật ký ngày / }).getByRole('alert')\nExpected substring: \u001b[32m\"Nội dung cần sửa kiểm chứng\"\u001b[39m\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByRole('dialog', { name: /^Nhật ký ngày / }).getByRole('alert') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: /^Nhật ký ngày / }).getByRole('alert')\u001b[22m\n"
+        },
+        {
+          "name": "gallery http: lỗi có retry/loading, không hiện album rỗng giả",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('dialog', { name: 'Album kiểm chứng phục hồi', exact: true }).getByRole('alert')\nExpected substring: \u001b[32m\"Tạm lỗi đọc ảnh kiểm chứng\"\u001b[39m\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByRole('dialog', { name: 'Album kiểm chứng phục hồi', exact: true }).getByRole('alert') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Album kiểm chứng phục hồi', exact: true }).getByRole('alert')\u001b[22m\n"
+        },
+        {
+          "name": "gallery network: lỗi có retry/loading, không hiện album rỗng giả",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('dialog', { name: 'Album kiểm chứng phục hồi', exact: true }).getByRole('alert')\nExpected substring: \u001b[32m\"Không tải được ảnh album\"\u001b[39m\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByRole('dialog', { name: 'Album kiểm chứng phục hồi', exact: true }).getByRole('alert') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Album kiểm chứng phục hồi', exact: true }).getByRole('alert')\u001b[22m\n"
+        },
+        {
+          "name": "danh sách album lỗi có retry, auth tạm lỗi được đọc lại đúng một lần",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('main').getByRole('alert')\nExpected substring: \u001b[32m\"Không tải được thông tin tài khoản\"\u001b[39m\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByRole('main').getByRole('alert') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('main').getByRole('alert')\u001b[22m\n"
+        },
+        {
+          "name": "upload đã nhận: refresh lỗi giữ ảnh cũ, retry chỉ GET và không POST ảnh lần hai",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('dialog', { name: 'Album kiểm chứng phục hồi', exact: true }).getByRole('alert')\nExpected substring: \u001b[32m\"Chưa đọc được ảnh sau upload\"\u001b[39m\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" getByRole('dialog', { name: 'Album kiểm chứng phục hồi', exact: true }).getByRole('alert') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Album kiểm chứng phục hồi', exact: true }).getByRole('alert')\u001b[22m\n"
+        },
+        {
+          "name": "tạo album pending chặn đóng/sửa/gửi trùng; lỗi giữ draft rồi retry đúng payload",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('dialog', { name: 'Thêm album mốc tiến độ', exact: true }).getByRole('textbox', { name: 'Tên mốc', exact: true })\nExpected: disabled\nReceived: enabled\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" getByRole('dialog', { name: 'Thêm album mốc tiến độ', exact: true }).getByRole('textbox', { name: 'Tên mốc', exact: true }) with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: 'Thêm album mốc tiến độ', exact: true }).getByRole('textbox', { name: 'Tên mốc', exact: true })\u001b[22m\n\u001b[2m    14 × locator resolved to <input value=\"Mốc giữ bản nhập\" placeholder=\"VD: Hoàn thiện tầng 10 — 07/2026\" class=\"mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white\"/>\u001b[22m\n\u001b[2m       - unexpected value \"enabled\"\u001b[22m\n"
+        },
+        {
+          "name": "viewer xem ảnh nhưng không có nút thêm/xoá ảnh hoặc tạo album",
+          "status": "expected",
+          "message": ""
+        },
+        {
+          "name": "chuông: tải đầu http không giả empty, có trạng thái chờ và retry",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('link', { name: 'Xem tất cả thông báo', exact: true }).locator('../..').getByText('Không có thông báo', { exact: true })\nExpected: \u001b[32m0\u001b[39m\nReceived: \u001b[31m1\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" getByRole('link', { name: 'Xem tất cả thông báo', exact: true }).locator('../..').getByText('Không có thông báo', { exact: true }) with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('link', { name: 'Xem tất cả thông báo', exact: true }).locator('../..').getByText('Không có thông báo', { exact: true })\u001b[22m\n\u001b[2m    14 × locator resolved to 1 element\u001b[22m\n\u001b[2m       - unexpected value \"1\"\u001b[22m\n"
+        },
+        {
+          "name": "công tác sẵn sàng ngay sau primary dù nhà thầu chưa phản hồi",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('heading', { name: '1. Công tác đầu kiểm chứng', exact: true, level: 2 }).locator('..')\nExpected: visible\nTimeout: 2500ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" getByRole('heading', { name: '1. Công tác đầu kiểm chứng', exact: true, level: 2 }).locator('..') with timeout 2500ms\u001b[22m\n\u001b[2m  - waiting for getByRole('heading', { name: '1. Công tác đầu kiểm chứng', exact: true, level: 2 }).locator('..')\u001b[22m\n"
+        }
+      ]
+    },
+    {
+      "run": "xboss-text-diary-red",
+      "stats": {
+        "startTime": "2026-10-24T04:15:52.999Z",
+        "duration": 24426.872000000003,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 4,
+        "flaky": 0
+      },
+      "tests": [
+        {
+          "name": "lưu pending khóa fields/đóng/khoá sổ, chỉ sau success mới cho khoá sổ",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('dialog', { name: /^Nhật ký ngày / }).locator('textarea').first()\nExpected: disabled\nReceived: enabled\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" getByRole('dialog', { name: /^Nhật ký ngày / }).locator('textarea').first() with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: /^Nhật ký ngày / }).locator('textarea').first()\u001b[22m\n\u001b[2m    14 × locator resolved to <textarea rows=\"4\" class=\"w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:opacity-60\">Bản nhập đang lưu</textarea>\u001b[22m\n\u001b[2m       - unexpected value \"enabled\"\u001b[22m\n"
+        },
+        {
+          "name": "lock pending giữ modal; HTTP/mạng lỗi tại chỗ và retry đúng method",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('dialog', { name: /^Nhật ký ngày / }).getByRole('button', { name: 'Khoá sổ', exact: true })\nExpected: disabled\nReceived: enabled\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" getByRole('dialog', { name: /^Nhật ký ngày / }).getByRole('button', { name: 'Khoá sổ', exact: true }) with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: /^Nhật ký ngày / }).getByRole('button', { name: 'Khoá sổ', exact: true })\u001b[22m\n\u001b[2m    14 × locator resolved to <button class=\"flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-emerald-700 hover:bg-emerald-800 text-on-accent\">…</button>\u001b[22m\n\u001b[2m       - unexpected value \"enabled\"\u001b[22m\n"
+        },
+        {
+          "name": "unlock pending giữ modal; HTTP/mạng lỗi tại chỗ và retry đúng method",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('dialog', { name: /^Nhật ký ngày / }).getByRole('button', { name: 'Mở khoá', exact: true })\nExpected: disabled\nReceived: enabled\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" getByRole('dialog', { name: /^Nhật ký ngày / }).getByRole('button', { name: 'Mở khoá', exact: true }) with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog', { name: /^Nhật ký ngày / }).getByRole('button', { name: 'Mở khoá', exact: true })\u001b[22m\n\u001b[2m    14 × locator resolved to <button class=\"flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-amber-800 hover:bg-amber-700 text-on-accent\">…</button>\u001b[22m\n\u001b[2m       - unexpected value \"enabled\"\u001b[22m\n"
+        },
+        {
+          "name": "nhãn: GET đầu http không khóa cache, mở lại phục hồi override mà không PATCH",
+          "status": "unexpected",
+          "message": "Error: GET nhãn sau khi đóng rồi mở lại settings\n\nGET nhãn sau khi đóng rồi mở lại settings\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m1\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate"
+        }
+      ]
+    },
+    {
+      "run": "xboss-report-red",
+      "stats": {
+        "startTime": "2026-10-24T04:15:29.291Z",
+        "duration": 11525.562999999998,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 2,
+        "flaky": 0
+      },
+      "tests": [
+        {
+          "name": "lookahead: http có retry và không in báo cáo chưa tải",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('button', { name: 'In / Lưu PDF', exact: true })\nExpected: disabled\nReceived: enabled\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" getByRole('button', { name: 'In / Lưu PDF', exact: true }) with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: 'In / Lưu PDF', exact: true })\u001b[22m\n\u001b[2m    14 × locator resolved to <button class=\"jsx-d7f2bf666cc6d15d flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-sm\">…</button>\u001b[22m\n\u001b[2m       - unexpected value \"enabled\"\u001b[22m\n"
+        },
+        {
+          "name": "báo cáo: phản hồi kỳ cũ không ghi đè kỳ mới, forecast không tải lại theo bộ lọc",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('button', { name: 'In', exact: true })\nExpected: disabled\nReceived: enabled\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" getByRole('button', { name: 'In', exact: true }) with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: 'In', exact: true })\u001b[22m\n\u001b[2m    14 × locator resolved to <button aria-label=\"In\" class=\"flex items-center gap-2 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0\">…</button>\u001b[22m\n\u001b[2m       - unexpected value \"enabled\"\u001b[22m\n"
+        }
+      ]
+    },
+    {
+      "run": "xboss-report-stale-red",
+      "stats": {
+        "startTime": "2026-10-24T04:17:56.726Z",
+        "duration": 17331.406,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 3,
+        "flaky": 0
+      },
+      "tests": [
+        {
+          "name": "lookahead: link 7 ngày giữ lựa chọn khi lọc hệ và đổi số ngày",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('heading', { level: 1 })\nExpected: \u001b[32m\"KẾ HOẠCH \u001b[7m7\u001b[27m NGÀY TỚI\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7m \u001b[27mKẾ HOẠCH \u001b[7m14\u001b[27m NGÀY TỚI\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" getByRole('heading', { level: 1 }) with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('heading', { level: 1 })\u001b[22m\n\u001b[2m    14 × locator resolved to <h1 class=\"jsx-d7f2bf666cc6d15d text-2xl font-bold flex items-center gap-2\">…</h1>\u001b[22m\n\u001b[2m       - unexpected value \" KẾ HOẠCH 14 NGÀY TỚI\"\u001b[22m\n"
+        },
+        {
+          "name": "lookahead: phản hồi 14 ngày đến muộn không ghi đè lựa chọn 7 ngày",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('heading', { level: 1 })\nExpected: \u001b[32m\"KẾ HOẠCH \u001b[7m7\u001b[27m NGÀY TỚI\"\u001b[39m\nReceived: \u001b[31m\"\u001b[7m \u001b[27mKẾ HOẠCH \u001b[7m14\u001b[27m NGÀY TỚI\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" getByRole('heading', { level: 1 }) with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('heading', { level: 1 })\u001b[22m\n\u001b[2m    14 × locator resolved to <h1 class=\"jsx-d7f2bf666cc6d15d text-2xl font-bold flex items-center gap-2\">…</h1>\u001b[22m\n\u001b[2m       - unexpected value \" KẾ HOẠCH 14 NGÀY TỚI\"\u001b[22m\n"
+        },
+        {
+          "name": "báo cáo: lỗi cũ không che dữ liệu mới; forecast lỗi có retry riêng",
+          "status": "unexpected",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('main')\nExpected substring: not \u001b[32m\"Lỗi từ kỳ cũ\"\u001b[39m\nReceived string: \u001b[31m\"Đã xảy ra lỗi tải dữ liệu\u001b[7mLỗi từ kỳ cũ\u001b[27m\"\u001b[39m\nTimeout: 5000ms\n\nCall log:\n\u001b[2m  - Expect \"not toContainText\" locator('main') with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('main')\u001b[22m\n\u001b[2m    14 × locator resolved to <main class=\"p-4 sm:p-6 pb-24 print:p-0\">…</main>\u001b[22m\n\u001b[2m       - unexpected value \"Đã xảy ra lỗi tải dữ liệuLỗi từ kỳ cũ\"\u001b[22m\n"
+        }
+      ]
+    }
+  ]
+}
