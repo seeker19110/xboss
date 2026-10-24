@@ -109,7 +109,7 @@ for (const failure of ["http", "network"] as const) {
       await expect(page.getByRole("status")).toContainText(/Đang tải kế hoạch/);
       await expect(page.getByText(/Không có công việc nào bắt đầu/)).toHaveCount(0);
       gate.release();
-      const alert = page.getByRole("alert");
+      const alert = page.getByRole("main").getByRole("alert");
       await expect(alert).toContainText(
         failure === "http" ? "Kế hoạch thử chưa tải được" : /kết nối/,
       );
@@ -230,7 +230,7 @@ test("báo cáo: lỗi cũ không che dữ liệu mới; forecast lỗi có retr
     gate.release();
     await expect.poll(() => oldFinished).toBe(true);
     await expect(page.locator("main")).not.toContainText("Lỗi từ kỳ cũ");
-    const alert = page.getByRole("alert");
+    const alert = page.getByRole("main").getByRole("alert");
     await expect(alert).toContainText(/dự báo/);
     await alert.getByRole("button", { name: "Thử lại", exact: true }).click();
     await expect(alert).toHaveCount(0);
@@ -254,8 +254,12 @@ test("báo cáo: retry lỗi mạng giữ URL, controls mobile và a11y hai them
       : route.fulfill({ json: report("KPI kiểm chứng") });
   });
   await page.goto("/report?system=acmv&range=week");
-  await expect(page.getByRole("alert")).toContainText(/kết nối/);
-  await page.getByRole("alert").getByRole("button", { name: "Thử lại", exact: true }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(/kết nối/);
+  await page
+    .getByRole("main")
+    .getByRole("alert")
+    .getByRole("button", { name: "Thử lại", exact: true })
+    .click();
   await expect(page.locator("main")).toContainText("KPI kiểm chứng");
   expect(gets).toBe(2);
   await axeThemes(page);
