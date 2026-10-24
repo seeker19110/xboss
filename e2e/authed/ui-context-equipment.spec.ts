@@ -70,6 +70,32 @@ async function open(page: Page) {
   return dialog;
 }
 
+async function checkThemes(page: Page, include: string) {
+  for (const light of [false, true]) {
+    await page.evaluate(async (isLight) => {
+      document.documentElement.classList.remove("light", "darkblue");
+      document.documentElement.classList.add(isLight ? "light" : "darkblue");
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await Promise.all(
+        document
+          .getAnimations()
+          .filter(
+            (a) =>
+              a.playState === "running" && a.effect?.getComputedTiming().iterations !== Infinity,
+          )
+          .map((a) => a.finished.catch(() => {})),
+      );
+    }, light);
+    const result = await new AxeBuilder({ page })
+      .include(include)
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    expect(
+      result.violations.filter((v) => ["serious", "critical"].includes(v.impact ?? "")),
+    ).toEqual([]);
+  }
+}
+
 test("GET danh sách thiết bị lỗi không thành empty; retry chỉ đọc lại để phục hồi", async ({
   page,
 }) => {
@@ -85,6 +111,7 @@ test("GET danh sách thiết bị lỗi không thành empty; retry chỉ đọc 
     "Danh sách thiết bị tạm lỗi",
   );
   await expect(page.getByText("Chưa có thiết bị nào", { exact: true })).toHaveCount(0);
+  await checkThemes(page, "main");
   await page.getByRole("button", { name: "Thử lại danh sách", exact: true }).click();
   await expect(page.getByText(CODE, { exact: true })).toBeVisible();
   await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
@@ -130,6 +157,7 @@ test("POST accepted và GET danh sách lỗi giữ modal/notice; retry danh sác
   );
   await expect(dialog.getByText("Đã ghi nhận thao tác vừa gửi.", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Ghi nhận", exact: true })).toBeEnabled();
+  await checkThemes(page, '[role="dialog"]');
   await dialog.getByRole("button", { name: "Thử lại danh sách", exact: true }).click();
   await expect(dialog.getByRole("status")).toHaveCount(0);
   await expect(dialog.getByRole("alert")).toHaveCount(0);

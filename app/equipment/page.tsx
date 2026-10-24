@@ -6,7 +6,7 @@ import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
-import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
+import { fetchMe, invalidateMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { formatDateVN, formatDateTimeVN, todayISO, daysFromTodayISO } from "@/lib/nen/date";
 import { EXPIRY_WARN_DAYS } from "@/lib/nen/han-hieu-luc";
 
@@ -52,6 +52,10 @@ export default function EquipmentPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [items, setItems] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasSnapshot, setHasSnapshot] = useState(false);
+  const [pageError, setPageError] = useState("");
+  const mounted = useRef(false);
+  const request = useRef({ id: 0, controller: null as AbortController | null });
   const [conditionFilter, setConditionFilter] = useState<EquipmentCondition | "">("");
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -76,24 +80,63 @@ export default function EquipmentPage() {
     window.open(`/api/qr/labels?kind=eq&ids=${[...checkedIds].join(",")}`, "_blank");
   }
 
-  function load() {
-    return fetch("/api/equipment").then((r) => (r.ok ? r.json() : null));
-  }
-
-  useEffect(() => {
-    Promise.all([fetchMe(), load()])
-      .then(([meData, e]) => {
-        if (!meData) return;
-        setMe(meData);
-        setItems(e?.equipment ?? []);
-      })
-      .finally(() => setLoading(false));
+  const refresh = useCallback(async () => {
+    const id = ++request.current.id;
+    request.current.controller?.abort();
+    const controller = new AbortController();
+    request.current.controller = controller;
+    const current = () =>
+      mounted.current && request.current.id === id && !controller.signal.aborted;
+    const fallback = "Không tải được danh sách thiết bị. Kiểm tra mạng rồi thử lại.";
+    setLoading(true);
+    setPageError("");
+    try {
+      const [meData, res] = await Promise.all([
+        fetchMe(),
+        fetch("/api/equipment", { signal: controller.signal }),
+      ]);
+      if (!current()) return;
+      if (res.status === 401) {
+        void redirectToLogin();
+        return;
+      }
+      const body = await res.json().catch(() => null);
+      if (!current()) return;
+      if (!meData) invalidateMe();
+      if (!res.ok) {
+        setPageError(typeof body?.error === "string" && body.error.trim() ? body.error : fallback);
+        return;
+      }
+      if (!meData || !Array.isArray(body?.equipment)) {
+        setPageError(fallback);
+        return;
+      }
+      setMe(meData);
+      setItems(body.equipment);
+      setHasSnapshot(true);
+    } catch {
+      if (current()) {
+        invalidateMe();
+        setPageError(fallback);
+      }
+    } finally {
+      if (mounted.current && request.current.id === id) {
+        request.current.controller = null;
+        setLoading(false);
+      }
+    }
   }, []);
 
-  async function refresh() {
-    const e = await load();
-    setItems(e?.equipment ?? []);
-  }
+  useEffect(() => {
+    const active = request.current;
+    mounted.current = true;
+    void refresh();
+    return () => {
+      mounted.current = false;
+      active.id++;
+      active.controller?.abort();
+    };
+  }, [refresh]);
 
   const filtered = useMemo(() => {
     return items.filter((e) => {
@@ -114,7 +157,7 @@ export default function EquipmentPage() {
   const selected = items.find((e) => e.id === selectedId) ?? null;
   const today = todayISO();
 
-  if (loading) return <PageSkeleton />;
+  if (loading && !hasSnapshot && !pageError) return <PageSkeleton />;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -150,6 +193,31 @@ export default function EquipmentPage() {
       />
 
       <main className="p-4 sm:p-6 pb-24 space-y-4">
+        {pageError && (
+          <div className="rounded-xl border border-red-500/40 bg-zinc-900 p-4 space-y-2">
+            <p role="alert" className="text-sm text-red-300">
+              {pageError}
+            </p>
+            {hasSnapshot && (
+              <p className="text-sm text-zinc-400">
+                Đang hiển thị danh sách thiết bị đã tải trước đó.
+              </p>
+            )}
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void refresh()}
+              className="min-h-11 rounded-lg bg-zinc-800 hover:bg-zinc-700 px-3 py-2 text-sm disabled:opacity-50"
+            >
+              Thử lại danh sách
+            </button>
+          </div>
+        )}
+        {loading && hasSnapshot && (
+          <p role="status" className="text-sm text-zinc-400">
+            Đang tải lại danh sách thiết bị…
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Lọc theo tình trạng">
             <button
@@ -185,13 +253,13 @@ export default function EquipmentPage() {
           />
         </div>
 
-        {filtered.length === 0 ? (
+        {hasSnapshot && filtered.length === 0 ? (
           <EmptyState
             icon={Wrench}
             title="Chưa có thiết bị nào"
             message={canManage ? 'Bấm "Thêm thiết bị" để bắt đầu.' : "Chưa có dữ liệu thiết bị."}
           />
-        ) : (
+        ) : hasSnapshot ? (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
             <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Sổ thiết bị">
               <table className="w-full text-sm sm:min-w-[760px]">
@@ -262,7 +330,7 @@ export default function EquipmentPage() {
               </table>
             </div>
           </div>
-        )}
+        ) : null}
       </main>
 
       {selected && (
@@ -272,6 +340,8 @@ export default function EquipmentPage() {
           me={me}
           onClose={() => setSelectedId(null)}
           onSaved={refresh}
+          pageError={pageError}
+          pageLoading={loading}
         />
       )}
       {addOpen && (
@@ -409,12 +479,16 @@ function EquipmentDetailModal({
   me,
   onClose,
   onSaved,
+  pageError,
+  pageLoading,
 }: {
   equipment: Equipment;
   canManage: boolean;
   me: Me | null;
   onClose: () => void;
   onSaved: () => void | Promise<void>;
+  pageError: string;
+  pageLoading: boolean;
 }) {
   const [logs, setLogs] = useState<EquipmentLog[] | null>(null);
   const [logsLoading, setLogsLoading] = useState(true);
@@ -574,6 +648,7 @@ function EquipmentDetailModal({
     writeRequest.current = controller;
     setUploading(true);
     setWriteError("");
+    setNotice("");
     try {
       const form = new FormData();
       form.append("file", f);
@@ -595,6 +670,7 @@ function EquipmentDetailModal({
           );
         return;
       }
+      setNotice("Đã tải giấy kiểm định vừa gửi.");
       try {
         await onSaved();
       } catch {
@@ -660,6 +736,32 @@ function EquipmentDetailModal({
           </div>
           {equipment.note && <div>Ghi chú: {equipment.note}</div>}
         </dl>
+
+        {pageLoading && (
+          <p role="status" className="text-sm text-zinc-400">
+            Đang tải lại danh sách thiết bị…
+          </p>
+        )}
+        {pageError && (
+          <div className="space-y-2">
+            <p role="alert" className="text-sm text-red-300">
+              {pageError}
+            </p>
+            <p className="text-sm text-zinc-400">
+              Thông tin thiết bị đang hiển thị là bản đã tải trước đó.
+            </p>
+            <button
+              type="button"
+              disabled={pageLoading || pending}
+              onClick={() => {
+                if (!writePending.current) void onSaved();
+              }}
+              className="min-h-11 rounded-lg bg-zinc-800 hover:bg-zinc-700 px-3 py-2 text-sm disabled:opacity-50"
+            >
+              Thử lại danh sách
+            </button>
+          </div>
+        )}
 
         {canManage && (
           <label className="inline-flex min-h-11 items-center gap-2 text-sm text-zinc-300 hover:text-white cursor-pointer bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg w-fit focus-within:outline-2 focus-within:outline-emerald-400">
