@@ -451,6 +451,20 @@ for (const light of [false, true]) {
     );
     await page.route("**/api/floor-stage-fronts", (route) => route.abort("failed"));
     const check = async () => {
+      // Đo màu ở trạng thái ổn định, không chụp giữa transition hover/focus của button.
+      await page.evaluate(async () => {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        await Promise.all(
+          document
+            .getAnimations()
+            .filter(
+              (animation) =>
+                animation.playState === "running" &&
+                animation.effect?.getComputedTiming().iterations !== Infinity,
+            )
+            .map((animation) => animation.finished.catch(() => {})),
+        );
+      });
       const result = await new AxeBuilder({ page })
         .include("main")
         .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
@@ -461,10 +475,10 @@ for (const light of [false, true]) {
     };
     try {
       await page.goto(PATH);
-      await page.evaluate(
-        (isLight) => document.documentElement.classList.toggle("light", isLight),
-        light,
-      );
+      await page.evaluate((isLight) => {
+        document.documentElement.classList.remove("light", "darkblue");
+        document.documentElement.classList.add(isLight ? "light" : "darkblue");
+      }, light);
       await expect(card(page).getByRole("status")).toContainText("Đang tải tài liệu");
       await check();
       pending.release();
