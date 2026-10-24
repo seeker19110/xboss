@@ -66,9 +66,21 @@ for (const failure of ["http", "network", "invalid"] as const) {
     if (failure === "http") {
       for (const light of [false, true]) {
         await page.evaluate(
-          (value) => document.documentElement.classList.toggle("light", value),
-          light,
+          (theme) => {
+            document.documentElement.classList.remove("light", "darkblue");
+            document.documentElement.classList.add(theme);
+          },
+          light ? "light" : "darkblue",
         );
+        await dialog.evaluate(async (element) => {
+          element.getBoundingClientRect();
+          await Promise.all(
+            element
+              .getAnimations({ subtree: true })
+              .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime))
+              .map((animation) => animation.finished.catch(() => {})),
+          );
+        });
         const axe = await new AxeBuilder({ page })
           .include('[role="dialog"]')
           .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])

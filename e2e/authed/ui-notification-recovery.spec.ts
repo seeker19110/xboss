@@ -46,13 +46,35 @@ async function openBell(page: Page) {
 async function axeThemes(page: Page, panel: Locator) {
   for (const light of [false, true]) {
     await page.evaluate(
-      (value) => document.documentElement.classList.toggle("light", value),
-      light,
+      (theme) => {
+        document.documentElement.classList.remove("light", "darkblue");
+        document.documentElement.classList.add(theme);
+      },
+      light ? "light" : "darkblue",
     );
+    await panel.evaluate(async (element) => {
+      // Đo theme thật sau khi màu transition kết thúc, không đo màu trung gian.
+      element.getBoundingClientRect();
+      await Promise.all(
+        element
+          .getAnimations({ subtree: true })
+          .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime))
+          .map((animation) => animation.finished.catch(() => {})),
+      );
+    });
     const result = await new AxeBuilder({ page })
       .include('[role="region"][aria-label="Thông báo gần đây"]')
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
       .analyze();
+    const timestamps = result.passes
+      .find((rule) => rule.id === "color-contrast")
+      ?.nodes.filter((node) => node.html.includes("24/10/2026"))
+      .map((node) => ({ target: node.target, checks: node.any.map((check) => check.data) }));
+    if (timestamps?.length)
+      await test.info().attach(`bell-timestamps-${light ? "light" : "darkblue"}`, {
+        body: JSON.stringify(timestamps, null, 2),
+        contentType: "application/json",
+      });
     expect(
       result.violations.filter((item) => ["serious", "critical"].includes(item.impact ?? "")),
     ).toEqual([]);
