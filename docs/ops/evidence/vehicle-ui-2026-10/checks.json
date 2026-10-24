@@ -1,0 +1,49 @@
+{
+  "checkpoint": "PRE_CI",
+  "base": "8f5e6702ca2f96e2dafbf7db1b7f9b5ed64e5b86",
+  "build": {
+    "status": "PASS",
+    "id": "IM5TAIdkFusxT9mXQxefH"
+  },
+  "gate": {
+    "passed": 18,
+    "total": 18,
+    "buildSeparate": "PASS"
+  },
+  "typecheck": "PASS",
+  "authenticatedE2E": {
+    "pass": 65,
+    "fail": 0,
+    "flaky": 0,
+    "skip": 0,
+    "retries": 0,
+    "newCasesPerProfile": 30,
+    "existingRegressionCases": 4,
+    "setup": 1,
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "visual": {
+    "scenes": 4,
+    "status": "PASS",
+    "openedForReview": 4,
+    "motionForAxe": "default; stable state after natural finite transitions",
+    "screenshotOnly": "viewport; animations disabled for capture only"
+  },
+  "astInvariants": 11,
+  "requestCounts": {
+    "readOnlySuppliers": 0,
+    "openSuppliers": 1,
+    "reopenSuppliersTotal": 1,
+    "failedThenRetrySuppliersTotal": 2,
+    "dateChangesReloadSuppliers": false
+  },
+  "fullLocalUnit": "RUNNING — not counted as PASS",
+  "productionAuthenticatedSessionVerified": false,
+  "productionReadyBefore": {
+    "ready": true,
+    "schema": "ok",
+    "migrations": 171
+  },
+  "uat": "WAITING",
+  "usage": "WAITING"
+}

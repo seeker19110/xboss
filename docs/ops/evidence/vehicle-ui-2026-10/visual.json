@@ -1,0 +1,45 @@
+{
+  "checkedAt": "2026-10-24T10:12:02.492Z",
+  "synthetic": true,
+  "base": "8f5e6702ca2f96e2dafbf7db1b7f9b5ed64e5b86",
+  "sourceSha256": "304fa26baa7780faf04463b10c6917130031304779960f0f29f6e9cfac1f9f5e",
+  "build": "IM5TAIdkFusxT9mXQxefH",
+  "scenes": [
+    {
+      "name": "desktop",
+      "theme": "light",
+      "scene": "list",
+      "file": "screenshots/desktop-light-list.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "supplierGets": 0
+    },
+    {
+      "name": "desktop",
+      "theme": "light",
+      "scene": "form",
+      "file": "screenshots/desktop-light-form.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "supplierGets": 1
+    },
+    {
+      "name": "mobile",
+      "theme": "darkblue",
+      "scene": "list",
+      "file": "screenshots/mobile-darkblue-list.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "supplierGets": 0
+    },
+    {
+      "name": "mobile",
+      "theme": "darkblue",
+      "scene": "form",
+      "file": "screenshots/mobile-darkblue-form.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "supplierGets": 1
+    }
+  ]
+}

@@ -180,8 +180,17 @@ Owner yêu cầu tự kiểm tra truy cập và hoàn thiện. Root/login/HTTPS/
 trực tiếp, không đăng nhập hay ghi production. RED desktop/mobile bắt form tự điền demo.
 Lát S: demo chỉ development, form production trống với autocomplete đúng mục đích, icon Lucide
 không phụ thuộc emoji. API/auth/SSO/2FA/cache/backend giữ nguyên. Gate/build19/19, E2E10/10,
-unit liên quan40/40 và visual hai theme desktop/360px + axe đạt; đang VERIFY trước CI;
+unit liên quan40/40 và visual hai theme desktop/360px + axe đạt; [PR#684](https://github.com/seeker19110/xboss/pull/684) đã deploy16:45:32 UTC+7 tại `8f5e6702`, PR/mainCI và public smoke hai theme đạt;
 F2/F3 tiếp tục WAITING. Không gỡ capability nghiệp vụ.
+
+## Iteration 11 — Xe ra vào đúng ngày và tải đúng nhu cầu
+
+Owner tiếp tục ủy quyền kiểm sau đăng nhập, tự sửa/kiểm kỹ/merge/deploy. Lát S theo
+[scope](../ops/evidence/vehicle-ui-2026-10/scope.md): không GET NCC khi chỉ xem; response mới nhất
+đúng ngày, lỗi/retry giữ snapshot chỉ xem; form Modal/label/16px/44px, giữ draft và pending chặn
+write lặp. API/auth/payload/trạng thái xe/backend/schema/dependency giữ nguyên. RED6 lỗi đã tái
+hiện; GREEN65/65, build/11 bất biến/4ảnh+axe đạt, đang chốt full unit/gate và CI. Kiểm trên PostgreSQL16 disposable với synthetic fixtures sau login thật; production
+chỉ đọc public smoke, không có phiên production có auth được xác minh. F2/F3 vẫn WAITING.
 
 ## Final audit
 
