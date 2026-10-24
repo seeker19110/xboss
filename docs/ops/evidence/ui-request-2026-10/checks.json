@@ -1,0 +1,66 @@
+{
+  "source": "ed8c35e73296ef85dd14a5518d5081f227a1fc19",
+  "buildId": "Z55AmGwQiXklUw6Dpia5b",
+  "Node": "v24.22.1 local; production patch unverified",
+  "build": "PASS",
+  "gate": "18/18 PASS after single-Modal repair",
+  "typecheck": "PASS final source via gate",
+  "unit": {
+    "files": 385,
+    "pass": 5165,
+    "fail": 0,
+    "skip": 1,
+    "reason": "Existing health inverse no-DB case; run with DB",
+    "provenance": "Started before UI-only repairs. Node-unit-reachable lib/API/tests/package code unchanged to final. CI must run exact HEAD."
+  },
+  "audit": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0,
+    "total": 0
+  },
+  "reports": {
+    "focus-repeat": {
+      "startTime": "2026-10-24T08:44:30.291Z",
+      "duration": 19300.334,
+      "expected": 20,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "green-modal": {
+      "startTime": "2026-10-24T08:44:50.164Z",
+      "duration": 17516.374,
+      "expected": 37,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "regression-modal": {
+      "startTime": "2026-10-24T08:45:08.184Z",
+      "duration": 10553.64,
+      "expected": 16,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "rawSha256": {
+    "/tmp/xboss-round4-green-wrap.json": "4029ab74a08480bf751697c09b77a838ddc3d57c9bef25e150acc90b1500b240",
+    "/tmp/xboss-round4-regression-wrap.json": "0222d8cdb8708d6a3dc7dbb3759fda45cfe1ce14b32f46d1b9a8e04e4b1105c7",
+    "/tmp/xboss-round4-unit.log": "4a371056774a9ea07f6d19ee16dee3117c64228a6275663f96af5c4bc9fa1a3b",
+    "/tmp/xboss-round4-gate-wrap.log": "cd9e731e70179640f653e98e361d2f897d9741d346c90240b41ceec969421a3e",
+    "/tmp/xboss-round4-build-wrap.log": "380b51bb13c0878767dad939e1e0002532ae15c5e0ec213b10ee0acf54672648",
+    "/tmp/xboss-round4-focus-repeat.json": "c2b3d11df2b1b88d5f42ab5de84abad818372a8d83d86fa760da37cb03743215",
+    "/tmp/xboss-round4-green-modal.json": "e8f12fcaffe9aadbc8b03c686014d6cc833e6701e3726f57c8faf1c9a4f76cb9",
+    "/tmp/xboss-round4-regression-modal.json": "827a24d8ad7c898474ff43353cc0a76b7bb92be2e3466a85a6db453afdc3d6ad",
+    "/tmp/xboss-round4-build-modal.log": "a0b744d8364ab75315c921e511f002f15bba7aa11851c78614d85b9922bcdf61",
+    "/tmp/xboss-round4-gate-modal.log": "b1566ce23a553813cd017322cb305bc4e14d4893a062800c4f9bc84964d59964"
+  },
+  "review": "Root reviewed full final diff +18 AST/text invariants; 20/20 focus repeats retries0, all behavior/visual checks passed; old CI flaky preserved in repair.json, new exact HEAD CI required.",
+  "release": "VERIFY, PR/main CI/deploy/public smoke pending",
+  "UAT": "WAITING",
+  "usage": "WAITING"
+}

@@ -1,0 +1,101 @@
+{
+  "checkedAt": "2026-10-24T08:18:32.834Z",
+  "origin": "https://xboss.donghanhcungban.org",
+  "readOnly": true,
+  "browsers": [
+    {
+      "name": "desktop",
+      "loginStatus": 200,
+      "seriousAxeViolations": 0,
+      "pageErrors": [],
+      "failedAssets": [],
+      "cssHashes": [
+        {
+          "path": "/_next/static/chunks/11my6udytlqno.css",
+          "sha256": "4d69da65fd3177dc810ed89426dd9626ccd7e4040b2709f4dd28bcb7e95fedf2"
+        }
+      ],
+      "hasResponsiveHeader": true,
+      "hasInsetFocus": true,
+      "protectedApis": [
+        {
+          "endpoint": "/api/dashboard",
+          "status": 401
+        },
+        {
+          "endpoint": "/api/search?q=quality",
+          "status": 401
+        }
+      ]
+    },
+    {
+      "name": "mobile",
+      "loginStatus": 200,
+      "seriousAxeViolations": 0,
+      "pageErrors": [],
+      "failedAssets": [],
+      "cssHashes": [
+        {
+          "path": "/_next/static/chunks/11my6udytlqno.css",
+          "sha256": "4d69da65fd3177dc810ed89426dd9626ccd7e4040b2709f4dd28bcb7e95fedf2"
+        }
+      ],
+      "hasResponsiveHeader": true,
+      "hasInsetFocus": true,
+      "protectedApis": [
+        {
+          "endpoint": "/api/dashboard",
+          "status": 401
+        },
+        {
+          "endpoint": "/api/search?q=quality",
+          "status": 401
+        }
+      ]
+    },
+    {
+      "name": "mobile-360",
+      "loginStatus": 200,
+      "seriousAxeViolations": 0,
+      "pageErrors": [],
+      "failedAssets": [],
+      "cssHashes": [
+        {
+          "path": "/_next/static/chunks/11my6udytlqno.css",
+          "sha256": "4d69da65fd3177dc810ed89426dd9626ccd7e4040b2709f4dd28bcb7e95fedf2"
+        }
+      ],
+      "hasResponsiveHeader": true,
+      "hasInsetFocus": true,
+      "protectedApis": [
+        {
+          "endpoint": "/api/dashboard",
+          "status": 401
+        },
+        {
+          "endpoint": "/api/search?q=quality",
+          "status": 401
+        }
+      ]
+    }
+  ],
+  "/api/health": {
+    "status": 200,
+    "body": {
+      "status": "ok",
+      "db": true,
+      "migration": "0171_users_disabled.sql",
+      "uptime_s": 6273
+    }
+  },
+  "/api/ready": {
+    "status": 200,
+    "body": {
+      "ready": true,
+      "schema": "ok",
+      "migrationsApplied": 171,
+      "appliedHead": "0171_users_disabled.sql"
+    }
+  },
+  "status": "PASS"
+}

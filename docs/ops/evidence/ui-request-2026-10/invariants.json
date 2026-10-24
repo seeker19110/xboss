@@ -1,0 +1,95 @@
+{
+  "base": "e52b4937c8e46936adba15bf4ed7d62d11d7add3",
+  "source": "ed8c35e73296ef85dd14a5518d5081f227a1fc19",
+  "checks": [
+    {
+      "path": "app/personnel/page.tsx",
+      "symbol": "PersonnelModal",
+      "unchanged": true
+    },
+    {
+      "path": "app/personnel/page.tsx",
+      "symbol": "DetailModal",
+      "unchanged": true
+    },
+    {
+      "path": "app/personnel/page.tsx",
+      "symbol": "CertificationModal",
+      "unchanged": true
+    },
+    {
+      "path": "app/personnel/page.tsx",
+      "symbol": "certBadge",
+      "unchanged": true
+    },
+    {
+      "path": "app/personnel/page.tsx",
+      "symbol": "canManage",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/page.tsx",
+      "symbol": "taiDanhSach",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/page.tsx",
+      "symbol": "HangHopDong",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/page.tsx",
+      "symbol": "canManage",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/page.tsx",
+      "symbol": "isAdmin",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/page.tsx",
+      "symbol": "refresh",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/page.tsx",
+      "symbol": "refreshHienTai",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/page.tsx",
+      "symbol": "mSumTien",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/page.tsx",
+      "symbol": "mulRatio",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/_components/ContractDocument.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/_components/AddContractModal.tsx",
+      "symbol": "submit",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/_components/AddContractModal.tsx",
+      "symbol": "canSubmit",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/_components/AddContractModal.tsx",
+      "symbol": "needsSupplier",
+      "unchanged": true
+    },
+    {
+      "path": "app/contracts/_components/AddContractModal.tsx",
+      "symbol": "all useState initializers",
+      "unchanged": true
+    }
+  ]
+}

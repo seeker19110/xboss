@@ -1,0 +1,30 @@
+{
+  "baselineMain": "e52b4937c8e46936adba15bf4ed7d62d11d7add3",
+  "buildId": "ZESpfgOuVNTdib35T73lw",
+  "buildSource": "992bd0c4 app content identical e52 main; server started before source changed, no rebuild during RED",
+  "reports": {
+    "red": {
+      "stats": {
+        "startTime": "2026-10-24T08:18:37.707Z",
+        "duration": 10497.336,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 3,
+        "flaky": 0
+      },
+      "sha256": "aa8c0dbe0603e5a381ee0b40b0b6be97798743cbaf7d707bef1b6135750cdbbc"
+    },
+    "stale-red": {
+      "stats": {
+        "startTime": "2026-10-24T08:20:30.233Z",
+        "duration": 5852.905000000001,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "sha256": "e631816b28cbc54a9a36b7557f6de6bde7b66c6ebb60ab1e311ffd8aba0d97e2"
+    }
+  },
+  "interpretation": "Initial RED includes missing keyboard name button in stale-test guard; separate stale-red removes that assertion and demonstrates old response replacing newer result. No environmental failure counted."
+}

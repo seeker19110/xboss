@@ -1,0 +1,120 @@
+{
+  "firstGreen": {
+    "startTime": "2026-10-24T08:22:02.996Z",
+    "duration": 89914.012,
+    "expected": 17,
+    "skipped": 0,
+    "unexpected": 6,
+    "flaky": 0
+  },
+  "rawSha256": "050711a5c4f0a40b520c0ca5326e8035a680cde4ece74c622b148686f0be3f94",
+  "failures": "6 contract executions: exact getByLabel Hệ missed native select despite ARIA snapshot containing options; unfiltered role=alert also matched Next route announcer. Changed to accessible combobox name and alert text filter, preserved all option/payload/count/error oracles.",
+  "gateFirst": "17/18; TS event overload union in test helper. Use typed Request callback with separate event registrations. No application failure or environment failure hidden.",
+  "sourceReview": "Personnel child modal/cert/write functions byte-identical to baseline. AddContractModal/ContractDocument unchanged; taiDanhSach/refresh/CAN/money expressions unchanged. Small added correction: empty only after valid matching snapshot; copy reflects active filter/viewer.",
+  "limits": "All final source checks PASS locally; exact HEAD CI/deploy still pending. No gate/assertion/timeout/skip weakening.",
+  "secondGreen": {
+    "stats": {
+      "startTime": "2026-10-24T08:25:25.767Z",
+      "duration": 35308.536,
+      "expected": 33,
+      "skipped": 0,
+      "unexpected": 2,
+      "flaky": 0
+    },
+    "rawSha256": "6203d3313f8cab1d25f6241f2517b9fbd2566a0f08962488cac2cf238c6f17ce",
+    "sourceFailure": "Two executions: after retry, swapping loading Modal to AddContractModal captured detached retry button instead of original trigger. Parent restores the captured create trigger after modal cleanup; guard inert/connected prevents stealing focus. Assertions unchanged.",
+    "sourceRepairAttempt": 1
+  },
+  "focusGreen": {
+    "stats": {
+      "startTime": "2026-10-24T08:27:47.069Z",
+      "duration": 19166.808,
+      "expected": 35,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "regression": {
+      "startTime": "2026-10-24T08:28:06.751Z",
+      "duration": 10230.541,
+      "expected": 16,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "longNameRed": {
+    "source": "19f4641f5f564f7a2d5cdaae9d828e64ac8849b3",
+    "buildId": "Uch2tND_vhuB0VPkj7MYD",
+    "stats": {
+      "startTime": "2026-10-24T08:29:13.639Z",
+      "duration": 804.28,
+      "expected": 0,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "rawSha256": "516c1078313d4777afbefb477f2e5c61b0917d03602defacda2383921092e7a7",
+    "issue": "Visual inspection caught whitespace-nowrap inherited through shared Button Inner span. Text rect exceeded button rect. Keep shared Button, give text child explicit normal wrapping/max width; assertion and keyboard open remain.",
+    "sourceRepairAttempt": 1
+  },
+  "finalGreen": {
+    "green": {
+      "startTime": "2026-10-24T08:30:27.701Z",
+      "duration": 19263.4,
+      "expected": 37,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "regression": {
+      "startTime": "2026-10-24T08:30:47.543Z",
+      "duration": 11722.878999999999,
+      "expected": 16,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "ciFocusFlaky": {
+    "run": 40078581040,
+    "head": "bf214855035cedc858d34ae030581c9ef5d87668",
+    "job": 120827424867,
+    "case": "authed-mobile: lỗi option không mở form thiếu; retry nguồn lỗi, đóng được",
+    "observed": "Expected create trigger focused, inactive after Escape; passed retry. Not accepted as clean release.",
+    "repairAttemptForFocus": 2,
+    "repair": "Keep one Modal in AddContractModal while preparation content switches to form; remove page manual focus recovery and Modal swap. Only optional presentation slot added; submit/fields/state unchanged. Add explicit dialog closed assertion. Repeat with retries0, full GREEN/gate/build and exact HEAD CI required."
+  },
+  "finalAfterSingleModal": {
+    "source": "ed8c35e73296ef85dd14a5518d5081f227a1fc19",
+    "build": "Z55AmGwQiXklUw6Dpia5b",
+    "reports": {
+      "focus-repeat": {
+        "startTime": "2026-10-24T08:44:30.291Z",
+        "duration": 19300.334,
+        "expected": 20,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "green-modal": {
+        "startTime": "2026-10-24T08:44:50.164Z",
+        "duration": 17516.374,
+        "expected": 37,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "regression-modal": {
+        "startTime": "2026-10-24T08:45:08.184Z",
+        "duration": 10553.64,
+        "expected": 16,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    "gate": "18/18",
+    "sameFocusFailureRepairCount": 2
+  }
+}

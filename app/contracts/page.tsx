@@ -1,7 +1,7 @@
 "use client";
-import { Fragment, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronRight, FileSignature, Plus, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, FileSignature, Plus, RotateCcw, X } from "lucide-react";
 import { todayISO } from "@/lib/nen/date";
 import AppHeader from "@/app/components/AppHeader";
 import MaskedValue from "@/app/components/MaskedValue";
@@ -11,7 +11,7 @@ import { HEADER_TIEN_V1 } from "@/lib/nen/money-dto";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
-import { fetchMe, type Me } from "@/app/lib/me";
+import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { Button, Card, Chip, StatCard } from "@/app/components/ui";
 import AddContractModal from "@/app/contracts/_components/AddContractModal";
 import ContractDocument, {
@@ -72,22 +72,76 @@ function ContractsInner() {
   const [showDeleted, setShowDeleted] = useState(false);
   const [restoringId, setRestoringId] = useState<number | null>(null);
 
+  const [optionsReady, setOptionsReady] = useState(false);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [optionsError, setOptionsError] = useState("");
+  const optionCache = useRef<{ suppliers: Supplier[] | null; systems: SystemOption[] | null }>({
+    suppliers: null,
+    systems: null,
+  });
+  const optionRequest = useRef<AbortController | null>(null);
+  const loadOptions = useCallback(async () => {
+    optionRequest.current?.abort();
+    const controller = new AbortController();
+    optionRequest.current = controller;
+    const current = () => !controller.signal.aborted && optionRequest.current === controller;
+    setOptionsLoading(true);
+    setOptionsError("");
+    const errors: string[] = [];
+    async function load<K extends "suppliers" | "systems">(key: K, label: string) {
+      if (optionCache.current[key] !== null) return;
+      try {
+        const response = await fetch(`/api/${key}`, { signal: controller.signal });
+        if (!current()) return;
+        if (response.status === 401) {
+          void redirectToLogin();
+          throw new Error("Phiên đăng nhập đã hết hạn.");
+        }
+        const body = await response.json().catch(() => null);
+        if (!response.ok || !Array.isArray(body?.[key]))
+          throw new Error(
+            typeof body?.error === "string" ? body.error : `Không tải được ${label}. Hãy thử lại.`,
+          );
+        if (current()) optionCache.current[key] = body[key];
+      } catch (error) {
+        if (current())
+          errors.push(
+            error instanceof Error && error.name !== "TypeError"
+              ? error.message
+              : `Mất kết nối — không tải được ${label}. Hãy thử lại.`,
+          );
+      }
+    }
+    await Promise.all([load("suppliers", "nhà cung cấp"), load("systems", "hệ")]);
+    if (!current()) return;
+    setOptionsLoading(false);
+    setOptionsError(errors.join(" "));
+    if (!errors.length && optionCache.current.suppliers && optionCache.current.systems) {
+      setSuppliers(optionCache.current.suppliers);
+      setSystems(optionCache.current.systems);
+      setOptionsReady(true);
+    }
+  }, []);
+  useEffect(() => {
+    if (addOpen && !optionsReady) void loadOptions();
+    return () => {
+      optionRequest.current?.abort();
+    };
+  }, [addOpen, optionsReady, loadOptions]);
+  function closeCreate() {
+    optionRequest.current?.abort();
+    setAddOpen(false);
+  }
+
   const canManage = me?.role === "admin" || me?.role === "pm";
   const isAdmin = me?.role === "admin";
 
   useEffect(() => {
-    Promise.all([
-      fetchMe(),
-      taiDanhSach(false),
-      fetch("/api/suppliers").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/systems").then((r) => (r.ok ? r.json() : null)),
-    ])
-      .then(([meData, c, s, d]) => {
+    Promise.all([fetchMe(), taiDanhSach(false)])
+      .then(([meData, c]) => {
         if (!meData) return;
         setMe(meData);
         setContracts(c?.contracts ?? []);
-        setSuppliers(s?.suppliers ?? []);
-        setSystems(d?.systems ?? []);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -384,7 +438,41 @@ function ContractsInner() {
         <AddContractModal
           suppliers={suppliers}
           systems={systems}
-          onClose={() => setAddOpen(false)}
+          preparation={
+            optionsReady ? undefined : (
+              <div className="p-5 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="font-semibold">Thêm hợp đồng</h2>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    icon={X}
+                    aria-label="Đóng"
+                    className="min-h-11 min-w-11"
+                    onClick={closeCreate}
+                  />
+                </div>
+                {optionsLoading && (
+                  <p role="status" className="text-sm text-zinc-400">
+                    Đang tải danh mục tạo hợp đồng…
+                  </p>
+                )}
+                {optionsError && (
+                  <div role="alert" className="space-y-3 text-sm text-rose-300">
+                    <p>{optionsError}</p>
+                    <Button
+                      variant="secondary"
+                      className="min-h-11"
+                      onClick={() => void loadOptions()}
+                    >
+                      Thử lại
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )
+          }
+          onClose={closeCreate}
           onCreated={() => {
             setAddOpen(false);
             void refreshHienTai();

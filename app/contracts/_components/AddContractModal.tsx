@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { Modal } from "@/app/components/dialogs";
 import { Button } from "@/app/components/ui";
@@ -21,11 +21,14 @@ export default function AddContractModal({
   systems,
   onClose,
   onCreated,
+  preparation,
 }: {
   suppliers: Supplier[];
   systems: SystemOption[];
   onClose: () => void;
   onCreated: () => void;
+  /** Nội dung tải/lỗi danh mục, giữ cùng Modal và điểm trả focus cho đến khi form sẵn sàng. */
+  preparation?: ReactNode;
 }) {
   const [code, setCode] = useState("");
   const [kind, setKind] = useState<ContractKind>("ncc");
@@ -80,6 +83,8 @@ export default function AddContractModal({
 
   const canSubmit =
     code.trim() && title.trim() && (needsSupplier ? partySupplierId : partyName.trim());
+
+  if (preparation !== undefined) return <Modal onClose={onClose}>{preparation}</Modal>;
 
   return (
     <Modal onClose={onClose}>

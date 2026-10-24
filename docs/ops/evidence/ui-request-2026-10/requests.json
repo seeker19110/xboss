@@ -1,0 +1,27 @@
+{
+  "source": "6a636c75b6188b5bf237fd4359e252618f3d5227",
+  "baseline": "Two unconditional mount fetches in e52 contract page; RED observed supplier1 before create. Source also calls systems once. Not a latency benchmark.",
+  "candidateInitial": "GREEN assertions suppliers0/systems0 before create, both profiles",
+  "candidateAfterOpenAndReopen": [
+    {
+      "profile": "authed-desktop",
+      "afterOpenAndReopen": {
+        "crews": 0,
+        "suppliers": 1,
+        "systems": 1,
+        "personnel": 0
+      }
+    },
+    {
+      "profile": "authed-mobile",
+      "afterOpenAndReopen": {
+        "crews": 0,
+        "suppliers": 1,
+        "systems": 1,
+        "personnel": 0
+      }
+    }
+  ],
+  "failedSystemRetry": "GREEN assertions system2/supplier1; only failed source retried",
+  "personnel": "Held auxiliary test primary visible; filter race latest result wins; auxiliary request counters stay1 each"
+}
