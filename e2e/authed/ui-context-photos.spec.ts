@@ -354,3 +354,56 @@ test("GET ảnh 401 dùng luồng hết phiên hiện hữu thay vì báo galler
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
   expect(gets).toBe(1);
 });
+
+test("360px: lỗi, gallery và viewer đạt axe hai theme, không tràn ngang, target đủ 44px", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  let gets = 0;
+  await page.route(`**/api/tasks/${TASK}/photos`, (route) => {
+    expect(route.request().method()).toBe("GET");
+    gets++;
+    return gets === 1
+      ? route.fulfill({ status: 500, json: { error: "Chưa tải được ảnh trên màn hình hẹp" } })
+      : route.fulfill({ json: { photos: [PHOTO] } });
+  });
+
+  async function target44(control: Locator, name: string) {
+    const box = await control.boundingBox();
+    expect(box, `${name}: control có bounds nhìn thấy`).not.toBeNull();
+    expect(box!.width, `${name}: chiều rộng target`).toBeGreaterThanOrEqual(44);
+    expect(box!.height, `${name}: chiều cao target`).toBeGreaterThanOrEqual(44);
+  }
+
+  const { dialog } = await openPhotos(page);
+  await expect(dialog.getByRole("alert")).toContainText("Chưa tải được ảnh trên màn hình hẹp");
+  const retry = dialog.getByRole("button", { name: "Thử lại", exact: true });
+  const close = dialog.getByRole("button", { name: "Đóng", exact: true });
+  const upload = dialog.locator("label").filter({
+    has: dialog.getByLabel("Thêm ảnh", { exact: true }),
+  });
+  await target44(retry, "Thử lại");
+  await target44(close, "Đóng gallery");
+  await target44(upload, "Thêm ảnh");
+  await checkA11y(page, dialog);
+
+  await retry.click();
+  const image = dialog.getByRole("button", { name: `Xem ảnh: ${PHOTO.caption}`, exact: true });
+  await expect(image).toBeVisible();
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
+  await expect(dialog.getByRole("status")).toHaveCount(0);
+  expect(gets).toBe(2);
+  await target44(image, "Mở ảnh");
+  await target44(dialog.getByRole("button", { name: "Xoá ảnh", exact: true }), "Xoá ảnh");
+  await checkA11y(page, dialog);
+
+  await image.click();
+  const viewer = page.getByRole("dialog", { name: `Xem ảnh: ${PHOTO.caption}`, exact: true });
+  await expect(viewer).toBeVisible();
+  await target44(viewer.getByRole("button", { name: "Đóng ảnh", exact: true }), "Đóng viewer");
+  await checkA11y(page, viewer);
+  await page.keyboard.press("Escape");
+  await expect(viewer).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  await expect(image).toBeFocused();
+});
