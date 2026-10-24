@@ -305,7 +305,9 @@ export default function PersonnelPage() {
                           disabled={!canUseRows}
                           onClick={() => setDetail(p)}
                         >
-                          {p.fullName}
+                          <span className="block max-w-56 whitespace-normal break-words">
+                            {p.fullName}
+                          </span>
                         </Button>
                         {p.code && <p className="text-xs text-zinc-500">{p.code}</p>}
                       </td>

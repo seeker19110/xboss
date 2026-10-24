@@ -24,5 +24,38 @@
     "rawSha256": "6203d3313f8cab1d25f6241f2517b9fbd2566a0f08962488cac2cf238c6f17ce",
     "sourceFailure": "Two executions: after retry, swapping loading Modal to AddContractModal captured detached retry button instead of original trigger. Parent restores the captured create trigger after modal cleanup; guard inert/connected prevents stealing focus. Assertions unchanged.",
     "sourceRepairAttempt": 1
+  },
+  "focusGreen": {
+    "stats": {
+      "startTime": "2026-10-24T08:27:47.069Z",
+      "duration": 19166.808,
+      "expected": 35,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "regression": {
+      "startTime": "2026-10-24T08:28:06.751Z",
+      "duration": 10230.541,
+      "expected": 16,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "longNameRed": {
+    "source": "19f4641f5f564f7a2d5cdaae9d828e64ac8849b3",
+    "buildId": "Uch2tND_vhuB0VPkj7MYD",
+    "stats": {
+      "startTime": "2026-10-24T08:29:13.639Z",
+      "duration": 804.28,
+      "expected": 0,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "rawSha256": "516c1078313d4777afbefb477f2e5c61b0917d03602defacda2383921092e7a7",
+    "issue": "Visual inspection caught whitespace-nowrap inherited through shared Button Inner span. Text rect exceeded button rect. Keep shared Button, give text child explicit normal wrapping/max width; assertion and keyboard open remain.",
+    "sourceRepairAttempt": 1
   }
 }

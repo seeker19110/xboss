@@ -427,3 +427,23 @@ for (const theme of ["light", "darkblue"])
       path: `.autopilot/round4-contract-${test.info().project.name}-${theme}.png`,
     });
   });
+
+test("nhân sự: họ tên dài nằm trong nút, không đè cột bên cạnh", async ({ page }) => {
+  await fixture(page);
+  const name = "Nhân sự kiểm chứng có họ tên dài cần xem đầy đủ";
+  await page.route(/\/api\/personnel(?:\?.*)?$/, (r) =>
+    r.fulfill({ json: { personnel: [{ ...person, fullName: name }] } }),
+  );
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto("/personnel");
+  const button = page.getByRole("button", { name, exact: true });
+  await expect(button).toBeVisible();
+  const bounds = await button.evaluate((e) => ({
+    button: e.getBoundingClientRect().toJSON(),
+    text: e.querySelector("span")!.getBoundingClientRect().toJSON(),
+  }));
+  expect(bounds.text.right).toBeLessThanOrEqual(bounds.button.right + 1);
+  await button.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+});
