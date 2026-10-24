@@ -189,8 +189,11 @@ Owner tiếp tục ủy quyền kiểm sau đăng nhập, tự sửa/kiểm kỹ
 [scope](../ops/evidence/vehicle-ui-2026-10/scope.md): không GET NCC khi chỉ xem; response mới nhất
 đúng ngày, lỗi/retry giữ snapshot chỉ xem; form Modal/label/16px/44px, giữ draft và pending chặn
 write lặp. API/auth/payload/trạng thái xe/backend/schema/dependency giữ nguyên. RED6 lỗi đã tái
-hiện; GREEN65/65, build/11 bất biến/4ảnh+axe đạt, đang chốt full unit/gate và CI. Kiểm trên PostgreSQL16 disposable với synthetic fixtures sau login thật; production
-chỉ đọc public smoke, không có phiên production có auth được xác minh. F2/F3 vẫn WAITING.
+hiện; GREEN65/65, build/11 bất biến/4ảnh+axe và gate đạt. [PR#685](https://github.com/seeker19110/xboss/pull/685) đã merge `00d20712`, PRCI40085303379/mainCI40089788255 success (5.173unitpass/0fail/1skip,1.053E2Epass/0fail/0flaky/51skip cũ,mutation52/52/0survivor); deploy40090380685 cùng SHA lúc18:37:44 UTC+7 ngày24/10, public smoke11:41:43Z đạt. Kiểm sau login thật trên PostgreSQL16 disposable, production chỉ đọc public; chưa xác minh phiên có auth production. F2/F3 WAITING.
+
+## Iteration 12 — Họp và Đề xuất tải đúng nhu cầu (S, VERIFY)
+
+Base main `00d20712`; người dùng tiếp tục duyệt sửa/kiểm/merge/deploy ngày24/10/2026. [Scope](../ops/evidence/meetings-proposals-2026-10/scope.md): người làm khi mở biên bản admin/PM, hợp đồng khi form tiền đúng quyền, vật tư khi cấp phát; cache trong trang/abort/retry riêng nguồn, list không chờ metadata/quyền, lỗi không giả rỗng/snapshot chỉ xem; bàn phím và mobile16px/44px/long content. GET định mức chỉ khi cấp phát có vật tư theo điều kiện API, cảnh báo vẫn mềm. Không đổi server/API/auth/payload/tính tiền/duyệt/tạo phiếu/schema/dependency/SW/workflow, không gỡ capability. RED10 và lỗi refresh trùng/tiêu đề/ô ngày đã tái hiện; GREEN87/87, full unit5.165pass/0fail/1skip health cũ release-gate exit0, gate18/18/build/34 bất biến/10scene+axe đạt. Đang chờ CI trước merge. Auth test trên DB disposable, chưa xác minh phiên có auth production. F2/F3 giữ WAITING.
 
 ## Final audit
 

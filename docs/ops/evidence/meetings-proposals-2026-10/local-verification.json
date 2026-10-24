@@ -1,0 +1,44 @@
+{
+  "status": "LOCAL_VERIFIED_PRE_CI",
+  "checkedAt": "2026-10-24T12:45:39.323705+00:00",
+  "base": "00d20712f065c9c10593ab15868bf7d2eed9b0fb",
+  "build": "Uv5tFTXwWU3vCrSQixQAI",
+  "node": "24.22.1",
+  "unit": {
+    "exitCode": 0,
+    "files": 385,
+    "pass": 5165,
+    "fail": 0,
+    "skip": 1,
+    "skipReason": "pre-existing health test only applicable without DB"
+  },
+  "e2e": {
+    "exitCode": 0,
+    "pass": 87,
+    "fail": 0,
+    "flaky": 0,
+    "skip": 0,
+    "retries": 0,
+    "newCasesPerProfile": 37
+  },
+  "gate": {
+    "exitCode": 0,
+    "pass": 18,
+    "total": 18
+  },
+  "buildExitCode": 0,
+  "astInvariants": 34,
+  "visualScenes": 10,
+  "seriousOrCriticalAxe": 0,
+  "database": "PostgreSQL16 disposable, separate browser and unit databases",
+  "authenticatedProductionSessionVerified": false,
+  "uat": "WAITING",
+  "usage": "WAITING",
+  "logSha256": {
+    "xboss-collaboration-unit-release.log": "f90fbcae954e2ae0dbd3f239207ff7a89e9aea355780795ae308f2932f469d4f",
+    "xboss-collaboration-e2e-final2.log": "2df067167b62dc092853875fcee77159d0166a01615b7b16edbc554434d0c557",
+    "xboss-collaboration-gate-final2.log": "f0c6c14e8837e335f2374496854befa13e98ebc3e7e890bf1a29cab4eb060e07",
+    "xboss-collaboration-build-final2.log": "bbe2fee2018c6237777ca242f5ca27c0d7d89c6653a6f581b683d4d42af87a11",
+    "xboss-collaboration-visual-final2.log": "57abdf7123392db12d6eca01106e85adb6290ec43a87323f538d95bcb9ca2b19"
+  }
+}

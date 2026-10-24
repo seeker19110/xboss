@@ -1,0 +1,31 @@
+{
+  "base": "00d20712f065c9c10593ab15868bf7d2eed9b0fb",
+  "initial": {
+    "cases": 5,
+    "profiles": ["authed-desktop", "authed-mobile"],
+    "retries": 0,
+    "summary": ["  10 failed", "  1 passed (1.1m)"],
+    "failures": [
+      "users eager GET",
+      "contracts/materials eager GET",
+      "HTTP meetings false empty/no retry",
+      "HTTP proposals false empty/no retry",
+      "proposal detail inaccessible by keyboard"
+    ]
+  },
+  "additional": {
+    "summary": ["  3 failed", "  2 passed (14.3s)"],
+    "failures": [
+      "delete refresh: expected 2 list GET total, received 3 on both profiles",
+      "mobile title width <200px from badges beside title"
+    ]
+  },
+  "logsSha256": {
+    "xboss-meeting-red.log": "af9c58ca0ec8d672d55b56cba77505b6e07c8f29f1041d3031206b8aebc27887",
+    "xboss-collaboration-delete-red2.log": "48ca4fde3f6eb8bdf4531290c19defdb353473e5bc2074164c67e409e94dd3c7"
+  },
+  "mobileDate": {
+    "summary": ["  4 failed", "  1 passed (19.2s)"],
+    "finding": "Meeting native date field137px clipped value/icon at360px; four failures across two themes and profiles"
+  }
+}

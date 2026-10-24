@@ -1,0 +1,154 @@
+{
+  "checkedAt": "2026-10-24T12:40:17.768Z",
+  "synthetic": true,
+  "base": "00d20712f065c9c10593ab15868bf7d2eed9b0fb",
+  "build": "Uv5tFTXwWU3vCrSQixQAI",
+  "sources": {
+    "app/meetings/page.tsx": "c03414f6f13e1f24734e200224c3b3bb085d4c26826ffb31a39dfde64f8e3067",
+    "app/proposals/page.tsx": "adf8066576e32b24e51e1b65f089ac91b602e18682b7f3bea8d11240d1615274",
+    "app/lib/useRemoteList.ts": "da78dbf419e15c78b5df4a10e442c0c37bc70ed1a2ac515c3eeee4b2d7f98631",
+    "app/components/SourceNotice.tsx": "319bf048fddee47111b2a687b21b3c045a5fbd31c949c3ada8138a7f707b9aef"
+  },
+  "scenes": [
+    {
+      "name": "desktop",
+      "theme": "light",
+      "scene": "meetings-expanded",
+      "file": "screenshots/desktop-light-meetings-expanded.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "catalogGets": {
+        "users": 1,
+        "contracts": 0,
+        "materials": 0
+      },
+      "normGets": 0
+    },
+    {
+      "name": "desktop",
+      "theme": "light",
+      "scene": "meetings-form",
+      "file": "screenshots/desktop-light-meetings-form.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "catalogGets": {
+        "users": 1,
+        "contracts": 0,
+        "materials": 0
+      },
+      "normGets": 0
+    },
+    {
+      "name": "desktop",
+      "theme": "light",
+      "scene": "proposals-list",
+      "file": "screenshots/desktop-light-proposals-list.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "catalogGets": {
+        "users": 1,
+        "contracts": 0,
+        "materials": 0
+      },
+      "normGets": 0
+    },
+    {
+      "name": "desktop",
+      "theme": "light",
+      "scene": "proposals-detail",
+      "file": "screenshots/desktop-light-proposals-detail.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "catalogGets": {
+        "users": 1,
+        "contracts": 0,
+        "materials": 0
+      },
+      "normGets": 0
+    },
+    {
+      "name": "desktop",
+      "theme": "light",
+      "scene": "proposals-form",
+      "file": "screenshots/desktop-light-proposals-form.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "catalogGets": {
+        "users": 1,
+        "contracts": 1,
+        "materials": 0
+      },
+      "normGets": 0
+    },
+    {
+      "name": "mobile",
+      "theme": "darkblue",
+      "scene": "meetings-expanded",
+      "file": "screenshots/mobile-darkblue-meetings-expanded.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "catalogGets": {
+        "users": 1,
+        "contracts": 0,
+        "materials": 0
+      },
+      "normGets": 0
+    },
+    {
+      "name": "mobile",
+      "theme": "darkblue",
+      "scene": "meetings-form",
+      "file": "screenshots/mobile-darkblue-meetings-form.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "catalogGets": {
+        "users": 1,
+        "contracts": 0,
+        "materials": 0
+      },
+      "normGets": 0
+    },
+    {
+      "name": "mobile",
+      "theme": "darkblue",
+      "scene": "proposals-list",
+      "file": "screenshots/mobile-darkblue-proposals-list.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "catalogGets": {
+        "users": 1,
+        "contracts": 0,
+        "materials": 0
+      },
+      "normGets": 0
+    },
+    {
+      "name": "mobile",
+      "theme": "darkblue",
+      "scene": "proposals-detail",
+      "file": "screenshots/mobile-darkblue-proposals-detail.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "catalogGets": {
+        "users": 1,
+        "contracts": 0,
+        "materials": 0
+      },
+      "normGets": 0
+    },
+    {
+      "name": "mobile",
+      "theme": "darkblue",
+      "scene": "proposals-form",
+      "file": "screenshots/mobile-darkblue-proposals-form.png",
+      "seriousAxe": 0,
+      "pageErrors": [],
+      "catalogGets": {
+        "users": 1,
+        "contracts": 1,
+        "materials": 0
+      },
+      "normGets": 0
+    }
+  ]
+}
