@@ -185,7 +185,7 @@ export default function LookaheadPage() {
               Chuẩn bị mặt bằng, vật tư, nhân lực trước ngày bắt đầu.
             </p>
             {data?.starting.length === 0 && (
-              <p className="text-sm text-zinc-400 mb-6">
+              <p className="text-sm text-zinc-600 mb-6">
                 Không có công việc nào bắt đầu trong giai đoạn này.
               </p>
             )}
@@ -205,7 +205,7 @@ export default function LookaheadPage() {
               Phải hoàn thành trong giai đoạn này — ưu tiên dòng đang trễ (đỏ).
             </p>
             {data?.due.length === 0 && (
-              <p className="text-sm text-zinc-400 mb-6">
+              <p className="text-sm text-zinc-600 mb-6">
                 Không có deadline nào trong giai đoạn này.
               </p>
             )}

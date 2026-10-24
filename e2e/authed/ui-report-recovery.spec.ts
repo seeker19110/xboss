@@ -48,6 +48,24 @@ async function fixtures(page: Page) {
   return errors;
 }
 
+async function axeThemes(page: Page) {
+  for (const light of [false, true]) {
+    await page.evaluate(
+      (value) => document.documentElement.classList.toggle("light", value),
+      light,
+    );
+    const result = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    expect(
+      result.violations.filter((v) => ["serious", "critical"].includes(v.impact ?? "")),
+    ).toEqual([]);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  }
+}
+
 test("lookahead: link 7 ngày giữ lựa chọn khi lọc hệ và đổi số ngày", async ({ page }) => {
   const errors = await fixtures(page);
   const queries: string[] = [];
@@ -95,9 +113,11 @@ for (const failure of ["http", "network"] as const) {
       await expect(alert).toContainText(
         failure === "http" ? "Kế hoạch thử chưa tải được" : /kết nối/,
       );
+      if (failure === "http") await axeThemes(page);
       await alert.getByRole("button", { name: "Thử lại", exact: true }).click();
       await expect(page.getByText(/Không có công việc nào bắt đầu/)).toBeVisible();
       await expect(print).toBeEnabled();
+      if (failure === "http") await axeThemes(page);
       expect(gets).toBe(2);
       expect(errors).toEqual([]);
     } finally {
@@ -229,20 +249,6 @@ test("báo cáo: retry lỗi mạng giữ URL, controls mobile và a11y hai them
   await page.getByRole("alert").getByRole("button", { name: "Thử lại", exact: true }).click();
   await expect(page.locator("main")).toContainText("KPI kiểm chứng");
   expect(gets).toBe(2);
-  for (const light of [false, true]) {
-    await page.evaluate(
-      (value) => document.documentElement.classList.toggle("light", value),
-      light,
-    );
-    const result = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-      .analyze();
-    expect(
-      result.violations.filter((v) => ["serious", "critical"].includes(v.impact ?? "")),
-    ).toEqual([]);
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-    ).toBe(true);
-  }
+  await axeThemes(page);
   expect(errors).toEqual([]);
 });
