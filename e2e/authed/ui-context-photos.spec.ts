@@ -234,12 +234,14 @@ test("keyboard chọn file, mở ảnh và Escape chỉ đóng viewer rồi tr�
   await (await chooser).setFiles([]);
   const target = dialog.locator("label").filter({ has: input });
   expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect(target).not.toHaveCSS("box-shadow", "none");
   await page.keyboard.press("Tab");
   await expect(dialog.getByRole("button", { name: "Đóng", exact: true })).toBeFocused();
   await page.keyboard.press("Tab");
   const image = dialog.getByRole("button", { name: `Xem ảnh: ${PHOTO.caption}`, exact: true });
   await expect(image).toBeFocused();
   expect((await image.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect(image).toHaveCSS("outline-style", "solid");
   await page.keyboard.press("Enter");
   const viewer = page.getByRole("dialog", { name: `Xem ảnh: ${PHOTO.caption}`, exact: true });
   await expect(viewer).toBeVisible();
