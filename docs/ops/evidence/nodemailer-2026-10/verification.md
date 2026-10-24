@@ -9,7 +9,7 @@ Audit production còn một package moderate, Nodemailer 10.0.14, gồm ba advis
 phân tích địa chỉ: chú thích lồng nhau, dấu chấm phẩy trong nhóm và local-part có nháy.
 Cả ba có thể làm envelope chọn sai người nhận. Bản vá tối thiểu là **10.1.4**.
 
-Pin riêng package này; diff lock chỉ root và `node_modules/nodemailer`. Ba điểm gọi
+Phần production pin riêng package này; diff lock chỉ root và `node_modules/nodemailer`. Ba điểm gọi
 daily-report, weekly-report và health-check giữ nguyên route, auth, SMTP settings,
 người nhận, nội dung và project/org scope. Không có migration.
 
@@ -48,3 +48,18 @@ phát hành, xác nhận bundle 7.30.1/OpenSSL 3.5.9. Không suy ra patch VPS t�
 Phát hành qua PR/CI/deploy hiện hữu, không đổi cổng. Nếu phát sinh lỗi vận chuyển thư,
 ưu tiên chẩn đoán và bản vá tương thích; không rollback về thư viện có advisory như
 một thao tác tự động. UAT và usage vẫn WAITING theo quyết định chủ dự án.
+
+## Bổ sung dev dependency trên cùng PR #678
+
+Full audit tiếp theo còn `fast-uri 4.2.1` moderate qua chuỗi dev-only
+`@commitlint/cli → @commitlint/load → config-validator → ajv 8.20.0`.
+Cập nhật transitive lên `4.2.3`; chỉ một entry lock, không thêm dependency trực tiếp
+hoặc sửa package.json. Bốn advisory: GHSA-w74x-v6f9-j3xg, GHSA-xhq7-xmqj-769h,
+GHSA-wjr9-j795-jxcr và GHSA-333x-w4r6-6crp. [Release maintainer](https://github.com/fastify/fast-uri/releases/tag/v4.2.3).
+
+`npm audit --json` sau sửa: **0 vulnerability toàn bộ**, gồm dev; thông báo cũ từ
+GitHub lúc push không dùng thay cho audit lock hiện tại. Commitlint tải cấu hình
+và kiểm message hợp lệ đạt, message sai bị chặn; validateConfig nhận config repo và
+từ chối `{ extends: 123 }`; gate chạy lại trên lock cuối.
+Trên Node 24.22.1/lock cuối, 27 ca mail/webhook/inbound/tenant/push-SSRF đạt, 0 fail/skip. Build và full unit ở trên
+là checkpoint trước thay đổi dev-only này; CI chạy lại toàn bộ, không gộp chứng cứ.

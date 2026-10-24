@@ -104,7 +104,8 @@ Owner duyệt #677 và giao tiếp: “rồi làm tất cả các việc còn l�
 ưu tiên chất lượng, đơn giản hoá”. Lát S ưu tiên: pin riêng Nodemailer 10.1.4 vá ba
 advisory moderate, không đổi route/SMTP/auth. Local RED 3 PoC, GREEN 6 ca; audit 0 vulnerability,
 gate/build/full unit đạt, xem [bằng chứng](../ops/evidence/nodemailer-2026-10/verification.md).
-CI/merge/deploy của lát mail được chốt theo PR tương ứng, chưa coi local là production.
+PR #678 bổ sung transitive dev-only fast-uri 4.2.1→4.2.3: full audit 0 vulnerability;
+gate cuối/CI tiếp tục chạy. CI/merge/deploy chốt theo PR, chưa coi local là production.
 
 Lát S kế tiếp Ready từ audit source: form tạo hạng mục chống Enter lặp; sửa nhãn chỉ
 commit sau lưu thật; mặt bằng phân biệt lỗi/empty, retry và giữ bản nhập; gom danh mục
