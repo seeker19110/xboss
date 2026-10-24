@@ -1,0 +1,174 @@
+{
+  "base": "00d20712f065c9c10593ab15868bf7d2eed9b0fb",
+  "checks": [
+    {
+      "path": "app/meetings/page.tsx",
+      "symbol": "MEETING_KIND_LABEL",
+      "unchanged": true
+    },
+    {
+      "path": "app/meetings/page.tsx",
+      "symbol": "MEETING_ACTION_STATUS_LABEL",
+      "unchanged": true
+    },
+    {
+      "path": "app/meetings/page.tsx",
+      "symbol": "KIND_BADGE",
+      "unchanged": true
+    },
+    {
+      "path": "app/meetings/page.tsx",
+      "symbol": "canManage",
+      "unchanged": true
+    },
+    {
+      "path": "app/meetings/page.tsx",
+      "symbol": "isAdminOrPm",
+      "unchanged": true
+    },
+    {
+      "path": "app/meetings/page.tsx",
+      "symbol": "canToggle",
+      "unchanged": true
+    },
+    {
+      "path": "app/meetings/page.tsx",
+      "symbol": "openActions",
+      "unchanged": true
+    },
+    {
+      "path": "app/meetings/page.tsx",
+      "symbol": "overdueCount",
+      "unchanged": true
+    },
+    {
+      "path": "app/meetings/page.tsx",
+      "symbol": "setActionStatus",
+      "unchanged": true
+    },
+    {
+      "path": "app/meetings/page.tsx",
+      "symbol": "deleteMeeting",
+      "unchanged": true
+    },
+    {
+      "path": "app/meetings/page.tsx",
+      "symbol": "deleteAction",
+      "unchanged": true
+    },
+    {
+      "path": "app/meetings/page.tsx",
+      "symbol": "submit",
+      "unchanged": true
+    },
+    {
+      "path": "app/meetings/page.tsx",
+      "symbol": "all JSON payloads",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "PROPOSAL_KIND_LABEL",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "PROPOSAL_STATUS_LABEL",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "STATUS_BADGE",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "fmtVND",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "canApprove",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "canCreate",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "isMoney",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "isAdminOrPm",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "isOwner",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "canSubmit",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "canDecide",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "canDelete",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "canUpload",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "billable",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "submit",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "approve",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "reject",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "remove",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "upload",
+      "unchanged": true
+    },
+    {
+      "path": "app/proposals/page.tsx",
+      "symbol": "all JSON payloads",
+      "unchanged": true
+    },
+    {
+      "symbol": "API/backend/auth/schema/dependencies/workflows/SW",
+      "unchanged": true
+    }
+  ]
+}

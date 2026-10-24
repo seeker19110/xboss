@@ -1,0 +1,52 @@
+{
+  "changes": [
+    {
+      "kind": "UI accessibility",
+      "finding": "Nested select label included option text; exact accessible names were unclear",
+      "fix": "aria-label matching visible labels for meeting kind/assignee and proposal kind; keep visible labels and real keyboard checks"
+    },
+    {
+      "kind": "UI contrast",
+      "finding": "Reload button opacity animation after disabled state briefly reduced light-theme contrast in existing axe tests",
+      "fix": "No opacity transition on reload control, full contrast during loading; keep disabled/feedback semantics and default motion elsewhere"
+    },
+    {
+      "kind": "test harness",
+      "finding": "New delete test initially selected alertdialog/Xác nhận, but existing shared confirmation uses dialog/Đồng ý",
+      "fix": "Match actual named shared confirmation and existing label; cancellation, focus, DELETE count and duplicate GET assertions retained"
+    },
+    {
+      "kind": "local environment",
+      "finding": "PG16 binaries required shared libraries; DR child test intentionally strips inherited LD_LIBRARY_PATH",
+      "fix": "Temporary PG16 launch wrappers export library location; no test/gate/source/skip changes"
+    },
+    {
+      "kind": "UI mobile",
+      "finding": "Screenshot and width assertion reproduced meeting title squeezed by inline badges",
+      "fix": "Title uses full grid column on mobile, badges occupy own row; desktop compact layout kept"
+    },
+    {
+      "kind": "request duplication",
+      "finding": "Confirmed deletion ran refresh in act/onChanged and onDeleted",
+      "fix": "onDeleted only closes detail; act/onChanged remains the sole list refresh; all financial handlers/DTOs unchanged"
+    },
+    {
+      "kind": "UI mobile date",
+      "finding": "Visual inspection and four failing width assertions at360px: date input137px clipped its value/calendar icon after font16px",
+      "fix": "Meeting modal uses one column on mobile, two on desktop; inline assignee/due fields span mobile width. Native date value/DTO unchanged"
+    }
+  ],
+  "noThresholdOrAuthChanges": true,
+  "noNewSkipsOrRetries": true,
+  "localUnitInterruption": {
+    "assertions": "5165 pass/0fail/1 pre-existing health skip",
+    "processExit": 143,
+    "followUp": "Rerun via isolated process group with explicit status file; do not label interrupted process gate PASS",
+    "final": {
+      "exitCode": 0,
+      "pass": 5165,
+      "fail": 0,
+      "skip": 1
+    }
+  }
+}
