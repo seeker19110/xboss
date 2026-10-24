@@ -1,0 +1,66 @@
+{
+  "initialCandidate": {
+    "pass": 27,
+    "fail": 10,
+    "cause": "Unscoped page.getByRole(alert) included the Next.js route announcer; assertions corrected to the page main landmark. Same expected errors/retry/zero app alerts, no thresholds/timeouts changed.",
+    "sourceDefect": false
+  },
+  "candidateAfterHarnessRepair": {
+    "pass": 53,
+    "fail": 0,
+    "flaky": 0,
+    "skip": 0
+  },
+  "extendedCandidate": {
+    "pass": 59,
+    "fail": 0,
+    "flaky": 0,
+    "skip": 0
+  },
+  "confirmationProbe": {
+    "pass": 3,
+    "fail": 0,
+    "sourceChanged": false
+  },
+  "lateCardRed": {
+    "pass": 1,
+    "fail": 2,
+    "profiles": ["desktop", "mobile"],
+    "cause": "Pre-existing rose950/30 background with zinc400 text has3.99 contrast; phone blue400 has3.04, both under4.5 in Light. Visual and new closed-card axe test reproduced.",
+    "repairAttempt": 1,
+    "repair": "Neutral zinc800 card face, keep rose border and Quá giờ badge; isLate/sort/status unchanged."
+  },
+  "qualityGatesUnchanged": true,
+  "lateCardGreen": {
+    "pass": 61,
+    "fail": 0,
+    "flaky": 0,
+    "skip": 0
+  },
+  "errorStateRed": {
+    "pass": 1,
+    "fail": 2,
+    "cause": "New red950/30 panels on Light also below4.5 (supplier3.3); includes primary/error+snapshot test.",
+    "repair": "Neutral zinc900 alert/warning surfaces retain semantic text/borders."
+  },
+  "exitHoverRed": {
+    "pass": 2,
+    "fail": 1,
+    "cause": "Existing exit zinc600→500 hover with inherited Light text loses contrast on desktop; mobile has no hover media.",
+    "repair": "Shared Button variants for all row actions, same handlers/messages. Use icon prop on toolbar Buttons."
+  },
+  "stableStateMeasurement": {
+    "candidatePass": 64,
+    "candidateFail": 1,
+    "cause": "axe sampled opacity transition when submit changed disabled→enabled after supplier response under load; same page passed previously.",
+    "repair": "Wait explicitly for supplier options and enabled submit, then finite animations finish naturally. Same axe thresholds, default motion and timeouts. No app source change."
+  },
+  "typecheckRepair": {
+    "cause": "Document.getAnimations accepts no options in installed DOM typings.",
+    "repair": "Use document.getAnimations(); includes all document animations. No cast or assertion relaxation."
+  },
+  "localTestIsolation": {
+    "abortedSetupNotCounted": "An initial unit launch was stopped before tests to avoid sharing E2E template setup.",
+    "final": "Fresh unit template xboss_test with CI disposable marker; UI xboss_vehicle_e2e, same owned PostgreSQL16 disposable container; other containers untouched."
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "base": "8f5e6702ca2f96e2dafbf7db1b7f9b5ed64e5b86",
+  "environment": "PostgreSQL16 disposable + production build + real test login; synthetic network fixtures",
+  "command": "playwright test vehicle-ui-recovery.spec.ts --grep (3 initial acceptance cases) --workers=2 --retries=0",
+  "passed": 1,
+  "failed": 6,
+  "casesPerProfile": [
+    "Chỉ xem đã GET suppliers; expected0, actual1",
+    "Ngày cũ trả chậm ghi đè ngày mới",
+    "Không có loading, hiện empty trong lúc giữ request"
+  ],
+  "profiles": ["authed-desktop", "authed-mobile"],
+  "sourceChangedBeforeRed": false,
+  "logLocal": "/tmp/xboss-vehicle-red.log"
+}

@@ -1,0 +1,49 @@
+{
+  "base": "8f5e6702ca2f96e2dafbf7db1b7f9b5ed64e5b86",
+  "checks": [
+    {
+      "symbol": "STATUS_LABEL",
+      "unchanged": true
+    },
+    {
+      "symbol": "STATUS_CLS",
+      "unchanged": true
+    },
+    {
+      "symbol": "isLate",
+      "unchanged": true
+    },
+    {
+      "symbol": "fmtTime",
+      "unchanged": true
+    },
+    {
+      "symbol": "canManage",
+      "unchanged": true
+    },
+    {
+      "symbol": "canExport",
+      "unchanged": true
+    },
+    {
+      "symbol": "sorted",
+      "unchanged": true
+    },
+    {
+      "symbol": "exportPdf",
+      "unchanged": true
+    },
+    {
+      "symbol": "POST/PATCH JSON payloads",
+      "unchanged": true
+    },
+    {
+      "symbol": "form default fields",
+      "unchanged": true
+    },
+    {
+      "symbol": "API/backend/auth/schema/dependencies/workflows/SW",
+      "unchanged": true
+    }
+  ]
+}
