@@ -1,0 +1,124 @@
+{
+  "repository": "seeker19110/xboss",
+  "pullRequest": "https://github.com/seeker19110/xboss/pull/677",
+  "sourceCommit": "65571994c2ed39b7d76a368c38816ef26ad915de",
+  "mergeCommit": "6b631f15708817824ba511c06abee57f6168cb54",
+  "prCi": {
+    "runId": 40054284196,
+    "conclusion": "success",
+    "unitPassed": 5160,
+    "e2ePassed": 743,
+    "e2eExistingConditionalSkips": 51,
+    "e2eFlaky": 0
+  },
+  "mainCi": {
+    "runId": 40055784430,
+    "conclusion": "success",
+    "unitFiles": 383,
+    "unitPassed": 5160,
+    "unitFailed": 0,
+    "unitAllowlistedSkips": 1,
+    "e2ePassed": 742,
+    "e2eFlakyPassedOnRetry": 1,
+    "e2eExistingConditionalSkips": 51,
+    "flakyTest": "authed-desktop costs-recovery.spec.ts:219 commercial http: HD-FIXTURE cell absent after 5s, retry passed; no failure artifact uploaded because job succeeded; no root cause established and no timeout/assertion/skip changed",
+    "mutationRunnable": 52,
+    "mutationSurvivors": 0,
+    "coverageFiles": 557,
+    "coverageLines": 91.69,
+    "coverageBranches": 85.03,
+    "coverageFunctions": 94.84
+  },
+  "deploy": {
+    "runId": 40056412712,
+    "conclusion": "success",
+    "completedAt": "2026-10-24T03:02:47Z",
+    "verifiedBuildSha": "6b631f15708817824ba511c06abee57f6168cb54",
+    "nodeMajor": 24,
+    "productionNodePatchVerified": false,
+    "postReloadHealth": "passed",
+    "logCompletionAt": "2026-10-24T03:02:44.9880712Z"
+  },
+  "publicSmoke": {
+    "checkedAt": "2026-10-24T03:03:08.224Z",
+    "origin": "https://xboss.donghanhcungban.org",
+    "readOnly": true,
+    "browsers": [
+      {
+        "name": "desktop",
+        "loginStatus": 200,
+        "seriousAxeViolations": 0,
+        "pageErrors": [],
+        "failedAssets": [],
+        "cssHashes": [
+          {
+            "path": "/_next/static/chunks/3w2o4njic1z7q.css",
+            "sha256": "022754e063f6ab8675064ff2743da3ac607159684b4a50f202f6c272ceb96ae6"
+          }
+        ],
+        "hasResponsiveHeader": true,
+        "hasInsetFocus": true,
+        "protectedApis": [
+          {
+            "endpoint": "/api/dashboard",
+            "status": 401
+          },
+          {
+            "endpoint": "/api/search?q=m137",
+            "status": 401
+          }
+        ]
+      },
+      {
+        "name": "mobile",
+        "loginStatus": 200,
+        "seriousAxeViolations": 0,
+        "pageErrors": [],
+        "failedAssets": [],
+        "cssHashes": [
+          {
+            "path": "/_next/static/chunks/3w2o4njic1z7q.css",
+            "sha256": "022754e063f6ab8675064ff2743da3ac607159684b4a50f202f6c272ceb96ae6"
+          }
+        ],
+        "hasResponsiveHeader": true,
+        "hasInsetFocus": true,
+        "protectedApis": [
+          {
+            "endpoint": "/api/dashboard",
+            "status": 401
+          },
+          {
+            "endpoint": "/api/search?q=m137",
+            "status": 401
+          }
+        ]
+      }
+    ],
+    "/api/health": {
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "db": true,
+        "migration": "0171_users_disabled.sql",
+        "uptime_s": 40
+      }
+    },
+    "/api/ready": {
+      "status": 200,
+      "body": {
+        "ready": true,
+        "schema": "ok",
+        "migrationsApplied": 171,
+        "appliedHead": "0171_users_disabled.sql"
+      }
+    },
+    "status": "PASS"
+  },
+  "limitations": [
+    "Authenticated flows verified on disposable DB/CI; production smoke public/read-only only.",
+    "UAT and usage remain WAITING by owner decision.",
+    "No real-user Core Web Vitals or Safari/touch-device UAT claimed.",
+    "Direct npm Undici upgraded; production Node bundled Undici patch not established."
+  ]
+}

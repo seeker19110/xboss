@@ -1,0 +1,116 @@
+{
+  "base": "6b631f15708817824ba511c06abee57f6168cb54",
+  "scope": "Nodemailer only; cron routes, SMTP settings and API contracts unchanged",
+  "before": "10.0.14",
+  "after": "10.1.4",
+  "changedLockEntries": ["", "node_modules/nodemailer"],
+  "productionAudit": {
+    "before": {
+      "info": 0,
+      "low": 0,
+      "moderate": 1,
+      "high": 0,
+      "critical": 0,
+      "total": 1
+    },
+    "after": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    }
+  },
+  "regression": {
+    "red": {
+      "nodemailer": "10.0.14",
+      "pass": 3,
+      "fail": 3,
+      "skipped": 0,
+      "exitCode": 1,
+      "testSha256": "a284618eddb50602af0694f1d04ebe8c475a4de0b85419847652ea86db39c2c7"
+    },
+    "green": {
+      "nodemailer": "10.1.4",
+      "pass": 6,
+      "fail": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "testSha256": "a284618eddb50602af0694f1d04ebe8c475a4de0b85419847652ea86db39c2c7"
+    }
+  },
+  "testScope": "streamTransport in memory; loopback fake SMTP PLAIN/PIPELINING only; no provider or production data",
+  "limitations": [
+    "Does not establish live SMTP/TLS provider delivery.",
+    "Does not upgrade Node bundled Undici or establish production Node patch version."
+  ],
+  "sources": [
+    "https://github.com/nodemailer/nodemailer/releases/tag/v10.1.4",
+    "https://github.com/nodemailer/nodemailer/security/advisories/GHSA-8c8m-p3m8-cjg8",
+    "https://github.com/nodemailer/nodemailer/security/advisories/GHSA-m943-m63m-w62w",
+    "https://github.com/nodemailer/nodemailer/security/advisories/GHSA-85x2-q946-cp5h"
+  ],
+  "localChecks": {
+    "fullUnit": {
+      "files": 383,
+      "passed": 5152,
+      "failed": 0,
+      "allowlistedSkips": 1,
+      "node": "24.21.0",
+      "includedNewMailTest": false
+    },
+    "newMailTest": {
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "runSeparatelyAfterFullSuiteStarted": true
+    },
+    "build": {
+      "status": "passed",
+      "node": "24.21.0"
+    },
+    "gate": {
+      "passed": 18,
+      "total": 18
+    }
+  },
+  "devRepair": {
+    "package": "fast-uri",
+    "before": "4.2.1",
+    "after": "4.2.3",
+    "scope": "dev-only transitive @commitlint/cli > @commitlint/load > config-validator > ajv8.20.0",
+    "changedLockEntries": ["node_modules/fast-uri"],
+    "addedDirectDependencies": false,
+    "auditAllBefore": {
+      "info": 0,
+      "low": 0,
+      "moderate": 1,
+      "high": 0,
+      "critical": 0,
+      "total": 1
+    },
+    "auditAllAfter": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "commitlintValidMessageExit": 0,
+    "checks": "Gate rerun on final lock; runtime build/unit not invalidated by dev-only fast-uri patch; final CI reruns all.",
+    "commitlintInvalidMessageExit": 1,
+    "repoConfigAccepted": true,
+    "invalidConfigRejected": true
+  },
+  "node24221TargetedRegression": {
+    "passed": 27,
+    "failed": 0,
+    "skipped": 0,
+    "scope": "6 mail + 21 webhook/inbound/tenant/push SSRF",
+    "node": "24.22.1",
+    "undiciBundled": "7.30.1",
+    "openssl": "3.5.9"
+  }
+}

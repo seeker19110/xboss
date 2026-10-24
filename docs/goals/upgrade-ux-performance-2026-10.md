@@ -1,14 +1,14 @@
 # Nâng cấp trải nghiệm, hiệu năng và tinh gọn XBoss
 
-| Thuộc tính            | Giá trị                                                                     |
-| --------------------- | --------------------------------------------------------------------------- |
-| Goal ID               | UPGRADE-2026-10                                                             |
-| Owner                 | Chủ dự án                                                                   |
-| State                 | WAITING — M137 đã kiểm local, chờ CI/rollout; UAT và usage tiếp tục WAITING |
-| Main SHA đã reconcile | `9afb984d46d5e2e0f0d14e6f65e3186b836a2800`                                  |
-| Bắt đầu               | 2026-10-23                                                                  |
-| Đối soát              | 2026-10-24                                                                  |
-| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026  |
+| Thuộc tính            | Giá trị                                                                    |
+| --------------------- | -------------------------------------------------------------------------- |
+| Goal ID               | UPGRADE-2026-10                                                            |
+| Owner                 | Chủ dự án                                                                  |
+| State                 | WAITING — M137 DEPLOYED; vá mail đang kiểm; UAT và usage tiếp tục WAITING  |
+| Main SHA đã reconcile | `6b631f15708817824ba511c06abee57f6168cb54`                                 |
+| Bắt đầu               | 2026-10-23                                                                 |
+| Đối soát              | 2026-10-24                                                                 |
+| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026 |
 
 ## Outcome và cổng hoàn thành
 
@@ -27,9 +27,13 @@ Hoàn thiện các luồng lưu khi mạng yếu, điều hướng mobile, dashb
 | F2  | UAT 3–5 người, Safari/cảm ứng thật           | WAITING  | Chưa có người/thiết bị và kết quả nghiệm thu                |
 | F3  | Usage và quyết định giữ/gộp/gỡ capability    | WAITING  | Chưa xác nhận nguồn/coverage/thời điểm thu và cửa sổ đủ dài |
 | F4  | Vá Zod mới phát hiện trong CI và phát hành   | VERIFIED | PR #676, CI/deploy đúng `9afb984d`, public smoke đạt        |
-| G   | Tải việc hiện trường và tạo trang tin cậy    | WAITING  | M137 CODE VERIFIED local; CI/merge/rollout theo PR          |
+| G   | Tải việc hiện trường và tạo trang tin cậy    | VERIFIED | PR #677; CI/deploy đúng 6b631f15, public smoke đạt          |
 
 ## Current truth
+
+[PR #677](https://github.com/seeker19110/xboss/pull/677) đã merge thành main `6b631f15`,
+CI main 40055784430 và deploy 40056412712 success cùng SHA ngày 24/10; public smoke
+desktop/mobile chỉ đọc đạt. G VERIFIED; [release và giới hạn](../ops/evidence/m137/release.md).
 
 [PR #675](https://github.com/seeker19110/xboss/pull/675) đã merge thành main `d413650c`.
 [CI main](https://github.com/seeker19110/xboss/actions/runs/39963366086) và
@@ -91,8 +95,22 @@ CODE VERIFIED local: browser RED/GREEN, 50 ca mới đạt; tổng hồi quy 128
 PR #677 bổ sung [M137-R1](../ops/evidence/m137/undici-repair.md): pin riêng Undici có sẵn
 8.10.2→8.12.2 để sửa audit high; 21 ca webhook/SSRF và build mới đạt, audit còn một
 package moderate có sẵn, 0 high/critical.
-G WAITING CI trên HEAD mới và merge/phát hành theo PR #677;
-chưa triển khai M137 lên production. F2/F3 tiếp tục chờ theo quyết định owner.
+Checkpoint trước release: chờ CI/rollout. Sau duyệt rõ ngày 24/10, #677 đã merge,
+CI/deploy cùng SHA và public smoke đạt như Current truth; G VERIFIED. F2/F3 tiếp tục chờ.
+
+## Iteration 4 — 2026-10-24
+
+Owner duyệt #677 và giao tiếp: “rồi làm tất cả các việc còn lại bạn có thể quyết,
+ưu tiên chất lượng, đơn giản hoá”. Lát S ưu tiên: pin riêng Nodemailer 10.1.4 vá ba
+advisory moderate, không đổi route/SMTP/auth. Local RED 3 PoC, GREEN 6 ca; audit 0 vulnerability,
+gate/build/full unit đạt, xem [bằng chứng](../ops/evidence/nodemailer-2026-10/verification.md).
+PR #678 bổ sung transitive dev-only fast-uri 4.2.1→4.2.3: full audit 0 vulnerability;
+gate cuối/CI tiếp tục chạy. CI/merge/deploy chốt theo PR, chưa coi local là production.
+
+Lát S kế tiếp Ready từ audit source: form tạo hạng mục chống Enter lặp; sửa nhãn chỉ
+commit sau lưu thật; mặt bằng phân biệt lỗi/empty, retry và giữ bản nhập; gom danh mục
+HSE/Risks thuần client/server. Giữ API/quyền/capability. Chỉ kết luận xong sau browser,
+gate/build/test và phát hành. Không lấy cleanup nội bộ làm quyết định bỏ tính năng.
 
 ## Final audit
 
@@ -103,7 +121,7 @@ chưa triển khai M137 lên production. F2/F3 tiếp tục chờ theo quyết �
 - [ ] F2 có UAT người thật và thiết bị thực.
 - [ ] F3 có cửa sổ usage phù hợp và quyết định owner về capability.
 - [x] F4 bản vá Zod qua CI, được merge/phát hành và kiểm chứng.
-- [ ] G/M137 có bằng chứng kỹ thuật và phát hành tương ứng.
+- [x] G/M137 có bằng chứng kỹ thuật và phát hành tương ứng.
 
 **Kết luận:** M136 và bản vá Zod CODE VERIFIED, DEPLOYED; toàn mục tiêu NOT COMPLETE vì
-F2/F3 đang chờ theo quyết định owner; M137 đã kiểm local, chờ CI và phát hành tương ứng.
+F2/F3 đang chờ theo quyết định owner. M137 DEPLOYED; các lát S mới phải có bằng chứng riêng.
