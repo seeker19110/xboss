@@ -497,7 +497,7 @@ export default function NotificationBell() {
                           />
                           <span className="block">{n.message}</span>
                         </span>
-                        <span className="text-xs text-zinc-500 pl-5">
+                        <span className="text-xs text-zinc-400 pl-5">
                           {formatDateTimeVN(n.createdAt)}
                         </span>
                       </button>
@@ -536,7 +536,7 @@ export default function NotificationBell() {
                                 />
                                 <span className="block">{n.message}</span>
                               </span>
-                              <span className="text-xs text-zinc-500 pl-5">
+                              <span className="text-xs text-zinc-400 pl-5">
                                 {formatDateTimeVN(n.createdAt)}
                               </span>
                             </button>
