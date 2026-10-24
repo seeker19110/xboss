@@ -76,7 +76,7 @@
     "react-dom": "^19.2.8",
     "react-is": "^19.2.8",
     "recharts": "^3.10.1",
-    "undici": "^8.10.0",
+    "undici": "8.12.2",
     "web-push": "^3.6.7",
     "xlsx": "npm:@e965/xlsx@^0.20.3",
     "zod": "4.6.6"

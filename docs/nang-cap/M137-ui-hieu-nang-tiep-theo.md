@@ -105,7 +105,7 @@ cho phép hủy fetch; [form HTML](https://developer.mozilla.org/en-US/docs/Web/
 là pattern submit/label semantic đang dùng ở các form hiện hữu. Giữ raw fetch/taiJson và
 AbortController sẵn có, không thêm thư viện cache/dependency chỉ để xử lý hai lỗi này.
 
-Kết quả local 24/10: CODE VERIFIED; 18/18 gate, build, full unit 5.152 pass/0 fail/
+Kết quả local phần UI 24/10 tại `cd1a2cee`: CODE VERIFIED; 18/18 gate, build, full unit 5.152 pass/0 fail/
 1 skip allowlist, 50 browser mới đạt và hồi quy tổng 128 pass/0 fail/1 skip nền tảng.
 [Bằng chứng, số đo và giới hạn](../ops/evidence/m137/verification.md). Sửa nhãn viewport
 benchmark lấy từ profile thực, đính chính metadata M136/M137 và giữ nguyên số đo raw.
@@ -113,7 +113,9 @@ CI/merge/rollout theo PR, chưa phát hành M137 tại checkpoint này.
 
 ## Phạm vi, đường lùi và triển khai
 
-Không schema/API/dependency/lock/CI/hook/auth, không xóa module sống, không telemetry mới.
+Không schema/API/CI/hook/auth, không xóa module sống, không telemetry mới. Phần UI không
+thêm dependency. Ngoại lệ M137-R1 sau push PR #677: audit tái hiện Undici có sẵn 8.10.2
+mức high, pin riêng bản sửa 8.12.2 và đổi hai manifest; [phạm vi/kiểm chứng](../ops/evidence/m137/undici-repair.md).
 Modal chung chỉ sửa giới hạn keyboard/scroll đã mô tả ở C, không đổi pattern/design hoặc API.
 Rollback bằng revert PR. Nhánh `codex/m137-ui-performance`; commit/push, mở PR với
 bằng chứng trên HEAD. Merge/deploy theo quyền người dùng và `xt.yaml`; không thay policy.

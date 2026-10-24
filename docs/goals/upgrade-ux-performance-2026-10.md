@@ -88,7 +88,10 @@ CODE VERIFIED local: browser RED/GREEN, 50 ca mới đạt; tổng hồi quy 128
 1 skip nền tảng có sẵn; gate 18/18, build, full unit 383 file/5.152 pass/0 fail/1 skip
 đúng allowlist. Cùng fixture ba việc và 40 hash khớp: nguồn phụ trễ 3s, median ready
 5,95→3,36s; normal gần như không đổi. [Bằng chứng và giới hạn](../ops/evidence/m137/verification.md).
-G WAITING CI trên HEAD và merge/phát hành theo PR nhánh `codex/m137-ui-performance`;
+PR #677 bổ sung [M137-R1](../ops/evidence/m137/undici-repair.md): pin riêng Undici có sẵn
+8.10.2→8.12.2 để sửa audit high; 21 ca webhook/SSRF và build mới đạt, audit còn một
+package moderate có sẵn, 0 high/critical.
+G WAITING CI trên HEAD mới và merge/phát hành theo PR #677;
 chưa triển khai M137 lên production. F2/F3 tiếp tục chờ theo quyết định owner.
 
 ## Final audit

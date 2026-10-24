@@ -1,0 +1,57 @@
+{
+  "recordedAt": "2026-10-24T02:24:07.508Z",
+  "command": "npm audit --omit=dev --audit-level=high --fetch-timeout=30000",
+  "before": {
+    "exitCode": 1,
+    "undici": "8.10.2",
+    "summary": {
+      "info": 0,
+      "low": 0,
+      "moderate": 1,
+      "high": 1,
+      "critical": 0,
+      "total": 2
+    }
+  },
+  "after": {
+    "exitCode": 0,
+    "undici": "8.12.2",
+    "summary": {
+      "info": 0,
+      "low": 0,
+      "moderate": 1,
+      "high": 0,
+      "critical": 0,
+      "total": 1
+    }
+  },
+  "unchangedModeratePackage": {
+    "name": "nodemailer",
+    "version": "10.0.14"
+  },
+  "fixedUndiciAdvisories": [
+    {
+      "url": "https://github.com/advisories/GHSA-4qv8-2p9j-2685",
+      "severity": "moderate",
+      "range": ">=8.0.0 <8.12.2"
+    },
+    {
+      "url": "https://github.com/advisories/GHSA-f72v-6w45-q472",
+      "severity": "moderate",
+      "range": ">=8.0.0 <8.12.2"
+    },
+    {
+      "url": "https://github.com/advisories/GHSA-xjj6-f33q-929c",
+      "severity": "high",
+      "range": ">=8.0.0 <8.12.2"
+    }
+  ],
+  "scope": "Direct npm package only. Does not establish the patched state of Node bundled Undici/global fetch or production runtime.",
+  "ciBefore": {
+    "head": "cd1a2cee77761284b9c990115ec8ca1a19d58c1d",
+    "run": 40053581102,
+    "staticJob": 120751440915,
+    "conclusion": "failure",
+    "cause": "Same Undici advisory reported in all six production-audit attempts; other build/unit/coverage/E2E jobs succeeded."
+  }
+}

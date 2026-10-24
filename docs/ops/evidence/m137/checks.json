@@ -18,7 +18,8 @@
     "failed": 0,
     "skipped": 1,
     "allowlist": "tests/health.test.ts: no-DB case intentionally skipped when DB is present",
-    "exitCode": 0
+    "exitCode": 0,
+    "checkpoint": "Before Undici upgrade, at UI source commit"
   },
   "browser": {
     "newCases": 50,
@@ -53,5 +54,43 @@
     "unit": "dabfc647c95d016a3312721806bd32f1e4f04fbf78b9293f5b100e57d5529398",
     "browser": "44a8865c2640c390438733da2f3a38f8064d3a44f710f00a8a20ac540c3acb11",
     "build": "365d3825c3ba43a43d94e51082b25acbb41164b8ffcedd41ce15f8b0e249f89c"
+  },
+  "uiSourceCommit": "cd1a2cee77761284b9c990115ec8ca1a19d58c1d",
+  "undiciRepair": {
+    "version": "8.12.2",
+    "targetedTests": {
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0
+    },
+    "audit": {
+      "exitCode": 0,
+      "high": 0,
+      "critical": 0,
+      "moderate": 1
+    },
+    "productionBuild": {
+      "passed": true,
+      "buildId": "Gf8ulP4q7FR49IWEgv0sY"
+    },
+    "logSha256": {
+      "webhooks": "b21d11c74c828fc7fcb84c468597965385de2e646c93d450cc7a683b2529fe5a",
+      "pushSsrf": "ff733c00fd3a057f4b0155c416584910e5f8c99ff7d00dbb94ff08e9263d73f5",
+      "build": "2c322484682cfa437ed930a13e4bde698f2cbce087061fb7ea5b3abc2e9d829d",
+      "browser": "aa8a34a9e788f11055e995052b1f38be2a0a23dbe0871b43358d07b81d321646",
+      "static": "b8f5a463fca60b3e6c30ff7528e697d4084cdf5622d85aa2128d19dbfe2621a2"
+    },
+    "browser": {
+      "passed": 128,
+      "failed": 0,
+      "skipped": 1,
+      "includesSetup": 1,
+      "retries": 0,
+      "newCases": 50
+    },
+    "static": {
+      "passed": 18,
+      "failed": 0
+    }
   }
 }

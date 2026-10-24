@@ -16,5 +16,21 @@
       "app/components/GlobalSearch.tsx": "789724bb22e56352d0ecc26934e197a2fe5c5b8677687c6e6b3473f6e8c63243",
       "scripts/bench-field-loading.ts": "24ea0388ca8cab6fd0a49127dbac9c02409be2f17d0d82bcf6b0c20ccaa3975c"
     }
+  },
+  "candidateWithUndici": {
+    "uiSourceCommit": "cd1a2cee77761284b9c990115ec8ca1a19d58c1d",
+    "undici": "8.12.2",
+    "buildId": "Gf8ulP4q7FR49IWEgv0sY",
+    "benchmark": "candidate-undici.json",
+    "sourceFileSha256": {
+      "app/components/NewSheetModal.tsx": "d56d03b0add9b09029ae381bf1b8f49def3e6042eeb804cbe8c1225495f97c76",
+      "app/components/dialogs.tsx": "413a8f077edafc4bbb7c04ab46a86ce8477388cdeb90f2adfcad8ad37dfc9e26",
+      "app/components/home/HomeHienTruong.tsx": "16cf59551c4227a969b1831a7e663436c053a8f9be4922546569132b2aad638d",
+      "app/components/home/HomeHienTruongData.ts": "2a756e08ef10d46be88ca55bafd83d155233cc7af1e31266d5c744af7d26df92",
+      "app/components/GlobalSearch.tsx": "789724bb22e56352d0ecc26934e197a2fe5c5b8677687c6e6b3473f6e8c63243",
+      "scripts/bench-field-loading.ts": "4774e84b4611da3babfadbaaf8523a1b51042fb0ff701b56257683985a5904d5",
+      "package.json": "2790a52f65fa2e30b216e83417aeecae8023296fda4222a903831e860d2b6a6b",
+      "package-lock.json": "7cba0df72dd23c062ccaa4c4ad0b758c1c8c43640a19962873e1831f5f86dfdf"
+    }
   }
 }

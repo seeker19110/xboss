@@ -26,8 +26,10 @@ Diagnostic riêng: trước sửa, đổi sáng lỗi tương phản ngay 3/3 l�
 đổi tối/sáng đều sạch ngay, màu option ổn định từ mẫu 0ms. Raw snapshots:
 [trước sửa](contrast-baseline.json), [sau sửa](contrast-candidate.json).
 
-Không đổi API/schema/auth/permission/dependency/lock/CI/service worker, không thêm
-telemetry hoặc xóa capability sống. Checkout gốc có 1.508 tệp xóa từ trước được giữ nguyên.
+Không đổi API/schema/auth/permission/CI/service worker, không thêm telemetry hoặc xóa
+capability sống. Ngoại lệ dependency sau push #677: pin riêng Undici 8.10.2→8.12.2 để
+xử lý audit high có sẵn; [hồ sơ M137-R1](undici-repair.md). Checkout gốc có 1.508 tệp xóa
+từ trước được giữ nguyên.
 
 ## Browser RED → GREEN và các cổng
 
@@ -38,7 +40,7 @@ scroll khi cha unmount trước. Oracle fieldset được sửa dùng thuộc t�
 Responsive có bốn ca 360/393px thất bại vì glyph tràn/cắt và thanh đáy cao hơn phần chừa,
 hai ca desktop 1280px đạt. Không tính lỗi oracle ban đầu thành bằng chứng lỗi ứng dụng.
 
-GREEN cuối trên production build, Chromium desktop + Pixel 5:
+GREEN phần UI tại `cd1a2cee` trên production build, Chromium desktop + Pixel 5:
 
 - Form: tám ca; field loading/retry/abort/role/empty/responsive: 32 ca; modal: mười ca.
 - Kèm bảy file hồi quy M127/M136/AppShell/dashboard/modal a11y hiện hữu; kết quả tổng
@@ -56,6 +58,11 @@ guard restore hoặc allowlist. Chạy lại riêng DR: 24/24 đạt, sau đó c
 Lượt full tiếp theo bị SIGTERM (exit 143) khi đang chạy nhóm worker, không có tổng kết;
 không tính là đạt. Chạy lại full trong terminal riêng, sau khi browser/gate đã hoàn tất.
 Lượt cuối exit 0, gồm DR 24/24 và toàn bộ nhóm DB, không sửa timeout/guard/test để đạt.
+Full unit 5.152 pass thuộc checkpoint UI trước M137-R1. Sau pin Undici: 21 ca webhook/
+SSRF đạt không skip, audit production exit 0 (0 high/critical, một package moderate còn
+có sẵn), build mới đạt. Gate chạy lại 18/18 và browser trên package mới **128 pass,
+0 fail, một skip có sẵn**, gồm setup; cả 50 ca mới đạt, không retry. Full CI trên HEAD
+sửa dependency được đối soát riêng, không lấy CI của HEAD cũ thay thế. [Chi tiết](undici-repair.md).
 
 ## Phép đo trước–sau
 
@@ -66,8 +73,9 @@ với phép đo. Mốc ready: thấy “Việc hôm nay”; hash lấy toàn b�
 
 Fixture có 160 task tổng, chỉ **ba task được giao cho engineer** trong cả hai build.
 40/40 mẫu cùng ba task, summary total 3 và cùng primary hash; không dùng fixture rỗng
-để kết luận tốc độ. [Baseline](baseline.json), [candidate](candidate.json),
-[tổng hợp](summary.json).
+để kết luận tốc độ. Bảng cuối so [baseline](baseline.json) với
+[candidate sau pin Undici](candidate-undici.json), [tổng hợp](summary.json).
+[Candidate UI trước pin](candidate.json) vẫn giữ nguyên để truy vết.
 
 Đính chính metadata: hai JSON raw ban đầu ghi nhãn cứng `393x851`; cấu hình chạy thật
 luôn lấy `devices["Pixel 5"]` của Playwright pin, có viewport **393×727**, screen 393×851
@@ -79,10 +87,10 @@ giữ nguyên JSON/số đo lịch sử; không thay cấu hình hoặc kết lu
 
 | Tình huống     | Median trước | Median sau | Chờ sau primary trước → sau |
 | -------------- | -----------: | ---------: | --------------------------: |
-| Bình thường    |      3.368ms |    3.361ms |                 424 → 415ms |
-| Thông báo chậm |      5.956ms |    3.364ms |               3.010 → 411ms |
-| Danh sách chậm |      5.958ms |    3.365ms |               3.026 → 425ms |
-| Tên dự án chậm |      5.950ms |    3.359ms |               3.023 → 426ms |
+| Bình thường    |      3.368ms |    3.347ms |                 424 → 412ms |
+| Thông báo chậm |      5.956ms |    3.364ms |               3.010 → 419ms |
+| Danh sách chậm |      5.958ms |    3.358ms |               3.026 → 403ms |
+| Tên dự án chậm |      5.950ms |    3.357ms |               3.023 → 429ms |
 
 Nguồn phụ chậm không còn chặn phần việc chính; tình huống bình thường gần như giữ nguyên.
 Đây là lab latency có kiểm soát, không phải field CWV/INP, tải lớn hoặc tốc độ mọi trang.
