@@ -6,9 +6,9 @@ Baseline main `e52b4937c8e46936adba15bf4ed7d62d11d7add3` (#682). Source cuối `
 
 Nhân sự tải danh sách song song, độc lập auth/tổ đội/nhà thầu phụ. Response cũ không ghi đè filter mới; lỗi giữ snapshot chỉ xem và có retry riêng từng nguồn; không hiện empty khi chưa có snapshot hợp lệ. Tên nhân sự là nút mở chi tiết bằng bàn phím; tên dài ngắt dòng, target44px; filter có nhãn, input16px dưới sm và bảng cuộn trong vùng giữ cột.
 
-Hợp đồng chỉ tải suppliers/systems khi mở tạo mới; cache trong vòng đời trang, retry chỉ nguồn lỗi. Form chưa mở khi chưa đủ option; đang tải/lỗi vẫn đóng được. Sau retry và đóng form, focus trở lại nút mở ban đầu. Không đổi source AddContractModal, ContractDocument, payload/header decimal-string, quyền hoặc tính tiền.
+Hợp đồng chỉ tải suppliers/systems khi mở tạo mới; cache trong vòng đời trang, retry chỉ nguồn lỗi. Form chưa mở khi chưa đủ option; đang tải/lỗi vẫn đóng được. Sau retry và đóng form, focus trở lại nút mở ban đầu. Không đổi logic ghi/state/payload AddContractModal hoặc source ContractDocument, payload/header decimal-string, quyền hoặc tính tiền.
 
-[Invariants](invariants.json) đối chiếu 15 điểm AST/text: PersonnelModal/DetailModal/CertificationModal/certBadge, taiDanhSach/HangHopDong/CAN/refresh và phép tính mSumTien/mulRatio; hai component hợp đồng giữ byte-identical. Backend/API/schema/dependency và offline giữ nguyên. Không gỡ capability.
+[Invariants](invariants.json) đối chiếu 18 điểm AST/text: PersonnelModal/DetailModal/CertificationModal/certBadge, taiDanhSach/HangHopDong/CAN/refresh và phép tính mSumTien/mulRatio; ContractDocument giữ byte-identical; AddContractModal chỉ thêm nội dung tải/lỗi trước form, chung một Modal; submit/canSubmit/needsSupplier/state giữ nguyên. Backend/API/schema/dependency và offline giữ nguyên. Không gỡ capability.
 
 ## RED, repair và GREEN
 

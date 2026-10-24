@@ -253,6 +253,7 @@ test("hợp đồng: lỗi option không mở form thiếu; retry nguồn lỗi,
   expect(s.counts.systems).toBe(2);
   expect(s.errors).toEqual([]);
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Thêm hợp đồng", exact: true })).toBeFocused();
 });
 

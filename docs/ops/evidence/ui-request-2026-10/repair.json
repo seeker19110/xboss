@@ -75,5 +75,14 @@
       "unexpected": 0,
       "flaky": 0
     }
+  },
+  "ciFocusFlaky": {
+    "run": 40078581040,
+    "head": "bf214855035cedc858d34ae030581c9ef5d87668",
+    "job": 120827424867,
+    "case": "authed-mobile: lỗi option không mở form thiếu; retry nguồn lỗi, đóng được",
+    "observed": "Expected create trigger focused, inactive after Escape; passed retry. Not accepted as clean release.",
+    "repairAttemptForFocus": 2,
+    "repair": "Keep one Modal in AddContractModal while preparation content switches to form; remove page manual focus recovery and Modal swap. Only optional presentation slot added; submit/fields/state unchanged. Add explicit dialog closed assertion. Repeat with retries0, full GREEN/gate/build and exact HEAD CI required."
   }
 }

@@ -13,7 +13,6 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { Button, Card, Chip, StatCard } from "@/app/components/ui";
-import { Modal } from "@/app/components/dialogs";
 import AddContractModal from "@/app/contracts/_components/AddContractModal";
 import ContractDocument, {
   ContractBottomActions,
@@ -70,16 +69,6 @@ function ContractsInner() {
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState<Set<ContractKind>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
-  const createTrigger = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => {
-    if (addOpen || !createTrigger.current) return;
-    const trigger = createTrigger.current;
-    // Sau cleanup của modal tải/form, trả focus về nút mở ban đầu (kể cả sau retry).
-    queueMicrotask(() => {
-      if (trigger.isConnected && !trigger.closest("[inert]"))
-        trigger.focus({ preventScroll: true });
-    });
-  }, [addOpen]);
   const [showDeleted, setShowDeleted] = useState(false);
   const [restoringId, setRestoringId] = useState<number | null>(null);
 
@@ -318,10 +307,7 @@ function ContractsInner() {
               variant="primary"
               className="ml-auto"
               aria-label="Thêm hợp đồng"
-              onClick={(event) => {
-                createTrigger.current = event.currentTarget;
-                setAddOpen(true);
-              }}
+              onClick={() => setAddOpen(true)}
             >
               Thêm hợp đồng
             </Button>
@@ -448,40 +434,44 @@ function ContractsInner() {
         )}
       </main>
 
-      {addOpen && !optionsReady && (
-        <Modal onClose={closeCreate} className="max-w-md">
-          <div className="p-5 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold">Thêm hợp đồng</h2>
-              <Button
-                size="icon"
-                variant="ghost"
-                icon={X}
-                aria-label="Đóng"
-                className="min-h-11 min-w-11"
-                onClick={closeCreate}
-              />
-            </div>
-            {optionsLoading && (
-              <p role="status" className="text-sm text-zinc-400">
-                Đang tải danh mục tạo hợp đồng…
-              </p>
-            )}
-            {optionsError && (
-              <div role="alert" className="space-y-3 text-sm text-rose-300">
-                <p>{optionsError}</p>
-                <Button variant="secondary" className="min-h-11" onClick={() => void loadOptions()}>
-                  Thử lại
-                </Button>
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
-      {addOpen && optionsReady && (
+      {addOpen && (
         <AddContractModal
           suppliers={suppliers}
           systems={systems}
+          preparation={
+            optionsReady ? undefined : (
+              <div className="p-5 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="font-semibold">Thêm hợp đồng</h2>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    icon={X}
+                    aria-label="Đóng"
+                    className="min-h-11 min-w-11"
+                    onClick={closeCreate}
+                  />
+                </div>
+                {optionsLoading && (
+                  <p role="status" className="text-sm text-zinc-400">
+                    Đang tải danh mục tạo hợp đồng…
+                  </p>
+                )}
+                {optionsError && (
+                  <div role="alert" className="space-y-3 text-sm text-rose-300">
+                    <p>{optionsError}</p>
+                    <Button
+                      variant="secondary"
+                      className="min-h-11"
+                      onClick={() => void loadOptions()}
+                    >
+                      Thử lại
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )
+          }
           onClose={closeCreate}
           onCreated={() => {
             setAddOpen(false);
