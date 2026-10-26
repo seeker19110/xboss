@@ -1,14 +1,14 @@
 # Goal: Đối soát và xử lý nợ kỹ thuật tháng 10
 
-| Thuộc tính            | Giá trị                                                                            |
-| --------------------- | ---------------------------------------------------------------------------------- |
-| Goal ID               | DEBT-2026-10                                                                       |
-| Owner                 | Chủ dự án                                                                          |
-| State                 | WAITING — lát S local VERIFIED, chờ PR/merge; phần auth/proxy cần spec và topology |
-| Main SHA đã reconcile | `0f5cef55e914711a0d004411d4123c5a966e3c25`                                         |
-| Bắt đầu / review      | 2026-10-26 / 2026-10-26                                                            |
-| Quyền AI              | Research, sửa nhánh, kiểm thử, PR; chưa có quyền merge/deploy/Settings/production  |
-| Budget/guardrails     | Tối đa3 repair attempts/failure; không nới auth/validation/gates hoặc dùng DB thật |
+| Thuộc tính            | Giá trị                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| Goal ID               | DEBT-2026-10                                                                            |
+| Owner                 | Chủ dự án                                                                               |
+| State                 | WAITING — lát S local VERIFIED, PR #687 chờ merge; phần auth/proxy cần spec và topology |
+| Main SHA đã reconcile | `0f5cef55e914711a0d004411d4123c5a966e3c25`                                              |
+| Bắt đầu / review      | 2026-10-26 / 2026-10-26                                                                 |
+| Quyền AI              | Research, sửa nhánh, kiểm thử, PR; chưa có quyền merge/deploy/Settings/production       |
+| Budget/guardrails     | Tối đa3 repair attempts/failure; không nới auth/validation/gates hoặc dùng DB thật      |
 
 ## Outcome và Goal DoD
 
@@ -34,13 +34,13 @@ GitHub Settings, merge/deploy; thay người thật để ký UAT hoặc tự t�
 
 ## Milestones và slices
 
-| ID  | Outcome/AC                                                                                   | Dependency                | Spec                                                                 | Issue | PR      | State   | Evidence                                                                                                         |
-| --- | -------------------------------------------------------------------------------------------- | ------------------------- | -------------------------------------------------------------------- | ----- | ------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
-| S1  | Đối soát7TD/#686/goals; sửa XSS/rollback build, race nháp và tương phản; kiểm HTTP/deploy/UI | Không                     | Sửa cấu hình/tài liệu mức S                                          | —     | Chưa mở | VERIFY  | [Báo cáo](../ops/technical-debt-2026-10-26.md), [checks](../ops/evidence/technical-debt-2026-10/verification.md) |
-| S2  | Gom IP/cookie sau contract edge được duyệt                                                   | D1/D2, operator           | [M138](../nang-cap/M138-cung-co-ranh-gioi-proxy-cookie.md) In review | —     | —       | SPEC    | Không code trước approval                                                                                        |
-| S3  | Xác minh ranh giới mạng                                                                      | Operator/topology         | M138                                                                 | —     | —       | WAITING | Required checks đã xác minh qua ruleset; firewall chưa kiểm                                                      |
-| S4  | Audit authz còn lại                                                                          | Inventory/AC từng lát     | QUALITY-FINAL-1 khi áp dụng                                          | —     | —       | BACKLOG | TD-007 PARTIAL; rollback build đã có bản vá/51 test, không kết luận authz từ scan tĩnh                           |
-| S5  | Bảo trì page dài theo miền                                                                   | Scope/regression từng lát | Mức rủi ro theo file                                                 | —     | —       | BACKLOG | TD-006 là rủi ro bảo trì;0 suppression TypeScript                                                                |
+| ID  | Outcome/AC                                                                                   | Dependency                | Spec                                                                 | Issue | PR                                                    | State   | Evidence                                                                                                         |
+| --- | -------------------------------------------------------------------------------------------- | ------------------------- | -------------------------------------------------------------------- | ----- | ----------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| S1  | Đối soát7TD/#686/goals; sửa XSS/rollback build, race nháp và tương phản; kiểm HTTP/deploy/UI | Không                     | Sửa cấu hình/tài liệu mức S                                          | —     | [#687](https://github.com/seeker19110/xboss/pull/687) | WAITING | [Báo cáo](../ops/technical-debt-2026-10-26.md), [checks](../ops/evidence/technical-debt-2026-10/verification.md) |
+| S2  | Gom IP/cookie sau contract edge được duyệt                                                   | D1/D2, operator           | [M138](../nang-cap/M138-cung-co-ranh-gioi-proxy-cookie.md) In review | —     | —                                                     | SPEC    | Không code trước approval                                                                                        |
+| S3  | Xác minh ranh giới mạng                                                                      | Operator/topology         | M138                                                                 | —     | —                                                     | WAITING | Required checks đã xác minh qua ruleset; firewall chưa kiểm                                                      |
+| S4  | Audit authz còn lại                                                                          | Inventory/AC từng lát     | QUALITY-FINAL-1 khi áp dụng                                          | —     | —                                                     | BACKLOG | TD-007 PARTIAL; rollback build đã có bản vá/51 test, không kết luận authz từ scan tĩnh                           |
+| S5  | Bảo trì page dài theo miền                                                                   | Scope/regression từng lát | Mức rủi ro theo file                                                 | —     | —                                                     | BACKLOG | TD-006 là rủi ro bảo trì;0 suppression TypeScript                                                                |
 
 ## Risk register
 
@@ -62,7 +62,7 @@ GitHub Settings, merge/deploy; thay người thật để ký UAT hoặc tự t�
 
 ### Iteration 1 — 2026-10-26
 
-- State/main: VERIFY trên nhánh, main `0f5cef55`.
+- State/main: WAITING — [PR #687](https://github.com/seeker19110/xboss/pull/687), local VERIFIED, main `0f5cef55`; CI theo HEAD PR, chưa merge/deploy.
 - Slice: S1; có68 targeted pass/0skip,51deploy pass, fullunit5.174pass/0fail/1skip; full E2E phát hiện/vá3nguyên nhân, fullE2E1.132pass/0fail/51skip cũ,retries0, gate/build19/19; kết quả trong verification.
 - Gap trước/sau: phân biệt chủ đích/historical/risk; có regression XSS và spec để review.
 - Risk/decision: giữ policy CSRF và cookie hiện hành; không tự duyệt M138 hoặc đóng UAT.
