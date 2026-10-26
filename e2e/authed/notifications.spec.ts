@@ -11,6 +11,56 @@ async function gotoNotifications(page: Page) {
   await expect(page.getByRole("button", { name: /Làm mới/ })).toBeVisible({ timeout: 15_000 });
 }
 
+for (const theme of ["light", "darkblue"]) {
+  test(`bốn loại hoạt động đủ tương phản trên mặt thẻ ${theme}`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem("xboss_theme", value), theme);
+    const types = ["progress", "photo", "document", "comment"];
+    await page.route("**/api/notifications/feed", (route) =>
+      route.fulfill({
+        json: {
+          overdue: [],
+          dueSoon: [],
+          upcomingStart: [],
+          materialOver: [],
+          fullAccess: true,
+          role: "admin",
+          prefs: {},
+          recentActivity: [
+            {
+              sheetCode: "TEST",
+              sheetName: "Hoạt động kiểm chứng tương phản",
+              sheetSlug: null,
+              events: types.map((type, i) => ({
+                type,
+                taskId: i + 1,
+                taskCode: `T${i + 1}`,
+                taskName: `Công việc kiểm chứng ${i + 1}`,
+                detail: "Nội dung hoạt động",
+                by: "Kỹ sư kiểm chứng",
+                at: new Date().toISOString(),
+                sheetSlug: null,
+              })),
+            },
+          ],
+        },
+      }),
+    );
+    await gotoNotifications(page);
+    await expect(page.locator("html")).toHaveClass(new RegExp(theme));
+    const main = page.getByRole("main");
+    for (const label of ["Cập nhật tiến độ", "Ảnh hiện trường", "Bản vẽ / tài liệu", "Bình luận"]) {
+      await expect(main.getByText(label, { exact: true })).toBeVisible();
+    }
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    const serious = results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    );
+    expect(serious, JSON.stringify({ theme, serious }, null, 2)).toEqual([]);
+  });
+}
+
 test.describe("Thông báo (sau đăng nhập)", () => {
   test("render nội dung chính", async ({ page }) => {
     await gotoNotifications(page);

@@ -239,8 +239,29 @@ rm -rf "$OLD_DIR"
 [ -d .next ] && mv .next "$OLD_DIR"
 mv "$BUILD_DIR" .next
 
+# Chỉ phục hồi bản build; không hoàn tác schema, source hoặc dependency đã cập nhật.
+# Lỗi reload/health sau swap giữ artifact và trả lỗi, kể cả khi reload bản cũ thành công.
+rollback_build() {
+  echo "==> $1 — rollback về bản build trước" >&2
+  if [ ! -d "$OLD_DIR" ]; then
+    echo "==> Không có bản build trước; giữ .next và gói CI để điều tra, cần người vận hành xử lý." >&2
+    exit 1
+  fi
+  # Xoá đích trước mv để không tạo .next/.next-old lồng bên trong.
+  rm -rf .next
+  mv "$OLD_DIR" .next
+  if ! pm2 reload "$PM2_NAME" --update-env; then
+    echo "==> Build cũ đã đặt lại nhưng PM2 reload lại thất bại; cần người vận hành kiểm tra process." >&2
+    exit 1
+  fi
+  echo "==> Đã khôi phục bản build trước và reload; deploy thất bại, cần kiểm tra health của bản cũ." >&2
+  exit 1
+}
+
 echo "==> 7/7 Reload app qua PM2 (graceful, kèm nạp lại biến môi trường) — process \"$PM2_NAME\""
-pm2 reload "$PM2_NAME" --update-env
+if ! pm2 reload "$PM2_NAME" --update-env; then
+  rollback_build "PM2 reload thất bại"
+fi
 
 echo "==> Health-check sau reload (tối đa 5 lần, cách nhau 3 giây) — endpoint /api/health"
 # Đọc cổng app từ file env đang dùng ($ENV_FILE — biến "PORT", mặc định 3000 nếu không đặt,
@@ -267,13 +288,5 @@ if [ "$HEALTHY" = true ]; then
   rm -f "$CI_TARBALL"
   echo "==> Xong! Deploy hoàn tất ($([ "$STAGING" = true ] && echo staging || echo production))."
 else
-  echo "==> Health-check thất bại sau 5 lần thử ($HEALTH_URL) — rollback về bản build trước"
-  # ".next" đang là bản build MỚI (vừa mv vào ở bước 6/7, chưa bị xoá) — phải rm -rf trước
-  # thì "mv OLD_DIR .next" mới THAY THẾ đúng chỗ, không thì mv sẽ đẩy OLD_DIR vào TRONG
-  # ".next" (thành ".next/.next-old") vì đích đã tồn tại là thư mục.
-  rm -rf .next
-  mv "$OLD_DIR" .next
-  pm2 reload "$PM2_NAME" --update-env
-  echo "==> Health-check thất bại — đã rollback về bản trước"
-  exit 1
+  rollback_build "Health-check thất bại sau 5 lần thử ($HEALTH_URL)"
 fi

@@ -100,11 +100,11 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 
 Danh sách **đầy đủ** (kèm biến bắt buộc/tuỳ chọn và luật validate) khai tập trung trong schema zod của `lib/nen/env.ts` — mục dưới chỉ tóm tắt các biến hay chạm.
 
-- `DATABASE_URL` — bắt buộc khi chạy app. `MIGRATE_DATABASE_URL` (tuỳ chọn) — chuỗi kết nối role owner chỉ dùng để chạy migration (`lib/db/migrate.ts`, ADR-0005); thiếu thì fallback về `DATABASE_URL`.
+- `DATABASE_URL` — bắt buộc khi chạy app, dùng role runtime `xboss_app`. `MIGRATE_DATABASE_URL` — bắt buộc riêng cho lệnh migration (`lib/db/migrate.ts`, ADR-0005), không fallback về `DATABASE_URL`; không đưa credential migration vào runtime/PM2.
 - `XBOSS_PG_POOL_MAX` / `XBOSS_PG_STMT_TIMEOUT_MS` / `XBOSS_SLOW_QUERY_MS` — (tuỳ chọn, M53) chỉnh pool + `statement_timeout` + ngưỡng log query chậm trong `lib/db/index.ts` (mặc định 10 / 30000 / 500; `XBOSS_SLOW_QUERY_MS=0` là tắt log).
 - `XBOSS_STRICT_MEMBERSHIP` — (tuỳ chọn, mặc định tắt; chỉ nhận `0`/`1`/`true`/`false`) cutover membership D01: bật thì non-admin chỉ thấy dự án được gán trong `user_projects` kể cả khi bảng rỗng toàn hệ (admin cùng org vẫn thấy hết). Bật theo runbook `docs/nang-cap/AUDIT-S16-MEMBERSHIP-CUTOVER.md` (dry-run `npm run membership:dry-run` trước).
 - `XBOSS_SECRET` — ký cookie phiên. **Bắt buộc trong production**: thiếu sẽ throw lúc ký/xác minh token (chủ đích fail-fast, build vẫn chạy được).
-- `XBOSS_ADMIN_PASSWORD` — production + DB trống chỉ tạo 1 admin với mật khẩu này (không seed 4 tài khoản demo như dev).
+- `XBOSS_ADMIN_PASSWORD` — dùng khi bootstrap admin tường minh qua `scripts/bootstrap-admin.ts` và seed môi trường test/dev. Runtime production không tự tạo tài khoản, kể cả khi DB trống.
 - `CRON_SECRET` — bảo vệ `/api/cron/daily-report`, chỉ nhận qua header `Authorization: Bearer` (không qua query param).
 - `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` + `REPORT_EMAIL_TO` — (tuỳ chọn) gửi báo cáo ngày/tuần + cảnh báo health-check qua email. Thiếu `SMTP_HOST`/`USER`/`PASS` → route cron trả **preview** thay vì gửi (không throw).
 - `APP_URL` — (tuỳ chọn) URL gốc của app, dùng dựng link tuyệt đối trong email/push và làm `redirect_uri` của SSO OIDC.
@@ -151,7 +151,7 @@ dùng alias `@/lib/<miền>/<module>`, không dùng đường dẫn tương đ�
 ### Lớp DB (`lib/db/index.ts`)
 
 - Helper `query/queryOne/run/insertId` — placeholder viết dạng `?`, tự chuyển sang `$1..$n` của pg.
-- **Schema qua hệ migrate SQL nhẹ** (`migrations/*.sql` đánh số + bảng `schema_migrations` + runner `lib/db/migrate.ts`, xem ADR-0003): `ensureSchema()` tự áp migration chưa chạy khi query đầu tiên (advisory lock chống chạy chồng), hoặc chủ động qua `npm run db:migrate`. **Đổi schema = thêm file `migrations/000N_*.sql` mới** (append-only, không sửa file đã áp production); vẫn idempotent (`IF NOT EXISTS`). Backfill dữ liệu phức tạp vẫn có thể viết script trong `scripts/` (xem `backfill-boq.ts`, `backfill-dims.ts`).
+- **Schema qua hệ migrate SQL nhẹ** (`migrations/*.sql` đánh số + bảng `schema_migrations` + runner `lib/db/migrate.ts`, xem ADR-0003): áp tường minh bằng `npm run db:migrate` với `MIGRATE_DATABASE_URL` (advisory lock chống chạy chồng). Runtime `ensureSchemaCompatible()` chỉ đọc marker và báo lỗi khi schema thiếu/lỗi thời, không migrate hoặc seed. **Đổi schema = thêm file `migrations/000N_*.sql` mới** (append-only, không sửa file đã áp production); vẫn idempotent (`IF NOT EXISTS`). Backfill dữ liệu phức tạp vẫn có thể viết script trong `scripts/` (xem `backfill-boq.ts`, `backfill-dims.ts`).
 - Type parser tuỳ chỉnh: cột `DATE` giữ nguyên **chuỗi** `'YYYY-MM-DD'` — toàn bộ code so sánh ngày bằng so sánh chuỗi (vd `end_date < todayISO()`). BIGINT/NUMERIC parse thành number.
 
 ### Auth (`lib/bao-mat/auth.ts`)
@@ -255,18 +255,18 @@ Parse file tracking gốc (sheet OGTĐ/OGHL/OGCH/ODNN) thành WBS — chứa log
 - Khi thêm API route mới: luôn có check auth + `export const dynamic = "force-dynamic"`.
 - TypeScript strict, import nội bộ qua alias `@/*`, tránh `any` tuỳ tiện.
 - SQL luôn dùng helper `lib/db` với placeholder `?` — **không nối chuỗi để chèn giá trị**.
-- **Merge NGAY khi CI xanh, không chờ hỏi lại** (quyết định 2026-08-25: "quy ước sẽ luôn bật auto merge cho mọi pr", sửa lại cùng ngày cho khớp thực tế — xem ghi chú dưới). Mở PR xong thì theo dõi checks; **đủ 100% checks `success` là merge `SQUASH` ngay**, không đợi người duyệt. Ý nghĩa không đổi so với bản cũ: **trách nhiệm chất lượng dồn hết vào CI + phần tự kiểm trước khi push** — chạy đủ cổng ở mục "Definition of Done" bên dưới TRƯỚC khi mở PR, đừng dựa vào "để review bắt".
-  - **Thử `enable_pr_auto_merge` trước; bị từ chối thì merge thẳng, KHÔNG coi là lỗi.** Repo hiện **chưa đặt required status checks** cho `main` trong branch protection, nên GitHub không mở đường auto-merge ở bất kỳ thời điểm nào: gọi lúc chưa check nào đăng ký → `clean` ("merge thẳng đi"), gọi lúc checks đang chạy → `unstable`, gọi lúc đã xanh hết → lại `clean`. Đã thử đủ 3 thời điểm ở PR #398 và #400.
+- **Merge theo quyền người dùng và checks**: quy ước tự merge ngày 25/08 chỉ áp dụng khi người dùng đã cấp quyền phù hợp; `AGENTS.md` hiện yêu cầu được cấp quyền trước merge/deploy. Sau khi có quyền và đủ checks `success` trên HEAD cuối, dùng `SQUASH`; vẫn chạy đủ cổng ở mục "Definition of Done" trước khi mở PR.
+  - **Required checks hiện có qua ruleset.** Đối soát 26/10/2026: ruleset `main` (22365300) active, yêu cầu PR và `ci`, `e2e`, `gitleaks`, `metadata`. `ci` tổng hợp static/typecheck, test, coverage và build. API branch protection cổ điển trả404 không có nghĩa ruleset vắng mặt; không dùng lỗi auto-merge lịch sử #398/#400 để bỏ qua rules hiện hành.
   - **`unstable` KHÔNG có nghĩa là có check đỏ**, dù thông báo lỗi của công cụ ghi "required checks are failing" — nó chỉ có nghĩa "chưa xanh hết". Luôn kiểm `get_check_runs` để phân biệt _đang chạy_ với _đỏ thật_, đừng đi sửa một lỗi không tồn tại.
-  - **Chờ đủ mọi check, đừng merge sớm.** `test (Postgres)` và 3 nhánh `e2e` là các job lâu nhất (~6–8 phút); rollup `ci`/`e2e` chỉ xanh sau khi các job con xong. Sự kiện webhook `check_suite.completed` có thể mang `head_sha` của **commit cũ** — đối chiếu với `git rev-parse HEAD` trước khi kết luận.
+  - **Chờ đủ mọi check, đừng merge sớm.** `test (Postgres)` và các shard `e2e` là các job lâu nhất; rollup `ci`/`e2e` chỉ xanh sau khi các job con xong. Sự kiện webhook `check_suite.completed` có thể mang `head_sha` của **commit cũ** — đối chiếu với `git rev-parse HEAD` trước khi kết luận.
   - **Job `OCR review (góp ý)` không chặn merge nhưng vẫn là một check** — chờ nó xong như mọi check. Phát hiện mức cao/critical phải xác minh: lỗi thật → sửa trước khi merge; báo sai → trả lời thread nêu lý do. Bật bằng secret `OCR_LLM_URL`/`OCR_LLM_AUTH_TOKEN` + biến `OCR_LLM_MODEL` (chưa cấu hình thì job tự bỏ qua, xem ADR-0012).
-  - Muốn auto-merge chạy thật đúng nghĩa thì phải bật **required status checks** cho `main` (Settings → Branches). Chừng nào chưa bật, quy ước là merge tay khi CI xanh như trên.
+  - Khi kiểm bảo vệ nhánh, đọc cả rulesets và effective rules cho `main`; quyền bypass và quyền merge phải kiểm riêng. Không tự đổi Settings hoặc bật auto-merge khi chưa được người dùng cấp quyền.
   - **Status `Vercel` KHÔNG tính vào điều kiện merge** (quyết định 2026-10-12, PR #632): đó là tích hợp preview ngoài (production chạy VPS, repo không có `vercel.json`), phiên cloud không xem được log cũng không redeploy được. Vercel đỏ thì ghi chú một dòng trong PR rồi merge theo các check còn lại; không đẩy commit chỉ để Vercel chạy lại.
 - **Tiền tệ (M45 PR1):** parser oid 1700 (`lib/db/index.ts`) chuyển NUMERIC → `parseFloat` nên **cấm cộng/nhân tiền trên float JS**. Mọi tổng/tích tiền (`SUM`, `* rate`) làm **trong SQL**; JS chỉ hiển thị. Khi buộc phải tính tiếp ở JS (vd tỷ lệ VAT/tạm ứng/giữ lại), cast cột tiền `::text` trong SELECT rồi đưa qua `lib/nen/money.ts` (`parseMoney`/`addMoney`/`mulRate`/`formatVnd` — làm việc trên bigint đơn vị nhỏ = đồng×100).
 
 ## Quy trình & Definition of Done
 
-Luồng chuẩn: hiểu yêu cầu → khám phá & tái dùng → code → cập nhật test khi đổi logic → `npm run lint` + `npm run typecheck` (+ `npm test` khi có thể) → **cập nhật `PROGRESS.md` (và `docs/nang-cap/README.md` nếu đóng/mở 1 mục `M<xx>`)** → commit → push branch → mở **PR** → **merge ngay khi CI xanh** (xem Quy ước).
+Luồng chuẩn: hiểu yêu cầu → khám phá & tái dùng → code → cập nhật test khi đổi logic → `npm run lint` + `npm run typecheck` (+ `npm test` khi có thể) → **cập nhật `PROGRESS.md` (và `docs/nang-cap/README.md` nếu đóng/mở 1 mục `M<xx>`)** → commit → push branch → mở **PR** → merge khi checks xanh và đã có quyền theo `AGENTS.md` (xem Quy ước).
 
 Trước khi push, đảm bảo:
 

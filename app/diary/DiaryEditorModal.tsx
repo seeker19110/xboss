@@ -64,7 +64,7 @@ export default function DiaryEditorModal({
   onChanged,
 }: {
   date: string;
-  role: string;
+  role: string | null;
   crewSuggestions: string[];
   onClose: () => void;
   onChanged: () => void | Promise<void>;
@@ -98,6 +98,7 @@ export default function DiaryEditorModal({
   const [banServer, setBanServer] = useState<BanServer | null>(null);
   const [taiBanMoi, setTaiBanMoi] = useState(false);
 
+  const awaitingRole = role === null;
   const canEdit = role === "admin" || role === "pm" || role === "engineer";
   const canLock = role === "admin" || role === "pm";
   const canUnlock = role === "admin";
@@ -137,6 +138,8 @@ export default function DiaryEditorModal({
   }
 
   useEffect(() => {
+    // Chưa biết quyền thì chưa mở form/vault: quyền tới muộn không được nạp lại đè input.
+    if (awaitingRole) return;
     let cancelled = false;
     setLoading(true);
     (async () => {
@@ -208,7 +211,7 @@ export default function DiaryEditorModal({
     return () => {
       cancelled = true;
     };
-  }, [date, canEdit]);
+  }, [date, canEdit, awaitingRole]);
 
   const totalHeadcount = manpower.reduce((s, m) => s + (parseInt(m.headcount) || 0), 0);
 
@@ -405,8 +408,10 @@ export default function DiaryEditorModal({
         </div>
       </div>
 
-      {loading ? (
-        <p className="text-sm text-zinc-400 py-8 text-center">Đang tải…</p>
+      {loading || awaitingRole ? (
+        <p className="text-sm text-zinc-400 py-8 text-center">
+          {awaitingRole ? "Đang tải quyền truy cập…" : "Đang tải…"}
+        </p>
       ) : (
         <fieldset disabled={saving} aria-busy={saving} className="min-w-0 space-y-4">
           {mutationError && (

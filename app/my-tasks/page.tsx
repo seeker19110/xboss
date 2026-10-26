@@ -161,6 +161,13 @@ const EVENT_COLOR: Record<EventType, string> = {
   document: "text-violet-200 bg-violet-950",
   comment: "text-amber-200 bg-amber-950",
 };
+// Chữ trên mặt thẻ dùng token tự đảo theo theme; màu -200 chỉ đi cùng chip nền tối.
+const EVENT_TEXT_COLOR: Record<EventType, string> = {
+  progress: "text-emerald-300",
+  photo: "text-sky-300",
+  document: "text-violet-300",
+  comment: "text-amber-300",
+};
 const EVENT_LABEL: Record<EventType, string> = {
   progress: "Cập nhật tiến độ",
   photo: "Ảnh hiện trường",
@@ -334,7 +341,7 @@ function SheetGroup({ group }: { group: SheetActivity }) {
                   <ExternalLink className="w-3 h-3 text-zinc-700 group-hover/ev:text-zinc-400 shrink-0" />
                 </div>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className={`text-xs font-medium ${EVENT_COLOR[ev.type].split(" ")[0]}`}>
+                  <span className={`text-xs font-medium ${EVENT_TEXT_COLOR[ev.type]}`}>
                     {EVENT_LABEL[ev.type]}
                   </span>
                   <span className="text-xs text-zinc-500 truncate">{ev.detail}</span>
