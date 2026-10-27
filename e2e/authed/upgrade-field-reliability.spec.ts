@@ -329,12 +329,7 @@ test("dashboard: đổi lý do trễ báo pending/lỗi, giữ giá trị cũ v�
   }
 });
 
-test("dashboard: đổi thứ tự thất bại rollback, thử kéo lại nhận xác nhận", async ({
-  page,
-  request,
-}) => {
-  const dash = await api<{ kpi: { sheetId: number }[] }>(request, "/api/dashboard");
-  expect(dash.kpi.length).toBeGreaterThan(1);
+test("dashboard: đổi thứ tự thất bại rollback, thử kéo lại nhận xác nhận", async ({ page }) => {
   const matMang = matMangCoCho();
   let soLan = 0;
   let idsDaGui: number[] = [];
@@ -346,7 +341,15 @@ test("dashboard: đổi thứ tự thất bại rollback, thử kéo lại nhậ
     return route.fulfill({ json: { ok: true } });
   });
   try {
+    // Cùng snapshot với UI; sheet tạm của worker khác có thể bị xoá giữa hai GET riêng.
+    const dashboard = page.waitForResponse(
+      (r) => new URL(r.url()).pathname === "/api/dashboard" && r.request().method() === "GET",
+    );
     await page.goto("/?tab=sheets");
+    const response = await dashboard;
+    expect(response.status()).toBe(200);
+    const dash = (await response.json()) as { kpi: { sheetId: number }[] };
+    expect(dash.kpi.length).toBeGreaterThan(1);
     const noiDung = page.getByRole("main");
     const ds = page.getByRole("tabpanel");
     const hang = ds.locator("[draggable]");

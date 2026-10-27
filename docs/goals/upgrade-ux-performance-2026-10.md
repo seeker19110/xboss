@@ -1,14 +1,14 @@
 # Nâng cấp trải nghiệm, hiệu năng và tinh gọn XBoss
 
-| Thuộc tính            | Giá trị                                                                            |
-| --------------------- | ---------------------------------------------------------------------------------- |
-| Goal ID               | UPGRADE-2026-10                                                                    |
-| Owner                 | Chủ dự án                                                                          |
-| State                 | WAITING — #675–#682 DEPLOYED; vòng tải đúng nhu cầu #683 VERIFY; UAT/usage WAITING |
-| Main SHA đã reconcile | `d4cb1b7de04ab8d632b9e6338afb98c0cece4f79`                                         |
-| Bắt đầu               | 2026-10-23                                                                         |
-| Đối soát              | 2026-10-24                                                                         |
-| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026         |
+| Thuộc tính            | Giá trị                                                                    |
+| --------------------- | -------------------------------------------------------------------------- |
+| Goal ID               | UPGRADE-2026-10                                                            |
+| Owner                 | Chủ dự án                                                                  |
+| State                 | WAITING — #675–#686 DEPLOYED; UAT/usage WAITING                            |
+| Main SHA đã reconcile | `0f5cef55e914711a0d004411d4123c5a966e3c25`                                 |
+| Bắt đầu               | 2026-10-23                                                                 |
+| Đối soát              | 2026-10-26                                                                 |
+| Spec                  | M136 — Approved for implementation, người dùng duyệt trong chat 23/10/2026 |
 
 ## Outcome và cổng hoàn thành
 
@@ -30,6 +30,13 @@ Hoàn thiện các luồng lưu khi mạng yếu, điều hướng mobile, dashb
 | G   | Tải việc hiện trường và tạo trang tin cậy    | VERIFIED | PR #677; CI/deploy đúng 6b631f15, public smoke đạt          |
 
 ## Current truth
+
+[PR #686](https://github.com/seeker19110/xboss/pull/686) đã merge thành main `0f5cef55`.
+Ngày26/10 đối chiếu trực tiếp main CI40114346685 (11/11 jobs success) và deploy40115106717
+success cùng SHA. Public smoke ngày25/10 đạt theo PR; phiên production có auth chưa xác minh.
+[Release #686](../ops/evidence/meetings-proposals-2026-10/release.md) giữ riêng bằng chứng local/PR/main.
+Các iteration bên dưới ghi checkpoint ở thời điểm thực hiện; #682–#686 đều đã phát hành,
+không còn chờ CI từ những checkpoint cũ. F2/F3 tiếp tục WAITING theo quyết định owner.
 
 [PR #679](https://github.com/seeker19110/xboss/pull/679) đã squash merge thành main
 `6a6bc0bd32a4efc652d2f31e979e1e9ba57bbe37`. CI main 40059853915 và deploy 40060604278
