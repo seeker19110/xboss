@@ -115,7 +115,7 @@
     "@types/web-push": "^3.6.4",
     "@typescript-eslint/parser": "^8.71.1",
     "dotenv": "^18.0.8",
-    "eslint": "^10.9.1",
+    "eslint": "^10.13.0",
     "eslint-config-next": "^16.4.2",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
