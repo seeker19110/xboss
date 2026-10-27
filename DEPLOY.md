@@ -163,7 +163,9 @@ pm2 start ecosystem.config.js --only xboss
 pm2 save && pm2 startup          # tự khởi động lại khi reboot
 ```
 
-Truy cập: `http://<IP-server>:3000`. Đổi cổng bằng biến `PORT` trong `.env.local`.
+Kiểm tra nội bộ qua `http://127.0.0.1:3000` trên VPS hoặc SSH tunnel. Đổi cổng bằng biến
+`PORT` trong `.env.local`. Truy cập production qua reverse proxy HTTPS; người vận hành
+phải chặn truy cập trực tiếp cổng app từ Internet và chốt nguồn header proxy như mục dưới.
 
 ### 3. Gỡ MEPF worker khỏi VPS cũ (chỉ làm một lần)
 
@@ -222,9 +224,12 @@ thẳng lên `.next` đang chạy giúp tránh 2 rủi ro: client đã tải HTM
 chunk JS/CSS đúng lúc file đó vừa bị ghi đè giữa chừng (ChunkLoadError thoáng
 qua), và build lỗi giữa chừng làm `.next` bị bỏ dở không rollback được (giờ
 `.next` đang chạy chỉ bị thay khi build mới đã hoàn tất chắc chắn). Nếu
-health-check vẫn thất bại sau 5 lần thử, script **tự rollback** về bản build
-trước (`.next-old`) và `pm2 reload` lại rồi thoát với mã lỗi — bản cũ đang
-chạy chỉ bị dọn (`rm -rf .next-old`) khi health-check pass.
+reload lỗi hoặc health-check vẫn thất bại sau 5 lần thử, script **tự rollback bản build**
+trước (`.next-old`) và `pm2 reload` lại rồi thoát với mã lỗi. Nếu chưa có build cũ (lần deploy
+đầu), giữ build mới/artifact để người vận hành điều tra; không xoá build rồi tìm bản cũ không
+tồn tại. Reload bản cũ cũng lỗi thì báo cần kiểm tra process, không báo phục hồi thành công.
+Bản cũ chỉ bị dọn (`rm -rf .next-old`) khi health-check pass. Đây là phục hồi build, không
+hoàn tác source, dependency hoặc migration; người vận hành vẫn phải kiểm health sau phục hồi.
 
 **Hai chế độ lấy bản build:**
 
@@ -319,9 +324,28 @@ Script giữ nguyên ID, tự chỉnh sequence và đối chiếu số dòng t�
 
 ---
 
-## HTTPS (tuỳ chọn)
+## HTTPS và ranh giới reverse proxy
 
 Đặt Nginx/Caddy làm reverse proxy trước cổng 3000, rồi dùng `certbot --nginx` cấp SSL miễn phí.
+
+App hiện lấy IP cho rate-limit từ `x-forwarded-for`/`x-real-ip` và nhận giao thức từ
+`x-forwarded-proto`. Các header này chỉ có giá trị khi do proxy tin cậy đặt. PM2 hiện
+bind `0.0.0.0`; cấu hình trong repo chưa chứng minh firewall đã chặn cổng app trên VPS.
+
+Trước khi coi IP là đáng tin, người vận hành cần xác nhận cấu hình thực tế:
+
+- Internet chỉ tới reverse proxy HTTPS; cổng app chỉ nhận từ proxy được phép.
+- Proxy cuối ghi đè các header forwarded nhận từ client. Với Nginx là edge trực tiếp,
+  nguồn IP là `$remote_addr`, không nối header client bằng `$proxy_add_x_forwarded_for`.
+- Khi có CDN/load balancer phía trước, chỉ nhận IP gốc từ peer/CIDR đã chốt; không áp
+  dụng cấu hình một proxy cho chuỗi nhiều proxy chưa xác minh. `Host`, forwarded host
+  và giao thức phải khớp domain/HTTPS được cấu hình.
+- Kiểm tra từ máy ngoài rằng cổng app bị chặn và thử header IP giả trên môi trường
+  biệt lập trước khi phát hành. Đọc response header HTTPS không chứng minh hai điều này.
+
+Hồ sơ nghiên cứu và giới hạn hiện tại ở
+[đối soát nợ kỹ thuật 26/10](docs/ops/technical-debt-2026-10-26.md);
+thay đổi trust policy/cookie cần duyệt [M138](docs/nang-cap/M138-cung-co-ranh-gioi-proxy-cookie.md).
 
 Sau khi HTTPS chạy ổn định, thêm HSTS vào block `server` cổng 443 của Nginx để chặn
 downgrade về HTTP (certbot không tự thêm header này):

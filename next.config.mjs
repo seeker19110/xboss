@@ -61,7 +61,8 @@ const nextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "X-XSS-Protection", value: "1; mode=block" },
+          // OWASP: tắt XSS Auditor cũ; cơ chế này đã lỗi thời và có thể gây thêm lỗi XSS.
+          { key: "X-XSS-Protection", value: "0" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
           {
             key: "Content-Security-Policy",

@@ -105,6 +105,53 @@ async function checkDialogAccessibility(page: Page) {
   }
 }
 
+test("quyền đến muộn: lịch vẫn xem được, form đợi quyền rồi giữ đúng nội dung nhập", async ({
+  page,
+}) => {
+  await mockPage(page);
+  const auth = barrier();
+  let reads = 0;
+  let writes = 0;
+  await page.route("**/api/auth/me", async (route) => {
+    await auth.promise;
+    await route.continue();
+  });
+  await page.route(DETAIL, async (route) => {
+    if (route.request().method() === "GET") {
+      reads++;
+      return route.fulfill({ json: body() });
+    }
+    expect(route.request().method()).toBe("PUT");
+    expect(route.request().postDataJSON().workDone).toBe("Bản nhập sau khi quyền sẵn sàng");
+    writes++;
+    await route.fulfill({
+      json: {
+        id: 920_201,
+        diary: { ...diary(), workDone: "Bản nhập sau khi quyền sẵn sàng" },
+        etag: NEW_ETAG,
+      },
+    });
+  });
+  try {
+    await page.goto("/diary");
+    await page.getByRole("button", { name: "11", exact: true }).first().click();
+    const dialog = page.getByRole("dialog", { name: /^Nhật ký ngày / });
+    await expect(dialog.getByText("Đang tải quyền truy cập…", { exact: true })).toBeVisible();
+    await expect(dialog.locator("textarea")).toHaveCount(0);
+    expect(reads).toBe(0);
+    auth.release();
+    const work = dialog.locator("textarea").first();
+    await expect(work).toHaveValue("Bản đã lưu");
+    await work.fill("Bản nhập sau khi quyền sẵn sàng");
+    await dialog.getByRole("button", { name: "Lưu nháp", exact: true }).click();
+    await expect.poll(() => writes).toBe(1);
+    await expect(work).toHaveValue("Bản nhập sau khi quyền sẵn sàng");
+    expect(reads).toBe(1);
+  } finally {
+    auth.release();
+  }
+});
+
 test("lưu pending khóa fields/đóng/khoá sổ, chỉ sau success mới cho khoá sổ", async ({ page }) => {
   await mockPage(page);
   const gate = barrier();

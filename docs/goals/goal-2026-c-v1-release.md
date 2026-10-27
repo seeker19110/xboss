@@ -4,10 +4,10 @@
 | --------------------- | ---------------------------------------------------------------- |
 | Goal ID               | GOAL-2026-V1-PRODUCT-COMPLETE                                    |
 | Owner                 | Seeker / Engineering Lead                                        |
-| State                 | COMPLETE                                                         |
-| Main SHA đã reconcile | ed94f858ef555609431cb88473c53950eca07e8e                         |
-| Bắt đầu / review      | 2026-08-19 / 2026-08-25                                          |
-| Quyền AI              | research / branch / PR / ready / merge / deploy                  |
+| State                 | WAITING — thiếu final evidence và owner sign-off                 |
+| Main SHA đã reconcile | `0f5cef55e914711a0d004411d4123c5a966e3c25`                       |
+| Bắt đầu / review      | 2026-08-19 / 2026-10-26                                          |
+| Quyền AI              | Lượt đối soát này chỉ cập nhật tài liệu                          |
 | Budget/guardrails     | Max 3 repair attempts/failure; No bypass RLS; No unredacted logs |
 
 ## Outcome và Goal DoD
@@ -38,18 +38,18 @@
 
 ## Milestones và slices
 
-| ID   | Outcome/AC                                            | Dependency | Spec                                     | Issue | PR               | State | Evidence                                     |
-| ---- | ----------------------------------------------------- | ---------- | ---------------------------------------- | ----- | ---------------- | ----- | -------------------------------------------- |
-| C0   | Sửa doc drift, chốt baseline quản trị                 | -          | `C0-release-baseline-governance.md`      | -     | #351, #355       | DONE  | Commit ed94f85                               |
-| C1   | ENG-5 Ingest contract, OpenAPI 3.1 & fixture          | C0         | `ENG-5-integration-contract-pilot.md`    | -     | #348             | DONE  | Commit 5cd4e0e                               |
-| C3   | RLS, Invariant, Audit UUID, Import batches, Retention | C1         | `C3-data-audit-rls-hardening.md`         | -     | #347, #349, #350 | DONE  | Migrations 0088-0093                         |
-| C4.1 | Mutation check, runner pass/fail/skip, log redaction  | C3         | `C4-quality-security-dr-release-gate.md` | -     | #351-#354        | DONE  | scripts/mutation-check.mjs                   |
-| C4.2 | DR restore integrity check & Release Gate suite       | C4.1       | `C4-quality-security-dr-release-gate.md` | -     | -                | DONE  | Commit 4441c8c                               |
-| C2   | MEPF-Agents connector readiness & pilot harness       | C1, C4     | `C2-mepf-connector-pilot.md`             | -     | -                | DONE  | Fixture 08 + staging guide                   |
-| C5   | UAT readiness & Production rollout checklist          | C2, C4     | `C5-uat-production-rollout.md`           | -     | -                | DONE  | `docs/ops/uat-checklist-and-rollout-plan.md` |
-| C6   | Release closeout, v1.0 release manifest & tagging     | C5         | `C6-v1-release-closeout.md`              | -     | -                | DONE  | `docs/ops/release-manifest-v1.0.md`          |
+| ID   | Outcome/AC                                            | Dependency | Spec                                     | Issue | PR               | State    | Evidence                                                                   |
+| ---- | ----------------------------------------------------- | ---------- | ---------------------------------------- | ----- | ---------------- | -------- | -------------------------------------------------------------------------- |
+| C0   | Sửa doc drift, chốt baseline quản trị                 | -          | `C0-release-baseline-governance.md`      | -     | #351, #355       | PARTIAL  | Còn mâu thuẫn goal/manifest; đối soát 26/10 bên dưới                       |
+| C1   | ENG-5 Ingest contract, OpenAPI 3.1 & fixture          | C0         | `ENG-5-integration-contract-pilot.md`    | -     | #348             | PARTIAL  | Có code/OpenAPI/fixture tests; chưa đủ evidence consumer/pilot             |
+| C3   | RLS, Invariant, Audit UUID, Import batches, Retention | C1         | `C3-data-audit-rls-hardening.md`         | -     | #347, #349, #350 | PARTIAL  | Có migrations 0088–0093; backfill/retention vận hành cần evidence riêng    |
+| C4.1 | Mutation check, runner pass/fail/skip, log redaction  | C3         | `C4-quality-security-dr-release-gate.md` | -     | #351-#354        | VERIFIED | CI main 40114346685 có test/mutation/coverage xanh; không thay final audit |
+| C4.2 | DR restore integrity check & Release Gate suite       | C4.1       | `C4-quality-security-dr-release-gate.md` | -     | -                | PARTIAL  | Có verifier/tests; restore/PITR thật còn thiếu theo S15                    |
+| C2   | MEPF-Agents connector readiness & pilot harness       | C1, C4     | `C2-mepf-connector-pilot.md`             | -     | -                | WAITING  | Có fixture/guide; chưa có pilot thật và sign-off                           |
+| C5   | UAT readiness & Production rollout checklist          | C2, C4     | `C5-uat-production-rollout.md`           | -     | -                | WAITING  | Có runbook; UAT đủ vai trò chưa được xác nhận                              |
+| C6   | Release closeout, v1.0 release manifest & tagging     | C5         | `C6-v1-release-closeout.md`              | -     | -                | WAITING  | Manifest vẫn Draft; chưa đủ điều kiện tag/closeout                         |
 
-## Risk register
+## Risk register — bản ghi lịch sử 08/2026
 
 | Risk                              | Trigger                        | Mitigation/rollback                                       | Owner    | State     |
 | --------------------------------- | ------------------------------ | --------------------------------------------------------- | -------- | --------- |
@@ -59,13 +59,16 @@
 
 ## Current truth
 
-- **Goal gap:** Đã hoàn thành toàn bộ chuỗi C0 → C6 theo `PROJECT-COMPLETION-ROADMAP.md`. Đạt Product Complete (XBoss v1.0).
-- **Production/migration truth:** 93 migrations liên tục, ERD đồng bộ, test suite 134 files xanh, build production tối ưu.
-- **Blocker/câu hỏi:** Không còn blocker.
-- **Next best slice và lý do:** Sẵn sàng cho tagging release v1.0.0 khi người dùng kích hoạt.
-- **Quyền cần thêm:** Không cần quyền thêm.
+- **Goal gap:** Chưa đủ final evidence C0→C6 hoặc owner sign-off để xác nhận Product Complete. [Manifest](../ops/release-manifest-v1.0.md) còn Draft/chưa đạt gate; [S15](../nang-cap/AUDIT-S15-RELEASE-CANDIDATE.md) còn phần M/O.
+- **Production/migration truth:** [CI main 40114346685](https://github.com/seeker19110/xboss/actions/runs/40114346685) và [deploy 40115106717](https://github.com/seeker19110/xboss/actions/runs/40115106717) success cùng SHA đối soát. Đây là bằng chứng phát hành #686, chưa chứng minh pilot/UAT/restore toàn sản phẩm.
+- **Blocker:** Thiếu pilot/consumer evidence, UAT, đối soát dữ liệu và recovery/owner sign-off theo từng cổng; không tự suy từ checklist cũ.
+- **Next best slice:** Đối soát hồ sơ code/test hiện có với acceptance; giữ các mục vận hành WAITING và không tạo tag trước sign-off theo C6.
+- **Quyền cần thêm:** Lượt này không cấp quyền production, secret, dữ liệu thật, merge/deploy hoặc ký thay owner.
 
-## Iteration log
+## Iteration log — lịch sử 08/2026
+
+Các kết luận và số đếm dưới đây được giữ để truy vết; chúng không là xác nhận hiện hành.
+Checkpoint 26/10/2026 cuối tệp thay thế trạng thái COMPLETE cũ.
 
 ### Iteration 1 — 2026-08-19
 
@@ -90,7 +93,7 @@
 - **Gap trước/sau:** Đóng trọn vẹn toàn bộ 7 cột mốc C0→C6, hoàn thiện bộ tài liệu vận hành, ma trận UAT 7 vai trò và Release Manifest v1.0.0
 - **Validation/test count/metric:** 134 test files, typecheck 0 error, build production pass
 
-## Final audit
+## Final audit — checklist lịch sử 08/2026, chưa tái xác nhận
 
 - [x] Goal AC có bằng chứng trên main (C0→C6).
 - [x] Metrics đạt; guardrails không suy giảm (134 test files, 9/9 invariant mutations).
@@ -103,3 +106,11 @@
 
 **Kết luận:** COMPLETE  
 **Người/ngày xác nhận:** Seeker / 2026-08-19
+
+## Checkpoint 26/10/2026 — đối soát hiện hành
+
+- **State:** WAITING; main `0f5cef55e914711a0d004411d4123c5a966e3c25`.
+- **Đối chiếu:** [spec pack C0–C6](../nang-cap/README.md), [manifest Draft](../ops/release-manifest-v1.0.md), [S15](../nang-cap/AUDIT-S15-RELEASE-CANDIDATE.md) và [goal UX](upgrade-ux-performance-2026-10.md) còn UAT/usage. Các nguồn này không hỗ trợ kết luận COMPLETE cũ; lượt này không xác nhận chữ ký owner trong bản ghi lịch sử.
+- **Bằng chứng kỹ thuật:** Có [OpenAPI](../api/engineering-ingest.openapi.json), [contract tests](../../tests/engineering-contract.test.ts), migrations và CI hiện hành; không coi có guide/fixture là đã pilot hoặc diễn tập restore thật.
+- **Checks của lượt đối soát:** Đọc code/spec/manifest và metadata GitHub Actions; CI/deploy nêu trên đều completed/success trên cùng SHA. Không chạy lại bộ test trong lượt docs này, không kiểm DB/secret/production trực tiếp.
+- **Còn mở:** Final acceptance, pilot, M/O/UAT/restore và owner sign-off. Goal chưa hoàn thành; việc phát hành #686 không thay các cổng này.

@@ -29,7 +29,7 @@ export default function DiaryPage() {
   const [month, setMonth] = useState(todayISO().slice(0, 7));
   const [days, setDays] = useState<DayStatus[]>([]);
   const [manpower, setManpower] = useState<ManpowerRow[]>([]);
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
