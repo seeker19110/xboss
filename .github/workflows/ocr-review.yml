@@ -62,7 +62,7 @@ jobs:
           llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
           llm_model: ${{ vars.OCR_LLM_MODEL }}
           llm_use_anthropic: ${{ vars.OCR_LLM_USE_ANTHROPIC || 'true' }}
-          ocr_version: "1.12.11"
+          ocr_version: "1.13.3"
           language: Vietnamese
           effort: ${{ vars.OCR_EFFORT || 'medium' }}
           max_tokens_budget: ${{ vars.OCR_MAX_TOKENS_BUDGET || '3000000' }}
