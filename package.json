@@ -17,7 +17,7 @@
     "sync:drawings": "tsx scripts/scan-drawings.ts",
     "gen:erd": "tsx scripts/gen-erd.ts",
     "gen:ocr-rules": "tsx scripts/gen-ocr-rules.ts",
-    "ocr": "npx --yes @alibaba-group/open-code-review@1.12.11",
+    "ocr": "npx --yes @alibaba-group/open-code-review@1.13.3",
     "check:sw-exclude": "tsx scripts/check-sw-exclude.ts",
     "check:migrations": "tsx scripts/check-migration-numbers.ts",
     "format": "prettier --write .",
