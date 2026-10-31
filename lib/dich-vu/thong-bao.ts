@@ -161,32 +161,23 @@ export async function syncAndListNotifications(
   }
 
   // Task hết trễ (hoặc không còn được giao cho mình) → dọn thông báo cũ chưa đọc.
+  // Lọc theo đúng danh sách `delayed` vừa đọc trong cùng transaction thay vì chạy lại cả
+  // điều kiện JOIN (mỗi lần poll chuông). `<> ALL('{}')` = true giống `NOT IN` tập rỗng.
   await run(
     `DELETE FROM notifications
       WHERE user_id = ? AND type = 'delayed' AND is_read = 0
-        AND task_id NOT IN (
-          SELECT t.id FROM tasks t
-           JOIN work_packages wp ON t.package_id = wp.id
-           JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
-           WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
-             AND t.status NOT IN ('hoan_thanh','nghiem_thu')${subconFilter}${projectFilter})`,
-    ...(isSubcon ? [user.id, today, user.id] : [user.id, today]),
-    ...projectParam,
+        AND task_id <> ALL(?::int[])`,
+    user.id,
+    delayed.map((t) => t.id),
   );
 
   // Task không còn "sắp đến hạn" (đã xong, đã qua hạn thành trễ, hoặc đổi deadline) → dọn tương tự.
   await run(
     `DELETE FROM notifications
       WHERE user_id = ? AND type = 'due_soon' AND is_read = 0
-        AND task_id NOT IN (
-          SELECT t.id FROM tasks t
-           JOIN work_packages wp ON t.package_id = wp.id
-           JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
-           WHERE ${DUE_SOON_COND}${subconFilter}${projectFilter})`,
-    ...(isSubcon
-      ? [user.id, ...dueSoonParams(dueSoonTh), user.id]
-      : [user.id, ...dueSoonParams(dueSoonTh)]),
-    ...projectParam,
+        AND task_id <> ALL(?::int[])`,
+    user.id,
+    dueSoon.map((t) => t.id),
   );
 
   // Task đình trệ: đang thi công, chưa xong, còn hạn (end_date ≥ hôm nay) nhưng KHÔNG có
@@ -224,13 +215,9 @@ export async function syncAndListNotifications(
   await run(
     `DELETE FROM notifications
       WHERE user_id = ? AND type = 'stalled' AND is_read = 0
-        AND task_id NOT IN (
-          SELECT t.id FROM tasks t
-           JOIN work_packages wp ON t.package_id = wp.id
-           JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
-           WHERE ${STALLED_COND}${subconFilter}${projectFilter})`,
-    ...(isSubcon ? [user.id, today, user.id] : [user.id, today]),
-    ...projectParam,
+        AND task_id <> ALL(?::int[])`,
+    user.id,
+    stalled.map((t) => t.id),
   );
 
   // Vật tư dùng vượt định mức → cảnh báo cho Admin/PM/Kỹ sư (subcon không quản vật tư).
@@ -297,11 +284,9 @@ export async function syncAndListNotifications(
     await run(
       `DELETE FROM notifications
         WHERE user_id = ? AND type = 'material_over' AND is_read = 0
-          AND material_id NOT IN (
-            SELECT id FROM materials m WHERE ${materialOverCond}${matProjectFilter})`,
+          AND material_id <> ALL(?::int[])`,
       user.id,
-      materialOverPct,
-      ...projectParam,
+      overMats.map((m) => m.id),
     );
   }
 

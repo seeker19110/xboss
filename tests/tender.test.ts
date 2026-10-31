@@ -210,6 +210,15 @@ test(
 
     assert.ok(await getTender(t1, p1));
     assert.equal(await getTender(t2, p1), undefined);
+    // getTender lọc thẳng theo id (không tải cả danh sách): không truyền dự án → vẫn tìm được,
+    // id không tồn tại → undefined, trả đủ trường như listTenders.
+    const any2 = await getTender(t2);
+    assert.equal(any2?.code, "GT-SCOPE-02");
+    assert.deepEqual(
+      any2,
+      (await listTenders(p2)).find((t) => t.id === t2),
+    );
+    assert.equal(await getTender(-1), undefined);
 
     await run(`DELETE FROM tender_packages WHERE id IN (?, ?)`, t1, t2);
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);

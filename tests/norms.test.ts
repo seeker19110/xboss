@@ -303,3 +303,137 @@ test(
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
   },
 );
+
+// Hiệu năng (đợt 2): overNormItems gom thực dùng mọi định mức vào 1 query + tính KL thực hiện
+// 1 lần mỗi dòng BOQ. Ca này khoá TƯƠNG ĐƯƠNG với đường cũ (normUsage — boqItemFloors + SUM từng
+// định mức): nhiều định mức chung một dòng BOQ, dòng có nhiều tầng (lọc floor_label), dòng không
+// có tầng (không lọc), giao dịch hoan_kho/nhap, và dòng có expected = 0 (bị loại).
+test(
+  "overNormItems: kết quả trùng normUsage — nhiều định mức/dòng, lọc tầng, dòng không tầng, expected=0",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { overNormItems, normUsage } = await import("@/lib/khoi-luong/norms");
+
+    const pj = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA Norm Batch', 'PJT-NB')`,
+    );
+    const ids = {
+      boq: [] as number[],
+      wp: [] as number[],
+      task: [] as number[],
+      mat: [] as number[],
+    };
+    async function boq(code: string, qty: number) {
+      const id = await insertId(
+        `INSERT INTO boq_items (code, name, unit, qty_contract, project_id) VALUES (?, 'Dòng NB', 'm', ?, ?)`,
+        code,
+        qty,
+        pj,
+      );
+      ids.boq.push(id);
+      return id;
+    }
+    async function mapTask(boqId: number, code: string, floor: string | null, progress: number) {
+      const wp = await insertId(
+        `INSERT INTO work_packages (code, name, floor_label) VALUES (?, 'Nhóm NB', ?)`,
+        `WP-${code}`,
+        floor,
+      );
+      const t = await insertId(
+        `INSERT INTO tasks (code, name, package_id, progress_percent) VALUES (?, 'Task NB', ?, ?)`,
+        `T-${code}`,
+        wp,
+        progress,
+      );
+      ids.wp.push(wp);
+      ids.task.push(t);
+      await run(
+        `INSERT INTO boq_task_map (boq_item_id, task_id, weight) VALUES (?, ?, 0.5)`,
+        boqId,
+        t,
+      );
+    }
+    async function mat(name: string) {
+      const id = await insertId(`INSERT INTO materials (name, unit) VALUES (?, 'kg')`, name);
+      ids.mat.push(id);
+      return id;
+    }
+    async function tx(materialId: number, delta: number, type: string, floor: string | null) {
+      await insertId(
+        `INSERT INTO material_transactions (material_id, delta, qty_after, type, floor_label) VALUES (?, ?, 0, ?, ?)`,
+        materialId,
+        delta,
+        type,
+        floor,
+      );
+    }
+
+    // Dòng 1: 2 tầng (5F, 6F), KL thực hiện = 100 × (0.5×1 + 0.5×0.5) = 75, 2 định mức vật tư.
+    const b1 = await boq("NB-1", 100);
+    await mapTask(b1, "NB1A", "5F", 1);
+    await mapTask(b1, "NB1B", "6F", 0.5);
+    const m1 = await mat("Ống NB");
+    const m2 = await mat("Co NB");
+    await tx(m1, -40, "xuat_cong_truong", "5F");
+    await tx(m1, -30, "xuat_cong_truong", "6F");
+    await tx(m1, 5, "hoan_kho", "6F");
+    await tx(m1, -999, "xuat_cong_truong", "99F"); // tầng khác → không tính
+    await tx(m2, -200, "xuat_cong_truong", "5F");
+    await tx(m2, 50, "nhap_kho", "5F");
+    // Dòng 2: không có tầng → không lọc floor_label.
+    const b2 = await boq("NB-2", 10);
+    await mapTask(b2, "NB2A", null, 1);
+    const m3 = await mat("Van NB");
+    await tx(m3, -20, "xuat_cong_truong", "12F");
+    await tx(m3, -3, "xuat_cong_truong", null);
+    // Dòng 3: chưa thi công (progress 0) → expected = 0 → bị loại.
+    const b3 = await boq("NB-3", 10);
+    await mapTask(b3, "NB3A", "7F", 0);
+
+    const norms: number[] = [];
+    for (const [b, m, q] of [
+      [b1, m1, 0.5],
+      [b1, m2, 1],
+      [b2, m3, 1],
+      [b3, m3, 1],
+    ] as const) {
+      norms.push(
+        await insertId(
+          `INSERT INTO boq_norms (boq_item_id, resource_type, material_id, qty_per_unit, unit_label)
+           VALUES (?, 'material', ?, ?, 'kg')`,
+          b,
+          m,
+          q,
+        ),
+      );
+    }
+
+    try {
+      const batched = await overNormItems(-1e9, pj); // ngưỡng rất thấp → mọi định mức expected > 0
+      const reference = new Map(
+        (await Promise.all([b1, b2, b3].map((b) => normUsage(b)))).flat().map((u) => [u.normId, u]),
+      );
+      assert.deepEqual(batched.map((o) => o.normId).sort(), norms.slice(0, 3).sort());
+      for (const o of batched) {
+        const ref = reference.get(o.normId)!;
+        assert.equal(o.expected, ref.expected, `expected norm ${o.normId}`);
+        assert.equal(o.actual, ref.actual, `actual norm ${o.normId}`);
+        assert.equal(o.variancePct, ref.variancePct, `variance norm ${o.normId}`);
+      }
+      const byNorm = new Map(batched.map((o) => [o.normId, o]));
+      assert.equal(byNorm.get(norms[0])!.actual, 65); // 40 + 30 − 5, bỏ 99F
+      assert.equal(byNorm.get(norms[1])!.actual, 250); // 200 + 50
+      assert.equal(byNorm.get(norms[2])!.actual, 23); // không lọc tầng
+    } finally {
+      await run(`DELETE FROM boq_norms WHERE id = ANY(?::int[])`, norms);
+      await run(`DELETE FROM material_transactions WHERE material_id = ANY(?::int[])`, ids.mat);
+      await run(`DELETE FROM materials WHERE id = ANY(?::int[])`, ids.mat);
+      await run(`DELETE FROM boq_task_map WHERE boq_item_id = ANY(?::int[])`, ids.boq);
+      await run(`DELETE FROM tasks WHERE id = ANY(?::int[])`, ids.task);
+      await run(`DELETE FROM work_packages WHERE id = ANY(?::int[])`, ids.wp);
+      await run(`DELETE FROM boq_items WHERE id = ANY(?::int[])`, ids.boq);
+      await run(`DELETE FROM projects WHERE id = ?`, pj);
+    }
+  },
+);

@@ -111,5 +111,45 @@ test(
 
     const list = await listEsignEnvelopes(projectId);
     assert.ok(list.length >= 1);
+
+    // Hiệu năng (đợt 2): signatory của mọi envelope lấy trong 1 query rồi gom theo envelope —
+    // khoá: mỗi envelope chỉ nhận đúng signatory của mình, đúng thứ tự ký kể cả khi nhập ngược.
+    const env2 = await createEsignEnvelope({
+      projectId,
+      title: "Envelope thứ hai",
+      documentType: "BBNT",
+      referenceCode: "BBNT-PLUMB-02",
+      documentPayload: { result: "PASS" },
+      signatories: [
+        {
+          userId: uid2,
+          signerName: "Tư Vấn Giám Sát B",
+          signerRole: "SUPERVISION_CONSULTANT",
+          signingOrder: 2,
+        },
+        {
+          userId: uid1,
+          signerName: "Kỹ Sư Nhà Thầu A",
+          signerRole: "CONTRACTOR_ENGINEER",
+          signingOrder: 1,
+        },
+      ],
+    });
+    const list2 = await listEsignEnvelopes(projectId);
+    for (const env of list2) {
+      assert.ok(Array.isArray(env.signatories));
+      assert.ok(env.signatories!.every((s) => s.envelopeId === env.id));
+      const orders = env.signatories!.map((s) => s.signingOrder);
+      assert.deepEqual(
+        orders,
+        [...orders].sort((a, b) => a - b),
+      );
+    }
+    const got2 = list2.find((e) => e.id === env2.id)!;
+    assert.deepEqual(
+      got2.signatories!.map((s) => s.signerName),
+      ["Kỹ Sư Nhà Thầu A", "Tư Vấn Giám Sát B"],
+    );
+    assert.equal(list2.find((e) => e.id === envelope.id)!.signatories!.length, 2);
   },
 );

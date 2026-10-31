@@ -224,19 +224,45 @@ export async function overNormItems(
     ...args,
   );
 
+  // KL thực hiện tính 1 lần cho mỗi dòng BOQ (nhiều định mức vật tư có thể chung một dòng);
+  // vẫn đi qua boqExecutedQty để giữ đúng một nguồn công thức + kẹp LEAST qty_contract.
+  const executedByItem = new Map<number, number>();
+  for (const id of new Set(materialNorms.map((n) => n.boqItemId))) {
+    executedByItem.set(id, await boqExecutedQty(id));
+  }
+  const candidates = materialNorms
+    .map((n) => ({ n, expected: n.qtyPerUnit * (executedByItem.get(n.boqItemId) ?? 0) }))
+    .filter((c) => c.expected > 0);
+  if (candidates.length === 0) return [];
+
+  // Thực dùng của mọi định mức trong MỘT query (thay vì 2 query/định mức): tầng của dòng BOQ
+  // gom bằng array_agg như boqItemFloors; dòng BOQ không có tầng → không lọc floor_label.
+  const totals = await query<{ normId: number; total: number }>(
+    `WITH f AS (
+       SELECT bm.boq_item_id, array_agg(DISTINCT wp.floor_label) AS floors
+         FROM boq_task_map bm
+         JOIN tasks t ON t.id = bm.task_id
+         JOIN work_packages wp ON wp.id = t.package_id
+        WHERE bm.boq_item_id = ANY(?::int[]) AND wp.floor_label IS NOT NULL AND wp.floor_label <> ''
+        GROUP BY bm.boq_item_id
+     )
+     SELECT k.norm_id AS "normId",
+            COALESCE((SELECT SUM(CASE WHEN mt.type IN ('xuat_cong_truong', 'hoan_kho') THEN -mt.delta ELSE GREATEST(mt.delta, 0) END)
+                        FROM material_transactions mt
+                       WHERE mt.material_id = k.material_id
+                         AND (f.floors IS NULL OR mt.floor_label = ANY(f.floors))), 0) AS total
+       FROM unnest(?::int[], ?::int[], ?::int[]) AS k(norm_id, material_id, boq_item_id)
+       LEFT JOIN f ON f.boq_item_id = k.boq_item_id`,
+    [...new Set(candidates.map((c) => c.n.boqItemId))],
+    candidates.map((c) => c.n.id),
+    candidates.map((c) => c.n.materialId),
+    candidates.map((c) => c.n.boqItemId),
+  );
+  const actualByNorm = new Map(totals.map((r) => [r.normId, r.total]));
+
   const result: OverNormItem[] = [];
-  for (const n of materialNorms) {
-    const executedQty = await boqExecutedQty(n.boqItemId);
-    const expected = n.qtyPerUnit * executedQty;
-    if (expected <= 0) continue;
-    const floors = await boqItemFloors(n.boqItemId);
-    const floorFilter = floors.length > 0 ? ` AND floor_label = ANY(?)` : "";
-    const row = await queryOne<{ total: number }>(
-      `SELECT COALESCE(SUM(CASE WHEN type IN ('xuat_cong_truong', 'hoan_kho') THEN -delta ELSE GREATEST(delta, 0) END), 0) AS total
-         FROM material_transactions WHERE material_id = ?${floorFilter}`,
-      ...(floors.length > 0 ? [n.materialId, floors] : [n.materialId]),
-    );
-    const actual = row?.total ?? 0;
+  for (const { n, expected } of candidates) {
+    const actual = actualByNorm.get(n.id) ?? 0;
     const variancePct = ((actual - expected) / expected) * 100;
     if (variancePct > thresholdPct)
       result.push({

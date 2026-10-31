@@ -317,3 +317,68 @@ test(
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
   },
 );
+
+// Hiệu năng (đợt 2): lọc task_history theo khoảng changed_at (mốc 00:00 giờ VN) thay vì ép
+// `::date` từng dòng. Khoá biên múi giờ: 23:59:59 VN (16:59:59Z) thuộc ngày đó, 00:00:00 VN
+// (17:00:00Z ngày trước theo UTC) thuộc ngày sau — cho cả missingDiaryDates lẫn buildDiaryPrefill.
+test(
+  "missingDiaryDates/buildDiaryPrefill: biên ngày theo giờ VN (23:59:59 vs 00:00:00) không lệch",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, queryOne } = await import("@/lib/db");
+    const { missingDiaryDates, buildDiaryPrefill } = await import("@/lib/hien-truong/diary");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
+
+    const p = await insertId(`INSERT INTO projects (name) VALUES ('DA biên giờ VN')`);
+    const tw = await insertId(`INSERT INTO towers (project_id, name) VALUES (?, 'Tháp BG')`, p);
+    const st = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TBIEN', 'Sheet biên')`,
+      tw,
+    );
+    const pkg = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'BG1', 'Nhóm biên')`,
+      st,
+    );
+    const task = await insertId(
+      `INSERT INTO tasks (package_id, code, name) VALUES (?, 'BG1,01', 'Task biên')`,
+      pkg,
+    );
+    const d3 = daysFromTodayISO(-3);
+    const d2 = daysFromTodayISO(-2);
+    // 23:59:59 giờ VN ngày d3 và 00:00:00 giờ VN ngày d2 (= 16:59:59Z / 17:00:00Z).
+    await run(
+      `INSERT INTO task_history (task_id, old_progress, new_progress, changed_by, changed_at)
+       VALUES (?, 0, 0.3, 'Người A', (?::date + TIME '23:59:59') AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+              (?, 0.3, 0.6, 'Người B', (?::date)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh')`,
+      task,
+      d3,
+      task,
+      d2,
+    );
+    try {
+      const utc = await queryOne<{ a: string; b: string }>(
+        `SELECT to_char(MIN(changed_at) AT TIME ZONE 'UTC', 'HH24:MI:SS') AS a,
+                to_char(MAX(changed_at) AT TIME ZONE 'UTC', 'HH24:MI:SS') AS b
+           FROM task_history WHERE task_id = ?`,
+        task,
+      );
+      assert.deepEqual(utc, { a: "16:59:59", b: "17:00:00" });
+
+      assert.deepEqual(await missingDiaryDates(7, p), [d3, d2]);
+      // Cửa sổ [d2, hôm nay): bản ghi 23:59:59 ngày d3 nằm ngay dưới mốc dưới → không lọt vào.
+      assert.deepEqual(await missingDiaryDates(2, p), [d2]);
+
+      const pre3 = await buildDiaryPrefill(d3, p);
+      assert.deepEqual(pre3.updatedBy, ["Người A"]);
+      const pre2 = await buildDiaryPrefill(d2, p);
+      assert.deepEqual(pre2.updatedBy, ["Người B"]);
+    } finally {
+      await run(`DELETE FROM task_history WHERE task_id = ?`, task);
+      await run(`DELETE FROM tasks WHERE id = ?`, task);
+      await run(`DELETE FROM work_packages WHERE id = ?`, pkg);
+      await run(`DELETE FROM sheet_types WHERE id = ?`, st);
+      await run(`DELETE FROM towers WHERE id = ?`, tw);
+      await run(`DELETE FROM projects WHERE id = ?`, p);
+    }
+  },
+);
