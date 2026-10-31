@@ -18,7 +18,11 @@ test.describe("Nhật ký (sau đăng nhập)", () => {
     // Bấm ô "hôm nay" (viền sky) để mở editor. Dự án mobile chạy SONG SONG với desktop trên cùng
     // DB: lưu nhật ký có precondition (S06 — If-None-Match/If-Match), hai project cùng mở rồi cùng
     // lưu một ngày thì bên sau nhận 412 đúng thiết kế → mobile dùng một ngày khác trong tháng.
-    const today = new Date().getDate();
+    // Ngày theo giờ VN — trang lấy tháng theo todayISO() (Asia/Ho_Chi_Minh), runner CI chạy UTC:
+    // 17:00–24:00 UTC ngày cuối tháng, ngày UTC (vd 31) không có trong lịch tháng mới.
+    const today = Number(
+      new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" }).slice(8, 10),
+    );
     const ngay = testInfo.project.name.includes("mobile") ? (today === 1 ? 2 : 1) : today;
     const dayCell = page.getByRole("button", { name: String(ngay), exact: true });
     await dayCell.first().click();
