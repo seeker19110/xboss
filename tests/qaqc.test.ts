@@ -157,6 +157,93 @@ test(
 );
 
 test(
+  "packagesWithQcBlock: nhiều nhóm/nhiều dependency — chỉ dependency còn chặn được nêu, inspection chưa đạt không mở khoá",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { packagesWithQcBlock, handoverBlocked } = await import("@/lib/ky-thuat/qaqc");
+
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test qc nhieu nhom')`);
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp T')`,
+      projectId,
+    );
+    const stId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TESTQCMULTI', 'Sheet qc nhiều')`,
+      towerId,
+    );
+    const otherStId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TESTQCOTHER', 'Sheet khác')`,
+      towerId,
+    );
+    const pkg = (code: string, sheet: number) =>
+      insertId(
+        `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, ?, ?)`,
+        sheet,
+        code,
+        `Nhóm ${code}`,
+      );
+    const passedId = await pkg("MPASS", stId);
+    const failedId = await pkg("MFAIL", stId);
+    const succAId = await pkg("MSUCCA", stId);
+    const succBId = await pkg("MSUCCB", stId);
+    const otherSuccId = await pkg("MOTHER", otherStId);
+
+    const checklistId = await insertId(
+      `INSERT INTO qc_checklists (name, items) VALUES ('Checklist nhiều', '[]'::jsonb)`,
+    );
+    await run(
+      `INSERT INTO qc_inspections (checklist_id, work_package_id, status) VALUES (?, ?, 'passed'), (?, ?, 'failed')`,
+      checklistId,
+      passedId,
+      checklistId,
+      failedId,
+    );
+    // succA phụ thuộc 2 nhóm: MPASS (đã mở) + MFAIL (inspection chưa đạt → vẫn chặn).
+    // succB chỉ phụ thuộc MPASS → không chặn. MOTHER ở sheet khác → không được trả về.
+    await run(
+      `INSERT INTO package_dependencies (predecessor_id, successor_id, requires_handover)
+       VALUES (?, ?, TRUE), (?, ?, TRUE), (?, ?, TRUE), (?, ?, TRUE)`,
+      passedId,
+      succAId,
+      failedId,
+      succAId,
+      passedId,
+      succBId,
+      failedId,
+      otherSuccId,
+    );
+
+    const blocked = await packagesWithQcBlock(stId);
+    assert.deepEqual(
+      blocked.map((b) => b.packageId),
+      [succAId],
+    );
+    assert.match(blocked[0].reason, /MFAIL/);
+    assert.doesNotMatch(blocked[0].reason, /MPASS/);
+
+    const gate = await handoverBlocked(succAId);
+    assert.equal(gate.blocked, true);
+    assert.equal(gate.reason, blocked[0].reason, "2 đường kiểm cùng một điều kiện");
+    assert.equal((await handoverBlocked(succBId)).blocked, false);
+
+    await run(`DELETE FROM qc_inspections WHERE checklist_id = ?`, checklistId);
+    await run(`DELETE FROM qc_checklists WHERE id = ?`, checklistId);
+    await run(
+      `DELETE FROM work_packages WHERE id IN (?, ?, ?, ?, ?)`,
+      passedId,
+      failedId,
+      succAId,
+      succBId,
+      otherSuccId,
+    );
+    await run(`DELETE FROM sheet_types WHERE id IN (?, ?)`, stId, otherStId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
+  },
+);
+
+test(
   "methodStatementBlocked: chặn tick khi package đánh dấu cần biện pháp mà chưa có rev method approved",
   { skip: !HAS_TEST_DB },
   async () => {
