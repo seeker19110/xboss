@@ -6,7 +6,9 @@ import {
   assignSheetManager,
   assignPackage,
   assignTask,
+  guiPushPhanCong,
   userWorkloads,
+  type PushPhanCong,
 } from "@/lib/tien-do/assignments";
 import { sheetTypeProjectId, packageProjectId, taskProjectId } from "@/lib/tien-do/workpackages";
 import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
@@ -145,16 +147,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Đối tượng không tồn tại" }, { status: 404 });
 
   // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
+  // Push "Phân công mới" gom lại, gửi SAU COMMIT (đợt tối ưu 3, L5) — không giữ khoá task/sheet
+  // + khoá quyền của org trong lúc chờ mạng.
+  const pushCho: PushPhanCong[] = [];
   const kq = await ghiNeuConQuyen(
     () => CAN.assign(me.role),
     async () => {
-      if (level === "sheet") await assignSheetManager(id, userId, me.id);
-      else if (level === "package") await assignPackage(id, userId, me.id);
-      else await assignTask(id, userId, me.id);
+      if (level === "sheet") await assignSheetManager(id, userId, me.id, pushCho);
+      else if (level === "package") await assignPackage(id, userId, me.id, pushCho);
+      else await assignTask(id, userId, me.id, pushCho);
     },
   );
   if (!kq.ok)
     return NextResponse.json({ error: "Chỉ Admin/PM mới được phân công" }, { status: 403 });
+  await guiPushPhanCong(pushCho);
 
   return NextResponse.json({ ok: true });
 }

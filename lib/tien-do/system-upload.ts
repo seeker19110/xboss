@@ -2,7 +2,7 @@
 import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
 import { query, queryOne, withTransaction } from "@/lib/db";
-import { recomputeTask } from "@/lib/tien-do/recompute";
+import { recomputePackage, recomputeTask } from "@/lib/tien-do/recompute";
 import { ghiDauVetTick } from "@/lib/tien-do/dimension-events";
 import {
   buildTrackingTab,
@@ -20,6 +20,20 @@ export type UploadResult = {
   unmatched: number;
   warnings: string[];
 };
+
+// Khoá trước mọi task sẽ ghi, MỘT câu, theo id tăng dần (cùng thứ tự khoá với tick theo lô).
+// Gọi BÊN TRONG withTransaction, trước câu ghi đầu tiên.
+// (id trùng không sao: `= ANY` khớp mỗi dòng 1 lần, ORDER BY id làm thứ tự khoá.)
+async function khoaTaskTheoId(taskIds: number[]): Promise<void> {
+  if (taskIds.length)
+    await query(`SELECT id FROM tasks WHERE id = ANY(?::int[]) ORDER BY id FOR UPDATE`, taskIds);
+}
+
+// Mỗi nhóm đúng 1 lần, theo id tăng dần, SAU khi đã tính lại mọi task (recomputeTask với
+// `hoanTinhNhom`) — % nhóm chỉ phụ thuộc % task sau cùng nên y như tính lại sau từng task.
+async function tinhLaiNhomTangDan(nhom: Set<number>): Promise<void> {
+  for (const pid of [...nhom].sort((a, b) => a - b)) await recomputePackage(pid);
+}
 
 function isChecked(v: unknown): boolean {
   if (v === true || v === 1) return true;
@@ -196,6 +210,7 @@ export async function parsePlanUpload(
   let matched = 0;
   let unmatched = 0;
   const warnings: string[] = [];
+  const canGhi: { taskId: number; startDate: string | null; endDate: string | null }[] = [];
 
   await withTransaction(async () => {
     for (let i = 1; i < sheetData.length; i++) {
@@ -250,18 +265,28 @@ export async function parsePlanUpload(
         continue;
       }
 
-      // Cập nhật ngày cho các task và recompute
-      for (const t of dbTasks) {
-        await query(
-          `UPDATE tasks SET start_date = ?, end_date = ? WHERE id = ?`,
-          startDate,
-          endDate,
-          t.id,
-        );
-        await recomputeTask(t.id, changedBy);
-      }
+      // Chỉ GHI NHẬN việc cần ghi (theo đúng thứ tự dòng file); ghi sau khi khoá xong ở dưới.
+      for (const t of dbTasks) canGhi.push({ taskId: t.id, startDate, endDate });
       matched += dbTasks.length;
     }
+
+    // Đợt tối ưu 3 (L6): đọc/khớp cả file TRƯỚC, rồi khoá mọi task sẽ ghi MỘT lần theo id tăng
+    // dần, rồi mới ghi — thứ tự khoá task → nhóm như tick. Trước đây xen "UPDATE task i → khoá
+    // task i+1" theo thứ tự dòng file → deadlock với tick đơn. Ghi + tính lại task vẫn theo thứ
+    // tự dòng (dòng trùng BOQ: dòng sau thắng, lịch sử y như trước); nhóm tính 1 lần ở cuối.
+    await khoaTaskTheoId(canGhi.map((g) => g.taskId));
+    const nhom = new Set<number>();
+    for (const g of canGhi) {
+      await query(
+        `UPDATE tasks SET start_date = ?, end_date = ? WHERE id = ?`,
+        g.startDate,
+        g.endDate,
+        g.taskId,
+      );
+      const r = await recomputeTask(g.taskId, changedBy, { hoanTinhNhom: true });
+      if (r) nhom.add(r.packageId);
+    }
+    await tinhLaiNhomTangDan(nhom);
   });
 
   return { rowCount: sheetData.length - 1, matched, unmatched, warnings };
@@ -290,6 +315,7 @@ export async function parseTrackingUpload(
   let unmatched = 0;
   let totalRows = 0;
   const warnings: string[] = [];
+  const canGhi: { taskId: number; daLap: number[]; chuaLap: number[] }[] = [];
 
   await withTransaction(async () => {
     for (const sheetName of wb.SheetNames) {
@@ -354,7 +380,9 @@ export async function parseTrackingUpload(
         );
         const dimsByLabel = new Map(dbDims.map((d) => [d.label, d.id]));
 
-        // Cập nhật từng ô dimension
+        // Phân loại từng ô dimension của dòng (ghi sau khi đã khoá task — xem cuối hàm). Map theo
+        // ô: header trùng nhãn thì cột sau thắng, y như ghi tuần tự từng ô trước đây.
+        const oCuaDong = new Map<number, boolean>();
         for (let c = 9; c < row.length; c++) {
           const label = dimLabels[c - 9];
           if (!label) continue;
@@ -370,16 +398,35 @@ export async function parseTrackingUpload(
             continue;
           }
 
-          // Dữ liệu sự kiện (M120 FR4) — cùng lib dùng chung với tick từ lưới: đã lắp thì
-          // đóng dấu thời điểm upload + người upload, chưa lắp thì xoá sạch dấu vết lắp (D2).
-          await ghiDauVetTick([dimId], isInstalled, { userId: uploadedBy ?? null });
+          oCuaDong.set(dimId, isInstalled);
         }
 
-        // recompute cho task (nó tự cascade cập nhật work package progress)
-        await recomputeTask(dbTask.id, changedBy);
+        const o = [...oCuaDong];
+        canGhi.push({
+          taskId: dbTask.id,
+          daLap: o.filter(([, lap]) => lap).map(([id]) => id),
+          chuaLap: o.filter(([, lap]) => !lap).map(([id]) => id),
+        });
         matched++;
       }
     }
+
+    // Đợt tối ưu 3 (L6): đọc/khớp cả file TRƯỚC (ở trên, không ghi gì), rồi khoá mọi task sẽ
+    // ghi MỘT lần theo id tăng dần, rồi mới ghi ô — thứ tự task → ô → nhóm như tick (trước đây
+    // ghi ô TRƯỚC khi khoá task, ngược chiều tick đơn → deadlock). Ô gom theo dòng thành 2 câu
+    // (đã lắp / chưa lắp) thay vì 1 câu mỗi ô. Ghi + tính lại task vẫn theo thứ tự dòng file
+    // (dòng trùng task: dòng sau thắng, lịch sử % y như trước); nhóm tính 1 lần ở cuối.
+    await khoaTaskTheoId(canGhi.map((g) => g.taskId));
+    const nhom = new Set<number>();
+    for (const g of canGhi) {
+      // Dữ liệu sự kiện (M120 FR4) — cùng lib dùng chung với tick từ lưới: đã lắp thì
+      // đóng dấu thời điểm upload + người upload, chưa lắp thì xoá sạch dấu vết lắp (D2).
+      await ghiDauVetTick(g.daLap, true, { userId: uploadedBy ?? null });
+      await ghiDauVetTick(g.chuaLap, false, { userId: uploadedBy ?? null });
+      const r = await recomputeTask(g.taskId, changedBy, { hoanTinhNhom: true });
+      if (r) nhom.add(r.packageId);
+    }
+    await tinhLaiNhomTangDan(nhom);
   });
 
   return { rowCount: totalRows, matched, unmatched, warnings };

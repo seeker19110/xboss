@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, withTransaction } from "@/lib/db";
 import { recomputeTask } from "@/lib/tien-do/recompute";
 import { chuanHoaGhiChuO, ghiDauVetTick } from "@/lib/tien-do/dimension-events";
-import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { handoverBlocked, methodStatementBlocked } from "@/lib/ky-thuat/qaqc";
-import { taskProjectId } from "@/lib/tien-do/workpackages";
 import {
   bamYeuCau,
   docThaoTacHangDoi,
@@ -63,9 +62,21 @@ export async function PATCH(
   if (!gc.ok) return NextResponse.json({ error: gc.error }, { status: 422 });
   const note = gc.note;
 
-  const dim = await queryOne<{ task_id: number; package_id: number; status: string | null }>(
-    `SELECT pd.task_id, t.package_id, t.status
+  // Ô + task + dự án + người được giao trong MỘT câu (đợt tối ưu 3, P4 — trước đây 3 câu riêng:
+  // ô, taskProjectId, canTouchTask). LEFT JOIN tháp: sheet chưa gán tháp ra project_id NULL →
+  // 404 như taskProjectId cũ.
+  const dim = await queryOne<{
+    task_id: number;
+    package_id: number;
+    status: string | null;
+    assigned_to: number | null;
+    project_id: number | null;
+  }>(
+    `SELECT pd.task_id, t.package_id, t.status, t.assigned_to, tw.project_id
        FROM progress_dimensions pd JOIN tasks t ON t.id = pd.task_id
+       JOIN work_packages wp ON wp.id = t.package_id
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       LEFT JOIN towers tw ON tw.id = st.tower_id
       WHERE pd.id = ?`,
     id,
   );
@@ -74,10 +85,11 @@ export async function PATCH(
   // Cách ly dự án (vá W6, Đợt 5) — canTouchTask chỉ trả lời "subcon có được giao task này
   // không" và trả `true` vô điều kiện cho mọi vai trò khác, KHÔNG so dự án. Không kiểm riêng
   // thì mọi vai trò không phải subcon ở dự án A tick được ô của dự án B (id đoán được).
-  if (projectId == null || (await taskProjectId(dim.task_id)) !== projectId)
+  if (projectId == null || dim.project_id !== projectId)
     return NextResponse.json({ error: "Không tìm thấy dimension" }, { status: 404 });
 
-  if (!(await canTouchTask(user, dim.task_id)))
+  // Cùng luật canTouchTask (lib/bao-mat/auth.ts): thầu phụ chỉ chạm task giao cho mình.
+  if (user.role === "subcon" && dim.assigned_to !== user.id)
     return NextResponse.json(
       { error: "Bạn chỉ được cập nhật task được giao cho mình" },
       { status: 403 },

@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run, withTransaction } from "@/lib/db";
+import { query, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
-import { recomputeTask, statusConsistentWithProgress } from "@/lib/tien-do/recompute";
-import { assignTask } from "@/lib/tien-do/assignments";
+import {
+  recomputePackage,
+  recomputeTask,
+  statusConsistentWithProgress,
+} from "@/lib/tien-do/recompute";
+import { assignTask, guiPushPhanCong, type PushPhanCong } from "@/lib/tien-do/assignments";
 import { handoverBlocked, methodStatementBlocked } from "@/lib/ky-thuat/qaqc";
 import { log } from "@/lib/nen/log";
 import type { StatusSlug } from "@/lib/tien-do/status";
-import { taskProjectId } from "@/lib/tien-do/workpackages";
 import { kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
@@ -49,13 +52,44 @@ export async function PATCH(req: NextRequest) {
     boqCode: "boq_code",
   };
   const toRecompute = new Set<number>();
+  // Push phân công gom lại, gửi SAU COMMIT (đợt tối ưu 3, L5) — không giữ khoá task/sheet trong
+  // lúc chờ mạng, và không báo "được giao" cho một phân công rồi bị rollback.
+  const pushCho: PushPhanCong[] = [];
+  // Khoá trước MỘT lần mọi task hợp lệ của lô theo id tăng dần (đợt tối ưu 3, L4) — cùng thứ tự
+  // với tick theo lô; trước đây khoá từng task theo thứ tự client gửi, xen kẽ với UPDATE → hai
+  // lô ngược chiều (hoặc lô + tick đơn) giữ chéo khoá rồi deadlock.
+  const idHopLe = [
+    ...new Set(updates.map((u) => parseInt(String(u.id))).filter((n) => !isNaN(n))),
+  ].sort((a, b) => a - b);
 
   try {
     const updated = await withTransaction(async () => {
       // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay đầu transaction ghi (giữ tới COMMIT).
       if (!(await kiemQuyenTaiLucGhi(() => CAN.editStructure(me.role))))
         throw new Error(KHONG_CON_QUYEN);
+      // Kèm dự án của task (P5 — trước đây 1 taskProjectId mỗi dòng). `OF t`: chỉ khoá dòng task.
+      const khoa = idHopLe.length
+        ? await query<{
+            id: number;
+            package_id: number;
+            status: string | null;
+            progress_percent: number | null;
+            project_id: number | null;
+          }>(
+            `SELECT t.id, t.package_id, t.status, t.progress_percent, tw.project_id
+               FROM tasks t
+               JOIN work_packages wp ON wp.id = t.package_id
+               JOIN sheet_types st ON st.id = wp.sheet_type_id
+               LEFT JOIN towers tw ON tw.id = st.tower_id
+              WHERE t.id IN (${idHopLe.map(() => "?").join(", ")})
+              ORDER BY t.id FOR UPDATE OF t`,
+            ...idHopLe,
+          )
+        : [];
+      const taskDaKhoa = new Map(khoa.map((r) => [r.id, r]));
       let count = 0;
+      // Duyệt theo thứ tự client gửi như trước (mọi khoá đã giữ ở trên) — lỗi đầu tiên báo ra
+      // và thứ tự ghi (id trùng trong lô: dòng sau thắng) giữ y hệt.
       for (const u of updates) {
         const id = parseInt(String(u.id));
         const patch = (u.patch && typeof u.patch === "object" ? u.patch : {}) as Record<
@@ -64,20 +98,12 @@ export async function PATCH(req: NextRequest) {
         >;
         if (isNaN(id)) throw new Error("ID không hợp lệ");
 
-        const exists = await queryOne<{
-          id: number;
-          package_id: number;
-          status: string | null;
-          progress_percent: number | null;
-        }>(
-          `SELECT id, package_id, status, progress_percent FROM tasks WHERE id = ? FOR UPDATE`,
-          id,
-        );
+        const exists = taskDaKhoa.get(id);
         if (!exists) throw new Error(`Không tìm thấy task #${id}`);
         // Cách ly dự án (vá W7, Đợt 5) — kiểm TỪNG task trong vùng chọn trước khi ghi, cùng
         // lỗi generic "Không tìm thấy" như task không tồn tại (không xác nhận task tồn tại
         // ở dự án khác).
-        if (projectId == null || (await taskProjectId(id)) !== projectId)
+        if (projectId == null || exists.project_id !== projectId)
           throw new Error(`Không tìm thấy task #${id}`);
         const progressPercent = exists.progress_percent ?? 0;
 
@@ -136,7 +162,12 @@ export async function PATCH(req: NextRequest) {
         }
 
         if (patch.assignedTo !== undefined) {
-          await assignTask(id, patch.assignedTo === null ? null : Number(patch.assignedTo), me.id);
+          await assignTask(
+            id,
+            patch.assignedTo === null ? null : Number(patch.assignedTo),
+            me.id,
+            pushCho,
+          );
         }
 
         const sets: string[] = [];
@@ -168,12 +199,23 @@ export async function PATCH(req: NextRequest) {
               me.name,
             );
           }
+          // Lần ghi sau cùng id trong lô đọc trạng thái MỚI như vòng SELECT … FOR UPDATE cũ.
+          if (patch.status !== undefined)
+            taskDaKhoa.set(id, { ...exists, status: String(patch.status) });
         }
         count++;
       }
-      for (const id of toRecompute) await recomputeTask(id);
+      // Task theo id tăng dần (đã khoá), rồi mỗi nhóm đúng 1 lần theo id tăng dần (P3) — % nhóm
+      // chỉ phụ thuộc % task sau cùng nên kết quả y như tính lại nhóm sau từng task.
+      const nhom = new Set<number>();
+      for (const id of [...toRecompute].sort((a, b) => a - b)) {
+        const r = await recomputeTask(id, undefined, { hoanTinhNhom: true });
+        if (r) nhom.add(r.packageId);
+      }
+      for (const pid of [...nhom].sort((a, b) => a - b)) await recomputePackage(pid);
       return count;
     });
+    await guiPushPhanCong(pushCho);
     return NextResponse.json({ ok: true, updated });
   } catch (e: unknown) {
     if (e instanceof Error && e.message === KHONG_CON_QUYEN)

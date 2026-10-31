@@ -5,7 +5,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId, visibleProjectIds } from "@/lib/ha-tang/projects";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
 import { validateCustom } from "@/lib/ha-tang/custom-fields";
-import { recomputePackage, recomputeTasksInheritingDates } from "@/lib/tien-do/recompute";
+import { recomputeTasksInheritingDates } from "@/lib/tien-do/recompute";
 import { packageProjectId } from "@/lib/tien-do/workpackages";
 import { storageDelete } from "@/lib/nen/storage";
 import { khoaNhatKyCuaAnhTask } from "@/lib/hien-truong/diary";
@@ -105,9 +105,18 @@ export async function PATCH(
   // lại — nhóm phải nằm trong 1 sheet của đúng dự án `pid` mới bị sửa.
   vals.push(id, pid);
   // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay đầu transaction ghi.
+  const doiNgay = body.endDate !== undefined || body.startDate !== undefined;
   const kq = await ghiNeuConQuyen(
     () => CAN.editStructure(user.role),
     async () => {
+      // Đổi ngày: khoá TRƯỚC các task kế thừa ngày nhóm (id tăng dần) rồi mới UPDATE nhóm (đợt
+      // tối ưu 3, L3) — cùng chiều task → nhóm với tick; trước đây UPDATE nhóm khoá nhóm trước rồi
+      // mới đi xin khoá từng task → ngược chiều tick đơn đang giữ task và chờ nhóm → deadlock.
+      if (doiNgay)
+        await query(
+          `SELECT id FROM tasks WHERE package_id = ? AND end_date IS NULL ORDER BY id FOR UPDATE OF tasks`,
+          id,
+        );
       await run(
         `UPDATE work_packages SET ${sets.join(", ")}
         WHERE id = ? AND sheet_type_id IN (
@@ -116,19 +125,25 @@ export async function PATCH(
         )`,
         ...vals,
       );
-      // Đổi deadline có thể đổi trạng thái trễ (tre ⇄ dang_thi_cong) của nhóm → tính lại.
-      if (body.endDate !== undefined || body.startDate !== undefined) {
-        await recomputePackage(id);
-        // Task con có end_date NULL (đang kế thừa ngày nhóm) phải tính lại trạng thái trễ
-        // theo ngày MỚI của nhóm — không tự động qua recomputePackage (xem lib/recompute.ts).
-        await recomputeTasksInheritingDates(id);
-      }
+      // Đổi deadline có thể đổi trạng thái trễ (tre ⇄ dang_thi_cong) của task kế thừa ngày nhóm
+      // lẫn của chính nhóm → tính lại task kế thừa rồi nhóm đúng 1 lần ở cuối (kể cả khi nhóm
+      // không có task kế thừa nào — xem lib/tien-do/recompute.ts).
+      if (doiNgay) await recomputeTasksInheritingDates(id);
+      // Bump watermark sheet → client khác refresh (trước đây: UPDATE tasks.updated_at cả nhóm
+      // SAU transaction — khoá lại mọi task của nhóm lần nữa, chạy autocommit). Cùng cách
+      // dimensions/rename: upsert thẳng dòng watermark, đặt CUỐI transaction (sau mọi khoá
+      // task/nhóm) để giữ thứ tự khoá task → nhóm → sheet.
+      await run(
+        `INSERT INTO sheet_versions (sheet_type_id)
+           SELECT sheet_type_id FROM work_packages WHERE id = ? AND sheet_type_id IS NOT NULL
+         ON CONFLICT (sheet_type_id) DO UPDATE
+           SET version = sheet_versions.version + 1, updated_at = NOW()`,
+        id,
+      );
     },
   );
   if (!kq.ok)
     return NextResponse.json({ error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" }, { status: 403 });
-  // Bump updated_at của tất cả task trong nhóm → sheetVersion đổi → client refresh.
-  await run(`UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE package_id = ?`, id);
   const wp = await queryOne(
     `SELECT id, code, name, floor_label AS "floorLabel", boq_code AS "boqCode",
             drawing_url AS "drawingUrl", requires_method_statement AS "requiresMethodStatement"
