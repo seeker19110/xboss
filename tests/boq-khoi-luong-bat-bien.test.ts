@@ -85,6 +85,95 @@ test(
 );
 
 test(
+  "boqExecutedQtyMany: khớp công thức 1 dòng cũ (oracle SQL) ở mọi ca — có map, không map, kẹp trần, qty âm, id lạ",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, queryOne } = await import("@/lib/db");
+    const { boqExecutedQty, boqExecutedQtyMany } = await import("@/lib/khoi-luong/boq");
+
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test KL nhieu dong')`);
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp N')`,
+      projectId,
+    );
+    const stId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TESTKLNHIEU', 'Sheet KL nhiều')`,
+      towerId,
+    );
+    const pkgId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'N1', 'Nhóm KL nhiều')`,
+      stId,
+    );
+    const task = async (code: string, p: number | null) =>
+      insertId(
+        `INSERT INTO tasks (package_id, code, name, progress_percent) VALUES (?, ?, ?, ?)`,
+        pkgId,
+        code,
+        `Task ${code}`,
+        p,
+      );
+    const dong = async (code: string, qty: number) =>
+      insertId(
+        `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price, project_id)
+         VALUES (?, 'Dòng', 'm', ?, 0, ?)`,
+        code,
+        qty,
+        projectId,
+      );
+    const map = (b: number, t: number, w: number) =>
+      run(`INSERT INTO boq_task_map (boq_item_id, task_id, weight) VALUES (?, ?, ?)`, b, t, w);
+
+    const tA = await task("N1,01", 0.5);
+    const tB = await task("N1,02", 1);
+    const tNull = await task("N1,03", null);
+    const coMap = await dong("TESTKLNHIEU-1", 80); // 80 × (0.6×0.5 + 0.4×1) = 56
+    await map(coMap, tA, 0.6);
+    await map(coMap, tB, 0.4);
+    const khongMap = await dong("TESTKLNHIEU-2", 50); // không map → 0
+    const kepTran = await dong("TESTKLNHIEU-3", 10); // Σweight 1.6 × 100% → kẹp 10
+    await map(kepTran, tB, 0.8);
+    await map(kepTran, await task("N1,04", 1), 0.8);
+    const qtyAm = await dong("TESTKLNHIEU-4", -5); // qty âm: LEAST giữ đúng dấu
+    await map(qtyAm, tA, 1);
+    const progressNull = await dong("TESTKLNHIEU-5", 30); // progress NULL tính như 0
+    await map(progressNull, tNull, 1);
+    const ids = [coMap, khongMap, kepTran, qtyAm, progressNull];
+
+    // Oracle: nguyên văn câu 1 dòng trước khi gộp — kết quả gộp phải trùng từng dòng.
+    const oracle = async (id: number) =>
+      (
+        await queryOne<{ executed: number }>(
+          `SELECT LEAST(
+                    bi.qty_contract,
+                    COALESCE(bi.qty_contract * SUM(m.weight * COALESCE(t.progress_percent, 0)), 0)
+                  ) AS executed
+             FROM boq_items bi
+             LEFT JOIN boq_task_map m ON m.boq_item_id = bi.id
+             LEFT JOIN tasks t ON t.id = m.task_id
+            WHERE bi.id = ?
+            GROUP BY bi.id, bi.qty_contract`,
+          id,
+        )
+      )?.executed ?? 0;
+
+    const many = await boqExecutedQtyMany([...ids, coMap, -1]); // trùng id + id lạ
+    assert.equal(many.size, ids.length, "id lạ vắng mặt, id trùng gộp 1");
+    assert.equal(many.has(-1), false);
+    for (const id of ids) {
+      const ky = await oracle(id);
+      assert.equal(Number(many.get(id)), Number(ky), `dòng ${id} khớp oracle`);
+      assert.equal(Number(await boqExecutedQty(id)), Number(ky), `boqExecutedQty dòng ${id}`);
+    }
+    assert.deepEqual(
+      ids.map((id) => Number(many.get(id))),
+      [56, 0, 10, -5, 0],
+    );
+    assert.equal(await boqExecutedQty(-1), 0, "id không tồn tại → 0 như cũ");
+    assert.equal((await boqExecutedQtyMany([])).size, 0);
+  },
+);
+
+test(
   "Sổ mã BOQ: một task và một dòng BOQ KHÔNG THỂ mang cùng mã — nên mã trên task không phải con trỏ tới BOQ",
   { skip: !HAS_TEST_DB },
   async () => {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, withTransaction } from "@/lib/db";
-import { recomputeTask } from "@/lib/tien-do/recompute";
+import { recomputePackage, recomputeTask } from "@/lib/tien-do/recompute";
 import { ghiDauVetTick } from "@/lib/tien-do/dimension-events";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -163,7 +163,16 @@ export async function PATCH(req: NextRequest) {
       // ghi chú là việc của từng ô, gán chung cả vùng chọn sẽ ra dữ liệu vô nghĩa (ghi chú cũ
       // của các ô được giữ nguyên khi tick, và bị xoá cùng dấu vết lắp khi bỏ tick).
       await ghiDauVetTick(dimIds, !!installed, { userId: user.id });
-      for (const tid of taskIds) await recomputeTask(tid, user.name);
+      // Tính lại task (đã khoá theo id tăng dần ở trên), rồi mỗi nhóm đúng 1 lần ở cuối — % nhóm
+      // chỉ phụ thuộc % task sau cùng nên kết quả y như tính lại sau từng task. Thứ tự khoá không
+      // đổi so với trước: SELECT … FOR UPDATE trong recomputeTask (JOIN work_packages, không
+      // `OF t`) đã khoá dòng nhóm theo thứ tự task; vòng dưới chỉ khoá lại dòng đã giữ.
+      const nhom = new Set<number>();
+      for (const tid of taskIds) {
+        const r = await recomputeTask(tid, user.name, { hoanTinhNhom: true });
+        if (r) nhom.add(r.packageId);
+      }
+      for (const pid of [...nhom].sort((a, b) => a - b)) await recomputePackage(pid);
       const receipt = bn
         ? await ghiBienNhan(bn, {
             resourceType: "progress_dimension_batch",

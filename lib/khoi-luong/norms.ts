@@ -2,7 +2,7 @@
 // thực tế (material_transactions theo tầng — M4; diary_manpower theo tổ đội — M5) với
 // định mức × KL thực hiện (boqExecutedQty — M1). Xem docs/nang-cap/M18-dinh-muc.md.
 import { query, queryOne } from "@/lib/db";
-import { boqExecutedQty } from "@/lib/khoi-luong/boq";
+import { boqExecutedQty, boqExecutedQtyMany } from "@/lib/khoi-luong/boq";
 
 export const NORM_RESOURCE_TYPES = ["material", "labor", "equipment"] as const;
 export type NormResourceType = (typeof NORM_RESOURCE_TYPES)[number];
@@ -224,12 +224,9 @@ export async function overNormItems(
     ...args,
   );
 
-  // KL thực hiện tính 1 lần cho mỗi dòng BOQ (nhiều định mức vật tư có thể chung một dòng);
-  // vẫn đi qua boqExecutedQty để giữ đúng một nguồn công thức + kẹp LEAST qty_contract.
-  const executedByItem = new Map<number, number>();
-  for (const id of new Set(materialNorms.map((n) => n.boqItemId))) {
-    executedByItem.set(id, await boqExecutedQty(id));
-  }
+  // KL thực hiện của mọi dòng BOQ trong 1 query (nhiều định mức vật tư có thể chung một dòng);
+  // boqExecutedQtyMany dùng đúng công thức + kẹp LEAST qty_contract của boqExecutedQty.
+  const executedByItem = await boqExecutedQtyMany(materialNorms.map((n) => n.boqItemId));
   const candidates = materialNorms
     .map((n) => ({ n, expected: n.qtyPerUnit * (executedByItem.get(n.boqItemId) ?? 0) }))
     .filter((c) => c.expected > 0);

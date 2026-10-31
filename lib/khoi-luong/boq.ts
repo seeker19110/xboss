@@ -67,19 +67,32 @@ export async function boqTakenBy(
 // trông vào việc mọi nơi gọi đều tự nhớ kẹp. Dòng BOQ có qty_contract < 0 (không hợp lệ) thì
 // LEAST vẫn giữ đúng dấu, không tự bịa số 0.
 export async function boqExecutedQty(boqItemId: number): Promise<number> {
-  const row = await queryOne<{ executed: number }>(
-    `SELECT LEAST(
+  return (await boqExecutedQtyMany([boqItemId])).get(boqItemId) ?? 0;
+}
+
+/**
+ * KL thực hiện của NHIỀU dòng BOQ trong 1 query — cùng đúng công thức + kẹp LEAST của
+ * `boqExecutedQty` (hàm đó gọi qua đây, một nguồn duy nhất). Dòng không tồn tại vắng mặt khỏi
+ * Map (caller coi là 0 như `boqExecutedQty`). Dùng cho gợi ý KL đợt IPC và định mức, thay vì
+ * 1 query mỗi dòng.
+ */
+export async function boqExecutedQtyMany(boqItemIds: number[]): Promise<Map<number, number>> {
+  const ids = Array.from(new Set(boqItemIds));
+  if (ids.length === 0) return new Map();
+  const rows = await query<{ id: number; executed: number }>(
+    `SELECT bi.id,
+            LEAST(
               bi.qty_contract,
               COALESCE(bi.qty_contract * SUM(m.weight * COALESCE(t.progress_percent, 0)), 0)
             ) AS executed
        FROM boq_items bi
        LEFT JOIN boq_task_map m ON m.boq_item_id = bi.id
        LEFT JOIN tasks t ON t.id = m.task_id
-      WHERE bi.id = ?
+      WHERE bi.id = ANY(?::int[])
       GROUP BY bi.id, bi.qty_contract`,
-    boqItemId,
+    ids,
   );
-  return row?.executed ?? 0;
+  return new Map(rows.map((r) => [Number(r.id), r.executed ?? 0]));
 }
 
 /** Đợt `c` đã có chứng từ huỷ hiệu lực (reversal) được duyệt — M128, bất biến uq_pca_reversal. */
