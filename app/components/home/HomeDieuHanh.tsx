@@ -60,6 +60,20 @@ const ScheduleControlPanel = dynamic(() => import("@/app/components/ScheduleCont
   loading: () => <Skeleton className="h-40 rounded-xl" />,
 });
 
+// FE-6: module này chỉ nạp khi trang chủ ở (hoặc đoán là) chế độ Điều hành — tải luôn chunk các
+// panel song song với /api/dashboard thay vì đợi shell render xong mới bắt đầu. Chỉ tải mã: mỗi
+// panel vẫn tự fetch dữ liệu khi mount như cũ.
+if (typeof window !== "undefined") {
+  void Promise.allSettled([
+    import("@/app/components/BlockedPanel"),
+    import("@/app/components/NormsOverPanel"),
+    import("@/app/components/SpiCards"),
+    import("@/app/components/ForecastCards"),
+    import("@/app/components/DashboardExtCards"),
+    import("@/app/components/ScheduleControlPanel"),
+  ]);
+}
+
 export default function HomeDieuHanh({
   me,
   onSwitchMode,

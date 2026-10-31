@@ -16,7 +16,9 @@ import GlobalSearch from "@/app/components/GlobalSearch";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import OnlineUsers from "@/app/components/OnlineUsers";
 import { Modal } from "@/app/components/dialogs";
+import LinkNoiBo from "@/app/components/LinkNoiBo";
 import { fetchMe } from "@/app/lib/me";
+import { taiCauHinhNav, taiCoTinhNang } from "@/app/lib/cauHinhNav";
 import {
   DASHBOARD_TREE,
   isNavItemActive,
@@ -84,19 +86,13 @@ export default function AppHeader({
     setPathQuery(window.location.search);
     fetchMe().then((u) => setMe(u));
     setCollapsed(document.documentElement.classList.contains("sidebar-collapsed"));
-    // `cache: "no-store"` chỉ chặn cache HTTP của trình duyệt — service worker
-    // (stale-while-revalidate cho mọi /api/* GET, xem public/sw.js) vẫn có thể trả
-    // thẳng bản cache cũ trước khi kiểm request init, nên phải bust cache bằng query
-    // param (cùng cơ chế `taiJsonMoi` trong app/lib/taiDuLieu.ts) để chắc
-    // chắn đọc đúng nav_settings vừa ghi (vd ngay sau khi admin bật/tắt ở /admin).
-    fetch(`/api/nav-settings?_=${Date.now()}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => data?.settings && setNavSettings(new Map(Object.entries(data.settings))))
-      .catch(() => {});
-    fetch(`/api/feature-flags?_=${Date.now()}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => data?.flags && setFeatureFlags(new Map(Object.entries(data.flags))))
-      .catch(() => {});
+    // Cache module 60s dùng chung cả tab (app/lib/cauHinhNav.ts — P7): AppHeader remount ở mỗi
+    // lần chuyển trang nhưng không gọi lại 2 route này mỗi lần; lần tải thật vẫn bust cache SW.
+    // Cache bị xoá khi đổi ngữ cảnh và ngay sau khi admin ghi nav-settings/feature-flags.
+    taiCauHinhNav().then(
+      (settings) => settings && setNavSettings(new Map(Object.entries(settings))),
+    );
+    taiCoTinhNang().then((flags) => flags && setFeatureFlags(new Map(Object.entries(flags))));
     try {
       const raw = localStorage.getItem(NAV_OPEN_KEY);
       if (raw) setOpenMap(JSON.parse(raw));
@@ -158,8 +154,9 @@ export default function AppHeader({
     }
     const itemActive = isNavItemActive(item, navPath);
     const displayLabel = frequent && item.href === "/" ? "Tổng quan dự án" : item.label;
+    // Điều hướng client-side khi an toàn (FE-1, quy tắc ở app/lib/dieuHuong.ts).
     return (
-      <a
+      <LinkNoiBo
         key={item.href}
         href={item.href}
         title={displayLabel}
@@ -173,7 +170,7 @@ export default function AppHeader({
       >
         <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
         <span className="sidebar-label flex-1 truncate">{displayLabel}</span>
-      </a>
+      </LinkNoiBo>
     );
   }
 
@@ -187,7 +184,7 @@ export default function AppHeader({
     return (
       <div key={dash.id ?? dash.label} role="group" aria-label={dash.label}>
         {dash.id && (
-          <a
+          <LinkNoiBo
             href={`/hub/${dash.id}`}
             title={`Tổng quan ${dash.label}`}
             aria-current={path === `/hub/${dash.id}` ? "page" : undefined}
@@ -199,7 +196,7 @@ export default function AppHeader({
           >
             <LayoutDashboard className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
             <span className="sidebar-label italic">Tổng quan</span>
-          </a>
+          </LinkNoiBo>
         )}
         {visibleChildren.map((child) => renderLeaf(child))}
       </div>
@@ -380,7 +377,7 @@ export default function AppHeader({
             <OnlineUsers isAdmin={me?.role === "admin"} />
             <NotificationBell />
             {me && (
-              <a
+              <LinkNoiBo
                 href="/account"
                 title={`Tài khoản: ${me.name} (${ROLE_LABELS[me.role as Role] ?? me.role})`}
                 aria-label={`Tài khoản — ${me.name}`}
@@ -400,7 +397,7 @@ export default function AppHeader({
                     {ROLE_LABELS[me.role as Role] ?? me.role}
                   </span>
                 </div>
-              </a>
+              </LinkNoiBo>
             )}
           </div>
         </div>

@@ -2,8 +2,8 @@
 // HTML cá nhân hóa, RSC và export luôn qua mạng. S08: API mặc định network-only; chỉ ALLOWLIST
 // tường minh các GET đọc lưới tracking được dùng lại khi MẤT MẠNG, gắn nhãn phiên vault + hạn
 // lease của đúng tab (xem AUDIT-S08-OFFLINE-RECOVERY.md).
-const CACHE = "xboss-public-v21";
-const API_CACHE = "xboss-api-v21";
+const CACHE = "xboss-public-v22";
+const API_CACHE = "xboss-api-v22";
 const SHELL_URLS = [
   "/offline",
   "/manifest.webmanifest",
@@ -224,7 +224,10 @@ function purgeOwnedCaches(keepCurrent) {
 async function publicFetch(request, epoch) {
   const response = await fetch(request, {
     credentials: "omit",
-    cache: "no-store",
+    // FE-4: chunk `/_next/static/*` có hash nội dung trong tên + header `immutable` → được đọc lại
+    // từ HTTP cache của trình duyệt (vd ngay sau CLEAR_CACHE xoá cache public), không tải lại mạng.
+    // Shell/manifest/icon (tên cố định) vẫn no-store để luôn lấy bản mới khi cài SW.
+    cache: new URL(request.url).pathname.startsWith("/_next/static/") ? "default" : "no-store",
     redirect: "error",
   });
   if (publicResponse(request, response)) {
@@ -271,8 +274,24 @@ self.addEventListener("install", (e) => {
 });
 
 self.addEventListener("activate", (e) => {
-  e.waitUntil(purgeOwnedCaches(true).then(() => self.clients.claim()));
+  e.waitUntil(
+    Promise.all([
+      purgeOwnedCaches(true),
+      // FE-4: request điều hướng chạy song song lúc SW đang khởi động (cold start) thay vì đợi SW
+      // thức dậy mới đi mạng. Preload luôn đi mạng như điều hướng thường — không cache HTML.
+      Promise.resolve(self.registration?.navigationPreload?.enable()).catch(() => {}),
+    ]).then(() => self.clients.claim()),
+  );
 });
+
+/**
+ * Điều hướng: dùng phản hồi navigation preload nếu trình duyệt đã bắn (tránh gửi trùng request —
+ * kể cả điều hướng tới /api/* như tải export), không có thì fetch no-store như cũ.
+ */
+async function dieuHuongMang(e) {
+  const preload = await e.preloadResponse;
+  return preload || fetch(e.request, { cache: "no-store" });
+}
 
 // Web Push và tín hiệu flush giữ nguyên; SW không tự gửi hàng đợi offline.
 self.addEventListener("push", (e) => {
@@ -366,7 +385,9 @@ self.addEventListener("fetch", (e) => {
       e.respondWith(apiNetworkFirst(e.request, e.clientId));
       return;
     }
-    e.respondWith(fetch(e.request, { cache: "no-store" }));
+    e.respondWith(
+      e.request.mode === "navigate" ? dieuHuongMang(e) : fetch(e.request, { cache: "no-store" }),
+    );
     return;
   }
 
@@ -374,12 +395,19 @@ self.addEventListener("fetch", (e) => {
   const isStatic = url.pathname.startsWith("/_next/static/");
   const publicAsset = !url.search && (isShell || isStatic);
   if (publicAsset) {
+    // Điều hướng thẳng tới shell (vd /offline): phục vụ từ cache, preload (nếu có) chỉ cần kết thúc.
+    if (e.request.mode === "navigate" && e.preloadResponse) {
+      e.waitUntil(Promise.resolve(e.preloadResponse).catch(() => {}));
+    }
     e.respondWith(publicCacheFirst(e.request));
     return;
   }
 
   // Không cache HTML/RSC, ảnh tối ưu động hoặc URL ký. Chỉ navigation lỗi mạng mới dùng
   // shell vô danh; 401/403/5xx từ server được trả nguyên trạng, không thay bằng cache 200.
-  const network = fetch(e.request, { cache: "no-store" });
-  e.respondWith(e.request.mode === "navigate" ? network.catch(offlineShell) : network);
+  if (e.request.mode === "navigate") {
+    e.respondWith(dieuHuongMang(e).catch(offlineShell));
+    return;
+  }
+  e.respondWith(fetch(e.request, { cache: "no-store" }));
 });

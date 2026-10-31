@@ -40,6 +40,7 @@ export async function chuyenDuAn(projectId: number): Promise<KetQuaChuyenDuAn> {
   } catch {
     /* private mode */
   }
+  // Kèm xoá cache phía client của tab này: danh sách dự án + cấu hình nav/cờ module (P7).
   phatDoiNguCanh("switch");
   // Chờ ACK tối đa 3s; lỗi vẫn an toàn vì cache gắn nhãn phiên vault của tab — tải lại là phiên mới.
   await clearServiceWorkerCache().catch(() => undefined);

@@ -9,6 +9,7 @@ import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
+import { xoaCacheCauHinhNav } from "@/app/lib/cauHinhNav";
 
 type ModuleOpt = { key: string; label: string };
 type ProjectFlags = { projectId: number; projectName: string; flags: Record<string, boolean> };
@@ -69,6 +70,7 @@ export default function FeatureFlagsPage() {
       load();
       return;
     }
+    xoaCacheCauHinhNav(); // sidebar của tab này đọc lại cờ module ở lần chuyển trang kế tiếp
   }
 
   if (meLoading) return <PageSkeleton />;
