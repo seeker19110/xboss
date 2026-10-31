@@ -382,3 +382,54 @@ test(
     }
   },
 );
+
+test(
+  "buildDiaryPrefill: ảnh lọc theo khoảng giờ VN — 23:30 thuộc ngày D, 00:30 thuộc D+1",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { buildDiaryPrefill } = await import("@/lib/hien-truong/diary");
+
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test diary ảnh biên')`);
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'T')`,
+      projectId,
+    );
+    const st = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TESTPHOTO', 'Sheet')`,
+      towerId,
+    );
+    const pkg = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'P1', 'N')`,
+      st,
+    );
+    const t = await insertId(
+      `INSERT INTO tasks (package_id, code, name) VALUES (?, 'P1,01', 'T')`,
+      pkg,
+    );
+    const mk = (offset: string) =>
+      insertId(
+        `INSERT INTO task_photos (task_id, file_name, created_at)
+         VALUES (?, 'x.jpg', ('2026-06-15'::date + ?::interval) AT TIME ZONE 'Asia/Ho_Chi_Minh')`,
+        t,
+        offset,
+      );
+    const before = await mk("-30 minutes"); // 14/06 23:30
+    const start = await mk("0 hours"); // 15/06 00:00 — đầu ngày, thuộc ngày 15
+    const late = await mk("23 hours 30 minutes"); // 15/06 23:30
+    const next = await mk("24 hours 30 minutes"); // 16/06 00:30
+
+    const ids = async (d: string) =>
+      (await buildDiaryPrefill(d, projectId)).photos.map((p) => p.id).sort((a, b) => a - b);
+    assert.deepEqual(await ids("2026-06-15"), [start, late]);
+    assert.deepEqual(await ids("2026-06-14"), [before]);
+    assert.deepEqual(await ids("2026-06-16"), [next]);
+
+    await run(`DELETE FROM task_photos WHERE task_id = ?`, t);
+    await run(`DELETE FROM tasks WHERE id = ?`, t);
+    await run(`DELETE FROM work_packages WHERE id = ?`, pkg);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, st);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
+  },
+);

@@ -230,8 +230,10 @@ export async function buildDiaryPrefill(date: string, projectId: number): Promis
        JOIN work_packages wp ON wp.id = t.package_id
        JOIN sheet_types st ON st.id = wp.sheet_type_id
        JOIN towers tw ON tw.id = st.tower_id
-      WHERE (p.created_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = ?${projectCond}
+      WHERE p.created_at >= (?::date)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh'
+        AND p.created_at < (?::date + 1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh'${projectCond}
       ORDER BY p.id DESC`,
+    date,
     date,
     ...projectArgs,
   );

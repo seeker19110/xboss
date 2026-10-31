@@ -287,3 +287,148 @@ export async function searchSources(
   const results = await Promise.all(allowed.map((s) => runSource(s, projectId, ftsQuery, prefix)));
   return results.flat();
 }
+
+// ─── Tìm task + nhóm (shape SearchHit) — perf G3/P2 ──────────────────────────
+export type SearchHit = {
+  kind: "task" | "package";
+  id: number;
+  code: string;
+  name: string;
+  boqCode: string | null;
+  status: string | null;
+  progress: number;
+  floorLabel: string | null;
+  sheetType: string;
+  sheetSlug: string | null;
+};
+
+// Từ khoá ≥ ngần này ký tự mới đi đường "ứng viên qua index" (CTE). Tiền tố ngắn khớp
+// phần lớn task → CTE chậm hơn truy vấn gốc (đo: 56ms so 32ms) nên giữ đường cũ.
+export const SEARCH_INDEXED_MIN_LEN = 4;
+
+type SearchTable = {
+  kind: "task" | "package";
+  table: "tasks" | "work_packages";
+  alias: "t" | "wp";
+  limit: number;
+  select: string;
+  joins: string;
+};
+
+const TASK_TABLE: SearchTable = {
+  kind: "task",
+  table: "tasks",
+  alias: "t",
+  limit: 15,
+  select: `'task' AS kind, t.id, t.code, t.name, t.boq_code AS "boqCode",
+              t.status, t.progress_percent AS progress,
+              wp.floor_label AS "floorLabel", st.code AS "sheetType", st.slug AS "sheetSlug"`,
+  joins: `FROM tasks t
+         JOIN work_packages wp ON t.package_id = wp.id
+         JOIN sheet_types st ON wp.sheet_type_id = st.id`,
+};
+
+const PACKAGE_TABLE: SearchTable = {
+  kind: "package",
+  table: "work_packages",
+  alias: "wp",
+  limit: 10,
+  select: `'package' AS kind, wp.id, wp.code, wp.name, wp.boq_code AS "boqCode",
+              wp.status, wp.progress, wp.floor_label AS "floorLabel",
+              st.code AS "sheetType", st.slug AS "sheetSlug"`,
+  joins: `FROM work_packages wp
+         JOIN sheet_types st ON wp.sheet_type_id = st.id`,
+};
+
+// Đường gốc: một WHERE OR trộn cột bảng chính với mã/tên hệ (planner duyệt cả dự án).
+async function searchLegacy(
+  tb: SearchTable,
+  projectId: number,
+  prefix: string,
+  ftsQuery: string,
+): Promise<SearchHit[]> {
+  const a = tb.alias;
+  const fts = ftsExpr([`${a}.code`, `${a}.boq_code`, `${a}.name`]);
+  return query<SearchHit>(
+    `SELECT ${tb.select}
+         ${tb.joins}
+         LEFT JOIN systems sys ON sys.id = st.system_id JOIN towers tw ON tw.id = st.tower_id
+        WHERE (lower(${a}.code) LIKE ?
+           OR lower(${a}.boq_code) LIKE ?
+           OR ${fts} @@ plainto_tsquery('simple', xboss_unaccent(?))
+           OR lower(sys.code) LIKE ?
+           OR lower(sys.name) LIKE ?) AND tw.project_id = ?
+        ORDER BY st.id, ${a}.code LIMIT ${tb.limit}`,
+    prefix,
+    prefix,
+    ftsQuery,
+    prefix,
+    prefix,
+    projectId,
+  );
+}
+
+// Đường index: tập ứng viên lấy qua index (lower(code)/lower(boq_code) text_pattern_ops +
+// GIN FTS, migration 0173) trong CTE MATERIALIZED; nhánh "khớp theo hệ" tách UNION; rồi
+// JOIN lọc dự án + ORDER BY + LIMIT y như đường gốc → kết quả giống hệt.
+async function searchIndexed(
+  tb: SearchTable,
+  projectId: number,
+  prefix: string,
+  ftsQuery: string,
+): Promise<SearchHit[]> {
+  const a = tb.alias;
+  const fts = ftsExpr([`${a}.code`, `${a}.boq_code`, `${a}.name`]);
+  const sysBranch =
+    tb.kind === "task"
+      ? `SELECT t2.id FROM tasks t2
+           JOIN work_packages wp2 ON t2.package_id = wp2.id
+           JOIN sheet_types st2 ON wp2.sheet_type_id = st2.id
+           JOIN towers tw2 ON tw2.id = st2.tower_id
+          WHERE tw2.project_id = ?
+            AND st2.system_id IN (SELECT id FROM systems WHERE lower(code) LIKE ? OR lower(name) LIKE ?)`
+      : `SELECT wp2.id FROM work_packages wp2
+           JOIN sheet_types st2 ON wp2.sheet_type_id = st2.id
+           JOIN towers tw2 ON tw2.id = st2.tower_id
+          WHERE tw2.project_id = ?
+            AND st2.system_id IN (SELECT id FROM systems WHERE lower(code) LIKE ? OR lower(name) LIKE ?)`;
+  return query<SearchHit>(
+    `WITH c AS MATERIALIZED (
+        SELECT ${a}.id FROM ${tb.table} ${a}
+         WHERE lower(${a}.code) LIKE ?
+            OR lower(${a}.boq_code) LIKE ?
+            OR ${fts} @@ plainto_tsquery('simple', xboss_unaccent(?))
+        UNION
+        ${sysBranch}
+     )
+     SELECT ${tb.select}
+         ${tb.joins}
+         JOIN towers tw ON tw.id = st.tower_id
+        WHERE ${a}.id IN (SELECT id FROM c) AND tw.project_id = ?
+        ORDER BY st.id, ${a}.code LIMIT ${tb.limit}`,
+    prefix,
+    prefix,
+    ftsQuery,
+    projectId,
+    prefix,
+    prefix,
+    projectId,
+  );
+}
+
+// Tìm task + nhóm theo dự án. `forceLegacy` chỉ để test đối chiếu.
+export async function searchTasksAndPackages(
+  projectId: number,
+  q: string,
+  opts: { forceLegacy?: boolean } = {},
+): Promise<{ tasks: SearchHit[]; packages: SearchHit[] }> {
+  const prefix = `${q.toLowerCase()}%`;
+  // plainto_tsquery chấp nhận chuỗi tự do; bỏ ký tự đặc biệt để không sinh token rác.
+  const ftsQuery = q.replace(/[^\p{L}\p{N}\s]/gu, " ").trim() || q;
+  const run = opts.forceLegacy || q.length < SEARCH_INDEXED_MIN_LEN ? searchLegacy : searchIndexed;
+  const [tasks, packages] = await Promise.all([
+    run(TASK_TABLE, projectId, prefix, ftsQuery),
+    run(PACKAGE_TABLE, projectId, prefix, ftsQuery),
+  ]);
+  return { tasks, packages };
+}
