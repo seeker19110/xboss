@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { TRAFFIC_TOKEN_HEADER, trafficToken } from "@/lib/bao-mat/traffic-token";
+import { trafficToken } from "@/lib/bao-mat/traffic-token";
+import { enqueueTraffic } from "@/lib/bao-mat/traffic-batch";
 import { COOKIE, parseToken } from "@/lib/bao-mat/session-token";
 import { isSameOrigin, needsSameOriginCheck } from "@/lib/bao-mat/csrf";
 import { log } from "@/lib/nen/log";
@@ -30,8 +31,8 @@ function trafficIngestUrl(): URL {
 }
 
 // Proxy (middleware) của Next 16 LUÔN chạy Node.js runtime — chỉ intercept /api/ (trừ chính
-// endpoint traffic/ingest). Fire-and-forget POST đến ingest để ghi ring buffer.
-// Không await → không làm trễ request gốc.
+// endpoint traffic/ingest). Entry traffic được GOM LÔ (lib/bao-mat/traffic-batch.ts) rồi
+// fire-and-forget 1 POST/~1s đến ingest để ghi ring buffer — không làm trễ request gốc.
 // Kèm gắn `x-request-id` (M43): sinh UUID nếu chưa có, forward vào request headers để
 // route handler đọc qua `headers()` (dùng cho audit trail + tương quan log), trả lại ở response.
 //
@@ -42,6 +43,9 @@ function trafficIngestUrl(): URL {
 export function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+  // Parse cookie phiên 1 lần (kiểm HMAC + hạn) — dùng chung cho orgId traffic và cờ mustSetup2fa.
+  const sessionCookie = req.cookies.get(COOKIE)?.value;
+  const session = sessionCookie ? parseToken(sessionCookie) : null;
   // Bỏ qua endpoint ingest để tránh vòng lặp vô hạn và các route traffic
   if (!path.startsWith("/api/admin/traffic/")) {
     // Ghi traffic chỉ là telemetry: cấu hình sai (APP_URL/PORT/XBOSS_SECRET) phải bỏ qua gửi
@@ -54,8 +58,7 @@ export function proxy(req: NextRequest) {
     try {
       const url = trafficIngestUrl();
       token = trafficToken();
-      const session = req.cookies.get(COOKIE)?.value;
-      orgId = (session ? parseToken(session)?.orgId : null) ?? null;
+      orgId = session?.orgId ?? null;
       ingestUrl = url;
     } catch (err) {
       // Cấu hình sai thì lỗi lặp lại ở MỌI request — chỉ cảnh báo một lần mỗi tiến trình.
@@ -67,19 +70,17 @@ export function proxy(req: NextRequest) {
       }
     }
     if (ingestUrl) {
-      fetch(ingestUrl.toString(), {
-        method: "POST",
-        redirect: "error", // Không chuyển tiếp token nội bộ sang đích redirect.
-        headers: { "Content-Type": "application/json", [TRAFFIC_TOKEN_HEADER]: token },
-        body: JSON.stringify({
+      enqueueTraffic(
+        {
           method: req.method,
           path,
           ip: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "",
           ua: req.headers.get("user-agent") ?? "",
           ts: Date.now(),
           orgId,
-        }),
-      }).catch(() => {});
+        },
+        { url: ingestUrl.toString(), token },
+      );
     }
   }
 
@@ -95,9 +96,7 @@ export function proxy(req: NextRequest) {
 
   // Chặn tài khoản bắt buộc 2FA chưa bật — mọi API ngoài whitelist /api/auth/*.
   if (!path.startsWith("/api/auth/")) {
-    const token = req.cookies.get(COOKIE)?.value;
-    const parsed = token ? parseToken(token) : null;
-    if (parsed?.mustSetup2fa) {
+    if (session?.mustSetup2fa) {
       return NextResponse.json(
         { error: "Cần bật xác thực 2 lớp trước khi tiếp tục", code: "2fa_required" },
         { status: 403, headers: { "x-request-id": requestId } },
