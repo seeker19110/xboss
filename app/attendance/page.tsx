@@ -1,15 +1,22 @@
 "use client";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import dynamic from "next/dynamic";
 import { Minus, Plus, Trash2, Users, CalendarCheck, RefreshCw } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
-import { PageSkeleton } from "@/app/components/Skeleton";
+import { PageSkeleton, Skeleton } from "@/app/components/Skeleton";
 import { appConfirm } from "@/app/components/dialogs";
 import { Button } from "@/app/components/ui";
 import { fetchMe, invalidateMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { todayISO } from "@/lib/nen/date";
-import AttendanceChart from "./AttendanceChart";
+
+// FE-2: recharts (~110KB gzip) chỉ vẽ khi tháng đã chốt snapshot — nạp chunk khi cần; skeleton
+// cao đúng bằng khung biểu đồ để không giật bố cục.
+const AttendanceChart = dynamic(() => import("./AttendanceChart"), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[260px] rounded-xl" />,
+});
 
 type Crew = { id: number; name: string };
 type Personnel = { id: number; fullName: string; crewNames: string | null };

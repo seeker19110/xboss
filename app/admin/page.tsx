@@ -22,6 +22,7 @@ import {
 import AppHeader from "@/app/components/AppHeader";
 import Button from "@/app/components/ui/Button";
 import { fetchMe } from "@/app/lib/me";
+import { xoaCacheCauHinhNav } from "@/app/lib/cauHinhNav";
 import { ROLE_LABELS } from "@/lib/nen/roles";
 import { DASHBOARD_TREE, dashboardStatus } from "@/app/lib/dashboardTree";
 import { systemColorClasses } from "@/lib/nen/systemColors";
@@ -327,6 +328,7 @@ export default function AdminPage() {
         setNavSettings((prev) => ({ ...prev, [nodeKey]: prevValue }));
         return;
       }
+      xoaCacheCauHinhNav(); // sidebar của tab này đọc lại ngay ở lần chuyển trang kế tiếp
       flash(`Đã ${next ? "bật" : "tắt"} mục menu`);
     } catch {
       setError("Mất kết nối mạng — vui lòng thử lại");

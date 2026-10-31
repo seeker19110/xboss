@@ -803,6 +803,8 @@ function DocColumn({
                     <img
                       src={href}
                       alt={d.uploaderName ?? label}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full aspect-square object-cover"
                     />
                   ) : (

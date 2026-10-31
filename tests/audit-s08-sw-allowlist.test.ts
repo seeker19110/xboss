@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 
 const ORIGIN = "https://xboss.test";
-const API_CACHE = "xboss-api-v21";
+const API_CACHE = "xboss-api-v22";
 const SOURCE = readFileSync("public/sw.js", "utf8");
 const TAB_A = "tab-a";
 const TAB_B = "tab-b";

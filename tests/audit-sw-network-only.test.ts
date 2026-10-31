@@ -5,12 +5,12 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 
 const ORIGIN = "https://xboss.test";
-const PUBLIC_CACHE = "xboss-public-v21";
+const PUBLIC_CACHE = "xboss-public-v22";
 const source = readFileSync("public/sw.js", "utf8");
 const key = (request: Request | string) =>
   typeof request === "string" ? new URL(request, ORIGIN).href : request.url;
 
-function fixture() {
+function fixture(registration?: Record<string, unknown>) {
   const data = new Map<string, Map<string, Response>>();
   const handlers = new Map<string, (event: Record<string, unknown>) => void>();
   const calls: { request: Request; init: RequestInit }[] = [];
@@ -41,6 +41,7 @@ function fixture() {
       },
       skipWaiting: () => {},
       clients: { claim: async () => {}, matchAll: async () => [] },
+      registration,
     },
     location: { origin: ORIGIN },
     URL,
@@ -223,4 +224,78 @@ test("SW: không chặn request khác origin hoặc ghi dữ liệu", () => {
   const request = new Request(`${ORIGIN}/api/tasks`, { method: "POST" });
   assert.equal(f.fire("fetch", { request }).response, undefined);
   assert.equal(f.calls.length, 0);
+});
+
+// ── FE-4: HTTP cache cho chunk có hash + navigation preload ─────────────────────────────────
+
+test("SW FE-4: chunk /_next/static tải với cache 'default' (HTTP cache immutable), shell vẫn no-store", async () => {
+  const f = fixture();
+  await f.get("/_next/static/chunks/app.js");
+  assert.equal(f.calls[0].init.cache, "default");
+  assert.equal(f.calls[0].init.credentials, "omit");
+  assert.equal(f.calls[0].init.redirect, "error");
+  f.setNetwork(async () => new Response("shell", { headers: { "Content-Type": "text/html" } }));
+  await f.get("/offline");
+  assert.equal(f.calls[1].init.cache, "no-store");
+});
+
+test("SW FE-4: sau CLEAR_CACHE chunk vẫn tải lại qua HTTP cache (không no-store), cache public vẫn bị xoá", async () => {
+  const f = fixture();
+  await f.get("/_next/static/chunks/app.js");
+  await f.fire("message", { data: { type: "CLEAR_CACHE", requestId: "r1" }, ports: [] }).done();
+  assert.equal(f.data.has(PUBLIC_CACHE), false);
+  await f.get("/_next/static/chunks/app.js");
+  assert.equal(f.calls.length, 2);
+  assert.equal(f.calls[1].init.cache, "default");
+});
+
+test("SW FE-4: activate bật navigation preload khi trình duyệt hỗ trợ", async () => {
+  let enabled = 0;
+  const f = fixture({ navigationPreload: { enable: async () => void enabled++ } });
+  await f.fire("activate", {}).done();
+  assert.equal(enabled, 1);
+  // Trình duyệt không hỗ trợ (không có registration.navigationPreload) vẫn activate bình thường.
+  await fixture().fire("activate", {}).done();
+});
+
+function dieuHuong(
+  f: ReturnType<typeof fixture>,
+  path: string,
+  preloadResponse: Promise<Response | undefined> | undefined,
+) {
+  const request = new Request(new URL(path, ORIGIN));
+  Object.defineProperty(request, "mode", { value: "navigate" });
+  return f.fire("fetch", { request, preloadResponse }).response!;
+}
+
+test("SW FE-4: điều hướng dùng phản hồi preload, không gửi trùng request", async () => {
+  const f = fixture();
+  const preload = new Response("html preload", { headers: { "Content-Type": "text/html" } });
+  assert.equal(
+    await (await dieuHuong(f, "/costs", Promise.resolve(preload))).text(),
+    "html preload",
+  );
+  // Điều hướng tới /api/* (vd tải export) cũng không bắn request thứ hai.
+  const file = new Response("xlsx", { headers: { "Content-Type": "application/octet-stream" } });
+  assert.equal(
+    await (await dieuHuong(f, "/api/export/excel", Promise.resolve(file))).text(),
+    "xlsx",
+  );
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.writes(), 0);
+});
+
+test("SW FE-4: không có preload → fetch no-store như cũ; preload lỗi mạng → shell vô danh", async () => {
+  const f = fixture();
+  f.setNetwork(async () => new Response("mạng", { headers: { "Content-Type": "text/html" } }));
+  assert.equal(await (await dieuHuong(f, "/costs", Promise.resolve(undefined))).text(), "mạng");
+  assert.equal(f.calls[0].init.cache, "no-store");
+  const shell = new Response("shell vô danh", { headers: { "Content-Type": "text/html" } });
+  f.data.set(PUBLIC_CACHE, new Map([[key("/offline"), shell]]));
+  const loi = Promise.reject(new Error("offline"));
+  assert.equal(await (await dieuHuong(f, "/costs", loi)).text(), "shell vô danh");
+  // 401 từ preload được trả nguyên trạng, không thay bằng shell/cache.
+  const tuChoi = Promise.resolve(new Response("từ chối", { status: 401 }));
+  assert.equal((await dieuHuong(f, "/costs", tuChoi)).status, 401);
+  assert.equal(f.writes(), 0);
 });
