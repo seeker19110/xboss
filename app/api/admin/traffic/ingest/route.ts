@@ -23,10 +23,11 @@ function ghi(body: unknown): boolean {
   const { method, path, ip, ua, ts, orgId } = body as Raw;
   if (!method || !path) return false;
   recordTraffic({
-    method: String(method).toUpperCase(),
-    path: String(path),
-    ip: String(ip ?? ""),
-    ua: String(ua ?? ""),
+    // Cắt độ dài phòng thủ chiều sâu (ring buffer 500 dòng hiển thị cho admin).
+    method: String(method).toUpperCase().slice(0, 16),
+    path: String(path).slice(0, 512),
+    ip: String(ip ?? "").slice(0, 64),
+    ua: String(ua ?? "").slice(0, 512),
     ts: Number(ts ?? Date.now()),
     // S02e: org do proxy suy từ cookie phiên đã ký; giá trị lạ → ẩn danh (không hiện cho ai).
     orgId: Number.isSafeInteger(orgId) && (orgId as number) > 0 ? (orgId as number) : null,

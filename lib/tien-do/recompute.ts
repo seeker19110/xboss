@@ -205,11 +205,20 @@ export async function recomputePackage(packageId: number): Promise<void> {
 // Thứ tự khoá (đợt tối ưu 3, L3): khoá task theo id tăng dần (FOR UPDATE OF tasks) rồi mới tới
 // nhóm — cùng chiều với tick. Caller nên khoá trước đúng tập này TRƯỚC khi UPDATE nhóm (xem
 // workpackages/[id]); câu dưới khoá lại dòng đã giữ nên không tốn chờ.
-export async function recomputeTasksInheritingDates(packageId: number): Promise<void> {
-  const rows = await query<{ id: number }>(
-    `SELECT id FROM tasks WHERE package_id = ? AND end_date IS NULL ORDER BY id FOR UPDATE OF tasks`,
-    packageId,
-  );
-  for (const r of rows) await recomputeTask(r.id, undefined, { hoanTinhNhom: true });
+// daKhoa: tập id caller đã khoá trước khi UPDATE nhóm — dùng đúng tập đó, không SELECT lại (một
+// task vừa đổi end_date → NULL ở transaction khác sẽ bị khoá SAU nhóm → ngược chiều tick).
+export async function recomputeTasksInheritingDates(
+  packageId: number,
+  daKhoa?: number[],
+): Promise<void> {
+  const ids =
+    daKhoa ??
+    (
+      await query<{ id: number }>(
+        `SELECT id FROM tasks WHERE package_id = ? AND end_date IS NULL ORDER BY id FOR UPDATE OF tasks`,
+        packageId,
+      )
+    ).map((r) => r.id);
+  for (const tid of ids) await recomputeTask(tid, undefined, { hoanTinhNhom: true });
   await recomputePackage(packageId);
 }

@@ -818,3 +818,45 @@ test(
     assert.equal(r!.a, ctx.userId);
   },
 );
+
+// ---------------------------------------------------------------------------------------
+// Audit-logic đợt 3 (MEDIUM): gán người cho nhóm/hệ phải khoá task TRƯỚC nhóm — cùng chiều tick.
+// Một tick đang giữ task T (và sắp xin khoá nhóm) thì assignPackage phải đứng chờ ở T, KHÔNG
+// được giữ sẵn khoá dòng nhóm (nếu giữ → hai bên chờ nhau → deadlock, một bên 500).
+// ---------------------------------------------------------------------------------------
+
+test(
+  "assignPackage: chờ khoá task trước, không giữ dòng nhóm khi task đang bị tick khoá",
+  S,
+  async () => {
+    const { withTransaction, queryOne } = await import("@/lib/db");
+    const { assignPackage } = await import("@/lib/tien-do/assignments");
+    const ctx = await dungDuAn();
+    const pkg = await nhom(ctx, "AS1");
+    const t = await task(pkg, "AS1,01");
+    const giu = await ketNoiRieng();
+    const quanSat = await ketNoiRieng();
+    try {
+      await giu.query("BEGIN");
+      await giu.query("SELECT id FROM tasks WHERE id = $1 FOR UPDATE", [t]);
+      const gan = withTransaction(() => assignPackage(pkg, ctx.userId, ctx.userId));
+      await new Promise((r) => setTimeout(r, 300));
+      const nhomTrong = await khoaDuocNgay(
+        quanSat,
+        "SELECT id FROM work_packages WHERE id = $1 FOR NO KEY UPDATE NOWAIT",
+        [pkg],
+      );
+      await giu.query("COMMIT");
+      await gan;
+      assert.equal(nhomTrong, true, "assignPackage không được khoá nhóm trước khi có khoá task");
+      const r = await queryOne<{ a: number | null }>(
+        `SELECT assigned_to AS a FROM tasks WHERE id = ?`,
+        t,
+      );
+      assert.equal(r?.a, ctx.userId);
+    } finally {
+      await giu.end();
+      await quanSat.end();
+    }
+  },
+);

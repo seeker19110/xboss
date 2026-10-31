@@ -112,11 +112,14 @@ export async function PATCH(
       // Đổi ngày: khoá TRƯỚC các task kế thừa ngày nhóm (id tăng dần) rồi mới UPDATE nhóm (đợt
       // tối ưu 3, L3) — cùng chiều task → nhóm với tick; trước đây UPDATE nhóm khoá nhóm trước rồi
       // mới đi xin khoá từng task → ngược chiều tick đơn đang giữ task và chờ nhóm → deadlock.
-      if (doiNgay)
-        await query(
-          `SELECT id FROM tasks WHERE package_id = ? AND end_date IS NULL ORDER BY id FOR UPDATE OF tasks`,
-          id,
-        );
+      const taskKeThua = doiNgay
+        ? (
+            await query<{ id: number }>(
+              `SELECT id FROM tasks WHERE package_id = ? AND end_date IS NULL ORDER BY id FOR UPDATE OF tasks`,
+              id,
+            )
+          ).map((r) => r.id)
+        : [];
       await run(
         `UPDATE work_packages SET ${sets.join(", ")}
         WHERE id = ? AND sheet_type_id IN (
@@ -128,7 +131,7 @@ export async function PATCH(
       // Đổi deadline có thể đổi trạng thái trễ (tre ⇄ dang_thi_cong) của task kế thừa ngày nhóm
       // lẫn của chính nhóm → tính lại task kế thừa rồi nhóm đúng 1 lần ở cuối (kể cả khi nhóm
       // không có task kế thừa nào — xem lib/tien-do/recompute.ts).
-      if (doiNgay) await recomputeTasksInheritingDates(id);
+      if (doiNgay) await recomputeTasksInheritingDates(id, taskKeThua);
       // Bump watermark sheet → client khác refresh (trước đây: UPDATE tasks.updated_at cả nhóm
       // SAU transaction — khoá lại mọi task của nhóm lần nữa, chạy autocommit). Cùng cách
       // dimensions/rename: upsert thẳng dòng watermark, đặt CUỐI transaction (sau mọi khoá

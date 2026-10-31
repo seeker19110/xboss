@@ -122,10 +122,12 @@ export async function assignSheetManager(
   );
   const count = Number(affected?.n ?? 0);
 
-  await run(
-    `UPDATE work_packages SET assigned_to = ?
-      WHERE sheet_type_id = ? AND assigned_manual = FALSE`,
-    userId,
+  // Thứ tự khoá chung (đợt 3): task (id tăng) → nhóm. Khoá trước mọi task sẽ cascade theo id rồi
+  // mới UPDATE — nếu UPDATE nhóm trước thì đi ngược chiều tick ô (task → nhóm) và có thể deadlock.
+  await query(
+    `SELECT t.id FROM tasks t JOIN work_packages wp ON t.package_id = wp.id
+      WHERE wp.sheet_type_id = ? AND wp.assigned_manual = FALSE AND t.assigned_manual = FALSE
+      ORDER BY t.id FOR UPDATE OF t`,
     sheetId,
   );
   await run(
@@ -133,6 +135,12 @@ export async function assignSheetManager(
       FROM work_packages wp
      WHERE tasks.package_id = wp.id AND wp.sheet_type_id = ?
        AND wp.assigned_manual = FALSE AND tasks.assigned_manual = FALSE`,
+    userId,
+    sheetId,
+  );
+  await run(
+    `UPDATE work_packages SET assigned_to = ?
+      WHERE sheet_type_id = ? AND assigned_manual = FALSE`,
     userId,
     sheetId,
   );
@@ -180,16 +188,22 @@ export async function assignPackage(
     );
     effective = r?.manager_id ?? null;
   }
-  await run(
-    `UPDATE work_packages SET assigned_to = ?, assigned_manual = ? WHERE id = ?`,
-    effective,
-    userId !== null,
+  // Thứ tự khoá chung (đợt 3): task (id tăng) → nhóm — xem assignSheetManager.
+  await query(
+    `SELECT id FROM tasks WHERE package_id = ? AND assigned_manual = FALSE
+      ORDER BY id FOR UPDATE`,
     packageId,
   );
   await run(
     `UPDATE tasks SET assigned_to = ?, updated_at = CURRENT_TIMESTAMP
       WHERE package_id = ? AND assigned_manual = FALSE`,
     effective,
+    packageId,
+  );
+  await run(
+    `UPDATE work_packages SET assigned_to = ?, assigned_manual = ? WHERE id = ?`,
+    effective,
+    userId !== null,
     packageId,
   );
 
