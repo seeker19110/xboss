@@ -46,7 +46,9 @@ export default function AllNotificationsPage() {
   const load = useCallback(async () => {
     // limit=1000: trang này liệt kê "tất cả" — không dùng limit mặc định 50 của dropdown
     // chuông, tránh lọc/tìm kiếm/phân trang phía client bị cắt mất dữ liệu cũ hơn.
-    const r = await fetch("/api/notifications?limit=1000").catch(() => null);
+    const r = await fetch("/api/notifications?limit=1000", {
+      headers: { "X-XBoss-Notif-Sync": "1" },
+    }).catch(() => null);
     if (r?.status === 401) {
       redirectToLogin();
       return;

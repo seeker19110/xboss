@@ -21,6 +21,7 @@ import { overNormItems, NORM_OVER_THRESHOLD_PCT } from "@/lib/khoi-luong/norms";
 import { openHseActions } from "@/lib/hien-truong/hse";
 import { overdueMeetingActions } from "@/lib/hien-truong/meetings";
 import { formatDateTimeVN } from "@/lib/nen/date";
+import { getServerEnv } from "@/lib/nen/env";
 import { pendingProposalsOver } from "@/lib/tai-chinh/proposals";
 import { expiringLegalDocs } from "@/lib/hien-truong/kickoff";
 import { expiringCertifications } from "@/lib/hien-truong/hr";
@@ -65,6 +66,48 @@ export async function loadCostAlertReport(
 ): Promise<CostReport | null> {
   if (!CAN.viewPayments(user.role) || projectId == null) return null;
   return getCostReport({ kind: "project", projectId }, { groupBy: "system", includeVo: true });
+}
+
+// Nhịp đồng bộ on-fetch: syncAndListNotifications chạy ~75 câu SQL nên poll chuông 30s không
+// cần đồng bộ lại mỗi lần — trong TTL chỉ đọc danh sách (listNotifications). Khoá đủ (tổ chức,
+// user, vai trò, dự án) để đổi vai trò/dự án đồng bộ ngay. Ghi nhớ theo tiến trình: chạy nhiều
+// instance thì mỗi instance tự đồng bộ ≤ 1 lần/TTL — cảnh báo trễ tối đa TTL, không sai dữ liệu.
+const DEFAULT_NOTIF_SYNC_TTL_MS = 120_000;
+const MAX_SYNC_ENTRIES = 5_000;
+const lastSyncAt = new Map<string, number>();
+
+export function notificationSyncTtlMs(): number {
+  const raw = getServerEnv().XBOSS_NOTIF_SYNC_TTL_MS;
+  const n = raw != null ? Number(raw) : NaN;
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_NOTIF_SYNC_TTL_MS;
+}
+
+export function notificationSyncKey(user: User, projectId: number): string {
+  return `${user.orgId}:${user.id}:${user.role}:${projectId}`;
+}
+
+/** true khi key đã đồng bộ trong vòng `ttlMs` — route chỉ cần đọc danh sách. */
+export function notificationSyncFresh(
+  key: string,
+  now = Date.now(),
+  ttlMs = notificationSyncTtlMs(),
+): boolean {
+  if (ttlMs <= 0) return false;
+  const at = lastSyncAt.get(key);
+  return at != null && now - at < ttlMs;
+}
+
+/** Ghi mốc đồng bộ thành công; dọn mốc hết hạn khi Map phình to (không rò bộ nhớ). */
+export function markNotificationSynced(
+  key: string,
+  now = Date.now(),
+  ttlMs = notificationSyncTtlMs(),
+): void {
+  if (lastSyncAt.size >= MAX_SYNC_ENTRIES) {
+    for (const [k, at] of lastSyncAt) if (now - at >= ttlMs) lastSyncAt.delete(k);
+    if (lastSyncAt.size >= MAX_SYNC_ENTRIES) lastSyncAt.clear();
+  }
+  lastSyncAt.set(key, now);
 }
 
 export async function syncAndListNotifications(
