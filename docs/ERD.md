@@ -590,6 +590,7 @@
 - `work_front_id` → `work_fronts(id)`
 
 **Index:**
+- `idx_notif_task`: INDEX idx_notif_task ON public.notifications USING btree (task_id) WHERE (task_id IS NOT NULL)
 - `idx_notif_user`: INDEX idx_notif_user ON public.notifications USING btree (user_id, is_read)
 - `notifications_pkey`: UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)
 - `notifications_user_id_task_id_type_key`: UNIQUE INDEX notifications_user_id_task_id_type_key ON public.notifications USING btree (user_id, task_id, type)
