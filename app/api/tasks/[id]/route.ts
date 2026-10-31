@@ -10,7 +10,7 @@ import {
   recomputePackage,
   statusConsistentWithProgress,
 } from "@/lib/tien-do/recompute";
-import { assignTask } from "@/lib/tien-do/assignments";
+import { assignTask, guiPushPhanCong, type PushPhanCong } from "@/lib/tien-do/assignments";
 import { validateCustom } from "@/lib/ha-tang/custom-fields";
 import { storageDelete } from "@/lib/nen/storage";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
@@ -97,15 +97,19 @@ export async function PATCH(
   let assignedHandled = false;
   if (body.assignedTo !== undefined) {
     // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi phân công.
+    // Push gom lại, gửi SAU COMMIT (đợt tối ưu 3, L5) — không chờ mạng trong transaction.
+    const pushCho: PushPhanCong[] = [];
     const kqGan = await ghiNeuConQuyen(
       () => CAN.editStructure(me.role),
-      () => assignTask(id, body.assignedTo === null ? null : Number(body.assignedTo), me.id),
+      () =>
+        assignTask(id, body.assignedTo === null ? null : Number(body.assignedTo), me.id, pushCho),
     );
     if (!kqGan.ok)
       return NextResponse.json(
         { error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" },
         { status: 403 },
       );
+    await guiPushPhanCong(pushCho);
     assignedHandled = true;
   }
 

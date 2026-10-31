@@ -124,7 +124,8 @@ export async function POST(req: NextRequest) {
       if (existing?.is_approved)
         throw Object.assign(new Error("Tầng này đã được nghiệm thu rồi"), { status: 409 });
 
-      // Khoá và đọc lại tiến độ task trong transaction để tránh TOCTOU
+      // Khoá và đọc lại tiến độ task trong transaction để tránh TOCTOU. ORDER BY t.id (đợt tối
+      // ưu 3, L8): khoá theo id tăng dần như tick theo lô — không theo thứ tự plan join.
       const tasks = await query<{
         id: number;
         package_id: number;
@@ -138,6 +139,7 @@ export async function POST(req: NextRequest) {
            FROM tasks t
            JOIN work_packages wp ON t.package_id = wp.id
           WHERE wp.sheet_type_id = ? AND wp.floor_label = ?
+          ORDER BY t.id
           FOR UPDATE OF t`,
         sheetTypeId,
         floorLabel,
@@ -263,15 +265,17 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // Tính lại nhóm TRONG transaction, tuần tự theo id nhóm tăng dần (đợt tối ưu 3, L8) — cùng
+      // cách huỷ nghiệm thu tầng (floor-approvals/[id]) và duyệt đơn: % nhóm không lệch tạm
+      // thời sau COMMIT task, không rút nhiều connection cùng lúc, lỗi thì rollback cả lô.
+      const packageIds = [...new Set(toApprove.map((t) => t.package_id))].sort((a, b) => a - b);
+      for (const pid of packageIds) await recomputePackage(pid);
+
       return { aid, tasks: toApprove };
     });
 
     approvalId = result.aid;
     taskCount = result.tasks.length;
-
-    // recomputePackage chạy ngoài transaction, song song để giảm latency.
-    const packageIds = new Set(result.tasks.map((t) => t.package_id));
-    await Promise.all([...packageIds].map((pid) => recomputePackage(pid)));
 
     // Mỗi task trong tầng vừa CHUYỂN sang nghiem_thu THẬT (bulk UPDATE trong transaction đã
     // commit) → 1 emit/task. Tầng đã nghiệm thu bị chặn 409 ở trên nên không phát trùng.

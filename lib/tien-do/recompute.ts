@@ -90,6 +90,10 @@ export async function recomputeTask(
   // nhóm" (xem savePkgDates ở app/tracking/[sheet]/page.tsx), phải dùng ngày HIỆU LỰC
   // (task.end_date ?? wp.end_date) để suy trạng thái trễ, không phải end_date thô của
   // riêng task (bug đã sửa: task kế thừa ngày nhóm trước đây không bao giờ lên "tre").
+  // `OF t` (đợt tối ưu 3, L1): chỉ khoá dòng TASK. Thiếu `OF t` Postgres khoá luôn dòng nhóm
+  // của JOIN theo thứ tự TASK → hai lô tick không chung task nhưng xen kẽ nhóm giữ chéo khoá
+  // nhóm rồi deadlock (một bên 500). Dòng nhóm chỉ khoá trong recomputePackage, sau khi caller
+  // đã giữ đủ khoá task — thứ tự toàn cục: task (id tăng dần) → nhóm (id tăng dần).
   const task = await queryOne<{
     id: number;
     package_id: number;
@@ -100,7 +104,7 @@ export async function recomputeTask(
   }>(
     `SELECT t.id, t.package_id, t.end_date, wp.end_date AS pkg_end_date, t.status, t.progress_percent
        FROM tasks t JOIN work_packages wp ON wp.id = t.package_id
-      WHERE t.id = ? FOR UPDATE`,
+      WHERE t.id = ? FOR UPDATE OF t`,
     taskId,
   );
   if (!task) return null;
@@ -154,8 +158,14 @@ export async function recomputePackage(packageId: number): Promise<void> {
   await withTransaction(async () => {
     // Khoá row work_packages TRƯỚC khi đọc AVG — lần gọi thứ 2 đồng thời phải đợi lần
     // đầu COMMIT xong mới đọc được aggregate mới nhất (không phải snapshot giữa chừng).
+    // FOR NO KEY UPDATE (đợt tối ưu 3, L1): vẫn tuần tự hoá 2 lần tính lại cùng nhóm (khoá này
+    // xung đột với chính nó), nhưng KHÔNG xung đột khoá KEY SHARE mà kiểm khoá ngoại
+    // tasks.package_id lấy trên dòng nhóm khi transaction UPDATE lại task nó vừa ghi (vd ngày
+    // thực tế ngay sau % trong recomputeTask). FOR UPDATE thì hai lô tick khác task cùng giữ KEY
+    // SHARE trên nhóm rồi cùng chờ nâng lên FOR UPDATE → deadlock dù đã khoá theo id tăng dần.
+    // Câu UPDATE dưới không đổi khoá chính nên cũng chỉ cần mức khoá này.
     const wp = await queryOne<{ end_date: string | null; status: string | null }>(
-      `SELECT end_date, status FROM work_packages WHERE id = ? FOR UPDATE`,
+      `SELECT end_date, status FROM work_packages WHERE id = ? FOR NO KEY UPDATE`,
       packageId,
     );
     if (!wp) return;
@@ -188,13 +198,18 @@ export async function recomputePackage(packageId: number): Promise<void> {
 }
 
 // Nhóm đổi ngày BĐ/KT → mọi task con đang KẾ THỪA ngày nhóm (end_date NULL) phải tính lại
-// trạng thái trễ theo ngày MỚI. Gọi từ PATCH /api/workpackages/:id khi đổi startDate/endDate
-// (KHÔNG gọi từ trong recomputePackage — sẽ đệ quy recomputeTask ⇄ recomputePackage vô hạn
-// vì recomputeTask luôn gọi recomputePackage ở cuối).
+// trạng thái trễ theo ngày MỚI, rồi tính lại nhóm ĐÚNG 1 LẦN ở cuối (kể cả khi không có task
+// kế thừa nào — trạng thái trễ của chính nhóm cũng đổi theo ngày mới). Gọi từ PATCH
+// /api/workpackages/:id khi đổi startDate/endDate, BÊN TRONG transaction (KHÔNG gọi từ trong
+// recomputePackage — sẽ đệ quy recomputeTask ⇄ recomputePackage).
+// Thứ tự khoá (đợt tối ưu 3, L3): khoá task theo id tăng dần (FOR UPDATE OF tasks) rồi mới tới
+// nhóm — cùng chiều với tick. Caller nên khoá trước đúng tập này TRƯỚC khi UPDATE nhóm (xem
+// workpackages/[id]); câu dưới khoá lại dòng đã giữ nên không tốn chờ.
 export async function recomputeTasksInheritingDates(packageId: number): Promise<void> {
   const rows = await query<{ id: number }>(
-    `SELECT id FROM tasks WHERE package_id = ? AND end_date IS NULL`,
+    `SELECT id FROM tasks WHERE package_id = ? AND end_date IS NULL ORDER BY id FOR UPDATE OF tasks`,
     packageId,
   );
-  for (const r of rows) await recomputeTask(r.id);
+  for (const r of rows) await recomputeTask(r.id, undefined, { hoanTinhNhom: true });
+  await recomputePackage(packageId);
 }
