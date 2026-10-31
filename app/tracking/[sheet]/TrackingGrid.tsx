@@ -107,6 +107,7 @@ export function TrackingGrid({
   refreshKey,
   isMobile,
   onChanged,
+  onTicked = onChanged,
   onOfflineTick,
   onOfflineTickBatch,
   hiddenPrintCols,
@@ -126,6 +127,8 @@ export function TrackingGrid({
   refreshKey: number;
   isMobile: boolean;
   onChanged: () => void;
+  /** Sau tick ô (đơn/hàng/vùng/hoàn tác) — trang truyền bản tải lại có gom nhịp; mặc định = onChanged. */
+  onTicked?: () => void;
   onOfflineTick: (dimId: number, installed: boolean) => Promise<boolean>;
   onOfflineTickBatch: (dimIds: number[], installed: boolean) => Promise<boolean>;
   hiddenPrintCols: Set<string>;
@@ -195,7 +198,7 @@ export function TrackingGrid({
   }, [grid]);
 
   // Chọn vùng + hoàn tác + dán/copy Excel (M121, M124 V5) — logic nằm trong hook.
-  const vungChon = useTickVung({ grid, load, onChanged, onOfflineTickBatch, editMode });
+  const vungChon = useTickVung({ grid, load, onChanged: onTicked, onOfflineTickBatch, editMode });
   // Đóng nhóm/đổi dữ liệu hoặc bật lọc task → bỏ vùng chọn (ô đã unmount/ẩn không còn hợp lệ).
   useEffect(() => {
     if (!expanded || taskFilter) vungChon.boChon();
@@ -423,7 +426,7 @@ export function TrackingGrid({
         showToast(OFFLINE_SAVE_ERROR, "error");
       }
     }
-    onChanged();
+    onTicked();
   }
 
   // Tick/bỏ tick cả hàng bằng MỘT request (M121 FR1). Trước đây bắn N request song song, mỗi
@@ -448,7 +451,7 @@ export function TrackingGrid({
     } else if (kq.trangThai === "tuChoi") showToast(kq.loi, "error");
     else vungChon.ghiThaoTacLo(lo.ids, truoc, value);
     load();
-    onChanged();
+    onTicked();
   }
 
   async function saveTaskName(id: number, name: string) {

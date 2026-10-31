@@ -375,18 +375,26 @@ export async function listEsignEnvelopes(projectId: number): Promise<EsignEnvelo
       projectId,
     );
 
-    for (const env of envelopes) {
-      env.signatories = await query<any>(
-        `SELECT id, envelope_id AS "envelopeId", project_id AS "projectId",
-                user_id AS "userId", signer_name AS "signerName", signer_role AS "signerRole",
-                signing_order AS "signingOrder", status, signature_data AS "signatureData",
-                signed_at AS "signedAt", ip_address AS "ipAddress", geo_location AS "geoLocation"
-         FROM engineering_esign_signatories
-         WHERE envelope_id = ?
-         ORDER BY signing_order ASC`,
-        env.id,
-      );
+    // Một query cho mọi signatory (không N+1 theo số envelope), gom theo envelope giữ thứ tự ký.
+    const signatories = envelopes.length
+      ? await query<any>(
+          `SELECT id, envelope_id AS "envelopeId", project_id AS "projectId",
+                  user_id AS "userId", signer_name AS "signerName", signer_role AS "signerRole",
+                  signing_order AS "signingOrder", status, signature_data AS "signatureData",
+                  signed_at AS "signedAt", ip_address AS "ipAddress", geo_location AS "geoLocation"
+           FROM engineering_esign_signatories
+           WHERE envelope_id = ANY(?)
+           ORDER BY envelope_id, signing_order ASC`,
+          envelopes.map((env) => env.id),
+        )
+      : [];
+    const byEnvelope = new Map<unknown, any[]>();
+    for (const s of signatories) {
+      const list = byEnvelope.get(s.envelopeId);
+      if (list) list.push(s);
+      else byEnvelope.set(s.envelopeId, [s]);
     }
+    for (const env of envelopes) env.signatories = byEnvelope.get(env.id) ?? [];
 
     return envelopes;
   });

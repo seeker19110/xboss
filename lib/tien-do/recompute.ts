@@ -75,10 +75,14 @@ export async function capNhatNgayThucTe(taskId: number, progress: number): Promi
 
 // Tính lại % của task từ dimensions (nếu có), cập nhật task + work package cha.
 // changedBy: tên người thao tác — nếu % thay đổi sẽ ghi vào task_history.
+// opts.hoanTinhNhom: KHÔNG tính lại nhóm ở cuối — chỉ dùng khi caller tính lại nhóm sau cả lô
+// trong CÙNG transaction (tick theo lô: N task cùng nhóm → 1 lần recomputePackage thay vì N).
+// Caller phải gọi recomputePackage cho mọi packageId trả về, sau khi đã khoá xong mọi task.
 export async function recomputeTask(
   taskId: number,
   changedBy?: string,
-): Promise<{ progress: number; status: StatusSlug } | null> {
+  opts: { hoanTinhNhom?: boolean } = {},
+): Promise<{ progress: number; status: StatusSlug; packageId: number } | null> {
   // FOR UPDATE: khi hàm này chạy trong withTransaction (mọi route gọi recomputeTask đều
   // nên bọc như vậy), khoá row task tới hết transaction — 2 recompute đồng thời trên
   // cùng task sẽ serialize thay vì cùng đọc 1 snapshot rồi ghi đè lẫn nhau (lost update).
@@ -136,8 +140,8 @@ export async function recomputeTask(
     );
   }
 
-  await recomputePackage(task.package_id);
-  return { progress, status };
+  if (!opts.hoanTinhNhom) await recomputePackage(task.package_id);
+  return { progress, status, packageId: task.package_id };
 }
 
 // % work package = trung bình % các sub-task.

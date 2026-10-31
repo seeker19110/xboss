@@ -92,17 +92,19 @@ export type TenderRow = {
   bidCount: number;
 };
 
-// projectId (M22): undefined = không lọc dự án (dùng nội bộ/test cũ).
-export async function listTenders(projectId?: number): Promise<TenderRow[]> {
-  const where = projectId != null ? "WHERE tp.project_id = ?" : "";
-  return query<TenderRow>(
-    `SELECT tp.id, tp.code, tp.name, tp.scope, tp.due_date AS "dueDate", tp.status,
+const TENDER_SELECT = `SELECT tp.id, tp.code, tp.name, tp.scope, tp.due_date AS "dueDate", tp.status,
             tp.awarded_bid_id AS "awardedBidId", tp.awarded_contract_id AS "awardedContractId",
             tp.created_by AS "createdBy", u.name AS "createdByName", tp.created_at AS "createdAt",
             (SELECT COUNT(*) FROM tender_items ti WHERE ti.tender_id = tp.id) AS "itemCount",
             (SELECT COUNT(*) FROM tender_bids tb WHERE tb.tender_id = tp.id) AS "bidCount"
        FROM tender_packages tp
-       LEFT JOIN users u ON u.id = tp.created_by
+       LEFT JOIN users u ON u.id = tp.created_by`;
+
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/test cũ).
+export async function listTenders(projectId?: number): Promise<TenderRow[]> {
+  const where = projectId != null ? "WHERE tp.project_id = ?" : "";
+  return query<TenderRow>(
+    `${TENDER_SELECT}
       ${where}
       ORDER BY tp.created_at DESC, tp.id DESC`,
     ...(projectId != null ? [projectId] : []),
@@ -110,10 +112,14 @@ export async function listTenders(projectId?: number): Promise<TenderRow[]> {
 }
 
 // projectId khi truyền → trả undefined nếu gói thầu không thuộc dự án đang chọn
-// (chặn truy cập chéo dự án qua đoán ID).
+// (chặn truy cập chéo dự án qua đoán ID). Lọc đúng 1 dòng theo id, không tải cả danh sách.
 export async function getTender(id: number, projectId?: number): Promise<TenderRow | undefined> {
-  const rows = await listTenders(projectId);
-  return rows.find((r) => r.id === id);
+  return queryOne<TenderRow>(
+    `${TENDER_SELECT}
+      WHERE tp.id = ?${projectId != null ? " AND tp.project_id = ?" : ""}`,
+    id,
+    ...(projectId != null ? [projectId] : []),
+  );
 }
 
 export type TenderItemRow = {

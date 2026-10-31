@@ -190,10 +190,12 @@ export async function buildDiaryPrefill(date: string, projectId: number): Promis
        JOIN sheet_types st ON st.id = wp.sheet_type_id
        JOIN towers tw ON tw.id = st.tower_id
        LEFT JOIN systems d ON d.id = st.system_id
-      WHERE (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = ?
+      WHERE th.changed_at >= (?::date)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh'
+        AND th.changed_at < (?::date + 1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh'
         AND th.new_progress > th.old_progress${projectCond}
       GROUP BY d.name, wp.floor_label
       ORDER BY d.name, wp.floor_label`,
+    date,
     date,
     ...projectArgs,
   );
@@ -213,8 +215,10 @@ export async function buildDiaryPrefill(date: string, projectId: number): Promis
        JOIN work_packages wp ON wp.id = t.package_id
        JOIN sheet_types st ON st.id = wp.sheet_type_id
        JOIN towers tw ON tw.id = st.tower_id
-      WHERE (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = ? AND th.changed_by IS NOT NULL${projectCond}
+      WHERE th.changed_at >= (?::date)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh'
+        AND th.changed_at < (?::date + 1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh' AND th.changed_by IS NOT NULL${projectCond}
       ORDER BY th.changed_by`,
+    date,
     date,
     ...projectArgs,
   );
@@ -336,12 +340,14 @@ export async function missingDiaryDates(lookbackDays = 7, projectId?: number): P
     diaryCond = " AND sd.project_id = ?";
     args.push(projectId);
   }
+  // Lọc theo khoảng changed_at (mốc 00:00 giờ VN) thay vì ép `::date` từng dòng: cùng tập
+  // ngày nhưng dùng được idx_history_changed_at — hàm này chạy mỗi lần poll chuông thông báo.
   const rows = await query<{ d: string }>(
     `SELECT DISTINCT (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS d
        FROM task_history th
        ${taskJoin}
-      WHERE (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date >= ?
-        AND (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date < ?${taskCond}
+      WHERE th.changed_at >= (?::date)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh'
+        AND th.changed_at < (?::date)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh'${taskCond}
         AND NOT EXISTS (
           SELECT 1 FROM site_diaries sd
            WHERE sd.diary_date = (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date${diaryCond})

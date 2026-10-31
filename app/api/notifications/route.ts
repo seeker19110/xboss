@@ -5,20 +5,27 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   listNotifications,
   loadCostAlertReport,
+  markNotificationSynced,
+  notificationSyncFresh,
+  notificationSyncKey,
   syncAndListNotifications,
 } from "@/lib/dich-vu/thong-bao";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/notifications?limit=<n>
+// GET /api/notifications?limit=<n>  (header tuỳ chọn `X-XBoss-Notif-Sync: 1`)
 // Đồng bộ task trễ → notifications cho user hiện tại, rồi trả về danh sách + số chưa đọc.
+// Đồng bộ tối đa 1 lần/XBOSS_NOTIF_SYNC_TTL_MS cho mỗi (tổ chức, user, vai trò, dự án); trong
+// khoảng đó poll chỉ đọc danh sách. Header `X-XBoss-Notif-Sync: 1` (mở chuông, trang tất cả
+// thông báo) ép đồng bộ ngay — dùng header thay query để URL (cache SW, mock e2e) không đổi.
 // `limit` mặc định 50 (đủ cho dropdown chuông); trang `/notifications/all` truyền limit lớn
 // hơn để không bị cắt bớt trong lúc lọc/tìm kiếm/phân trang phía client.
 export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const limitParam = Number(new URL(req.url).searchParams.get("limit"));
+  const params = new URL(req.url).searchParams;
+  const limitParam = Number(params.get("limit"));
   const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 1000) : 50;
 
   // Dự án đang chọn — lọc mọi cảnh báo theo dự án để tránh rò rỉ chéo dự án (đa dự án, M22+).
@@ -32,12 +39,18 @@ export async function GET(req: Request) {
   // xen kẽ INSERT/DELETE trên notifications (bảng không-RLS) sau mỗi khối đọc.
   // Báo cáo chi phí (cost_over) tự mở snapshot REPEATABLE READ riêng — đọc TRƯỚC khi vào
   // scope, vì withTransaction không cho yêu cầu REPEATABLE READ lồng trong transaction có sẵn.
+  const syncKey = notificationSyncKey(user, projectId);
+  const forceSync = req.headers.get("x-xboss-notif-sync") === "1";
+  if (!forceSync && notificationSyncFresh(syncKey)) {
+    return NextResponse.json(await listNotifications(user, limit));
+  }
   const costReport = await loadCostAlertReport(user, projectId);
   const data = await withProjectScope(
     projectId,
     () => syncAndListNotifications(user, projectId, limit, { costReport }),
     { readOnly: false },
   );
+  markNotificationSynced(syncKey);
   return NextResponse.json(data);
 }
 

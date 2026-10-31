@@ -30,3 +30,8 @@ export const HAS_TEST_DB = !!process.env.TEST_DATABASE_URL;
 // dựng lại ngay sau đó), vừa có nguy cơ làm chúng đỏ vì "cannot use a pool after end".
 // Cờ này chỉ bật trong test, không đổi hành vi production.
 process.env.XBOSS_PG_ALLOW_EXIT_ON_IDLE = "1";
+
+// Chuông thông báo giãn nhịp đồng bộ on-fetch theo XBOSS_NOTIF_SYNC_TTL_MS (mặc định 120s, ghi
+// nhớ trong tiến trình). Test gọi route liên tiếp trong cùng tiến trình và chờ dữ liệu mới
+// ngay → tắt giãn nhịp (0 = đồng bộ mọi request); test riêng của cơ chế truyền ttl tường minh.
+process.env.XBOSS_NOTIF_SYNC_TTL_MS ??= "0";

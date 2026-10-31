@@ -3,7 +3,7 @@
 // giá trị đợt (tạm ứng/giữ lại/đề nghị) và cảnh báo luỹ kế vượt giá trị hợp đồng.
 // Xem docs/nang-cap/M17-thanh-toan-kl.md.
 import { query, queryOne, run, withTransaction } from "@/lib/db";
-import { boqExecutedQty } from "@/lib/khoi-luong/boq";
+import { boqExecutedQtyMany } from "@/lib/khoi-luong/boq";
 import {
   parseMoneyExact,
   ipcSumV1,
@@ -201,9 +201,12 @@ export async function suggestQtyForContract(contractId: number): Promise<
   for (const d of dieuChinh)
     cumMap.set(d.boqItemId, (cumMap.get(d.boqItemId) ?? 0) + Number(d.qtyDelta));
 
+  // KL thực hiện mọi dòng của hợp đồng trong 1 query (cùng công thức + kẹp LEAST của
+  // boqExecutedQty), thay vì 1 query mỗi dòng.
+  const executedMap = await boqExecutedQtyMany(items.map((it) => it.id));
   const result = [];
   for (const it of items) {
-    const executed = await boqExecutedQty(it.id);
+    const executed = executedMap.get(it.id) ?? 0;
     const already = cumMap.get(it.id) ?? 0;
     result.push({
       boqItemId: it.id,

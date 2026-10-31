@@ -368,6 +368,7 @@ cần scale lên nhiều instance/traffic cao:
 | `XBOSS_PG_POOL_MAX`        | Số connection tối đa trong pool Postgres của mỗi instance app (clamp 1–100).                                                                                   | `10`     |
 | `XBOSS_PG_STMT_TIMEOUT_MS` | Thời gian tối đa (ms) cho 1 câu query trước khi Postgres huỷ (clamp 1.000–300.000). Riêng phiên chạy migration (`npm run db:migrate`) không bị áp timeout này. | `30000`  |
 | `XBOSS_SLOW_QUERY_MS`      | Ngưỡng (ms) coi 1 query là "chậm" để ghi log cảnh báo.                                                                                                         | `500`    |
+| `XBOSS_NOTIF_SYNC_TTL_MS`  | Khoảng tối thiểu (ms) giữa 2 lần đồng bộ cảnh báo của chuông thông báo cho cùng user/vai trò/dự án; mở chuông vẫn đồng bộ ngay. `0` = đồng bộ mọi request.     | `120000` |
 
 ---
 

@@ -7,6 +7,9 @@ import type { Data } from "./types";
 // Thử mở lại SSE sau khi rớt (fallback poll vẫn chạy trong lúc chờ).
 const SSE_RETRY_MS = 120_000;
 const SYNC_POLL_MS = 10_000;
+// Tick liên tiếp chỉ tải lại toàn sheet 1 lần sau khi ngừng tay (ô đã cập nhật lạc quan tại chỗ;
+// lần tải này chỉ để đồng bộ % nhóm/task) — thay vì mỗi tick một GET toàn sheet chồng nhau.
+const TICK_RELOAD_DEBOUNCE_MS = 500;
 
 // Fetch dữ liệu sheet tracking + đồng bộ đa người dùng (SSE/poll) + hàng đợi tick offline.
 // Logic giữ nguyên 100% từ app/tracking/[sheet]/page.tsx trước khi tách (M52 PR5).
@@ -25,9 +28,19 @@ export function useTrackingData(sheet: string) {
   // cảnh báo trên hàng nhóm (chặn ghi thật đã nằm ở các route dùng handoverBlocked).
   const [qcBlocked, setQcBlocked] = useState<Map<number, string>>(new Map());
 
+  // Chỉ phản hồi của lần tải MỚI NHẤT được ghi vào state — các lần tải chồng nhau (tick, SSE,
+  // thao tác cấu trúc) trả về lệch thứ tự không được ghi đè dữ liệu mới bằng dữ liệu cũ.
+  const loadSeqRef = useRef(0);
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const load = useCallback(() => {
+    if (reloadTimerRef.current) {
+      clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = null;
+    }
+    const seq = ++loadSeqRef.current;
     fetch(`/api/tasks?sheet=${sheet}`)
       .then(async (r) => {
+        if (seq !== loadSeqRef.current) return;
         if (r.status === 401) {
           await redirectToLogin();
           return;
@@ -41,12 +54,14 @@ export function useTrackingData(sheet: string) {
           return;
         }
         const d: Data = await r.json();
+        if (seq !== loadSeqRef.current) return;
         setData(d);
         if (d?.version) versionRef.current = d.version;
         setLoadErrorMessage(null);
         setLoadError(false);
       })
       .catch(() => {
+        if (seq !== loadSeqRef.current) return;
         // mất mạng — giữ dữ liệu đang hiển thị nếu đã có (chỉ chặn màn hình khi
         // đây là lần tải đầu, chưa có gì để hiển thị)
         setLoadErrorMessage(null);
@@ -57,6 +72,18 @@ export function useTrackingData(sheet: string) {
   useEffect(() => {
     load();
   }, [load]);
+  // Tải lại sau tick: gom các tick liên tiếp thành 1 lần tải (trailing debounce).
+  const loadSauTick = useCallback(() => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(load, TICK_RELOAD_DEBOUNCE_MS);
+  }, [load]);
+  useEffect(
+    () => () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = null;
+    },
+    [load],
+  );
 
   useEffect(() => {
     const sheetTypeId = data?.sheet.id;
@@ -192,6 +219,7 @@ export function useTrackingData(sheet: string) {
     loadError,
     loadErrorMessage,
     load,
+    loadSauTick,
     refreshKey,
     syncToast,
     pendingFronts,

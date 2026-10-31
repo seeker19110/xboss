@@ -1005,6 +1005,56 @@ test("PATCH /api/dimensions/batch: id trùng lặp trong body chỉ tính 1 lầ
   assert.equal((await res.json()).updated, 1);
 });
 
+test(
+  "PATCH /api/dimensions/batch: lô trải 2 nhóm — % nhóm = trung bình task sau cả lô (tính nhóm gom cuối lô)",
+  S,
+  async () => {
+    // Bất biến % nhóm (recomputePackage gom cuối lô thay vì sau từng task): nhóm 1 có task được
+    // tick 2/4 ô + 1 task anh em 0.33 không có ô (không đổi); nhóm 2 có 1 task tick đủ 2/2.
+    // Kết quả phải đúng như tính tay, kể cả làm tròn NUMERIC và trần 0.99/=1.
+    const { insertId, queryOne } = await import("@/lib/db");
+    const ctx = await dungDuLieu("pm", `hainhom${RUN}`, { progress: 0 });
+    await insertId(
+      `INSERT INTO tasks (package_id, code, name, progress_percent) VALUES (?, 'T1,99', 'Task anh em', 0.33)`,
+      ctx.packageId,
+    );
+    const pkg2 = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'H2', 'Nhóm hai')`,
+      ctx.sheetTypeId,
+    );
+    const task2 = await insertId(
+      `INSERT INTO tasks (package_id, code, name, progress_percent) VALUES (?, 'H2,01', 'Task nhóm hai', 0)`,
+      pkg2,
+    );
+    const d1 = await themDimensions(ctx.taskId, 4);
+    const d2 = await themDimensions(task2, 2);
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    const { PATCH } = await import("@/app/api/dimensions/batch/route");
+    const res = await PATCH(
+      req("/api/dimensions/batch", { ids: [d2[1], d1[0], d2[0], d1[1]], installed: true }),
+    );
+    assert.equal(res.status, 200);
+    const nhom = async (id: number) =>
+      (await queryOne<{ progress: number; status: string }>(
+        `SELECT progress, status FROM work_packages WHERE id = ?`,
+        id,
+      ))!;
+    // Nhóm 1: AVG(0.5, 0.33) = 0.415 → ROUND NUMERIC 0.42 (float sẽ ra 0.41).
+    assert.equal((await nhom(ctx.packageId)).progress, 0.42);
+    // Nhóm 2: task duy nhất đủ 100% → nhóm đúng 1, hoàn thành.
+    const n2 = await nhom(pkg2);
+    assert.equal(n2.progress, 1);
+    assert.equal(n2.status, "hoan_thanh");
+    // Bỏ tick cả lô → nhóm 1 về AVG(0, 0.33) = 0.17 (0.165 làm tròn lên), nhóm 2 về 0.
+    const res2 = await PATCH(
+      req("/api/dimensions/batch", { ids: [...d1, ...d2], installed: false }),
+    );
+    assert.equal(res2.status, 200);
+    assert.equal((await nhom(ctx.packageId)).progress, 0.17);
+    assert.equal((await nhom(pkg2)).progress, 0);
+  },
+);
+
 // ---------------------------------------------------------------------------------------
 // GET/POST /api/approvals — duyệt nghiệm thu theo lô (cả tầng)
 // ---------------------------------------------------------------------------------------

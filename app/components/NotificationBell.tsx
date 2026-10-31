@@ -214,6 +214,9 @@ export default function NotificationBell() {
   const keyRef = useRef<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof createVisiblePoll> | null>(null);
+  // Mở chuông → lượt tải kế tiếp (poll ≤ 30s, retry, sau đánh dấu đã đọc) ép server đồng bộ cảnh báo (header
+  // X-XBoss-Notif-Sync); poll nền thì để server tự giãn nhịp (XBOSS_NOTIF_SYNC_TTL_MS) và chỉ đọc danh sách.
+  const forceSyncRef = useRef(false);
   const markingAllRef = useRef(false);
   const mounted = useRef(false);
 
@@ -287,7 +290,12 @@ export default function NotificationBell() {
       everyMs: POLL_MS,
       load: async (signal) => {
         setLoading(true);
-        const r = await fetch("/api/notifications", { signal });
+        const sync = forceSyncRef.current;
+        forceSyncRef.current = false;
+        const r = await fetch("/api/notifications", {
+          signal,
+          headers: sync ? { "X-XBoss-Notif-Sync": "1" } : undefined,
+        });
         if (!r.ok) throw new Error(`Không tải được thông báo (${r.status})`);
         return (await r.json()) as { notifications?: Notif[]; unread?: number };
       },
@@ -394,7 +402,11 @@ export default function NotificationBell() {
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          // Không tải thêm khi mở (giữ đúng nhịp poll); chỉ đánh dấu để lượt tải kế tiếp ép đồng bộ.
+          if (!open) forceSyncRef.current = true;
+          setOpen((o) => !o);
+        }}
         title="Thông báo"
         aria-label="Thông báo"
         aria-haspopup="true"

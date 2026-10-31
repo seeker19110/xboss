@@ -21,6 +21,7 @@ import { overNormItems, NORM_OVER_THRESHOLD_PCT } from "@/lib/khoi-luong/norms";
 import { openHseActions } from "@/lib/hien-truong/hse";
 import { overdueMeetingActions } from "@/lib/hien-truong/meetings";
 import { formatDateTimeVN } from "@/lib/nen/date";
+import { getServerEnv } from "@/lib/nen/env";
 import { pendingProposalsOver } from "@/lib/tai-chinh/proposals";
 import { expiringLegalDocs } from "@/lib/hien-truong/kickoff";
 import { expiringCertifications } from "@/lib/hien-truong/hr";
@@ -65,6 +66,48 @@ export async function loadCostAlertReport(
 ): Promise<CostReport | null> {
   if (!CAN.viewPayments(user.role) || projectId == null) return null;
   return getCostReport({ kind: "project", projectId }, { groupBy: "system", includeVo: true });
+}
+
+// Nhịp đồng bộ on-fetch: syncAndListNotifications chạy ~75 câu SQL nên poll chuông 30s không
+// cần đồng bộ lại mỗi lần — trong TTL chỉ đọc danh sách (listNotifications). Khoá đủ (tổ chức,
+// user, vai trò, dự án) để đổi vai trò/dự án đồng bộ ngay. Ghi nhớ theo tiến trình: chạy nhiều
+// instance thì mỗi instance tự đồng bộ ≤ 1 lần/TTL — cảnh báo trễ tối đa TTL, không sai dữ liệu.
+const DEFAULT_NOTIF_SYNC_TTL_MS = 120_000;
+const MAX_SYNC_ENTRIES = 5_000;
+const lastSyncAt = new Map<string, number>();
+
+export function notificationSyncTtlMs(): number {
+  const raw = getServerEnv().XBOSS_NOTIF_SYNC_TTL_MS;
+  const n = raw != null ? Number(raw) : NaN;
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_NOTIF_SYNC_TTL_MS;
+}
+
+export function notificationSyncKey(user: User, projectId: number): string {
+  return `${user.orgId}:${user.id}:${user.role}:${projectId}`;
+}
+
+/** true khi key đã đồng bộ trong vòng `ttlMs` — route chỉ cần đọc danh sách. */
+export function notificationSyncFresh(
+  key: string,
+  now = Date.now(),
+  ttlMs = notificationSyncTtlMs(),
+): boolean {
+  if (ttlMs <= 0) return false;
+  const at = lastSyncAt.get(key);
+  return at != null && now - at < ttlMs;
+}
+
+/** Ghi mốc đồng bộ thành công; dọn mốc hết hạn khi Map phình to (không rò bộ nhớ). */
+export function markNotificationSynced(
+  key: string,
+  now = Date.now(),
+  ttlMs = notificationSyncTtlMs(),
+): void {
+  if (lastSyncAt.size >= MAX_SYNC_ENTRIES) {
+    for (const [k, at] of lastSyncAt) if (now - at >= ttlMs) lastSyncAt.delete(k);
+    if (lastSyncAt.size >= MAX_SYNC_ENTRIES) lastSyncAt.clear();
+  }
+  lastSyncAt.set(key, now);
 }
 
 export async function syncAndListNotifications(
@@ -161,32 +204,23 @@ export async function syncAndListNotifications(
   }
 
   // Task hết trễ (hoặc không còn được giao cho mình) → dọn thông báo cũ chưa đọc.
+  // Lọc theo đúng danh sách `delayed` vừa đọc trong cùng transaction thay vì chạy lại cả
+  // điều kiện JOIN (mỗi lần poll chuông). `<> ALL('{}')` = true giống `NOT IN` tập rỗng.
   await run(
     `DELETE FROM notifications
       WHERE user_id = ? AND type = 'delayed' AND is_read = 0
-        AND task_id NOT IN (
-          SELECT t.id FROM tasks t
-           JOIN work_packages wp ON t.package_id = wp.id
-           JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
-           WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
-             AND t.status NOT IN ('hoan_thanh','nghiem_thu')${subconFilter}${projectFilter})`,
-    ...(isSubcon ? [user.id, today, user.id] : [user.id, today]),
-    ...projectParam,
+        AND task_id <> ALL(?::int[])`,
+    user.id,
+    delayed.map((t) => t.id),
   );
 
   // Task không còn "sắp đến hạn" (đã xong, đã qua hạn thành trễ, hoặc đổi deadline) → dọn tương tự.
   await run(
     `DELETE FROM notifications
       WHERE user_id = ? AND type = 'due_soon' AND is_read = 0
-        AND task_id NOT IN (
-          SELECT t.id FROM tasks t
-           JOIN work_packages wp ON t.package_id = wp.id
-           JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
-           WHERE ${DUE_SOON_COND}${subconFilter}${projectFilter})`,
-    ...(isSubcon
-      ? [user.id, ...dueSoonParams(dueSoonTh), user.id]
-      : [user.id, ...dueSoonParams(dueSoonTh)]),
-    ...projectParam,
+        AND task_id <> ALL(?::int[])`,
+    user.id,
+    dueSoon.map((t) => t.id),
   );
 
   // Task đình trệ: đang thi công, chưa xong, còn hạn (end_date ≥ hôm nay) nhưng KHÔNG có
@@ -224,13 +258,9 @@ export async function syncAndListNotifications(
   await run(
     `DELETE FROM notifications
       WHERE user_id = ? AND type = 'stalled' AND is_read = 0
-        AND task_id NOT IN (
-          SELECT t.id FROM tasks t
-           JOIN work_packages wp ON t.package_id = wp.id
-           JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
-           WHERE ${STALLED_COND}${subconFilter}${projectFilter})`,
-    ...(isSubcon ? [user.id, today, user.id] : [user.id, today]),
-    ...projectParam,
+        AND task_id <> ALL(?::int[])`,
+    user.id,
+    stalled.map((t) => t.id),
   );
 
   // Vật tư dùng vượt định mức → cảnh báo cho Admin/PM/Kỹ sư (subcon không quản vật tư).
@@ -297,11 +327,9 @@ export async function syncAndListNotifications(
     await run(
       `DELETE FROM notifications
         WHERE user_id = ? AND type = 'material_over' AND is_read = 0
-          AND material_id NOT IN (
-            SELECT id FROM materials m WHERE ${materialOverCond}${matProjectFilter})`,
+          AND material_id <> ALL(?::int[])`,
       user.id,
-      materialOverPct,
-      ...projectParam,
+      overMats.map((m) => m.id),
     );
   }
 

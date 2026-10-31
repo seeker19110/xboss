@@ -111,6 +111,9 @@ const serverSchema = z
     XBOSS_PG_STMT_TIMEOUT_MS: z.string().optional(),
     // Ngưỡng cảnh báo query chậm (ms) — mặc định 500, 0 = tắt hẳn (M53 PR1, lib/db/index.ts).
     XBOSS_SLOW_QUERY_MS: z.string().optional(),
+    // Khoảng tối thiểu (ms) giữa 2 lần đồng bộ cảnh báo on-fetch của chuông thông báo cho cùng
+    // (tổ chức, user, vai trò, dự án) — mặc định 120000, 0 = đồng bộ mọi request (lib/dich-vu/thong-bao.ts).
+    XBOSS_NOTIF_SYNC_TTL_MS: z.string().optional(),
 
     // Theo dõi lỗi (Sentry) — thiếu thì sentry.server.config.ts/sentry.edge.config.ts tự
     // enabled=false (đọc trực tiếp process.env.SENTRY_DSN, không qua getServerEnv(), vì

@@ -77,6 +77,7 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
     loadError,
     loadErrorMessage,
     load,
+    loadSauTick,
     refreshKey,
     syncToast,
     pendingFronts,
@@ -417,6 +418,7 @@ function TrackingPageNoiDung({ params }: { params: Promise<{ sheet: string }> })
         refreshKey={refreshKey}
         isMobile={isMobile}
         onChanged={load}
+        onTicked={loadSauTick}
         onOfflineTick={enqueue}
         onOfflineTickBatch={enqueueBatch}
         hiddenPrintCols={hiddenPrintCols}
