@@ -541,6 +541,45 @@ test(
   },
 );
 
+test(
+  "GET /api/gantt?only=blocked: cùng tập blocked như bản đầy đủ, bars chỉ nhóm bị chặn, không CPM",
+  S,
+  async () => {
+    const projectId = await taoDuAn("ganttonly");
+    const pm = await taoUser("pm", "ganttonly");
+    const { insertId } = await import("@/lib/db");
+    const pred = await dungWbs(projectId, "ganttonlyPred", {
+      startDate: "2024-01-01",
+      endDate: "2024-01-10",
+      progress: 0.5,
+    });
+    const succ = await dungWbs(projectId, "ganttonlySucc", {
+      startDate: "2024-02-01",
+      endDate: "2024-02-10",
+      progress: 0,
+    });
+    await insertId(
+      `INSERT INTO package_dependencies (predecessor_id, successor_id) VALUES (?, ?)`,
+      pred.pkgId,
+      succ.pkgId,
+    );
+    await dangNhapDuAn(pm, projectId);
+    const { GET } = await import("@/app/api/gantt/route");
+    const full = await (await GET(jreq("/api/gantt"))).json();
+    const res = await GET(jreq("/api/gantt?only=blocked"));
+    assert.equal(res.status, 200);
+    const slim = await res.json();
+    assert.deepEqual(slim.blocked, full.blocked);
+    assert.deepEqual(
+      slim.bars.map((b: { id: number }) => b.id),
+      slim.blocked.map((b: { id: number }) => b.id),
+    );
+    assert.ok(slim.bars.some((b: { id: number }) => b.id === succ.pkgId));
+    assert.equal(slim.critical, undefined);
+    assert.equal(slim.deps, undefined);
+  },
+);
+
 // ============================================================================
 // GET /api/lookahead
 // ============================================================================

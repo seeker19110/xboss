@@ -29,6 +29,8 @@ export async function GET(req: NextRequest) {
       criticalDeps: [],
       float: {},
     });
+  // ?only=blocked: client (BlockedPanel) chỉ cần nhóm bị chặn → bỏ CPM + deps/critical/float.
+  const onlyBlocked = req.nextUrl.searchParams.get("only") === "blocked";
   const { nodes, edges, meta } = await getCpmData(systemId, projectId);
   const bars = [...meta.values()];
 
@@ -48,6 +50,11 @@ export async function GET(req: NextRequest) {
   }
 
   const blocked = [...blockedBy.entries()].map(([id, preds]) => ({ id, preds }));
+
+  if (onlyBlocked) {
+    const ids = new Set(blocked.map((b) => b.id));
+    return NextResponse.json({ blocked, bars: bars.filter((b) => ids.has(b.id)) });
+  }
 
   const cpm = computeCpm(nodes, edges);
 
