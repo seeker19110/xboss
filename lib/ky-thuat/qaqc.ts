@@ -9,62 +9,49 @@ export type HandoverCheck = { blocked: boolean; reason?: string };
 // Hold point chuyển bước: package (successor) bị khoá nếu có dependency requires_handover=TRUE
 // mà predecessor CHƯA có inspection đạt lẫn biên bản chuyển bước (task_documents.doc_category
 // = 'chuyen_buoc' gắn vào task thuộc package đó) — chỉ cần 1 trong 2 là đủ để mở khoá.
+//
+// Điều kiện viết một lần trong SQL (NOT EXISTS) cho cả 2 hàm dưới: trước đây mỗi predecessor
+// tốn 2 query riêng và lưới tracking gọi lặp theo từng nhóm (N+1) — nay mỗi lời gọi đúng 1 query.
+// DISTINCT ON + ORDER BY pd.id: mỗi nhóm chỉ lấy 1 dependency đang chặn (ổn định theo id) để nêu lý do.
+const BLOCKING_DEPS_SQL = `
+  SELECT DISTINCT ON (pd.successor_id)
+         pd.successor_id AS "packageId",
+         wp.name AS "predecessorName", wp.code AS "predecessorCode"
+    FROM package_dependencies pd
+    JOIN work_packages wp ON wp.id = pd.predecessor_id
+    JOIN work_packages succ ON succ.id = pd.successor_id
+   WHERE pd.requires_handover = TRUE
+     AND NOT EXISTS (SELECT 1 FROM qc_inspections qi
+                      WHERE qi.work_package_id = pd.predecessor_id AND qi.status = 'passed')
+     AND NOT EXISTS (SELECT 1 FROM task_documents td
+                       JOIN tasks t ON td.task_id = t.id
+                      WHERE t.package_id = pd.predecessor_id AND td.doc_category = 'chuyen_buoc')`;
+
+type BlockingDep = { packageId: number; predecessorName: string; predecessorCode: string };
+
+function handoverReason(dep: BlockingDep): string {
+  return `Chờ biên bản chuyển bước: ${dep.predecessorCode} — ${dep.predecessorName}`;
+}
+
 export async function handoverBlocked(packageId: number): Promise<HandoverCheck> {
-  const deps = await query<{
-    predecessorId: number;
-    predecessorName: string;
-    predecessorCode: string;
-  }>(
-    `SELECT wp.id AS "predecessorId", wp.name AS "predecessorName", wp.code AS "predecessorCode"
-       FROM package_dependencies pd
-       JOIN work_packages wp ON wp.id = pd.predecessor_id
-      WHERE pd.successor_id = ? AND pd.requires_handover = TRUE`,
+  const dep = await queryOne<BlockingDep>(
+    `${BLOCKING_DEPS_SQL} AND pd.successor_id = ? ORDER BY pd.successor_id, pd.id`,
     packageId,
   );
-
-  for (const dep of deps) {
-    const inspected = await queryOne<{ count: number }>(
-      `SELECT COUNT(*)::int AS count FROM qc_inspections
-        WHERE work_package_id = ? AND status = 'passed'`,
-      dep.predecessorId,
-    );
-    if ((inspected?.count ?? 0) > 0) continue;
-
-    const handedOver = await queryOne<{ count: number }>(
-      `SELECT COUNT(*)::int AS count FROM task_documents td
-         JOIN tasks t ON td.task_id = t.id
-        WHERE t.package_id = ? AND td.doc_category = 'chuyen_buoc'`,
-      dep.predecessorId,
-    );
-    if ((handedOver?.count ?? 0) > 0) continue;
-
-    return {
-      blocked: true,
-      reason: `Chờ biên bản chuyển bước: ${dep.predecessorCode} — ${dep.predecessorName}`,
-    };
-  }
-  return { blocked: false };
+  return dep ? { blocked: true, reason: handoverReason(dep) } : { blocked: false };
 }
 
 // Danh sách nhóm (work_packages) thuộc 1 sheet đang bị hold-point chuyển bước — dùng để
 // hiện icon cảnh báo QC trên hàng nhóm lưới tracking (chỉ hiển thị, không chặn ghi — chặn
-// ghi thật đã nằm ở các route dùng handoverBlocked trực tiếp). N+1 query chấp nhận được vì
-// số nhóm/sheet nhỏ, cùng mức tối ưu hoá hiện có của codebase.
+// ghi thật đã nằm ở các route dùng handoverBlocked trực tiếp).
 export async function packagesWithQcBlock(
   sheetTypeId: number,
 ): Promise<{ packageId: number; reason: string }[]> {
-  const packages = await query<{ id: number }>(
-    `SELECT id FROM work_packages WHERE sheet_type_id = ?`,
+  const deps = await query<BlockingDep>(
+    `${BLOCKING_DEPS_SQL} AND succ.sheet_type_id = ? ORDER BY pd.successor_id, pd.id`,
     sheetTypeId,
   );
-  const result: { packageId: number; reason: string }[] = [];
-  for (const pkg of packages) {
-    const gate = await handoverBlocked(pkg.id);
-    if (gate.blocked) {
-      result.push({ packageId: pkg.id, reason: gate.reason ?? "Đang chờ nghiệm thu chuyển bước" });
-    }
-  }
-  return result;
+  return deps.map((dep) => ({ packageId: dep.packageId, reason: handoverReason(dep) }));
 }
 
 // Gate nghiệm thu: task chỉ bị chặn approve nếu có ÍT NHẤT 1 checklist mẫu đang bật `required`
