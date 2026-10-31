@@ -195,13 +195,26 @@ export async function GET(req: NextRequest) {
   delWs.views = [{ state: "frozen", ySplit: 1 }];
 
   // 1 tab tracking đầy đủ cho mỗi sheet — checkbox đã tick = "x", chưa tick = "○".
-  const sheetCodes = [...new Set(allTasks.map((t) => t.sheetCode))];
-  for (const code of sheetCodes) {
-    const tasks = allTasks.filter((t) => t.sheetCode === code);
-    const taskIds = new Set(tasks.map((t) => t.taskId));
-    const dims = allDims.filter((d) => taskIds.has(d.taskId));
-    buildTrackingTab(wb.addWorksheet(safeTabName(code)), tasks, dims);
+  // Gom task/dimension theo sheet MỘT lần (Map giữ thứ tự xuất hiện) thay vì lọc lại toàn bộ
+  // allTasks/allDims cho mỗi sheet — cùng thứ tự tab, thứ tự dòng như trước.
+  const tasksBySheet = new Map<string, TrackTask[]>();
+  const sheetOfTask = new Map<number, string>();
+  for (const t of allTasks) {
+    let list = tasksBySheet.get(t.sheetCode);
+    if (!list) tasksBySheet.set(t.sheetCode, (list = []));
+    list.push(t);
+    sheetOfTask.set(t.taskId, t.sheetCode);
   }
+  const dimsBySheet = new Map<string, DimRow[]>();
+  for (const d of allDims) {
+    const code = sheetOfTask.get(d.taskId);
+    if (code === undefined) continue;
+    let list = dimsBySheet.get(code);
+    if (!list) dimsBySheet.set(code, (list = []));
+    list.push(d);
+  }
+  for (const [code, tasks] of tasksBySheet)
+    buildTrackingTab(wb.addWorksheet(safeTabName(code)), tasks, dimsBySheet.get(code) ?? []);
 
   // Tên file theo mã DỰ ÁN ĐANG CHỌN (fallback "XBoss" khi dự án chưa có mã). AUDIT-S16
   // (A1-AC03): không đọc "dự án đầu tiên của DB" — có thể thuộc tổ chức khác.

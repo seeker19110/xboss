@@ -14,7 +14,15 @@ type DocRow = {
   taskCode: string;
   fileName: string | null;
   originalName: string | null;
+  sizeBytes: number | null;
 };
+
+// Trần một lần nén (đợt tối ưu 3 G2): route gom mọi file vào RAM (buffer từng file + output
+// nén + Buffer.concat ≈ 2–3× tổng dung lượng) — không trần thì một lần bấm "tải tất cả" ở dự
+// án nhiều biên bản có thể làm tiến trình Node hết bộ nhớ. Kiểm TRƯỚC khi đọc file nào: số
+// tệp và tổng size_bytes đã lưu lúc upload (dòng cũ thiếu size tính 0 — trần số tệp vẫn chặn).
+const ZIP_MAX_FILES = 500;
+const ZIP_MAX_BYTES = 500 * 1024 * 1024;
 
 // Mã task/tên gốc là dữ liệu người dùng. Entry ZIP phải phẳng: archiver chỉ bỏ
 // ../ ở đầu, vẫn giữ đường dẫn như nhom/../../tep.pdf ở giữa tên.
@@ -60,7 +68,8 @@ export async function GET(req: NextRequest) {
   values.push(projectId);
 
   const rows = await query<DocRow>(
-    `SELECT t.code AS "taskCode", d.file_name AS "fileName", d.original_name AS "originalName"
+    `SELECT t.code AS "taskCode", d.file_name AS "fileName", d.original_name AS "originalName",
+            d.size_bytes AS "sizeBytes"
        FROM task_documents d
        JOIN tasks t ON t.id = d.task_id
        LEFT JOIN work_packages wp ON wp.id = t.package_id
@@ -70,6 +79,19 @@ export async function GET(req: NextRequest) {
       ORDER BY t.code, d.id`,
     ...values,
   );
+
+  const coFile = rows.filter((r) => r.fileName);
+  const tongByte = coFile.reduce((s, r) => s + (r.sizeBytes ?? 0), 0);
+  if (coFile.length > ZIP_MAX_FILES || tongByte > ZIP_MAX_BYTES)
+    return NextResponse.json(
+      {
+        error:
+          `Quá nhiều hồ sơ để nén một lần (${coFile.length} tệp, khoảng ${Math.ceil(tongByte / 1048576)} MB; ` +
+          `tối đa ${ZIP_MAX_FILES} tệp / ${ZIP_MAX_BYTES / 1048576} MB). ` +
+          `Hãy lọc theo hệ, tầng hoặc loại hồ sơ rồi tải lại.`,
+      },
+      { status: 413 },
+    );
 
   const archive = new ZipArchive();
   const chunks: Buffer[] = [];

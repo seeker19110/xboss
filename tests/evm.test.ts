@@ -232,10 +232,11 @@ test("plannedRatio: scurve/spi dùng chung một bản, không sao chép công t
   const { readFileSync } = await import("node:fs");
   for (const f of ["app/api/dashboard/scurve/route.ts", "app/api/dashboard/spi/route.ts"]) {
     const src = readFileSync(f, "utf8");
+    // plannedRatioMs (đợt tối ưu 3 G2) là cùng công thức nhận sẵn ms — plannedRatio gọi lại nó.
     assert.match(
       src,
-      /import \{ plannedRatio \} from "@\/lib\/tien-do\/evm"/,
-      `${f} phải import plannedRatio từ lib/tien-do/evm`,
+      /import \{ plannedRatio(Ms)? \} from "@\/lib\/tien-do\/evm"/,
+      `${f} phải import plannedRatio/plannedRatioMs từ lib/tien-do/evm`,
     );
     assert.doesNotMatch(
       src,
