@@ -995,6 +995,8 @@ function ApprovalsPageInner() {
                       <img
                         src={href}
                         alt={d.originalName ?? ""}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full max-h-48 object-cover object-top"
                       />
                     </a>

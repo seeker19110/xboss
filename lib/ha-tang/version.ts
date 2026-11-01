@@ -20,3 +20,32 @@ export async function sheetVersion(sheetSlug: string, projectId: number | null):
   // Phòng thủ: sheet chưa có dòng watermark (không nên xảy ra sau backfill) → '0'.
   return r?.version ?? "0";
 }
+
+// ── Memo dùng chung cho SSE /api/events ──
+// N stream cùng (dự án, sheet) → 1 query/chu kỳ: giữ promise in-flight + kết quả TTL ngắn.
+// projectId đã được xác thực riêng cho từng stream nên khoá theo projectId không rò chéo org.
+const SHARED_TTL_MS = 2_500;
+const shared = new Map<string, { at: number; p: Promise<string> }>();
+
+export function sheetVersionShared(sheetSlug: string, projectId: number | null): Promise<string> {
+  const key = `${projectId}|${sheetSlug}`;
+  const now = Date.now();
+  const hit = shared.get(key);
+  if (hit && now - hit.at < SHARED_TTL_MS) return hit.p;
+  const p = sheetVersion(sheetSlug, projectId);
+  const entry = { at: now, p };
+  shared.set(key, entry);
+  // Lỗi không được cache: lượt sau thử lại. Dọn khoá cũ để map không phình theo số sheet đã xem.
+  p.catch(() => {
+    if (shared.get(key) === entry) shared.delete(key);
+  });
+  if (shared.size > 500) {
+    for (const [k, v] of shared) if (now - v.at >= SHARED_TTL_MS) shared.delete(k);
+  }
+  return p;
+}
+
+/** Chỉ dùng cho test — xoá memo. */
+export function resetSheetVersionShared(): void {
+  shared.clear();
+}

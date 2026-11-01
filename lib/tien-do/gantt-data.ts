@@ -1,7 +1,7 @@
 // Dữ liệu chung để dựng CPM (đường găng) cấp nhóm việc — dùng bởi cả `/api/gantt` và
 // `/api/schedule-control` (M36 PR3), tránh lặp SQL dựng nodes/edges của `lib/cpm.ts`.
 // Trích nguyên logic dựng `bars`/`deps` đã có trong `app/api/gantt/route.ts`.
-import { query } from "@/lib/db";
+import { query, dangTrongGiaoDich } from "@/lib/db";
 import type { CpmNode, CpmEdge } from "@/lib/tien-do/cpm";
 
 export type PackageMeta = {
@@ -39,7 +39,7 @@ export async function getCpmData(
 }> {
   const systemFilter = systemId !== null ? "AND st.system_id = ?" : "";
   const systemParams = systemId !== null ? [systemId] : [];
-  const bars = await query<PackageMeta>(
+  const barsP = query<PackageMeta>(
     `SELECT wp.id, wp.code, wp.name, wp.floor_label AS "floorLabel",
             wp.start_date AS "startDate", wp.end_date AS "endDate",
             wp.progress, wp.status, st.code AS "sheetType", st.slug AS "sheetSlug"
@@ -59,7 +59,10 @@ export async function getCpmData(
   // không có trong `nodes` (xem lib/cpm.ts). Nhưng LUÔN trong dự án: cả việc trước lẫn việc
   // sau phải thuộc dự án đang chọn — trước đây trả MỌI cạnh toàn hệ (kèm mã nhóm việc tổ chức
   // khác).
-  const edges = await query<DepRow>(
+  // Trong transaction dùng chung 1 client → tuần tự; ngoài transaction hai query độc lập chạy song song.
+  const dangTx = dangTrongGiaoDich();
+  const barsTx = dangTx ? await barsP : undefined;
+  const edgesP = query<DepRow>(
     `SELECT d.id, d.predecessor_id AS "predecessorId", d.successor_id AS "successorId",
             p.code AS "predCode", p.progress AS "predProgress"
        FROM package_dependencies d
@@ -74,6 +77,7 @@ export async function getCpmData(
     projectId,
   );
 
+  const [bars, edges] = await Promise.all([barsTx ?? barsP, edgesP]);
   const meta = new Map<number, PackageMeta>(bars.map((b) => [b.id, b]));
   const nodes: CpmNode[] = bars
     .filter((b) => b.startDate && b.endDate)

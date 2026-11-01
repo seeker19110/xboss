@@ -74,6 +74,7 @@ async function handleDailyReport(project: ReportProject) {
     baselineId: null,
     systemId: null,
     source: "bills",
+    chiTomTat: true, // chỉ cần SPI/CPI — bỏ tải lịch sử + dựng chuỗi điểm
   });
   if (evm) {
     const spiBelow = await getAlertThreshold("spi_below", project.id);

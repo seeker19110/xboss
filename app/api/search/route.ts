@@ -1,24 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { ftsExpr, searchSources, type DocHit } from "@/lib/tien-do/search";
+import {
+  searchSources,
+  searchTasksAndPackages,
+  type DocHit,
+  type SearchHit,
+} from "@/lib/tien-do/search";
 
 export const dynamic = "force-dynamic";
 
-// SHAPE CŨ — KHÔNG đổi field (client GlobalSearch + grep phụ thuộc).
-export type SearchHit = {
-  kind: "task" | "package";
-  id: number;
-  code: string;
-  name: string;
-  boqCode: string | null;
-  status: string | null;
-  progress: number;
-  floorLabel: string | null;
-  sheetType: string;
-  sheetSlug: string | null;
-};
+// SHAPE CŨ — KHÔNG đổi field (client GlobalSearch + grep phụ thuộc); định nghĩa ở lib/tien-do/search.ts.
+export type { SearchHit };
 
 // GET /api/search?q= → tìm task + nhóm (shape SearchHit cũ) + các nguồn kho hồ sơ
 // (hợp đồng/công văn/họp/nhật ký/NCR/vật tư/bản vẽ/tài liệu/bình luận — shape DocHit,
@@ -46,57 +39,9 @@ export async function GET(req: NextRequest) {
   // dự án khả kiến (A1-AC02) → không có kết quả, không query nghiệp vụ.
   const projectId = await getCurrentProjectId(user);
   if (projectId == null) return NextResponse.json({ hits: [] });
-  const projectJoin = " JOIN towers tw ON tw.id = st.tower_id";
-  const projectFilter = " AND tw.project_id = ?";
-  const projectParam = [projectId];
 
-  const taskFts = ftsExpr(["t.code", "t.boq_code", "t.name"]);
-  const wpFts = ftsExpr(["wp.code", "wp.boq_code", "wp.name"]);
-
-  const [tasks, packages, docs] = await Promise.all([
-    query<SearchHit>(
-      `SELECT 'task' AS kind, t.id, t.code, t.name, t.boq_code AS "boqCode",
-              t.status, t.progress_percent AS progress,
-              wp.floor_label AS "floorLabel", st.code AS "sheetType", st.slug AS "sheetSlug"
-         FROM tasks t
-         JOIN work_packages wp ON t.package_id = wp.id
-         JOIN sheet_types st ON wp.sheet_type_id = st.id
-         LEFT JOIN systems sys ON sys.id = st.system_id${projectJoin}
-        WHERE (lower(t.code) LIKE ?
-           OR lower(t.boq_code) LIKE ?
-           OR ${taskFts} @@ plainto_tsquery('simple', xboss_unaccent(?))
-           OR lower(sys.code) LIKE ?
-           OR lower(sys.name) LIKE ?)${projectFilter}
-        ORDER BY st.id, t.code LIMIT 15`,
-      prefix,
-      prefix,
-      ftsQuery,
-      prefix,
-      prefix,
-      ...projectParam,
-    ),
-
-    query<SearchHit>(
-      `SELECT 'package' AS kind, wp.id, wp.code, wp.name, wp.boq_code AS "boqCode",
-              wp.status, wp.progress, wp.floor_label AS "floorLabel",
-              st.code AS "sheetType", st.slug AS "sheetSlug"
-         FROM work_packages wp
-         JOIN sheet_types st ON wp.sheet_type_id = st.id
-         LEFT JOIN systems sys ON sys.id = st.system_id${projectJoin}
-        WHERE (lower(wp.code) LIKE ?
-           OR lower(wp.boq_code) LIKE ?
-           OR ${wpFts} @@ plainto_tsquery('simple', xboss_unaccent(?))
-           OR lower(sys.code) LIKE ?
-           OR lower(sys.name) LIKE ?)${projectFilter}
-        ORDER BY st.id, wp.code LIMIT 10`,
-      prefix,
-      prefix,
-      ftsQuery,
-      prefix,
-      prefix,
-      ...projectParam,
-    ),
-
+  const [{ tasks, packages }, docs] = await Promise.all([
+    searchTasksAndPackages(projectId, q),
     searchSources(user.role, projectId, ftsQuery, prefix),
   ]);
 

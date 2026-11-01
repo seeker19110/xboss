@@ -684,6 +684,45 @@ test("POST /api/admin/traffic/ingest: đúng token → ghi vào ring buffer", S,
   assert.ok(getRecent().some((e) => e.path === marker));
 });
 
+test(
+  "POST /api/admin/traffic/ingest: nhận mảng — ghi phần tử hợp lệ, bỏ phần tử thiếu path",
+  S,
+  async () => {
+    const { trafficToken, TRAFFIC_TOKEN_HEADER } = await import("@/lib/bao-mat/traffic-token");
+    const { getRecent } = await import("@/lib/bao-mat/traffic");
+    const { POST } = await import("@/app/api/admin/traffic/ingest/route");
+    const m1 = `/batch-${uniq("traffic")}-1`;
+    const m2 = `/batch-${uniq("traffic")}-2`;
+    const res = await POST(
+      jreq(
+        "/api/admin/traffic/ingest",
+        [{ method: "GET", path: m1 }, { method: "GET" }, { method: "post", path: m2 }],
+        "POST",
+        { [TRAFFIC_TOKEN_HEADER]: trafficToken() },
+      ),
+    );
+    assert.equal(res.status, 200);
+    const rec = getRecent();
+    assert.ok(rec.some((e) => e.path === m1));
+    assert.ok(rec.some((e) => e.path === m2 && e.method === "POST"));
+  },
+);
+
+test(
+  "POST /api/admin/traffic/ingest: mảng rỗng, quá 200 hoặc toàn phần tử sai → 400",
+  S,
+  async () => {
+    const { trafficToken, TRAFFIC_TOKEN_HEADER } = await import("@/lib/bao-mat/traffic-token");
+    const { POST } = await import("@/app/api/admin/traffic/ingest/route");
+    const h = { [TRAFFIC_TOKEN_HEADER]: trafficToken() };
+    const day = Array.from({ length: 201 }, () => ({ method: "GET", path: "/x" }));
+    for (const body of [[], day, [{ method: "GET" }]]) {
+      const res = await POST(jreq("/api/admin/traffic/ingest", body, "POST", h));
+      assert.equal(res.status, 400);
+    }
+  },
+);
+
 // ============================================================================
 // POST /api/users/:id/revoke-sessions
 // ============================================================================

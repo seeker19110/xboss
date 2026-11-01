@@ -200,6 +200,13 @@ export async function DELETE(
     const kq = await ghiNeuConQuyen(
       () => CAN.editStructure(user.role),
       async () => {
+        // Khoá TRƯỚC mọi task của các nhóm bị ảnh hưởng theo id tăng dần (đợt tối ưu 3, L7) rồi
+        // mới xoá ô — cùng thứ tự task → ô với tick (trước đây xoá ô trước rồi mới tính lại từng
+        // task, ngược chiều tick đơn → deadlock khi có người tick đúng task đang bị xoá cột).
+        const tasks = await query<{ id: number }>(
+          `SELECT id FROM tasks WHERE package_id = ANY(?::int[]) ORDER BY id FOR UPDATE`,
+          affectedPkgIds,
+        );
         let totalDeleted = 0;
         for (const pid of affectedPkgIds) {
           const { changes } = await run(
@@ -209,17 +216,12 @@ export async function DELETE(
             pid,
           );
           totalDeleted += changes;
-
-          // Tính lại % cho mọi task + nhóm bị ảnh hưởng (trong transaction — xem chú thích ở POST).
-          const tasks = await query<{ id: number }>(
-            `SELECT id FROM tasks WHERE package_id = ?`,
-            pid,
-          );
-          await withTransaction(async () => {
-            for (const t of tasks) await recomputeTask(t.id, user.name);
-            await recomputePackage(pid);
-          });
         }
+        // Tính lại % mọi task (id tăng dần, đã khoá), rồi mỗi nhóm đúng 1 lần theo id tăng dần
+        // — cùng transaction với việc xoá (xem chú thích ở POST); % nhóm chỉ phụ thuộc % task
+        // sau cùng nên kết quả y như tính lại nhóm sau từng task.
+        for (const t of tasks) await recomputeTask(t.id, user.name, { hoanTinhNhom: true });
+        for (const pid of [...affectedPkgIds].sort((a, b) => a - b)) await recomputePackage(pid);
         return totalDeleted;
       },
     );

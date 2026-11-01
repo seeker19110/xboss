@@ -209,3 +209,29 @@ test(
     await cleanup(s);
   },
 );
+
+test(
+  "sheetVersionShared: 2 lần gọi trong TTL dùng chung 1 query (memo), reset thì đọc lại",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run } = await import("@/lib/db");
+    const { sheetVersion, sheetVersionShared, resetSheetVersionShared } =
+      await import("@/lib/ha-tang/version");
+    const s = await seedSheet("memo");
+    resetSheetVersionShared();
+    const v1 = await sheetVersionShared(s.slug, s.projectId);
+    // Đổi dữ liệu → watermark thật đổi, nhưng trong TTL memo vẫn trả giá trị cũ (không query lại).
+    await run(
+      `INSERT INTO tasks (package_id, code, name) VALUES (?, 'M,01', 'Task memo')`,
+      s.pkgId,
+    );
+    const real = await sheetVersion(s.slug, s.projectId);
+    assert.notEqual(real, v1);
+    assert.equal(await sheetVersionShared(s.slug, s.projectId), v1, "trong TTL → dùng memo");
+    // 2 lời gọi đồng thời cùng khoá → cùng 1 promise
+    assert.equal(sheetVersionShared(s.slug, s.projectId), sheetVersionShared(s.slug, s.projectId));
+    resetSheetVersionShared();
+    assert.equal(await sheetVersionShared(s.slug, s.projectId), real, "sau reset đọc lại DB");
+    await cleanup(s);
+  },
+);

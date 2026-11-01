@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import EditableText from "@/app/components/EditableText";
+import LinkNoiBo from "@/app/components/LinkNoiBo";
 import { Card, Chip, Section } from "@/app/components/ui";
 
 // Cột phải trang chủ (M125): điều hướng + phân tích phụ, gom lại để cột chính chỉ còn
@@ -185,7 +186,7 @@ export default function HomeRail({
           {HUBS.map((hub) => {
             const HubIcon = hub.icon;
             return (
-              <a
+              <LinkNoiBo
                 key={hub.href}
                 href={hub.href}
                 className="group flex items-center gap-2.5 min-h-11 px-2 rounded-lg hover:bg-zinc-800/60 transition interactive-press"
@@ -205,7 +206,7 @@ export default function HomeRail({
                   className="w-3.5 h-3.5 shrink-0 text-zinc-600 group-hover:text-emerald-400 transition-colors"
                   aria-hidden="true"
                 />
-              </a>
+              </LinkNoiBo>
             );
           })}
         </Card>
@@ -217,11 +218,11 @@ export default function HomeRail({
       <Section title="Vòng đời" description="6 giai đoạn quy trình dự án">
         <div className="flex flex-wrap gap-1.5">
           {LIFECYCLE.map((stg) => (
-            <a key={stg.stage} href={stg.href} title={stg.desc} className="shrink-0">
+            <LinkNoiBo key={stg.stage} href={stg.href} title={stg.desc} className="shrink-0">
               <Chip className="whitespace-nowrap">
                 <span className="font-mono font-bold">{stg.stage}</span> {stg.title}
               </Chip>
-            </a>
+            </LinkNoiBo>
           ))}
         </div>
       </Section>

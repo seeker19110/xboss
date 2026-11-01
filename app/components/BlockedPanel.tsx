@@ -13,13 +13,13 @@ type Bar = {
 type Blocked = { id: number; preds: string[] };
 
 // Panel "Việc bị chặn": nhóm đã tới ngày bắt đầu nhưng việc trước (phụ thuộc) chưa xong.
-// Dữ liệu lấy từ /api/gantt (đã tính sẵn `blocked`).
+// Dữ liệu lấy từ /api/gantt?only=blocked (chỉ nhóm bị chặn, không CPM).
 export default function BlockedPanel() {
   const [bars, setBars] = useState<Bar[]>([]);
   const [blocked, setBlocked] = useState<Blocked[]>([]);
 
   useEffect(() => {
-    fetch("/api/gantt")
+    fetch("/api/gantt?only=blocked")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         if (!j) return;

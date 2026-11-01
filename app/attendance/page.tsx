@@ -1,15 +1,38 @@
 "use client";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import dynamic from "next/dynamic";
 import { Minus, Plus, Trash2, Users, CalendarCheck, RefreshCw } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
-import { PageSkeleton } from "@/app/components/Skeleton";
+import { PageSkeleton, Skeleton } from "@/app/components/Skeleton";
 import { appConfirm } from "@/app/components/dialogs";
 import { Button } from "@/app/components/ui";
 import { fetchMe, invalidateMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { todayISO } from "@/lib/nen/date";
-import AttendanceChart from "./AttendanceChart";
+
+// FE-2: recharts (~110KB gzip) chỉ vẽ khi tháng đã chốt snapshot — nạp chunk khi cần; skeleton
+// cao đúng bằng khung biểu đồ để không giật bố cục.
+const AttendanceChart = dynamic(
+  () =>
+    import("./AttendanceChart").catch(() => ({
+      // Chunk biểu đồ tải lỗi (mạng yếu) → báo tại chỗ, không văng error boundary cả trang.
+      default: function BieuDoLoiTai() {
+        return (
+          <p
+            role="alert"
+            className="flex h-[260px] items-center justify-center rounded-xl border border-zinc-800 bg-zinc-950/70 px-4 text-center text-sm text-zinc-400"
+          >
+            Không tải được biểu đồ — kiểm tra kết nối mạng rồi tải lại trang.
+          </p>
+        );
+      },
+    })),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[260px] rounded-xl" />,
+  },
+);
 
 type Crew = { id: number; name: string };
 type Personnel = { id: number; fullName: string; crewNames: string | null };

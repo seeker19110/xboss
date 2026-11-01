@@ -1,5 +1,6 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import LinkNoiBo from "@/app/components/LinkNoiBo";
 
 // Nút dùng chung — gom về một chỗ các biến thể đang bị chép tay rải rác khắp trang
 // (bg-emerald-700 hover:bg-emerald-600…, bg-zinc-800 hover:bg-zinc-700…). Mọi màu đều
@@ -81,7 +82,10 @@ export default function Button({
   );
 }
 
-/** Cùng hình thức với Button nhưng là link điều hướng thật (`<a href>`). */
+/**
+ * Cùng hình thức với Button nhưng là link điều hướng thật. Link nội bộ (`/…`, không target/download)
+ * đi qua router của Next khi an toàn (FE-1, xem app/lib/dieuHuong.ts); còn lại vẫn là `<a href>`.
+ */
 export function ButtonLink({
   variant,
   size = "md",
@@ -89,13 +93,24 @@ export function ButtonLink({
   labelOnDesktopOnly,
   children,
   className,
+  href,
   ...rest
 }: Common & Omit<ComponentPropsWithoutRef<"a">, "children" | "className">) {
+  const inner = (
+    <Inner icon={icon} size={size} labelOnDesktopOnly={labelOnDesktopOnly}>
+      {children}
+    </Inner>
+  );
+  const cls = buttonClass({ variant, size, className });
+  if (href == null)
+    return (
+      <a className={cls} {...rest}>
+        {inner}
+      </a>
+    );
   return (
-    <a className={buttonClass({ variant, size, className })} {...rest}>
-      <Inner icon={icon} size={size} labelOnDesktopOnly={labelOnDesktopOnly}>
-        {children}
-      </Inner>
-    </a>
+    <LinkNoiBo className={cls} href={href} {...rest}>
+      {inner}
+    </LinkNoiBo>
   );
 }

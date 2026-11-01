@@ -79,10 +79,15 @@ const toISO = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 // Tỷ lệ kế hoạch đã trôi của 1 task tại thời điểm atMs (nội suy tuyến tính start→end,
 // clamp 0..1) — cùng công thức với S-curve/SPI. Hàm thuần, test trực tiếp.
 export function plannedRatio(startISO: string, endISO: string, atMs: number): number {
-  const s = toMs(startISO),
-    e = toMs(endISO);
-  if (e <= s) return atMs >= e ? 1 : 0;
-  return Math.min(1, Math.max(0, (atMs - s) / (e - s)));
+  return plannedRatioMs(toMs(startISO), toMs(endISO), atMs);
+}
+
+// Cùng công thức `plannedRatio` nhưng nhận sẵn mốc ms — vòng lặp điểm × task (S-curve, EVM)
+// tính trước ms của ngày BĐ/KT một lần thay vì parse chuỗi ISO ở mỗi điểm (đợt tối ưu 3 G2).
+// `plannedRatio` gọi lại hàm này nên chỉ có MỘT công thức.
+export function plannedRatioMs(sMs: number, eMs: number, atMs: number): number {
+  if (eMs <= sMs) return atMs >= eMs ? 1 : 0;
+  return Math.min(1, Math.max(0, (atMs - sMs) / (eMs - sMs)));
 }
 
 /** Tỷ lệ hữu tỉ exact num/den (den > 0). */
@@ -131,6 +136,9 @@ export async function getEvmSeries(opts: {
   baselineId?: number | null;
   systemId?: number | null;
   source?: EvmSource;
+  /** Chỉ cần summary (vd cron báo cáo ngày lấy SPI/CPI): bỏ query task_history + dựng chuỗi
+   *  điểm — summary vốn không dùng lịch sử. Khi bật: `series` rỗng, `from` = `to` = hôm nay. */
+  chiTomTat?: boolean;
 }): Promise<{
   series: EvmPoint[];
   summary: EvmSummary;
@@ -211,25 +219,29 @@ export async function getEvmSeries(opts: {
     tasks.map((t) => [t.id, t.valueText != null ? parseMoney(t.valueText) : fallback]),
   );
 
-  // Lịch sử % từng task để tái dựng EV theo ngày (cùng pattern /api/dashboard/scurve).
-  const hist = await query<{
+  // Lịch sử % từng task để tái dựng EV theo ngày (cùng pattern /api/dashboard/scurve) — chỉ
+  // chuỗi điểm cần; `chiTomTat` bỏ hẳn query này (summary không dùng lịch sử).
+  type HistRow = {
     taskId: number;
     oldProgress: number | null;
     newProgress: number | null;
     day: string;
-  }>(
-    `SELECT h.task_id AS "taskId", h.old_progress AS "oldProgress",
-            h.new_progress AS "newProgress",
-            (h.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS day
-       FROM task_history h
-       JOIN tasks t ON h.task_id = t.id
-       JOIN work_packages wp ON t.package_id = wp.id
-       JOIN sheet_types st ON wp.sheet_type_id = st.id
-       ${projectJoin}
-       ${where}
-      ORDER BY h.task_id, h.changed_at`,
-    ...args,
-  );
+  };
+  const hist: HistRow[] = opts.chiTomTat
+    ? []
+    : await query<HistRow>(
+        `SELECT h.task_id AS "taskId", h.old_progress AS "oldProgress",
+                h.new_progress AS "newProgress",
+                (h.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS day
+           FROM task_history h
+           JOIN tasks t ON h.task_id = t.id
+           JOIN work_packages wp ON t.package_id = wp.id
+           JOIN sheet_types st ON wp.sheet_type_id = st.id
+           ${projectJoin}
+           ${where}
+          ORDER BY h.task_id, h.changed_at, h.id`, // + id: trùng changed_at vẫn xác định
+        ...args,
+      );
   const eventsByTask = new Map<number, { day: string; progress: number }[]>();
   for (const h of hist) {
     if (!eventsByTask.has(h.taskId)) eventsByTask.set(h.taskId, []);
@@ -309,7 +321,7 @@ export async function getEvmSeries(opts: {
   const series: EvmPoint[] = [];
   let from = today,
     to = today;
-  if (hasValues) {
+  if (hasValues && !opts.chiTomTat) {
     const dates: string[] = [];
     for (const t of tasks) {
       if (t.startDate) dates.push(t.startDate);
@@ -335,6 +347,11 @@ export async function getEvmSeries(opts: {
       evCur.set(t.id, eventsByTask.has(t.id) ? (baseProgress.get(t.id) ?? 0) : (t.progress ?? 0));
     let acPtr = 0;
     let acCur = 0n; // AC luỹ kế exact (bigint đồng×100) tới điểm đang xét
+    // Tính trước ms ngày BĐ/KT + giá trị của task có kế hoạch (cùng thứ tự `planned` để tổng
+    // float cộng đúng thứ tự cũ) — không parse chuỗi ISO ở mỗi điểm × task.
+    const plVal = Float64Array.from(planned, (t) => valueNum.get(t.id)!);
+    const plS = Float64Array.from(planned, (t) => toMs(t.startDate!));
+    const plE = Float64Array.from(planned, (t) => toMs(t.endDate!));
 
     for (let ms = toMs(from); ; ms += step * DAY_MS) {
       if (ms > toMs(to)) ms = toMs(to);
@@ -343,8 +360,7 @@ export async function getEvmSeries(opts: {
       let pv: number | null = null;
       if (planned.length > 0) {
         let sum = 0;
-        for (const t of planned)
-          sum += valueNum.get(t.id)! * plannedRatio(t.startDate!, t.endDate!, ms);
+        for (let i = 0; i < plVal.length; i++) sum += plVal[i] * plannedRatioMs(plS[i], plE[i], ms);
         pv = Math.round(sum / 100);
       }
 

@@ -17,6 +17,9 @@ const TABLES = [
   "task_history",
   "tasks",
   "work_packages",
+  // Nghiệm thu tầng (FK tới sheet_types, không CASCADE) — file test khác chạy trước trên cùng
+  // DB (vd duyệt tầng ở dot3-g1) để lại dòng thì DELETE sheet_types vướng 23503.
+  "floor_approvals",
   "sheet_types",
   "towers",
 ];

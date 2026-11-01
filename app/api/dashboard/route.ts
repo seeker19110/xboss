@@ -64,7 +64,10 @@ export async function GET(req: NextRequest) {
   // trễ/xử lý — bảng Pareto trên dashboard dựa vào đây). Các số liệu tổng hợp bên dưới
   // (totalDelayed/kpi[].delayed) đếm theo HẠNG MỤC = cặp (sheet, tầng): OGTĐ tầng 27 có
   // nhiều công tác trễ vẫn tính 1 hạng mục trễ; OGTĐ-27 và OGCH-27 tính riêng 2 hạng mục.
-  const delayedTasks = await query<{
+  // Đợt tối ưu 3 (G2): 4 nguồn độc lập dưới đây (task trễ, % nhóm, KPI sheet, % đầu kỳ) chạy
+  // song song trong đợt 1 thay vì tuần tự — route không bọc transaction nên mỗi query mượn
+  // kết nối pool riêng. Đợt 2 (khối mở rộng) cần kpiRaw/previousRows nên chạy sau.
+  const delayedTasksP = query<{
     id: number;
     code: string;
     name: string;
@@ -105,6 +108,23 @@ export async function GET(req: NextRequest) {
     ...projectParams,
   );
 
+  // Tiến độ trung bình của TOÀN BỘ công tác trong từng hạng mục (sheet+tầng) — dùng cho
+  // cột "Tiến độ TB" ở bảng hạng mục trễ, tránh nhầm với avg chỉ tính trên công tác trễ.
+  // KPI theo từng sheet — tách hàm dùng chung lib/kpi.ts (dùng lại cho /api/v1/dashboard/kpi).
+  // `?range=week|month` (M36 PR3): thêm % đầu kỳ + Δ kỳ cho từng dòng KPI — tái dựng từ
+  // task_history qua `progressAtDate` (mốc 7/30 ngày trước), gộp theo sheetId.
+  const [delayedTasks, groupProgress, kpiRaw, previousRows] = await Promise.all([
+    delayedTasksP,
+    getGroupProgressMap({ systemId, projectId }),
+    sheetProgressKpi({ projectId, systemId }),
+    range === "week" || range === "month"
+      ? progressAtDate(range === "week" ? daysFromTodayISO(-7) : daysFromTodayISO(-30), {
+          ...(systemId !== null ? { systemId } : {}),
+          projectId,
+        })
+      : undefined,
+  ]);
+
   // Hạng mục trễ = cặp (sheet, tầng) có ≥1 công tác trễ — nhiều công tác trễ cùng một
   // (sheet, tầng) vẫn tính 1 hạng mục. Suy trực tiếp từ delayedTasks (đã lọc theo
   // systemFilter) thay vì query SQL riêng, đảm bảo tổng số + số theo từng sheet luôn khớp.
@@ -118,26 +138,11 @@ export async function GET(req: NextRequest) {
     0,
   );
 
-  // Tiến độ trung bình của TOÀN BỘ công tác trong từng hạng mục (sheet+tầng) — dùng cho
-  // cột "Tiến độ TB" ở bảng hạng mục trễ, tránh nhầm với avg chỉ tính trên công tác trễ.
-  const groupProgress = await getGroupProgressMap({ systemId, projectId });
-
-  // KPI theo từng sheet — tách hàm dùng chung lib/kpi.ts (dùng lại cho /api/v1/dashboard/kpi).
-  const kpiRaw = await sheetProgressKpi({ projectId, systemId });
   const kpi = kpiRaw.map((k) => ({
     ...k,
     delayed: delayedItemsBySheet.get(k.sheetType)?.size ?? 0,
   }));
 
-  // `?range=week|month` (M36 PR3): thêm % đầu kỳ + Δ kỳ cho từng dòng KPI — tái dựng từ
-  // task_history qua `progressAtDate` (mốc 7/30 ngày trước), gộp theo sheetId.
-  const previousRows =
-    range === "week" || range === "month"
-      ? await progressAtDate(range === "week" ? daysFromTodayISO(-7) : daysFromTodayISO(-30), {
-          ...(systemId !== null ? { systemId } : {}),
-          projectId,
-        })
-      : undefined;
   const kpiWithDelta =
     previousRows !== undefined
       ? (() => {
@@ -168,21 +173,22 @@ export async function GET(req: NextRequest) {
   const canViewFinance = CAN.viewPayments(user.role);
   // M127 — `dueSoon` (task sắp đến hạn theo ngưỡng alert_rules) + `weekDelta` (Δ % tổng so
   // với 7 ngày trước) cho dải KPI trang chủ; cùng bộ lọc dự án + `?system=` như các khối khác.
-  const [quality, procurement, workfront, bySystem, dueSoon, weekDelta] = await Promise.all([
-    qualityBlock(projectId),
-    procurementBlock(projectId),
-    workfrontBlock(projectId),
-    bySystemBlock(projectId, { includeBudget: false }),
-    dueSoonBlock({ projectId, systemId }),
-    weekDeltaBlock(
-      { projectId, systemId },
-      { kpi: kpiRaw, ...(range === "week" ? { previousRows } : {}) },
-    ),
-  ]);
-  const vo = canViewFinance ? await voBlock(projectId) : null;
-
-  // Widget "Chờ duyệt" (M19) — chỉ người có quyền duyệt (Admin/PM) cần thấy.
-  const approvals = CAN.approve(user.role) ? await approvalsBlock(projectId) : null;
+  // `vo` chỉ cho PAYMENT_VIEW_ROLES; widget "Chờ duyệt" (M19) chỉ người có quyền duyệt
+  // (Admin/PM) — không đủ quyền thì không chạy query, trả null như cũ.
+  const [quality, procurement, workfront, bySystem, dueSoon, weekDelta, vo, approvals] =
+    await Promise.all([
+      qualityBlock(projectId),
+      procurementBlock(projectId),
+      workfrontBlock(projectId),
+      bySystemBlock(projectId, { includeBudget: false }),
+      dueSoonBlock({ projectId, systemId }),
+      weekDeltaBlock(
+        { projectId, systemId },
+        { kpi: kpiRaw, ...(range === "week" ? { previousRows } : {}) },
+      ),
+      canViewFinance ? voBlock(projectId) : null,
+      CAN.approve(user.role) ? approvalsBlock(projectId) : null,
+    ]);
 
   return NextResponse.json({
     approvals,

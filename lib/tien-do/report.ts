@@ -156,6 +156,16 @@ export function reconstructProgressAtDate<T extends { id: number; progress: numb
 // Bản đọc DB: tái dựng % tiến độ từng task tại mốc `date`, lọc theo hệ nếu có `systemId`
 // và theo dự án đang chọn nếu có `projectId` (đa dự án, M22+ — optional, không truyền =
 // không lọc, tương thích ngược các chỗ gọi cũ như buildWeeklyReport).
+//
+// Đợt tối ưu 3 (G2): trước đây kéo TOÀN BỘ task_history của dự án về Node rồi
+// `reconstructProgressAtDate` — chi phí tăng theo tuổi dự án. Nay 1 query, mỗi task 1 dòng,
+// 2 LATERAL LIMIT 1 bám index idx_task_history_task_changed (task_id, changed_at DESC). Giữ
+// ĐÚNG ngữ nghĩa bản JS (test so khớp ở tests/perf-bao-cao-tuong-duong.test.ts):
+//  - `lp` = sự kiện cuối có ngày VN ≤ `date` ⇔ changed_at < 00:00 giờ VN của ngày kế;
+//  - có `lp` → new_progress ?? 0 (KHÔNG rơi tiếp sang fp khi new_progress NULL — vì vậy dùng
+//    cờ `found`, không COALESCE chuỗi); chưa có → old_progress ?? 0 của sự kiện đầu `fp`;
+//    task không lịch sử → progress hiện tại (?? 0 ở JS như cũ);
+//  - trùng changed_at: tie-break theo id (bản cũ phụ thuộc thứ tự quét, không xác định).
 export async function progressAtDate(
   date: string,
   filter: { systemId?: number; projectId?: number } = {},
@@ -166,37 +176,46 @@ export async function progressAtDate(
   const projectFilter = filter.projectId != null ? "AND tw.project_id = ?" : "";
   const projectParams = filter.projectId != null ? [filter.projectId] : [];
 
-  const tasks = await query<{ id: number; progress: number; sheetId: number; sheetType: string }>(
-    `SELECT t.id, t.progress_percent AS progress, st.id AS "sheetId", st.code AS "sheetType"
+  const rows = await query<{
+    id: number;
+    progress: number | null;
+    sheetId: number;
+    sheetType: string;
+  }>(
+    `SELECT t.id, st.id AS "sheetId", st.code AS "sheetType",
+            CASE WHEN lp.found THEN COALESCE(lp.new_progress, 0)
+                 WHEN fp.found THEN COALESCE(fp.old_progress, 0)
+                 ELSE t.progress_percent END AS progress
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
        ${projectJoin}
+       LEFT JOIN LATERAL (
+         SELECT h.new_progress, true AS found
+           FROM task_history h
+          WHERE h.task_id = t.id
+            AND h.changed_at < ((?::date + 1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh')
+          ORDER BY h.changed_at DESC, h.id DESC
+          LIMIT 1
+       ) lp ON true
+       LEFT JOIN LATERAL (
+         SELECT h.old_progress, true AS found
+           FROM task_history h
+          WHERE h.task_id = t.id
+          ORDER BY h.changed_at ASC, h.id ASC
+          LIMIT 1
+       ) fp ON true
       WHERE 1=1 ${systemFilter} ${projectFilter}`,
+    date,
     ...systemParams,
     ...projectParams,
   );
 
-  const hist = await query<HistRow>(
-    `SELECT h.task_id AS "taskId", h.old_progress AS "oldProgress", h.new_progress AS "newProgress",
-            (h.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS day
-       FROM task_history h
-       JOIN tasks t ON h.task_id = t.id
-       JOIN work_packages wp ON t.package_id = wp.id
-       JOIN sheet_types st ON wp.sheet_type_id = st.id
-       ${projectJoin}
-      WHERE 1=1 ${systemFilter} ${projectFilter}
-      ORDER BY h.task_id, h.changed_at`,
-    ...systemParams,
-    ...projectParams,
-  );
-
-  const progress = reconstructProgressAtDate(tasks, hist, date);
-  return tasks.map((t) => ({
-    taskId: t.id,
-    sheetId: t.sheetId,
-    sheetType: t.sheetType,
-    progress: progress.get(t.id) ?? t.progress ?? 0,
+  return rows.map((r) => ({
+    taskId: r.id,
+    sheetId: r.sheetId,
+    sheetType: r.sheetType,
+    progress: r.progress ?? 0,
   }));
 }
 

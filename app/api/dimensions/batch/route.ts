@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, withTransaction } from "@/lib/db";
 import { recomputePackage, recomputeTask } from "@/lib/tien-do/recompute";
 import { ghiDauVetTick } from "@/lib/tien-do/dimension-events";
-import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { handoverBlocked, methodStatementBlocked } from "@/lib/ky-thuat/qaqc";
-import { taskProjectId } from "@/lib/tien-do/workpackages";
 import {
   bamYeuCau,
   docThaoTacHangDoi,
@@ -77,28 +76,40 @@ export async function PATCH(req: NextRequest) {
 
   // Sắp tăng dần: mọi lô khoá task theo CÙNG một thứ tự (N2, audit logic 2026-10-01) — hai lô
   // chồng nhau xếp hàng ở task chung đầu tiên thay vì giữ chéo khoá rồi deadlock (Postgres huỷ 1
-  // bên → 500). Khoá work_packages trong recomputeTask đến SAU khi đã giữ đủ khoá task.
+  // bên → 500). Khoá work_packages (trong recomputePackage) đến SAU khi đã giữ đủ khoá task.
   const taskIds = [...new Set(dims.map((d) => d.task_id))].sort((a, b) => a - b);
+  const taskPlaceholders = taskIds.map(() => "?").join(", ");
 
   // Cách ly dự án (vá W6, Đợt 5) — canTouchTask không so dự án (xem ghi chú ở
   // app/api/dimensions/[id]/route.ts). Kiểm TỪNG task trong vùng chọn: chỉ cần 1 ô thuộc
   // dự án khác là chặn nguyên request (id đoán được, "Không tìm thấy dimension" — không lộ
-  // dòng nào thuộc dự án khác tồn tại).
-  for (const tid of taskIds) {
-    if (projectId == null || (await taskProjectId(tid)) !== projectId)
-      return NextResponse.json({ error: "Không tìm thấy dimension" }, { status: 404 });
-  }
+  // dòng nào thuộc dự án khác tồn tại). Dự án + người được giao của cả vùng chọn đọc trong
+  // MỘT câu (đợt tối ưu 3, P5 — trước đây 1 taskProjectId + 1 canTouchTask mỗi task); vẫn
+  // 404 (dự án) trước rồi mới 403 (thầu phụ), thông điệp y hệt.
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy dimension" }, { status: 404 });
+  const phamVi = await query<{ id: number; assigned_to: number | null; project_id: number | null }>(
+    `SELECT t.id, t.assigned_to, tw.project_id
+       FROM tasks t
+       JOIN work_packages wp ON wp.id = t.package_id
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       LEFT JOIN towers tw ON tw.id = st.tower_id
+      WHERE t.id IN (${taskPlaceholders})`,
+    ...taskIds,
+  );
+  const duAnCuaTask = new Map(phamVi.map((r) => [r.id, r]));
+  if (taskIds.some((tid) => duAnCuaTask.get(tid)?.project_id !== projectId))
+    return NextResponse.json({ error: "Không tìm thấy dimension" }, { status: 404 });
 
-  for (const tid of taskIds) {
-    if (!(await canTouchTask(user, tid)))
-      return NextResponse.json(
-        { error: "Bạn chỉ được cập nhật task được giao cho mình" },
-        { status: 403 },
-      );
-  }
+  // Cùng luật canTouchTask (lib/bao-mat/auth.ts): thầu phụ chỉ chạm task giao cho mình, vai
+  // trò khác không giới hạn — đọc assigned_to từ câu trên thay vì 1 query mỗi task.
+  if (user.role === "subcon" && phamVi.some((r) => r.assigned_to !== user.id))
+    return NextResponse.json(
+      { error: "Bạn chỉ được cập nhật task được giao cho mình" },
+      { status: 403 },
+    );
 
   const dimIds = dims.map((d) => d.id);
-  const taskPlaceholders = taskIds.map(() => "?").join(", ");
 
   // Receipt (S06): hash theo TẬP ô client yêu cầu (đã khử trùng, sắp tăng) + trạng thái — gửi lại
   // cùng lô theo thứ tự khác vẫn là cùng thao tác; đổi tập ô/trạng thái dưới cùng key → 409.
@@ -164,9 +175,10 @@ export async function PATCH(req: NextRequest) {
       // của các ô được giữ nguyên khi tick, và bị xoá cùng dấu vết lắp khi bỏ tick).
       await ghiDauVetTick(dimIds, !!installed, { userId: user.id });
       // Tính lại task (đã khoá theo id tăng dần ở trên), rồi mỗi nhóm đúng 1 lần ở cuối — % nhóm
-      // chỉ phụ thuộc % task sau cùng nên kết quả y như tính lại sau từng task. Thứ tự khoá không
-      // đổi so với trước: SELECT … FOR UPDATE trong recomputeTask (JOIN work_packages, không
-      // `OF t`) đã khoá dòng nhóm theo thứ tự task; vòng dưới chỉ khoá lại dòng đã giữ.
+      // chỉ phụ thuộc % task sau cùng nên kết quả y như tính lại sau từng task. Thứ tự khoá
+      // (đợt tối ưu 3, L1): recomputeTask chỉ khoá dòng task (`FOR UPDATE OF t`), dòng nhóm chỉ
+      // bị khoá ở vòng recomputePackage dưới theo id nhóm tăng dần — mọi task trước, mọi nhóm sau,
+      // nên hai lô xen kẽ nhóm không còn giữ chéo khoá nhóm.
       const nhom = new Set<number>();
       for (const tid of taskIds) {
         const r = await recomputeTask(tid, user.name, { hoanTinhNhom: true });

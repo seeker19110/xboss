@@ -146,7 +146,10 @@ test("A2-AC05: nhật ký — IDB abort → form giữ nội dung, toast OFFLINE
   await expect(page.getByText("Nhật ký thi công", { exact: false })).toBeVisible({
     timeout: 15_000,
   });
-  const ngay = new Date().getDate();
+  // Ngày theo giờ VN — trang lấy tháng theo todayISO() (Asia/Ho_Chi_Minh), runner CI chạy UTC.
+  const ngay = Number(
+    new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" }).slice(8, 10),
+  );
   await page
     .getByRole("button", { name: String(ngay), exact: true })
     .first()

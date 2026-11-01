@@ -3,7 +3,7 @@ import { query, queryOne, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { resolveSystemId } from "@/lib/tien-do/systems";
 import { kiemBaselineThuocDuAn, parseBaselineParam } from "@/lib/tien-do/baseline-scope";
-import { plannedRatio } from "@/lib/tien-do/evm";
+import { plannedRatioMs } from "@/lib/tien-do/evm";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
@@ -167,7 +167,7 @@ export async function GET(req: NextRequest) {
          JOIN sheet_types st ON wp.sheet_type_id = st.id
          ${projectJoin}
         WHERE 1=1 ${sheetFilter} ${projectFilter}
-        ORDER BY h.task_id, h.changed_at`,
+        ORDER BY h.task_id, h.changed_at, h.id`, // + id: trùng changed_at vẫn xác định
       ...params,
       ...projectParams,
     );
@@ -200,6 +200,18 @@ export async function GET(req: NextRequest) {
   const planned = tasks.filter((t) => t.startDate && t.endDate);
   const points: { date: string; planned: number | null; actual: number | null }[] = [];
 
+  // Đợt tối ưu 3 (G2): tính trước ms ngày BĐ/KT (không parse chuỗi ở mỗi điểm × task) và
+  // dùng con trỏ đi xuôi cho đường thực tế (mẫu lib/tien-do/evm.ts) thay vì quét lại sự kiện
+  // từ đầu ở mỗi điểm — các điểm `ms` tăng đơn điệu nên kết quả y hệt; cộng theo đúng thứ tự
+  // task cũ để tổng float không đổi.
+  const plS = Float64Array.from(planned, (t) => toDate(t.startDate!));
+  const plE = Float64Array.from(planned, (t) => toDate(t.endDate!));
+  const taskEvents = eventsByTask ? tasks.map((t) => eventsByTask!.get(t.id)) : [];
+  const evPtr = new Int32Array(taskEvents.length);
+  const evCur = Float64Array.from(tasks, (t, i) =>
+    taskEvents[i] ? (baselineProgress!.get(t.id) ?? 0) : (t.progress ?? 0),
+  );
+
   for (let ms = toDate(from); ; ms += step * DAY_MS) {
     if (ms > toDate(to)) ms = toDate(to); // luôn chốt điểm cuối
     const d = toISO(ms);
@@ -208,7 +220,7 @@ export async function GET(req: NextRequest) {
     let plannedPct: number | null = null;
     if (planned.length > 0) {
       let sum = 0;
-      for (const t of planned) sum += plannedRatio(t.startDate!, t.endDate!, ms);
+      for (let i = 0; i < plS.length; i++) sum += plannedRatioMs(plS[i], plE[i], ms);
       plannedPct = sum / planned.length;
     }
 
@@ -219,19 +231,17 @@ export async function GET(req: NextRequest) {
       if (mvActual) {
         actualPct = mvActual.get(d) ?? 0;
       } else {
+        // Task không lịch sử: evCur giữ % hiện tại từ đầu; có lịch sử: % nền (old_progress
+        // của sự kiện đầu) rồi tiến con trỏ qua mọi sự kiện có ngày ≤ d.
         let sum = 0;
-        for (const t of tasks) {
-          const events = eventsByTask!.get(t.id);
-          if (!events) {
-            sum += t.progress ?? 0;
-            continue;
-          } // không có lịch sử → coi như % hiện tại từ đầu
-          let p = baselineProgress!.get(t.id) ?? 0;
-          for (const ev of events) {
-            if (ev.day <= d) p = ev.progress;
-            else break;
+        for (let i = 0; i < tasks.length; i++) {
+          const events = taskEvents[i];
+          if (events) {
+            let j = evPtr[i];
+            while (j < events.length && events[j].day <= d) evCur[i] = events[j++].progress;
+            evPtr[i] = j;
           }
-          sum += p;
+          sum += evCur[i];
         }
         actualPct = sum / tasks.length;
       }

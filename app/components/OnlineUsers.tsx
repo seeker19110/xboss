@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Wifi } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/nen/roles";
+import { createVisiblePoll } from "@/app/lib/visiblePoll";
 
 type PresenceEntry = { userId: number; name: string; role: string; lastSeen: number };
 
@@ -14,28 +15,36 @@ export default function OnlineUsers({ isAdmin }: { isAdmin: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Heartbeat — mọi user đều gửi
+  // Heartbeat — mọi user đều gửi; tab ẩn thì tạm dừng, hiện lại gửi bù ngay.
   useEffect(() => {
-    const send = () => fetch("/api/presence", { method: "POST" }).catch(() => {});
-    send();
-    const id = setInterval(send, HEARTBEAT_MS);
-    return () => clearInterval(id);
+    const poll = createVisiblePoll({
+      visibility: document,
+      everyMs: HEARTBEAT_MS,
+      load: (signal) => fetch("/api/presence", { method: "POST", signal }),
+      onData: () => {},
+    });
+    return () => poll.dispose();
   }, []);
 
-  // Poll danh sách — chỉ admin
+  // Danh sách online — chỉ admin. Popover đóng: tải 1 lần (cho số đếm trên nút), không poll nền;
+  // popover mở: poll định kỳ khi tab hiện.
   useEffect(() => {
     if (!isAdmin) return;
-    const load = () =>
-      fetch("/api/presence")
-        .then((r) => (r.ok ? r.json() : null))
-        .then((j) => {
-          if (j?.users) setUsers(j.users);
-        })
-        .catch(() => {});
-    load();
-    const id = setInterval(load, POLL_MS);
-    return () => clearInterval(id);
-  }, [isAdmin]);
+    const load = async (signal: AbortSignal) => {
+      const r = await fetch("/api/presence", { signal });
+      return r.ok ? ((await r.json()) as { users?: PresenceEntry[] }) : null;
+    };
+    const onData = (j: { users?: PresenceEntry[] } | null) => {
+      if (j?.users) setUsers(j.users);
+    };
+    if (!open) {
+      const ctl = new AbortController();
+      load(ctl.signal).then(onData, () => {});
+      return () => ctl.abort();
+    }
+    const poll = createVisiblePoll({ visibility: document, everyMs: POLL_MS, load, onData });
+    return () => poll.dispose();
+  }, [isAdmin, open]);
 
   // Đóng popover khi click ngoài hoặc bấm Escape
   useEffect(() => {

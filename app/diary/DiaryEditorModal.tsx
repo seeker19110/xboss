@@ -682,6 +682,8 @@ export default function DiaryEditorModal({
                       <img
                         src={`/api/photos/${p.id}`}
                         alt={`Ảnh task ${p.taskCode}`}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover"
                       />
                       {checked && (

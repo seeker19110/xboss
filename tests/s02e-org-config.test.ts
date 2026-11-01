@@ -430,6 +430,16 @@ test(
         headers: { cookie: `${COOKIE}=${token.slice(0, -4)}abcd` },
       }),
     );
+    // G4 (đợt 3): proxy gom lô traffic — flush tay rồi trải mảng entry (thứ tự giữ nguyên).
+    const { flushTraffic } = await import("@/lib/bao-mat/traffic-batch");
+    flushTraffic();
+    await new Promise((r) => setImmediate(r));
+    const entries = bodies.flatMap((b) => (Array.isArray(b) ? b : [b])) as Record<
+      string,
+      unknown
+    >[];
+    bodies.length = 0;
+    bodies.push(...entries);
     assert.equal(bodies.length, 3);
     assert.equal(bodies[0].orgId, orgId);
     assert.equal(bodies[1].orgId, null);

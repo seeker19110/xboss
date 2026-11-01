@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
-import { sheetVersion } from "@/lib/ha-tang/version";
+import { sheetVersionShared } from "@/lib/ha-tang/version";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
         if (closed) return;
         tick++;
         try {
-          const v = await sheetVersion(sheet, projectId);
+          const v = await sheetVersionShared(sheet, projectId);
           if (v !== last || tick % REFRESH_EVERY === 0) {
             last = v;
             send(`event: version\ndata: ${JSON.stringify({ v })}\n\n`);

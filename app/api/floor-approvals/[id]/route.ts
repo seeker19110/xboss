@@ -72,6 +72,8 @@ export async function DELETE(
           -- mình đã duyệt. COALESCE(...,'floor'): task nghiệm thu từ trước migration không
           -- biết nguồn → coi như duyệt-theo-tầng, giữ nguyên hành vi cũ cho dữ liệu cũ.
           AND COALESCE(t.approval_source, 'floor') <> 'task'
+        -- Khoá theo id tăng dần như tick theo lô (đợt tối ưu 3, L8).
+        ORDER BY t.id
         FOR UPDATE OF t`,
       approval.sheet_type_id,
       approval.floor_label,
@@ -115,7 +117,7 @@ export async function DELETE(
       );
     }
 
-    const packageIds = new Set(tasks.map((t) => t.package_id));
+    const packageIds = [...new Set(tasks.map((t) => t.package_id))].sort((a, b) => a - b);
     for (const pid of packageIds) await recomputePackage(pid);
     return tasks.length;
   }).catch((e: unknown) => {

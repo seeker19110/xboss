@@ -39,3 +39,28 @@ export function saveMode(mode: HomeMode): void {
     /* trình duyệt chặn localStorage (chế độ riêng tư) — không ảnh hưởng hiển thị */
   }
 }
+
+// FE-6: chế độ trang chủ đã hiển thị LẦN TRƯỚC trên trình duyệt này (mọi vai trò, không chỉ kỹ sư) —
+// chỉ dùng để ĐOÁN chunk cần tải trước song song với /api/auth/me; quyết định thật vẫn là
+// resolveHomeMode sau khi biết vai trò. Không phải dữ liệu riêng tư (chỉ tên chế độ).
+export const HOME_MODE_LAST_KEY = "xboss_home_mode_gan_nhat";
+
+/** Đoán chế độ trước khi biết vai trò: lần hiển thị gần nhất, rồi tới lựa chọn đã lưu; null = không đoán. */
+export function doanCheDoTrangChu(): HomeMode | null {
+  try {
+    const v = window.localStorage.getItem(HOME_MODE_LAST_KEY);
+    if (v === "dieu-hanh" || v === "hien-truong") return v;
+  } catch {
+    /* storage bị chặn — thử lựa chọn đã lưu */
+  }
+  return readSavedMode();
+}
+
+/** Ghi chế độ vừa hiển thị (bỏ qua im lặng khi storage bị chặn). */
+export function ghiCheDoGanNhat(mode: HomeMode): void {
+  try {
+    window.localStorage.setItem(HOME_MODE_LAST_KEY, mode);
+  } catch {
+    /* chế độ riêng tư — lần sau chỉ không tải trước được */
+  }
+}

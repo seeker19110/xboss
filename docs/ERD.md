@@ -108,7 +108,9 @@
 
 **Index:**
 - `idx_wp_boq_lower`: INDEX idx_wp_boq_lower ON public.work_packages USING btree (lower(boq_code)) WHERE (boq_code IS NOT NULL)
+- `idx_wp_boq_lower_pat`: INDEX idx_wp_boq_lower_pat ON public.work_packages USING btree (lower(boq_code) text_pattern_ops) WHERE (boq_code IS NOT NULL)
 - `idx_wp_code_lower`: INDEX idx_wp_code_lower ON public.work_packages USING btree (lower(code))
+- `idx_wp_code_lower_pat`: INDEX idx_wp_code_lower_pat ON public.work_packages USING btree (lower(code) text_pattern_ops)
 - `idx_wp_fts`: INDEX idx_wp_fts ON public.work_packages USING gin (to_tsvector('simple'::regconfig, COALESCE(name, ''::text)))
 - `idx_wp_fts_ua`: INDEX idx_wp_fts_ua ON public.work_packages USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((((COALESCE(code, ''::text) || ' '::text) || COALESCE(boq_code, ''::text)) || ' '::text) || COALESCE(name, ''::text)))))
 - `idx_wp_sheet`: INDEX idx_wp_sheet ON public.work_packages USING btree (sheet_type_id)
@@ -155,7 +157,9 @@
 - `idx_tasks_approval_source`: INDEX idx_tasks_approval_source ON public.tasks USING btree (approval_source) WHERE (approval_source IS NOT NULL)
 - `idx_tasks_assigned`: INDEX idx_tasks_assigned ON public.tasks USING btree (assigned_to)
 - `idx_tasks_boq_lower`: INDEX idx_tasks_boq_lower ON public.tasks USING btree (lower(boq_code)) WHERE (boq_code IS NOT NULL)
+- `idx_tasks_boq_lower_pat`: INDEX idx_tasks_boq_lower_pat ON public.tasks USING btree (lower(boq_code) text_pattern_ops) WHERE (boq_code IS NOT NULL)
 - `idx_tasks_code_lower`: INDEX idx_tasks_code_lower ON public.tasks USING btree (lower(code))
+- `idx_tasks_code_lower_pat`: INDEX idx_tasks_code_lower_pat ON public.tasks USING btree (lower(code) text_pattern_ops)
 - `idx_tasks_end`: INDEX idx_tasks_end ON public.tasks USING btree (end_date)
 - `idx_tasks_fts`: INDEX idx_tasks_fts ON public.tasks USING gin (to_tsvector('simple'::regconfig, COALESCE(name, ''::text)))
 - `idx_tasks_fts_ua`: INDEX idx_tasks_fts_ua ON public.tasks USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((((COALESCE(code, ''::text) || ' '::text) || COALESCE(boq_code, ''::text)) || ' '::text) || COALESCE(name, ''::text)))))
@@ -442,6 +446,7 @@
 **Index:**
 - `idx_photos_album`: INDEX idx_photos_album ON public.task_photos USING btree (album_id)
 - `idx_photos_task`: INDEX idx_photos_task ON public.task_photos USING btree (task_id)
+- `idx_task_photos_created`: INDEX idx_task_photos_created ON public.task_photos USING btree (created_at DESC)
 - `idx_task_photos_task_hash`: INDEX idx_task_photos_task_hash ON public.task_photos USING btree (task_id, sha256) WHERE (sha256 IS NOT NULL)
 - `task_photos_pkey`: UNIQUE INDEX task_photos_pkey ON public.task_photos USING btree (id)
 
@@ -461,6 +466,7 @@
 
 **Index:**
 - `idx_comments_task`: INDEX idx_comments_task ON public.task_comments USING btree (task_id)
+- `idx_task_comments_created`: INDEX idx_task_comments_created ON public.task_comments USING btree (created_at DESC)
 - `idx_task_comments_fts`: INDEX idx_task_comments_fts ON public.task_comments USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(COALESCE(body, ''::text))))
 - `task_comments_pkey`: UNIQUE INDEX task_comments_pkey ON public.task_comments USING btree (id)
 
@@ -491,6 +497,7 @@
 **Index:**
 - `idx_documents_floor`: INDEX idx_documents_floor ON public.task_documents USING btree (floor_approval_id)
 - `idx_documents_task`: INDEX idx_documents_task ON public.task_documents USING btree (task_id)
+- `idx_task_documents_created`: INDEX idx_task_documents_created ON public.task_documents USING btree (created_at DESC)
 - `task_documents_pkey`: UNIQUE INDEX task_documents_pkey ON public.task_documents USING btree (id)
 
 ### progress_albums

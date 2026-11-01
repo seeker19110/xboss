@@ -1,6 +1,7 @@
 import { query, queryOne, run, todayISO } from "@/lib/db";
 import { linkTracking } from "@/lib/nen/link-tracking";
-import { sendPushToUsers } from "@/lib/van-hanh/push";
+import { log } from "@/lib/nen/log";
+import { sendPushToUsers, type PushPayload } from "@/lib/van-hanh/push";
 
 // ===== Phân công theo hệ (sheet) với kế thừa tự động =====
 //
@@ -38,7 +39,32 @@ async function logAssignment(
   );
 }
 
-async function notifyAssigned(userIds: number[], message: string, url?: string): Promise<void> {
+// Một push "Phân công mới" chờ gửi — gom trong transaction, gửi SAU COMMIT bằng guiPushPhanCong.
+export type PushPhanCong = { userIds: number[]; payload: PushPayload };
+
+// Gửi các push đã gom (đợt tối ưu 3, L5). Gọi SAU khi transaction phân công đã COMMIT: web push là
+// HTTPS ra ngoài (timeout 10s/thiết bị) — gửi trong transaction giữ khoá task/sheet + khoá quyền
+// của org suốt lúc chờ mạng, và có thể báo "được giao" cho một phân công rồi bị rollback. Lỗi push
+// không làm hỏng thao tác đã ghi (chỉ log).
+export async function guiPushPhanCong(ds: PushPhanCong[]): Promise<void> {
+  for (const p of ds) {
+    await sendPushToUsers(p.userIds, p.payload).catch((err: unknown) =>
+      log.error("Gửi push phân công thất bại", {
+        route: "lib/tien-do/assignments.ts",
+        err: err instanceof Error ? err.message : String(err),
+      }),
+    );
+  }
+}
+
+// `hangDoiPush` (tuỳ chọn): có thì CHỈ ghi notifications và gom push vào hàng đợi để caller gửi
+// sau COMMIT; không truyền thì gửi ngay như cũ (đường gọi ngoài transaction / script).
+async function notifyAssigned(
+  userIds: number[],
+  message: string,
+  url?: string,
+  hangDoiPush?: PushPhanCong[],
+): Promise<void> {
   const uniqueIds = [...new Set(userIds.filter(Boolean))];
   if (!uniqueIds.length) return;
   for (const uid of uniqueIds) {
@@ -55,7 +81,12 @@ async function notifyAssigned(userIds: number[], message: string, url?: string):
       message,
     );
   }
-  await sendPushToUsers(uniqueIds, { title: "Phân công mới", body: message, url });
+  const push: PushPhanCong = {
+    userIds: uniqueIds,
+    payload: { title: "Phân công mới", body: message, url },
+  };
+  if (hangDoiPush) hangDoiPush.push(push);
+  else await sendPushToUsers(push.userIds, push.payload);
 }
 
 // Gán quản lý cả hệ; cascade xuống nhóm + task chưa gán thủ công.
@@ -63,6 +94,7 @@ export async function assignSheetManager(
   sheetId: number,
   userId: number | null,
   changedBy: number,
+  hangDoiPush?: PushPhanCong[],
 ): Promise<void> {
   const prev = await queryOne<{
     manager_id: number | null;
@@ -90,10 +122,12 @@ export async function assignSheetManager(
   );
   const count = Number(affected?.n ?? 0);
 
-  await run(
-    `UPDATE work_packages SET assigned_to = ?
-      WHERE sheet_type_id = ? AND assigned_manual = FALSE`,
-    userId,
+  // Thứ tự khoá chung (đợt 3): task (id tăng) → nhóm. Khoá trước mọi task sẽ cascade theo id rồi
+  // mới UPDATE — nếu UPDATE nhóm trước thì đi ngược chiều tick ô (task → nhóm) và có thể deadlock.
+  await query(
+    `SELECT t.id FROM tasks t JOIN work_packages wp ON t.package_id = wp.id
+      WHERE wp.sheet_type_id = ? AND wp.assigned_manual = FALSE AND t.assigned_manual = FALSE
+      ORDER BY t.id FOR UPDATE OF t`,
     sheetId,
   );
   await run(
@@ -101,6 +135,12 @@ export async function assignSheetManager(
       FROM work_packages wp
      WHERE tasks.package_id = wp.id AND wp.sheet_type_id = ?
        AND wp.assigned_manual = FALSE AND tasks.assigned_manual = FALSE`,
+    userId,
+    sheetId,
+  );
+  await run(
+    `UPDATE work_packages SET assigned_to = ?
+      WHERE sheet_type_id = ? AND assigned_manual = FALSE`,
     userId,
     sheetId,
   );
@@ -114,6 +154,7 @@ export async function assignSheetManager(
       [userId],
       msg,
       prev?.slug ? linkTracking(prev.slug, { projectId: prev.project_id }) : "/",
+      hangDoiPush,
     );
   }
 }
@@ -124,6 +165,7 @@ export async function assignPackage(
   packageId: number,
   userId: number | null,
   changedBy: number,
+  hangDoiPush?: PushPhanCong[],
 ): Promise<void> {
   const prev = await queryOne<{
     assigned_to: number | null;
@@ -146,16 +188,22 @@ export async function assignPackage(
     );
     effective = r?.manager_id ?? null;
   }
-  await run(
-    `UPDATE work_packages SET assigned_to = ?, assigned_manual = ? WHERE id = ?`,
-    effective,
-    userId !== null,
+  // Thứ tự khoá chung (đợt 3): task (id tăng) → nhóm — xem assignSheetManager.
+  await query(
+    `SELECT id FROM tasks WHERE package_id = ? AND assigned_manual = FALSE
+      ORDER BY id FOR UPDATE`,
     packageId,
   );
   await run(
     `UPDATE tasks SET assigned_to = ?, updated_at = CURRENT_TIMESTAMP
       WHERE package_id = ? AND assigned_manual = FALSE`,
     effective,
+    packageId,
+  );
+  await run(
+    `UPDATE work_packages SET assigned_to = ?, assigned_manual = ? WHERE id = ?`,
+    effective,
+    userId !== null,
     packageId,
   );
 
@@ -179,6 +227,7 @@ export async function assignPackage(
       [effective],
       `Bạn được giao nhóm "${prev?.name ?? prev?.code}" (${n} task kế thừa)`,
       prev?.sheet_slug ? linkTracking(prev.sheet_slug, { projectId: prev.project_id }) : "/",
+      hangDoiPush,
     );
   }
 }
@@ -188,6 +237,7 @@ export async function assignTask(
   taskId: number,
   userId: number | null,
   changedBy: number,
+  hangDoiPush?: PushPhanCong[],
 ): Promise<void> {
   const prev = await queryOne<{
     assigned_to: number | null;
@@ -235,6 +285,7 @@ export async function assignTask(
       [effective],
       `Bạn được giao task "${prev?.name ?? prev?.code}"`,
       prev?.sheet_slug ? linkTracking(prev.sheet_slug, { projectId: prev.project_id }) : "/",
+      hangDoiPush,
     );
   }
 }

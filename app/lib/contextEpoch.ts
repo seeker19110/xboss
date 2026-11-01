@@ -10,6 +10,7 @@
 // trước; khác đi nghĩa là actor đã đổi (kể cả vào qua SSO/OIDC không qua preflight của trang đăng
 // nhập) → tab hiện tại dọn cache SW riêng tư + phát đổi ngữ cảnh cho các tab khác.
 
+import { xoaCacheCauHinhNav } from "@/app/lib/cauHinhNav";
 import { xoaCacheDuAnKhaKien } from "@/app/lib/duAnKhaKien";
 
 const KENH = "xboss-context";
@@ -37,6 +38,7 @@ const epochCuaToi = new Set<string>();
 /** Phát "ngữ cảnh đã đổi" tới mọi tab khác. Gọi TRƯỚC khi reload/điều hướng ở tab hiện tại. */
 export function phatDoiNguCanh(r: LyDoDoiNguCanh): void {
   xoaCacheDuAnKhaKien(); // danh sách dự án của ngữ cảnh cũ không còn đúng cho tab này
+  xoaCacheCauHinhNav(); // cấu hình nav/cờ module theo dự án cũ (P7) — tải lại ở lần mount sau
   const e =
     globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   epochCuaToi.add(e);

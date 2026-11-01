@@ -1,13 +1,36 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight, Lock, FileEdit, NotebookPen, Users } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
-import { PageSkeleton } from "@/app/components/Skeleton";
+import { PageSkeleton, Skeleton } from "@/app/components/Skeleton";
 import { ErrorState } from "@/app/components/ErrorState";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { todayISO } from "@/lib/nen/date";
 import DiaryEditorModal from "@/app/diary/DiaryEditorModal";
-import ManpowerChart from "@/app/diary/ManpowerChart";
+
+// FE-2: recharts (~110KB gzip) chỉ dùng ở tab "Nhân lực" (mặc định mở tab Lịch) — nạp chunk khi
+// cần; skeleton cao đúng bằng khung biểu đồ để không giật bố cục.
+const ManpowerChart = dynamic(
+  () =>
+    import("@/app/diary/ManpowerChart").catch(() => ({
+      // Chunk biểu đồ tải lỗi (mạng yếu) → báo tại chỗ, không văng error boundary cả trang.
+      default: function BieuDoLoiTai() {
+        return (
+          <p
+            role="alert"
+            className="flex h-[280px] items-center justify-center rounded-xl border border-zinc-800 bg-zinc-950/70 px-4 text-center text-sm text-zinc-400"
+          >
+            Không tải được biểu đồ — kiểm tra kết nối mạng rồi tải lại trang.
+          </p>
+        );
+      },
+    })),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[280px] rounded-xl" />,
+  },
+);
 
 type DayStatus = { date: string; status: "draft" | "locked" };
 type ManpowerRow = { date: string; crew: string; headcount: number };
