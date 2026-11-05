@@ -77,6 +77,14 @@ function chay(
 
 const quyet = (r: ReturnType<typeof chay>) => r.json?.hookSpecificOutput?.permissionDecision;
 
+/** Khối `env` của `.claude/settings.json` — Claude Code nạp vào môi trường hook của phiên. Guard khung chỉ HỎI
+ *  người khi `XT_GUARD_POLICY=strict` (ADR-0018 của khung); XBoss giữ tư thế hỏi bằng biến này, nên test
+ *  guard chạy đúng env dự án khai — gỡ biến khỏi settings là test đỏ. */
+function envDuAn(): Record<string, string> {
+  const s = JSON.parse(readFileSync(join(GOC, ".claude/settings.json"), "utf8"));
+  return { ...(s.env ?? {}) };
+}
+
 test("X-Templates: repo lồng có cổng riêng phải hỏi trước, không chạy mã của repo đó", () => {
   const r = dungRepo();
   const long = join(r, "vendor", "thu-vien");
@@ -95,7 +103,7 @@ test("X-Templates: repo lồng có cổng riêng phải hỏi trước, không c
     `git -C '${long}' commit -m 'thu'`,
     "git commit -m 'thu'",
   ]) {
-    const res = chay("pre-bash-guard.sh", r, { cwd: long, tool_input: { command } });
+    const res = chay("pre-bash-guard.sh", r, { cwd: long, tool_input: { command } }, envDuAn());
     assert.equal(res.code, 0, res.stderr);
     assert.equal(quyet(res), "ask", command);
     assert.equal(
@@ -137,14 +145,19 @@ test("X-Templates: chặn force push, hỏi hành động đối ngoại, cho ph
     ["npm ci", undefined],
     ["git status --short", undefined],
   ] as const) {
-    const res = chay("pre-bash-guard.sh", r, { cwd: r, tool_input: { command } });
+    const res = chay("pre-bash-guard.sh", r, { cwd: r, tool_input: { command } }, envDuAn());
     assert.equal(res.code, 0, res.stderr);
     assert.equal(quyet(res), decision, command);
   }
-  const mcp = chay("pre-mcp-guard.sh", r, {
-    tool_name: "mcp__github__merge_pull_request",
-    tool_input: { repository_full_name: "seeker19110/xboss", pr_number: 661 },
-  });
+  const mcp = chay(
+    "pre-mcp-guard.sh",
+    r,
+    {
+      tool_name: "mcp__github__merge_pull_request",
+      tool_input: { repository_full_name: "seeker19110/xboss", pr_number: 661 },
+    },
+    envDuAn(),
+  );
   assert.equal(quyet(mcp), "ask");
 });
 

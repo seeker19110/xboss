@@ -5,6 +5,9 @@
   "fallbackModel": [
     "opus"
   ],
+  "env": {
+    "XT_GUARD_POLICY": "strict"
+  },
   "permissions": {
     "allow": [
       "Bash(npm run lint)",
@@ -12,8 +15,7 @@
       "Bash(npm test)",
       "Bash(npm run build)",
       "Bash(npx tsx --test *)",
-      "Bash(git:*)",
-      "Bash"
+      "Bash(git:*)"
     ],
     "deny": [
       "Bash(git push --force * main*)",

@@ -19,7 +19,7 @@ XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO T
 
 - `.xtemplates/` + phần harness khung trong `.claude/` — khung X-Templates (luật chung ở `AGENTS.md` mục "Khung X-Templates"). Riêng Claude Code:
   - Hook khung trong `.claude/settings.json` chạy cạnh hook XBoss: PreToolUse guard (`pre-bash-guard.sh`/`pre-edit-guard.sh`/`pre-mcp-guard.sh`, chặn **không hỏi người** hành động không đảo ngược, lộ bí mật, tắt/bỏ qua hook, ghi tay `.autopilot/`, merge chưa đủ điều kiện, tiêu đề PR/subject commit sai luật); SessionStart nạp `PROGRESS.md`; PreCompact ghi checkpoint; Stop, PermissionRequest, PostToolUseFailure, TaskCompleted, SubagentStop. Luật đầy đủ trong `.claude/hooks/guard.py`; nhóm và lý do: `.xtemplates/framework/11-autonomous-loop/stop-points-and-escalation.md` §Điểm dừng.
-  - Quyền: `permissions.allow` có `Bash` (khung gộp từ 3.x) — Bash chạy không hỏi; hàng rào là `deny` + guard + hook XBoss. Muốn lớp hỏi: `XT_GUARD_POLICY=strict` và/hoặc thay `Bash` bằng danh sách `Bash(...)` cụ thể (khi đó đặt `harness_permissions: own` trong `xt.yaml` để lần cài khung sau không gộp lại).
+  - Quyền: XBoss giữ **tư thế hỏi người** — `permissions.allow` chỉ có danh sách `Bash(...)` cụ thể (không `Bash` trần), khối `env` của `.claude/settings.json` đặt `XT_GUARD_POLICY=strict` (guard hỏi trước hành động đối ngoại, cài phụ thuộc, merge, commit vào repo lồng — `tests/claude-hooks.test.ts` ghim), `xt.yaml` đặt `harness_permissions: own` để lần cài khung sau không gộp `allow`/`deny` của khung. Muốn chuyển sang chế độ tự chủ của khung (ADR-0018 của khung): chủ dự án bỏ `XT_GUARD_POLICY`, cân nhắc thêm `Bash` vào `allow`, và sửa test tương ứng.
   - Headless/CI: không dùng `--bare` (mất hook/skill/CLAUDE.md).
 
 ## Vai trò & nguyên tắc

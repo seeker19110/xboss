@@ -46,6 +46,8 @@ test_release: npm test -- --release-gate
 # claude_min_version: ""   # doctor cảnh báo khi Claude Code thấp hơn (LOOP-HARNESS-026)
 # ai_attribution: ""    # forbid = guard chặn commit/PR ghi tên model hay URL phiên AI (LOOP-HARNESS-027)
 # pr_title_check: ""    # off = không đòi tiêu đề PR `<type>(scope): mô tả` ≤ 100 ký tự
-# harness_permissions: ""   # own = install.py giữ quyền + dạng lệnh hook của dự án (không thêm allow/deny khung)
+# own = install.py giữ quyền + dạng lệnh hook của dự án (không thêm allow/deny khung). XBoss giữ tư thế hỏi người:
+# không `allow Bash`, `.claude/settings.json` đặt env `XT_GUARD_POLICY=strict` (test: tests/claude-hooks.test.ts).
+harness_permissions: own
 # max_rethink: 1        # trần `pr rethink` mỗi PR (ADR-0061 của khung); 0 = không trần
 # Chia shard test (chỉ khi đo thấy test là đường dài nhất): test_list · test_unit · test_combine — xem mẫu .xtemplates/framework/templates/xt.yaml
