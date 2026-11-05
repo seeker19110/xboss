@@ -3,7 +3,7 @@ title: Tiếp cận (a11y) theo WCAG 2.2 AA và nền tảng mobile
 kind: module
 prefix: UX-A11Y
 applies_to: [web-app, mobile-app, desktop-app, static-site, game, monorepo]
-updated: 2026-10-16
+updated: 2026-11-04
 ---
 
 # Tiếp cận (a11y) theo WCAG 2.2 AA và nền tảng mobile
@@ -37,7 +37,7 @@ updated: 2026-10-16
 ## Checklist
 
 - [ ] `UX-A11Y-001` **MUST** Mọi trang/màn hình qua quét axe-core với tag `wcag2a`, `wcag2aa`, `wcag21aa`, `wcag22aa` không có vi phạm (`violations.length === 0`). → Kiểm: `@axe-core/playwright` trong mọi smoke test E2E; CI đỏ nếu vi phạm. · Nguồn: WCAG 2.2 AA
-- [ ] `UX-A11Y-002` **MUST** Tương phản chữ ≥ 4.5:1 (chữ lớn ≥ 3:1); thành phần UI và trạng thái (viền input, icon, focus) ≥ 3:1 với nền kề. → Kiểm: `check:contrast` trên token + axe rule `color-contrast` ở cả hai theme. · Nguồn: WCAG 2.2 SC 1.4.3, 1.4.11
+- [ ] `UX-A11Y-002` **MUST** Tương phản chữ ≥ 4.5:1 (chữ lớn ≥ 3:1 — chữ lớn chỉ khi ≥ 24 px, hoặc ≥ 18,66 px **và** đậm; chữ thường 18–23 px vẫn cần 4.5:1); thành phần UI và trạng thái (viền input, icon, focus) ≥ 3:1 với nền kề. → Kiểm: `xt.py contrast` trên token (`UX-DS-003`) + axe rule `color-contrast` ở cả hai theme. · Nguồn: WCAG 2.2 SC 1.4.3, 1.4.11
 - [ ] `UX-A11Y-003` **MUST** Toàn bộ chức năng dùng được bằng bàn phím; không bẫy focus (trừ dialog modal có Esc để thoát). → Kiểm: E2E luồng chính chỉ dùng `keyboard.press('Tab'|'Enter'|'Escape')`; axe rule `focus-order-semantics`. · Nguồn: WCAG 2.2 SC 2.1.1, 2.1.2
 - [ ] `UX-A11Y-004` **MUST@L** Phần tử nhận focus không bị che hoàn toàn bởi header/footer dính hay banner cookie. → Kiểm: E2E Tab qua trang có sticky header, `boundingBox` của phần tử focus không nằm trọn dưới sticky element. · Nguồn: WCAG 2.2 SC 2.4.11
 - [ ] `UX-A11Y-005` **MUST@L** Chỉ báo focus nhìn thấy trên mọi điều khiển, không `outline: none` mà không thay thế. → Kiểm: stylelint cấm `outline: none|0` không kèm `:focus-visible` thay thế; ảnh snapshot trạng thái focus. · Nguồn: WCAG 2.2 SC 2.4.7
@@ -52,7 +52,7 @@ updated: 2026-10-16
 - [ ] `UX-A11Y-014` **MUST@L** Dialog modal: focus vào trong khi mở, Tab quay vòng trong dialog, Esc đóng, focus trả về phần tử mở; `role="dialog"` + `aria-modal="true"` + tên tiếp cận. → Kiểm: E2E theo pattern APG; dùng `<dialog>` hoặc component headless. · Nguồn: WAI-ARIA APG Dialog (Modal)
 - [ ] `UX-A11Y-015` **MUST@L** Nội dung tự chuyển động/nhấp nháy > 5 giây có nút tạm dừng/dừng/ẩn; không nhấp nháy quá 3 lần/giây. → Kiểm: review carousel/auto-play có nút Pause; E2E bấm Pause dừng được. · Nguồn: WCAG 2.2 SC 2.2.2, 2.3.1
 - [ ] `UX-A11Y-016` **MUST@L** Không chặn zoom (`user-scalable=no`, `maximum-scale=1`). → Kiểm: grep meta viewport; axe rule `meta-viewport`. · Nguồn: WCAG 2.2 SC 1.4.4
-- [ ] `UX-A11Y-017` **MUST@L** Luồng chính được kiểm tay bằng trình đọc màn hình (VoiceOver/TalkBack/NVDA) mỗi release, có biên bản. → Kiểm: file `docs/a11y/manual-<release>.md` liệt kê luồng, thiết bị, kết quả. · Nguồn: WCAG 2.2 (phần máy không quét được)
+- [ ] `UX-A11Y-017` **MUST@L** Luồng chính được kiểm tay bằng trình đọc màn hình (VoiceOver/TalkBack/NVDA) mỗi release, có biên bản. Kết quả `incomplete` của axe cũng được người duyệt riêng và ghi vào biên bản. → Kiểm: file `docs/a11y/manual-<release>.md` liệt kê luồng, thiết bị, kết quả, và mục `incomplete` đã duyệt. · Nguồn: WCAG 2.2 (phần máy không quét được)
 - [ ] `UX-A11Y-018` **MUST@L** Mobile native: mọi điều khiển có nhãn (`accessibilityLabel`/`contentDescription`), hỗ trợ Dynamic Type/font scale tới 200% không cắt chữ, tôn trọng Reduce Motion. → Kiểm: Xcode Accessibility Inspector audit + Android Accessibility Scanner 0 lỗi; test UI với font scale lớn nhất. · Nguồn: Apple HIG Accessibility; Android Accessibility
 - [ ] `UX-A11Y-019` **SHOULD** Thông báo động (lỗi, thành công, cập nhật) đi qua live region: `role="status"`/`aria-live="polite"` cho thường, `role="alert"` cho khẩn; không chuyển focus bằng alert. → Kiểm: E2E kiểm `[role=status]` chứa thông điệp sau hành động. · Nguồn: WAI-ARIA APG Alert; WAI tutorial Forms
 - [ ] `UX-A11Y-020` **SHOULD** Có liên kết "Bỏ qua tới nội dung chính" là phần tử focus đầu tiên. → Kiểm: E2E Tab lần đầu → phần tử có text "Bỏ qua". · Nguồn: WCAG 2.2 SC 2.4.1
@@ -63,7 +63,8 @@ updated: 2026-10-16
 - [ ] `UX-A11Y-025` **SHOULD** Lỗi form liên kết với ô nhập (`aria-describedby`, `aria-invalid`), focus về ô lỗi đầu tiên (chi tiết ở [`../07-frontend/forms-and-validation.md`](../07-frontend/forms-and-validation.md)). → Kiểm: E2E submit form lỗi → `document.activeElement` là ô lỗi đầu.
 - [ ] `UX-A11Y-026` **MAY** Hỗ trợ `prefers-contrast: more` và chế độ "forced colors" (Windows High Contrast) không mất viền/icon. → Kiểm: `emulateMedia({ forcedColors: 'active' })` chụp ảnh so sánh.
 - [ ] `UX-A11Y-027` **MAY** Phụ đề/transcript cho media; mô tả âm thanh cho video quan trọng. → Kiểm: mọi `<video>` có `<track kind="captions">`. · Nguồn: WCAG 2.2 SC 1.2.2
-- [ ] `UX-A11Y-028` **SHOULD** Điều khiển đạt tương phản ≥ 3:1 (biên/icon) và chữ ≥ 4.5:1 ở các trạng thái **hover, focus-visible, active, selected**, ở **cả hai theme** (bổ sung cho `UX-A11Y-002` vốn kiểm trạng thái mặc định); trạng thái disabled được WCAG miễn. → Kiểm: Playwright `hover()`/`focus()` từng story/component rồi tính tỷ lệ từ computed style (màu chữ/viền so nền hiệu dụng) cho mỗi trạng thái × theme; dưới ngưỡng → đỏ. · Nguồn: WCAG 2.2 SC 1.4.3, 1.4.11; `seeker19110/stored` 06 §7d.2 (XIAS: README ghi "52/52" nhưng một ô harness đạt 2,92:1 < 3:1, chạy lại 49/52; đọc 2026-10-16)
+- [ ] `UX-A11Y-028` **SHOULD** Điều khiển đạt tương phản ≥ 3:1 (biên/icon) và chữ ≥ 4.5:1 ở các trạng thái **hover, focus-visible, active, selected**, ở **cả hai theme** (bổ sung cho `UX-A11Y-002` vốn kiểm trạng thái mặc định); trạng thái disabled được WCAG miễn. → Kiểm: Playwright `hover()`/`focus()` từng story/component rồi tính tỷ lệ từ computed style (màu chữ/viền so nền hiệu dụng) cho mỗi trạng thái × theme; dưới ngưỡng → đỏ. Mẫu chạy được cho chữ ở mặc định/hover/focus: [`../templates/ui-gates/verify-render.mjs`](../templates/ui-gates/README.md) (exit 0/1/2; nền ảnh/gradient in `UNMEASURED`). · Nguồn: WCAG 2.2 SC 1.4.3, 1.4.11; `seeker19110/stored` 06 §7d.2 (XIAS: README ghi "52/52" nhưng một ô harness đạt 2,92:1 < 3:1, chạy lại 49/52; đọc 2026-10-16)
+- [ ] `UX-A11Y-029` **MAY** Thử căng bố cục ở **280 CSS px** ngoài ngưỡng chuẩn 320 px (`UX-A11Y-013`): không tràn ngang. 280 px là phép thử căng của bộ cổng XIAS, **không phải chuẩn WCAG** và chưa xác minh được là bề rộng cover screen của máy gập nào. → Kiểm: `node verify-render.mjs <url> --widths 320,280` (mẫu ở [`../templates/ui-gates/`](../templates/ui-gates/README.md)) hoặc Playwright viewport 280×800 → `scrollWidth <= 280`. · Nguồn: WCAG 2.2 SC 1.4.10 (320 px); `seeker19110/stored` 06 §7d.2 (`verify_overflow` ở 280 px), đọc 2026-10-18
 
 ## Bẫy thường gặp
 
@@ -77,6 +78,7 @@ updated: 2026-10-16
 - **Chỉ kiểm axe trên trang chủ**: lỗi nằm ở dialog, bước 3 của form, trạng thái lỗi. Quét sau mỗi bước trong E2E.
 - **Tin điểm Lighthouse 100 là đạt AA**: Lighthouse chỉ chạy một phần rule axe; không thay kiểm tay.
 - **Mobile: ẩn Dynamic Type để giữ layout** → chữ không phóng được; sửa layout, không khoá cỡ chữ.
+- **Coi chữ 18 px là "chữ lớn"**: WCAG định nghĩa 18 pt (≈ 24 px) hoặc 14 pt đậm (≈ 18,66 px); bộ luật/script ghi "18px+" (vd `anti-slop`) báo PASS cho chữ 18–23 px chỉ đạt 3:1. Cặp khai `min 3` trong `--pairs` của `xt.py contrast` chỉ dành cho chữ đạt định nghĩa này (`UX-A11Y-002`).
 - **Chỉ kiểm tương phản ở trạng thái mặc định, hoặc tin con số công bố**: hover/focus/selected nhạt hơn nền mà bộ kiểm không chạm tới (XIAS công bố "52/52", tự chạy lại có ô 2,92:1 < 3:1). Chụp computed style từng trạng thái × theme (`UX-A11Y-028`).
 
 ## Cổng tự động
@@ -90,7 +92,8 @@ updated: 2026-10-16
 | Storybook `@storybook/addon-a11y` 10.6.2 (MIT) | `vitest --project=storybook` | CI | 0 vi phạm trên story |
 | Xcode Accessibility Inspector · Android Accessibility Scanner | audit thủ công theo kịch bản | Trước release (mobile) | 0 cảnh báo touch target/label |
 | Kiểm tay trình đọc màn hình | kịch bản luồng chính | Trước release (M/L) | biên bản trong `docs/a11y/` |
-| Tương phản theo trạng thái | Playwright `hover()`/`focus()` từng story + tính tỷ lệ từ computed style | CI | < 3:1 (biên/icon) hoặc < 4.5:1 (chữ) = đỏ; disabled bỏ qua |
+| Tương phản theo trạng thái | Playwright `hover()`/`focus()` từng story + tính tỷ lệ từ computed style (mẫu `templates/ui-gates/verify-render.mjs`) | CI | < 3:1 (biên/icon) hoặc < 4.5:1 (chữ) = đỏ; disabled bỏ qua |
+| Cổng render tổng hợp: axe (tag `wcag22aa`, gồm `target-size`) + tràn ngang 320/280 px + tương phản theo trạng thái | `node scripts/verify-render.mjs <url>…` (mẫu ở `framework/templates/ui-gates/`) | CI E2E sau khi dựng server | exit 0; `UNMEASURED` đo tay |
 
 Tag `wcag22aa` của axe-core: kiểm danh sách tag hiện hành trong tài liệu axe-core trước khi cấu hình (tài liệu Playwright
 chỉ ví dụ tới `wcag21aa`).
@@ -102,6 +105,7 @@ chỉ ví dụ tới `wcag21aa`).
 - WAI-ARIA Authoring Practices Guide — Dialog (Modal) <https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/>, Alert <https://www.w3.org/WAI/ARIA/apg/patterns/alert/>; WAI tutorial Form notifications <https://www.w3.org/WAI/tutorials/forms/notifications/> — xác minh 2026-10-13.
 - Apple HIG — Buttons ("hit region of at least 44x44 pt; visionOS 60x60 pt"): <https://developer.apple.com/design/human-interface-guidelines/buttons>; HIG Accessibility (Reduce Motion, Dynamic Type ≥ 200%; bảng cỡ điều khiển mặc định 44×44 pt / tối thiểu 28×28 pt): <https://developer.apple.com/design/human-interface-guidelines/accessibility> — xác minh 2026-10-13 qua dữ liệu JSON của trang.
 - Android — Make apps more accessible (touch target ≥ 48×48 dp; contentDescription; tương phản 4.5:1 / 3:1): <https://developer.android.com/guide/topics/ui/accessibility/apps> — xác minh 2026-10-13. Material 3 (m3.material.io) không truy cập được nội dung ngày 2026-10-13 **(chưa xác minh)**.
+- axe-core API (kết quả `incomplete`): <https://github.com/dequelabs/axe-core/blob/develop/doc/API.md> — tra 2026-11-04.
 - axe-core README (MPL-2.0; "on average 57% of WCAG issues automatically"): <https://github.com/dequelabs/axe-core>; Playwright accessibility testing: <https://playwright.dev/docs/accessibility-testing> — xác minh 2026-10-13.
 - pa11y (LGPL-3.0-only, v10 cần Node ≥ 22.13): <https://github.com/pa11y/pa11y> — xác minh 2026-10-13.
 - Phiên bản npm `latest` (2026-10-13): axe-core 4.14.0 · @axe-core/playwright 4.13.0 · pa11y 10.0.0 · eslint-plugin-jsx-a11y 6.10.2 · @biomejs/biome 2.5.15 · lighthouse 13.5.0 · @lhci/cli 0.15.1.

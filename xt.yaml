@@ -1,21 +1,16 @@
-# xt.yaml — lệnh chuẩn của dự án cho agent và hook (YAML PHẲNG `task: lệnh`, do .xtemplates/scripts/dev-task.sh đọc).
-# Agent KHÔNG suy diễn lệnh từ văn xuôi; đọc file này. Để trống "" = không có; thiếu khoá = tự dò (package.json/pyproject/go.mod/Cargo.toml/Makefile).
-# Khi autopilot đang chạy, lint/test để "" hoặc lệnh không kiểm gì (true, :, exit 0, echo …) = cổng ĐỎ (ADR-0011): điền ở task đầu PLAN.
-# Nhà của bộ khoá: LOOP-HARNESS-008 (framework/11-autonomous-loop/harness-files.md). `scripts/dev-task.sh` CHỈ chạy các khoá format · lint · typecheck · test · build · format_file
-# (`gate` = build → typecheck → lint → test; lint nên gồm kiểm format). Khoá khác (install, dev, e2e, migrate, init, smoke, audit…) là lệnh KHAI BÁO để agent ĐỌC và chạy trực tiếp; dev-task không chạy.
-# Mẫu theo stack (giữ MỘT bộ, xoá phần còn lại):
-#   Node:   lint: npm run lint · typecheck: npm run typecheck · test: npm test -- --run · build: npm run build · format: npm run format · format_file: npx --no-install prettier --write "{}"
-#   Python: lint: ruff check . · typecheck: pyright · test: pytest -q · build: "" · format: ruff format . · format_file: case "{}" in *.py) ruff format "{}" ;; esac
-#   Go:     lint: go vet ./... · typecheck: "" · test: go test ./... · build: go build ./... · format: gofmt -l -w . · format_file: gofmt -w "{}"
+# xt.yaml — lệnh chuẩn của dự án (YAML PHẲNG `task: lệnh`), nguồn duy nhất cho agent, hook và CI; agent không suy diễn
+# lệnh từ văn xuôi. "" = không có; thiếu khoá = tự dò từ manifest. Nhà của bộ khoá, sàn M/L, mẫu theo stack
+# (Node/Python/Go): .xtemplates/framework/11-autonomous-loop/harness-files.md §Khoá của xt.yaml (LOOP-HARNESS-008/023).
+# gate = build → typecheck → lint → test; gate-fast = format_check → lint → typecheck → test_fast.
+# Autopilot đang chạy mà lint/test rỗng hay no-op (true, :, echo …) = cổng ĐỎ (ADR-0011).
+# Khoá khác (e2e, audit, static, test_release…) là lệnh KHAI BÁO để agent ĐỌC và chạy trực tiếp; dev-task không chạy.
 lint: npm run format:check && npm run lint
 typecheck: npm run typecheck
 test: npm test
 build: DATABASE_URL=postgres://ci:ci@localhost:5432/xboss_test npm run build
 format: npm run format
 format_file: npx --no-install prettier --write "{}"
-# Merge PR (ADR-0013/0014/0015, LOOP-STOP-022): L3 (mặc định) = mở PR là bật auto-merge của GitHub, merge khi required check
-# xanh (cần bật "Allow auto-merge" + ruleset có required check; ghi miễn trừ WF-REVIEW-007); L2 = máy chỉ tự merge làn nhanh
-# (`xt.py merge-check`); L1 = người merge mọi PR.
+# merge_autonomy: L3 = máy merge ghim head theo làn · L2 = chỉ làn nhanh · L1 = người merge mọi PR (ADR-0015, D-122 của khung).
 # merge_risk_paths: glob thêm vào danh sách đường dẫn nhạy cảm (luôn để người merge), cách nhau dấu phẩy.
 merge_autonomy: L1
 merge_risk_paths: "migrations/*, deploy.sh, ecosystem.config.js, DEPLOY.md, next.config.mjs, proxy.ts, lib/bao-mat/*, .env.example"
@@ -30,3 +25,29 @@ audit: npm audit --audit-level=critical
 static: npm run gate
 test_release: npm test -- --release-gate
 # Merge: main tự deploy qua deploy.yml (workflow_run sau CI) và có deploy.sh/VPS thật → L1 (người merge mọi PR) tới khi chủ repo quyết L2.
+
+# Khoá mới của khung (bản 3.30.0 (454d146)) — bật bằng cách bỏ "# "; vắng khoá = hành vi cũ
+# setup: ""             # cài phụ thuộc trước mỗi job CI (npm ci · pip install …); trống = bỏ qua
+# format_check: ""      # sàn M/L: kiểm format không ghi file, đỏ khi lệch
+# coverage: ""          # sàn M/L: test có ngưỡng coverage; artefact ra mktemp, không `|| true`
+# commit_gate: fast
+# test_fast: ""         # test liên quan file đổi (XT_CHANGED_FILES, mỗi dòng một file); trống → test
+# merge_hard_exceptions: auto
+# delivery_phase: build
+# e2e_setup: ""         # trước e2e: cài trình duyệt (vd npx playwright install --with-deps chromium)
+# e2e_affected: ""      # chỉ spec của lát đang làm (Gate mỗi task); trống = e2e
+# attack: ""            # tấn công thử: DAST (ZAP baseline/API scan) · fuzz API (schemathesis run …) trên bản chạy cục bộ/staging
+# perf: ""              # kiểm tải có ngưỡng, đỏ khi vượt ngân sách (vd k6 run với thresholds)
+# migration_check: ""   # cổng production (ADR-0062): migration tiến + lùi trên bản sao dữ liệu/staging
+# rollback: ""          # cổng production: diễn tập quay về bản trước (tag/artifact cũ + migration lùi)
+# acceptance: ""        # cổng production: kiểm thử nghiệm thu theo tiêu chí chấp nhận (UAT tự động)
+# preview: ""           # cách chạy thử bản trình người duyệt (`xt.py stage submit` ghi lại — ADR-0058); vd npm run preview
+# preview_smoke: ""     # Gate bản trình: `stage submit` chạy (qua guard), exit ≠ 0 → không trình (D-247); vd npm run build && npx playwright test smoke
+# claude_min_version: ""   # doctor cảnh báo khi Claude Code thấp hơn (LOOP-HARNESS-026)
+# ai_attribution: ""    # forbid = guard chặn commit/PR ghi tên model hay URL phiên AI (LOOP-HARNESS-027)
+# pr_title_check: ""    # off = không đòi tiêu đề PR `<type>(scope): mô tả` ≤ 100 ký tự
+# own = install.py giữ quyền + dạng lệnh hook của dự án (không thêm allow/deny khung). XBoss giữ tư thế hỏi người:
+# không `allow Bash`, `.claude/settings.json` đặt env `XT_GUARD_POLICY=strict` (test: tests/claude-hooks.test.ts).
+harness_permissions: own
+# max_rethink: 1        # trần `pr rethink` mỗi PR (ADR-0061 của khung); 0 = không trần
+# Chia shard test (chỉ khi đo thấy test là đường dài nhất): test_list · test_unit · test_combine — xem mẫu .xtemplates/framework/templates/xt.yaml

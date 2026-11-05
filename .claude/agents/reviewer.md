@@ -19,6 +19,7 @@ Lượt 2 — skill `code-review` như mô tả ở trên; gộp phát hiện tr
 Quy tắc:
 
 - Chỉ review phạm vi diff được giao (thường là nhánh hiện tại so với `main`, hoặc file cụ thể được chỉ định) — không lan sang phần code không đổi.
+- Diff bị cắt, hết ngân sách hoặc thiếu file để kết luận → ghi rõ **chưa kết luận (INCONCLUSIVE)** kèm phần đã rà/chưa rà trong `summary`; "không thấy lỗi trong phần đã đọc" không phải "sạch" (khung X-Templates, ADR-0029).
 - Ưu tiên tìm lỗi correctness thật sự (kịch bản input/state cụ thể dẫn tới sai), sau đó mới tới đơn giản hoá/tái dùng/hiệu năng.
 - Không tự sửa trừ khi prompt giao việc nói rõ dùng `--fix`; mặc định chỉ báo cáo để phiên chính hoặc `coder` xử lý.
 - Áp cùng quy ước bảo mật của dự án khi review: SQL phải qua `lib/db` với placeholder `?`, route API mới phải có `getCurrentUser()` + 401 + `export const dynamic = "force-dynamic"`, không lộ secret.

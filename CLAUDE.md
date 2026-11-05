@@ -17,6 +17,11 @@ XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO T
 - `.opencodereview/` — checklist `docs/audit.md`/`TRAPS.md` đúc thành **luật review máy đọc theo đường dẫn** (ADR-0012), dùng bởi lệnh `/ocr-review`, `/review`, agent `reviewer` và CI (`OCR review`). **Sửa checklist audit thì sửa mảnh tương ứng trong `.opencodereview/rules/` + chạy `npm run gen:ocr-rules`.**
 - `.claude/` — cấu hình agent (xem `.claude/README.md`): agent/skill/command/hook của XBoss + **lớp ECC vendor** (`ecc-*`, ADR-0013). Rules nạp tự động: `.claude/rules/00-uu-tien-ecc.md` (**XBoss thắng khi ECC mâu thuẫn**) và `.claude/rules/xboss/*` (checklist theo đường dẫn file, chỉ nạp khi chạm file khớp).
 
+- `.xtemplates/` + phần harness khung trong `.claude/` — khung X-Templates (luật chung ở `AGENTS.md` mục "Khung X-Templates"). Riêng Claude Code:
+  - Hook khung trong `.claude/settings.json` chạy cạnh hook XBoss: PreToolUse guard (`pre-bash-guard.sh`/`pre-edit-guard.sh`/`pre-mcp-guard.sh`, chặn **không hỏi người** hành động không đảo ngược, lộ bí mật, tắt/bỏ qua hook, ghi tay `.autopilot/`, merge chưa đủ điều kiện, tiêu đề PR/subject commit sai luật); SessionStart nạp `PROGRESS.md`; PreCompact ghi checkpoint; Stop, PermissionRequest, PostToolUseFailure, TaskCompleted, SubagentStop. Luật đầy đủ trong `.claude/hooks/guard.py`; nhóm và lý do: `.xtemplates/framework/11-autonomous-loop/stop-points-and-escalation.md` §Điểm dừng.
+  - Quyền: XBoss giữ **tư thế hỏi người** — `permissions.allow` chỉ có danh sách `Bash(...)` cụ thể (không `Bash` trần), khối `env` của `.claude/settings.json` đặt `XT_GUARD_POLICY=strict` (guard hỏi trước hành động đối ngoại, cài phụ thuộc, merge, commit vào repo lồng — `tests/claude-hooks.test.ts` ghim), `xt.yaml` đặt `harness_permissions: own` để lần cài khung sau không gộp `allow`/`deny` của khung. Muốn chuyển sang chế độ tự chủ của khung (ADR-0018 của khung): chủ dự án bỏ `XT_GUARD_POLICY`, cân nhắc thêm `Bash` vào `allow`, và sửa test tương ứng.
+  - Headless/CI: không dùng `--bare` (mất hook/skill/CLAUDE.md).
+
 ## Vai trò & nguyên tắc
 
 Làm việc với vai trò **kỹ sư full-stack senior kiêm chuyên gia thiết kế UI/UX**, làm chủ toàn bộ stack XBoss (Next.js App Router, React, TypeScript strict, Tailwind, PostgreSQL raw SQL, PWA) lẫn thiết kế giao diện (xem **Thiết kế giao diện (UI/UX)** trong phần Kiến trúc). Nguyên tắc:
