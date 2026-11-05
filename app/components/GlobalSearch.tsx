@@ -184,12 +184,20 @@ export default function GlobalSearch({
         aria-label="Mở tìm kiếm toàn cục"
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-keyshortcuts="Control+K"
         onClick={() => setOpen(true)}
         icon={Search}
         className={`min-w-11 min-h-11 shrink-0 px-2 ${compact ? "" : "md:px-3 md:border-zinc-800 md:bg-zinc-900"}`}
       >
         {!compact && <span className="hidden md:inline text-zinc-400">Tìm kiếm…</span>}
-        {!compact && <kbd className="hidden lg:inline text-[10px] text-zinc-400">Ctrl+K</kbd>}
+        {/* Gợi ý phím tắt vẽ bằng CSS `content`: chữ "Ctrl+K" trong DOM mà không có trong tên
+            sẽ vi phạm axe label-content-name-mismatch; phím tắt đã khai qua aria-keyshortcuts. */}
+        {!compact && (
+          <kbd
+            aria-hidden="true"
+            className="hidden lg:inline text-[10px] text-zinc-400 after:content-['Ctrl+K']"
+          />
+        )}
       </Button>
       {open && (
         <Modal

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -208,6 +208,7 @@ export default function NotificationBell() {
   const [markError, setMarkError] = useState("");
   const [markingAll, setMarkingAll] = useState(false);
   const [open, setOpen] = useState(false);
+  const moTaChuaDocId = useId();
   const [tab, setTab] = useState<Tab>("all");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [push, setPush] = useState<PushState>("unavailable");
@@ -399,6 +400,8 @@ export default function NotificationBell() {
       .filter((g) => g.rows.length > 0);
   }, [visibleItems]);
 
+  const soChuaDoc = unread > 99 ? "99+" : String(unread);
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -409,17 +412,28 @@ export default function NotificationBell() {
         }}
         title="Thông báo"
         aria-label="Thông báo"
+        aria-describedby={unread > 0 ? moTaChuaDocId : undefined}
         aria-haspopup="true"
         aria-expanded={open}
         className="relative min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
       >
         <Bell className="w-5 h-5" />
-        {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 bg-red-600 text-on-accent text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
-            {unread > 99 ? "99+" : unread}
-          </span>
-        )}
       </button>
+      {/* Badge nằm NGOÀI nút: chữ số hiển thị bên trong nút mà không có trong tên truy cập sẽ
+          vi phạm axe `label-content-name-mismatch` (4.14+). Số chưa đọc đọc qua aria-describedby. */}
+      {unread > 0 && (
+        <>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-0.5 -right-0.5 bg-red-600 text-on-accent text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center"
+          >
+            {soChuaDoc}
+          </span>
+          <span id={moTaChuaDocId} className="sr-only">
+            {soChuaDoc} chưa đọc
+          </span>
+        </>
+      )}
 
       {open && (
         <div

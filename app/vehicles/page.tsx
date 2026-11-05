@@ -396,7 +396,7 @@ export default function VehiclesPage() {
               aria-label="Thử tải lại danh sách xe"
               onClick={() => void load()}
             >
-              Thử lại
+              Thử tải lại
             </Button>
           </div>
         )}
@@ -632,7 +632,7 @@ export default function VehiclesPage() {
                       aria-label="Thử tải lại nhà cung cấp"
                       onClick={() => setSupplierAttempt((n) => n + 1)}
                     >
-                      Thử lại
+                      Thử tải lại
                     </Button>
                   </div>
                 )}

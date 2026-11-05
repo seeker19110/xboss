@@ -405,7 +405,7 @@ function BangThietBi({
                           icon={KeyRound}
                           disabled={ban}
                           onClick={() => onDoiHoSo(t)}
-                          aria-label={`Đổi hồ sơ thiết bị của ${t.userName}`}
+                          aria-label={`${t.profile === "field-personal" ? "Hạ về dùng chung" : "Duyệt cá nhân"} — hồ sơ thiết bị của ${t.userName}`}
                         >
                           {t.profile === "field-personal" ? "Hạ về dùng chung" : "Duyệt cá nhân"}
                         </Button>

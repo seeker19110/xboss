@@ -192,7 +192,7 @@ export default function ProposalsPage() {
               aria-label="Tạo đề xuất"
               className="min-h-11 min-w-11 shrink-0"
             >
-              Đề xuất mới
+              Tạo đề xuất
             </Button>
           ) : undefined
         }

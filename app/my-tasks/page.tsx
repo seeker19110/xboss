@@ -853,7 +853,8 @@ export default function MyTasksPage() {
                     <button
                       key={tab.key}
                       onClick={() => setFeedTab(tab.key)}
-                      aria-label={tab.label}
+                      // Tên phải chứa cả số đếm hiển thị (axe label-content-name-mismatch).
+                      aria-label={tab.count > 0 ? `${tab.label} ${tab.count}` : tab.label}
                       className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition shrink-0 ${
                         isActive
                           ? tab.activeCls
@@ -861,7 +862,7 @@ export default function MyTasksPage() {
                       }`}
                     >
                       {tab.icon}
-                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span className="hidden sm:inline">{tab.label}</span>{" "}
                       {tab.count > 0 && (
                         <span
                           className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${

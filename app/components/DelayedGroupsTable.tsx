@@ -139,7 +139,8 @@ export default function DelayedGroupsTable<T extends TaskRow>({
                     <button
                       type="button"
                       aria-expanded={isOpen}
-                      aria-label={isOpen ? "Thu gọn công tác trễ" : "Xem công tác trễ"}
+                      // Tên chứa tên nhóm đang hiển thị (axe label-content-name-mismatch).
+                      aria-label={`${isOpen ? "Thu gọn công tác trễ" : "Xem công tác trễ"} ${g.name}`}
                       className="flex items-center gap-1.5 text-left hover:text-emerald-400 transition"
                     >
                       <ChevronRight
