@@ -3,7 +3,8 @@ title: Xác thực, phiên, token, phân quyền (RBAC/ABAC), đa yếu tố
 kind: module
 prefix: BE-AUTH
 applies_to: [web-app, api-service, ai-agent, agentic-system, data-ml, monorepo, blockchain]
-updated: 2026-10-16
+essential: [BE-AUTH-003@auth, BE-AUTH-006@jwt, BE-AUTH-008@oauth, BE-AUTH-015@reset]
+updated: 2026-11-04
 ---
 
 # Xác thực, phiên, token, phân quyền (RBAC/ABAC), đa yếu tố
@@ -11,6 +12,11 @@ updated: 2026-10-16
 > **Nhà duy nhất** của khung cho xác thực, phiên, token, OAuth/OIDC, passkey, MFA và phân quyền. Module khác
 > (`12-security/appsec-web`, hồ sơ, gói ngành) chỉ nêu lớp lỗ hổng rồi trỏ về đây. Áp dụng cho mọi hệ có
 > người dùng hoặc client cần định danh.
+>
+> **Mục thiết yếu** (frontmatter `essential`, ADR-0030 — `docs/adr/0030-essential-items-not-capped-at-m.md` của
+> repo khung): ở quy mô M, `BE-AUTH-003` (dự án có đăng nhập — `--feature auth`), `BE-AUTH-006` (`jwt`), `BE-AUTH-008`
+> (`oauth`) và `BE-AUTH-015` (`reset`) là MUST khi `xt.py compose` bật fact tương ứng, dù ghi `MUST@L`; không bật thì
+> như cũ.
 
 ## Nguyên tắc
 
@@ -49,7 +55,7 @@ updated: 2026-10-16
 - [ ] `BE-AUTH-007` **MUST@L** Refresh token của public client (SPA/mobile) xoay vòng mỗi lần dùng, phát hiện tái sử dụng → thu hồi cả họ token; refresh token không lưu `localStorage`. → Kiểm: test dùng lại refresh token cũ → 401 và token mới bị thu hồi. · Nguồn: RFC 9700 §2.2.2, OAuth 2.1 draft-16
 - [ ] `BE-AUTH-008` **MUST@L** OAuth/OIDC: chỉ Authorization Code + PKCE (S256) cho mọi client; không implicit, không resource owner password; redirect URI so khớp chuỗi chính xác; kiểm `state`/`nonce`; access token audience-restricted. → Kiểm: cấu hình IdP/client không có grant `implicit`/`password`; test redirect URI khác một ký tự → bị từ chối. · Nguồn: RFC 9700 (BCP 240) §2.1, §2.3–2.4; draft-ietf-oauth-v2-1-16
 - [ ] `BE-AUTH-009` **MUST** Mọi endpoint/handler không công khai (gồm Server Action, RPC, GraphQL resolver, WebSocket handshake, job trigger) kiểm xác thực và phân quyền ở server; `user_id` lấy từ phiên/token, không từ body/query. → Kiểm: test gọi với `user_id` khác trong body → vẫn thao tác trên user của token; scan route không guard = allowlist. · Nguồn: ASVS 5.0 V8, OWASP Authorization Cheat Sheet
-- [ ] `BE-AUTH-010` **MUST** Kiểm quyền theo object cho mọi truy cập có ID (IDOR): truy vấn luôn kèm điều kiện sở hữu/tenant (`WHERE id = ? AND tenant_id = ?` hoặc RLS/policy engine); trả 404 hoặc 403 nhất quán. → Kiểm: test người dùng A đọc/sửa/xoá bản ghi của B qua ID → 403/404; test chạy cho mọi tài nguyên có ID. · Nguồn: OWASP Authorization Cheat Sheet, ASVS 5.0 V8
+- [ ] `BE-AUTH-010` **MUST** Kiểm quyền theo object cho mọi truy cập có ID (IDOR): truy vấn luôn kèm điều kiện sở hữu/tenant (`WHERE id = ? AND tenant_id = ?` hoặc RLS/policy engine); trả 404 hoặc 403 nhất quán. → Kiểm: test người dùng A đọc/sửa/xoá bản ghi của B qua ID → 403/404; test chạy cho mọi tài nguyên có ID, trên dữ liệu đại diện khác tài khoản/tenant; xác thực (kể cả SSO/IdP) không thay kiểm quyền theo object của ứng dụng (phần tenant/IdP là suy luận của khung). · Nguồn: OWASP Authorization Cheat Sheet <https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html> (tra 2026-11-04), ASVS 5.0 V8 (chưa xác minh trực tiếp)
 - [ ] `BE-AUTH-011` **MUST@L** Quyết định phân quyền tập trung một nơi (policy module/engine), có unit test "deny by default" và test theo ma trận vai × hành động; không rải `if role ==` trong handler. → Kiểm: test policy với vai không khai báo → deny; grep `role ==`/`isAdmin` ngoài policy module = 0. · Nguồn: OWASP Authorization Cheat Sheet
 - [ ] `BE-AUTH-012` **MAY** Ngừng dùng 2026-10-14 — gộp vào [`SEC-LOG-001`](../12-security/logging-audit-and-incident.md): ghi sự kiện xác thực/phân quyền (đăng nhập, khoá, đổi mật khẩu/MFA, từ chối quyền) có cấu trúc theo trường của `SEC-LOG-002`, không mật khẩu/token.
 - [ ] `BE-AUTH-013` **MUST@L** MFA bắt buộc cho tài khoản quản trị và hành động nhạy cảm (đổi email/mật khẩu, tắt MFA, rút tiền, nâng quyền); xác thực lại bằng yếu tố hiện có trước khi đổi yếu tố; cung cấp mã khôi phục dùng một lần; OTP có TTL ngắn, dùng một lần, giới hạn lần thử. → Kiểm: test tắt MFA không xác thực lại → 403; OTP dùng lần hai → từ chối; 10 OTP sai → khoá. · Nguồn: OWASP MFA Cheat Sheet, RFC 6238 §5.2, NIST SP 800-63B-4 AAL2
@@ -65,6 +71,7 @@ updated: 2026-10-16
 - [ ] `BE-AUTH-023` **MAY** Sender-constrained token (DPoP RFC 9449 hoặc mTLS RFC 8705) cho API giá trị cao. → Kiểm: test dùng token với khoá DPoP khác → 401. · Nguồn: RFC 9700 §2.2.1
 - [ ] `BE-AUTH-024` **MAY** Bước xác thực theo rủi ro (thiết bị/vị trí mới → yêu cầu MFA), không dùng vị trí làm yếu tố xác thực. → Kiểm: test đăng nhập từ UA/IP mới → prompt MFA. · Nguồn: OWASP MFA Cheat Sheet
 - [ ] `BE-AUTH-025` **MUST@L** Nhận lời mời vào workspace/tenant chỉ sau khi **xác minh quyền sở hữu email bằng token** gửi tới đúng email đó (link/mã một lần trong thư mời); không suy từ việc đã có tài khoản đăng ký với email trùng, kể cả khi tài khoản ấy bị gắn `email_verified=true` bởi đường tự đăng ký. → Kiểm: test tạo tài khoản chưa xác minh trùng email người được mời → không có membership trong tenant; chỉ token từ thư mời mới nhận được lời mời. · Nguồn: `seeker19110/stored` 07 (Overmind tự host: `LocalSessionView` tạo tài khoản `email_verified=True` rồi `claim_pending_invites()` coi email trùng là bằng chứng sở hữu; đọc 2026-10-16)
+- [ ] `BE-AUTH-026` **SHOULD** API key/token do hệ thống phát hành cho khách có định dạng nhận diện được: tiền tố riêng theo sản phẩm và môi trường (vd `acme_live_`/`acme_test_`), phần ngẫu nhiên entropy cao và checksum (vd 32-bit), để từ chối nhanh chuỗi sai định dạng trước khi tra CSDL và để quét bí mật bắt được khi key lộ. Regex được công bố, có rule gitleaks hoặc custom pattern trong repo; dự án L có key công khai cân nhắc đăng ký GitHub secret scanning partner program. → Kiểm: unit test bộ sinh key khớp regex công bố + checksum hợp lệ; rule gitleaks/custom pattern của repo bắt mẫu key giả; key sai checksum → 401 không truy vấn CSDL. · Nguồn: GitHub secret scanning partner program (tiền tố + entropy + checksum 32-bit)
 
 ## Bẫy thường gặp
 
@@ -98,15 +105,16 @@ updated: 2026-10-16
 - RFC 9106 Argon2 (khuyến nghị Argon2id): <https://www.rfc-editor.org/rfc/rfc9106> — xác minh 2026-10-13
 - NIST SP 800-63B-4 Digital Identity Guidelines: Authentication and Authenticator Management (8/15 ký tự, ≥64, không composition rule, không rotation, blocklist, ≤100 lần thử): <https://pages.nist.gov/800-63-4/sp800-63b.html> — xác minh 2026-10-13
 - OWASP Session Management Cheat Sheet: <https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html> — xác minh 2026-10-13
-- OWASP Authentication Cheat Sheet: <https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html> — xác minh 2026-10-13
+- OWASP Authentication Cheat Sheet (phản hồi chung, thời gian phản hồi xấp xỉ nhau, chống tấn công tự động): <https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html> — xác minh 2026-10-20
 - OWASP Authorization Cheat Sheet (deny by default, ABAC/ReBAC, IDOR, test): <https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html> — xác minh 2026-10-13
 - OWASP Multifactor Authentication Cheat Sheet: <https://cheatsheetseries.owasp.org/cheatsheets/Multifactor_Authentication_Cheat_Sheet.html> — xác minh 2026-10-13
-- RFC 8725 JSON Web Token Best Current Practices (BCP 225): <https://www.rfc-editor.org/rfc/rfc8725> — xác minh 2026-10-13
+- RFC 8725 JSON Web Token Best Current Practices (BCP 225; §3.1 kiểm thuật toán, `none`; §3.9 `aud`): <https://www.rfc-editor.org/rfc/rfc8725> — xác minh 2026-10-20
 - RFC 9700 Best Current Practice for OAuth 2.0 Security (BCP 240): <https://www.rfc-editor.org/rfc/rfc9700> — xác minh 2026-10-13
 - OAuth 2.1 draft-ietf-oauth-v2-1-16 (03/09/2026, **vẫn là Internet-Draft**, chưa RFC): <https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1/> — xác minh 2026-10-13
 - W3C Web Authentication Level 3 — Recommendation 25/08/2026: <https://www.w3.org/TR/webauthn-3/> — xác minh 2026-10-13
 - RFC 6238 TOTP (bước 30 giây, không chấp nhận OTP dùng lại): <https://www.rfc-editor.org/rfc/rfc6238> — xác minh 2026-10-13
 - OWASP ASVS 5.0.0 chương V6 Authentication, V7 Session Management, V8 Authorization, V9 Self-contained Tokens, V10 OAuth and OIDC: <https://github.com/OWASP/ASVS/tree/master/5.0/en> — xác minh 2026-10-13
-- (chưa xác minh) OWASP Forgot Password Cheat Sheet — không fetch ngày 2026-10-13; nội dung mục 015 lấy theo NIST + Authentication Cheat Sheet.
+- OWASP Forgot Password Cheat Sheet (thông báo như nhau dù tài khoản có hay không, thời gian đồng đều; token sinh bằng thuật toán an toàn mật mã, đủ dài, lưu an toàn, dùng một lần, hết hạn): <https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html> — xác minh 2026-10-20
 - `research/2026-10-13-stored-catalog-extraction.md` §2.5 (IDOR, Server Action), §2.11 (prompt không phải cơ chế bảo mật); catalog `09-engineering-checklists` §1.3 mục 4.4; `23-own-repos-lessons` §4.1 (API phải `validateAuth()` + user_id từ token).
 - Catalog `seeker19110/stored` 07 (Overmind: nhận lời mời theo email trùng với `email_verified=True` tự gán) — đọc 2026-10-16.
+- GitHub liệt kê đặc điểm của bí mật chất lượng cao, nhận diện được: tiền tố định nghĩa duy nhất, chuỗi ngẫu nhiên entropy cao, checksum 32-bit; phát hiện tự động trên GitHub cần tham gia chương trình partner (`BE-AUTH-026`): <https://docs.github.com/en/code-security/secret-scanning/secret-scanning-partnership-program/secret-scanning-partner-program> — xác minh 2026-10-30.

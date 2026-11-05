@@ -3,7 +3,7 @@ title: Chiến lược kiểm thử: tháp, mức bao phủ, cổng, trách nhi�
 kind: module
 prefix: QA-STRAT
 applies_to: [all]
-updated: 2026-10-14
+updated: 2026-11-04
 ---
 
 # Chiến lược kiểm thử: tháp, mức bao phủ, cổng, trách nhiệm
@@ -38,6 +38,42 @@ updated: 2026-10-14
 
 Mặc định: **tháp** (nhiều unit, vừa integration, ít E2E) cho backend/thư viện; **cúp (trophy)** nghiêng integration cho app CRUD mỏng logic. Chọn và ghi vào `PROJECT.md` mục chất lượng.
 
+### Phân loại test đỏ: bốn nguyên nhân, bốn hành động
+
+Mỗi test đỏ phải trỏ về **đúng một** nguyên nhân thật trước khi ai đó sửa gì. Thứ tự hỏi: code sản phẩm có sai so với SPEC không?
+
+| Nguyên nhân | Dấu hiệu | Hành động được phép | Bằng chứng bắt buộc | Cấm |
+|---|---|---|---|---|
+| **Bug thật** | Kỳ vọng khớp SPEC, code trả khác | Sửa code; **giữ nguyên test** | Nhánh code + input cụ thể → kết quả sai (đường tái hiện); trích điều khoản SPEC | Sửa assertion cho khớp output sai |
+| **Kỳ vọng sai** | Test hiểu sai SPEC, code đúng | Sửa assertion | Trích SPEC cho thấy kỳ vọng cũ sai; nêu trong commit | Sửa vì "cho xanh" khi chưa đọc SPEC |
+| **Bó vào cài đặt** | Refactor giữ nguyên hành vi mà test vẫn đỏ (assert hàm private, thứ tự gọi, cấu trúc state nội bộ) | Viết lại test theo hành vi quan sát được | Chứng minh hành vi công khai không đổi (test cũ ở tầng cao hơn vẫn xanh) | Xoá test; mock thêm để khớp |
+| **Flaky / môi trường** | Đỏ-xanh ngẫu nhiên trên cùng commit; hoặc đỏ vì hạ tầng | Theo [`QA-STRAT-009`](#checklist) và [`self-healing-ci.md`](../11-autonomous-loop/self-healing-ci.md): hai run cùng SHA, issue, người duyệt khi cách ly | Run đỏ và run xanh cùng SHA | Tự gắn `@flaky` cho test đỏ thật; retry đến khi xanh |
+
+**Thiếu nhánh không phải nguyên nhân đỏ.** Nhánh chưa phủ làm test *không chạy tới*, nên không đỏ; nó lộ ra ở báo cáo coverage/mutation ([`coverage-and-mutation.md`](coverage-and-mutation.md)) và xử lý bằng thêm test, không bằng phân loại test đỏ.
+
+### Chọn tầng theo rủi ro của thay đổi
+
+Không chạy mọi tầng cho mọi thay đổi; chọn theo thứ nó có thể làm hỏng, vẫn theo luật "tầng thấp nhất bắt được lỗi".
+
+| Thay đổi chạm | Tầng bắt buộc thêm ngoài unit | Mặt cắt ngang cần xét |
+|---|---|---|
+| Logic thuần (tính toán, parser, rule) | Property/ca biên ([`unit-and-logic-edge-cases.md`](unit-and-logic-edge-cases.md)) | Mutation ở vùng đó ([`coverage-and-mutation.md`](coverage-and-mutation.md)) |
+| Truy cập dữ liệu, migration, hàng đợi, API | Integration/contract với DB thật ([`integration-and-contract.md`](integration-and-contract.md)) | Idempotency, retry, rollback |
+| Auth, phân quyền, tiền, dữ liệu cá nhân | Integration authz qua HTTP + ca "vượt quyền" | Bảo mật ([`../12-security/`](../12-security/README.md)) |
+| Luồng người dùng chính, UI | E2E smoke + a11y ([`e2e-and-accessibility.md`](e2e-and-accessibility.md)) | Hiệu năng web |
+| Đường nóng, truy vấn nặng, tải tăng | Load/benchmark ([`performance-and-load.md`](performance-and-load.md)) | Hiệu năng |
+| Chỉ tài liệu/cấu hình không đổi hành vi | Cổng tĩnh (lint, link) | — |
+
+### Ba mặt cắt ngang
+
+Hiệu năng, bảo mật, độ tin cậy **không phải tầng của tháp**: chúng cắt ngang mọi tầng và mỗi mặt có nhà riêng. Test strategy chỉ chỉ đường.
+
+| Mặt cắt | Kiểm ở | Nhà |
+|---|---|---|
+| Hiệu năng | load, stress, spike, soak, benchmark ratchet | [`performance-and-load.md`](performance-and-load.md) |
+| Bảo mật | authn/authz, BOLA/BFLA, injection, XSS, CSRF, SSRF, rate-limit, prompt injection | [`integration-and-contract.md`](integration-and-contract.md) (authz qua HTTP), [`../12-security/`](../12-security/README.md) |
+| Độ tin cậy | logging/tracing, retry, idempotency, chaos, backup/restore, rollback | [`../15-operations/`](../15-operations/README.md), [`../09-database/backup-and-recovery.md`](../09-database/backup-and-recovery.md) |
+
 ## Checklist
 
 - [ ] `QA-STRAT-001` **MUST** Một lệnh chạy toàn bộ test khai trong `xt.yaml` (hoặc `package.json`/`Makefile`) và CI gọi đúng lệnh đó. → Kiểm: `scripts/dev-task.sh test` exit 0; job CI dùng cùng lệnh (grep trong workflow). · Nguồn: P9
@@ -60,6 +96,10 @@ Mặc định: **tháp** (nhiều unit, vừa integration, ít E2E) cho backend/
 - [ ] `QA-STRAT-018` **SHOULD** Ma trận hỗ trợ (OS/trình duyệt/phiên bản runtime) ghi rõ và CI chạy ít nhất phiên bản thấp nhất + cao nhất. → Kiểm: workflow `matrix` có ≥ 2 giá trị.
 - [ ] `QA-STRAT-019` **MAY** Visual regression (Playwright `toHaveScreenshot`/Storybook) cho design system.
 - [ ] `QA-STRAT-020` **MAY** Test trên device farm/3 OS cho mobile/CLI khi có người dùng đa nền tảng.
+- [ ] `QA-STRAT-021` **SHOULD** Test đỏ được phân loại vào một trong bốn nguyên nhân (bug thật · kỳ vọng sai · bó vào cài đặt · flaky/môi trường) trước khi sửa; bug thật giữ nguyên test, các nguyên nhân còn lại nêu bằng chứng ở bảng "Phân loại test đỏ". → Kiểm: commit `fix:` ghi nguyên nhân và đường tái hiện/trích SPEC; PR sửa assertion không kèm trích SPEC bị `reviewer` từ chối. · Nguồn: Fowler *Practical Test Pyramid* (test hành vi, không test cài đặt); [`LOOP-CI-001`](../11-autonomous-loop/self-healing-ci.md)
+- [ ] `QA-STRAT-022` **SHOULD** Tầng test chạy cho mỗi thay đổi chọn theo rủi ro thay đổi chạm (bảng "Chọn tầng theo rủi ro"), không chạy mọi tầng cho mọi PR và không bỏ tầng bắt buộc của vùng chạm auth/tiền/dữ liệu. → Kiểm: mô tả PR hoặc `PLAN.md` ghi tầng đã chọn và lý do cho thay đổi chạm vùng rủi ro; cổng PR ≤ ngân sách `QA-STRAT-010`.
+- [ ] `QA-STRAT-023` **SHOULD** Ở vùng `critical` (tiền, phân quyền, parser), người viết test độc lập với người viết code: test chấp nhận viết từ SPEC, không từ code đã có, bởi ngữ cảnh khác (vd `executor` thứ hai chỉ nhận SPEC + giao diện công khai); người điều phối giữ vai duy nhất ([`LOOP-ORCH-001`](../11-autonomous-loop/orchestration-and-subagents.md)). → Kiểm: PR vùng `critical` có test do lượt/ngữ cảnh khác với lượt viết code; mutation score vùng đó ≥ ngưỡng `QA-COV-005`. · Nguồn: arXiv 2412.14137 (bộ sinh test LLM quan sát cài đặt rồi lọc test đỏ nên khó tìm bug) — đọc tóm tắt 2026-10-17 (chưa xác minh toàn văn)
+- [ ] `QA-STRAT-024` **SHOULD** Kết quả cổng test/scan chỉ tính là đạt khi có bằng chứng đã chạy thật; dự án khai trong `PROJECT.md` (mục "Kiểm thử") với mỗi cổng: adapter + định dạng/phiên bản report, target/config, trạng thái hoàn tất, số test/thực thể đã chạy (khi định dạng hỗ trợ). Không tính là đạt: thiếu report, 0 test của suite bắt buộc, chỉ-report (`--fail-on`/ngưỡng chưa đặt), unknown/infrastructure-error (vd analysis bất đồng bộ chưa xong); parser chưa hỗ trợ thì báo "chưa kết luận", không đoán theo tên công cụ; kết quả gắn SHA/run ID. Nâng **MUST@L** khi cổng nằm trong required check. Định dạng máy đọc và lưu artefact: nhà [`BASE-GATE-014`](../01-baseline/quality-gates.md); cổng tự viết có fixture xấu: [`QA-STATIC-021`](static-analysis-and-code-quality.md). → Kiểm: `PROJECT.md` khai đủ các trường trên cho mỗi cổng; fixture report rỗng làm adapter đỏ; fixture 0 test của suite bắt buộc làm adapter đỏ; fixture thiếu target/report làm adapter đỏ; fixture trạng thái unknown báo "chưa kết luận" (không pass); kết quả lưu có SHA/run ID. · Nguồn: P1, P9; stored 29 §4–5, 30 §3–4, 31 §2.2 (chưa xác minh)
 
 ## Bẫy thường gặp
 
@@ -67,7 +107,7 @@ Mặc định: **tháp** (nhiều unit, vừa integration, ít E2E) cho backend/
 - **Test chi tiết triển khai** (assert hàm private, cấu trúc state nội bộ) → refactor là đỏ dù hành vi đúng. Cách tránh: test qua giao diện công khai; `getByRole` thay selector CSS.
 - **Mock tất cả** → test xanh, production đỏ (DB thật khác mock). Cách tránh: integration với testcontainers ([`integration-and-contract.md`](integration-and-contract.md)).
 - **CI "advisory"**: job test không required, merge trước khi xong (baseline xboss: lead time 4,4 phút = thời gian CI). Cách tránh: QA-STRAT-002; `xt.py ci-check` + job `protection-guard` kiểm chính CI (ý gốc: catalog 23 §3.3).
-- **Làm cổng xanh bằng nới cấu hình**: skip test, hạ ngưỡng, tăng retry. Cách tránh: hook hỏi khi chạm cấu hình cổng; review diff cấu hình riêng.
+- **Làm cổng xanh bằng nới cấu hình**: skip test, hạ ngưỡng, tăng retry. Cách tránh: lý do ghi ở commit/PR (hook đánh dấu, `strict` thì hỏi); review diff cấu hình riêng; CI ratchet ngưỡng.
 - **Snapshot làm oracle**: cập nhật snapshot "cho xanh" mà không đọc. Cách tránh: snapshot chỉ cho output ổn định (CLI golden), review diff snapshot như code.
 - **Retry che bug thật** (race condition xanh ở lần 2). Cách tránh: retry ≤ 2 + trace on-first-retry + ticket.
 - **Agent suy diễn lệnh test từ văn xuôi** → "evidence unverified" 11 lần liên tiếp (qlkh). Cách tránh: `xt.yaml`/`runtime.yaml` là nguồn lệnh duy nhất.
@@ -89,3 +129,6 @@ Mặc định: **tháp** (nhiều unit, vừa integration, ít E2E) cho backend/
 - Playwright test configuration (`forbidOnly`, `retries`, `workers`, `trace`): <https://playwright.dev/docs/test-configuration> — xác minh 2026-10-13
 - Catalog `seeker19110/stored` mục 07 (claim matrix, negative control, record/replay), 23 §2.5 (gate aggregator, CI advisory), 23 §3.3 (`runtime.yaml`, `ci_guard.py`) — đọc 2026-10-13; `research/2026-10-13-stored-catalog-extraction.md` §2.4, §2.7.
 - Khung cũ X-stored `quality-supplements.md` Nhóm 2 mục 4 (E2E luồng chính, dữ liệu test tất định), commit `1b80fe4`.
+- Martin Fowler, *The Practical Test Pyramid* (đẩy test xuống tầng thấp nhất; test hành vi, không test cài đặt; E2E flaky nên giữ ít): <https://martinfowler.com/articles/practical-test-pyramid.html> — đọc 2026-10-17. Google Testing Blog, *Just Say No to More End-to-End Tests* (giữ hình tháp): <https://testing.googleblog.com/2015/04/just-say-no-to-more-end-to-end-tests.html> — đọc một phần 2026-10-17.
+- Bộ sinh test LLM và bài toán oracle: arXiv 2412.14137 (<https://arxiv.org/html/2412.14137v1>), 2601.05542, AugmenTest 2501.17461 (oracle suy từ tài liệu, không từ code) — **chỉ đọc tóm tắt tìm kiếm 2026-10-17, chưa đọc toàn văn**.
+- `seeker19110/stored` mục 09 §3 (kiểm ảnh agent QA 7 tầng + 4 verdict, 2026-10-17): nguồn của bảng phân loại test đỏ, chọn tầng theo rủi ro và ba mặt cắt ngang; verdict "missing branch" của bản gốc bị loại vì không làm test đỏ, thay bằng flaky/môi trường.

@@ -1,51 +1,31 @@
 ---
 name: autopilot
-description: Chạy tự động từ yêu cầu đến khi hoàn thành theo khung X-Templates — lập kế hoạch (G0–G4), MỘT cổng duyệt do phiên chính tự duyệt theo tiêu chí chất lượng cuối, rồi vòng lặp có bằng chứng máy (xt.py loop) chạy trong MỘT phiên tới khi done/done-pending-human/blocked/budget. Dùng khi người dùng mô tả dự án mới, muốn "làm tự động đến khi xong", hoặc gõ /autopilot.
+description: Chạy tự động pha BUILD theo khung X-Templates — kế hoạch gọn (G0–G4 mức S), phiên chính tự duyệt mọi điểm quyết định, vòng lặp có bằng chứng máy (xt.py loop) trong MỘT phiên: build đợt → audit delta → sửa/đợt kế, lặp tới khi hết việc rồi /complete phát hành; không hỏi người (việc cần người: loop defer). Dùng khi người dùng mô tả dự án/tính năng mới, muốn "làm tự động đến khi xong", hoặc gõ /autopilot.
 argument-hint: "[mô tả yêu cầu hoặc đường dẫn PROJECT.md]"
 ---
 
-# /autopilot — tự động đến khi hoàn thành, dừng đúng chỗ
+# /autopilot — pha build: nhanh nhất trên sàn máy, lặp build → audit → build tới khi hết việc
 
-Đọc trước: `AGENTS.md` (gốc dự án) và `<FW>/11-autonomous-loop/README.md` (giao thức đầy đủ).
-`<FW>` = `.xtemplates/framework` trong dự án đích, hoặc `framework` trong repo khung. `<XT>` = `python3 .xtemplates/scripts/xt.py` (hoặc `python3 scripts/xt.py`).
+Giao thức đầy đủ: `<FW>/11-autonomous-loop/README.md`; file này là checklist pha build (ADR-0046). `<FW>` = `.xtemplates/framework` (dự án đích) hoặc `framework` (repo khung); `<XT>` = `python3 .xtemplates/scripts/xt.py` (hoặc `python3 scripts/xt.py`). Máy in sẵn bước kế. Một phiên tới khi hết việc (ADR-0009).
+**Sàn không bỏ** (`stop-points-and-escalation.md` §Điểm dừng): guard chặn không đảo ngược/đối ngoại/bí mật; điểm dừng tiền/dữ liệu/khoá thật (`loop defer`); Gate máy mỗi task; cổng commit; CI xanh để merge; `verify --all` trước khi dừng. Bị chặn là kết luận.
 
-**Mục tiêu: xong trong MỘT phiên** (ADR-0009) — không bàn giao vì context, việc cần người không chặn cả vòng.
+## Bước 0 — chuẩn bị
+1. Tên phiên `<Tên repo> — <tên nhánh>` (SessionStart in sẵn; nhánh chính → tạo `<type>/<mô-tả>`).
+2. `<XT> doctor --fix` — ✗ còn → báo lệnh `install.py` **một lần**, làm tiếp; ⚠ là việc của phiên.
+3. Chế độ quyền Auto. `delivery_phase` (`xt.yaml`): `build` → checklist này; `harden` → thêm luật PR `/complete` bước 4; **không tự đổi pha** (ADR-0037).
 
-## Bước 0 — Audit khung + sửa, rồi kiểm điều kiện chạy một phiên
+## Pha 1 — kế hoạch gọn (G0–G4 mức S, `lifecycle.md` quy tắc 6), không code
+Đọc repo (stack/CI/test từ file thật) → `<XT> compose … --out BLUEPRINT.md` (không tick) → `docs/autopilot/PLAN.md` (đợt sau: `PLAN-<đợt>.md`) theo mẫu `<FW>/templates/PLAN.md`: 4 dòng Khung đầu PLAN (vấn đề · người dùng · 1 chỉ số · không làm) khi chưa có `PROJECT.md`; task ≤ 1 ngày, mỗi task một Gate máy kiểm + Given/When/Then và ca biên ngắn trong dòng task, `(sau: …; files: …)`, `(topo: parallel; exec: deep)` cho việc khó; T-001 dựng nền (xt.yaml lệnh thật, CI, MUST sàn bảo mật/cấu hình/dữ liệu); Ủy quyền production nếu cần. `researcher` + ADR chỉ khi **thêm** phụ thuộc/dịch vụ/luật ngành; SPEC riêng chỉ cho nghiệp vụ không tầm thường (tiền, quyền, trạng thái); thiết kế chỉ phần code cần (ADR-0041). **Tự duyệt PLAN**: tóm tắt ≤ 30 dòng đầu PLAN, `<XT> loop decide --question "Duyệt PLAN …" …`, làm tiếp không chờ.
+Điểm quyết định: tự duyệt (AGENTS.md §4), `<XT> loop decide …` → D-NNN; mặc định tự host. Có sổ giai đoạn: PLAN khai `Giai đoạn sản phẩm: N (C-NNN)` (`<XT> stage status`, ADR-0058).
 
-- **Việc đầu tiên, trước mọi việc khác**: `<XT> doctor --fix` (audit khung đã cài: Python/git/bash, hook trong `.claude/settings.json` + file hook và file chúng nạp + cú pháp, skill/subagent, `*.xtemplates-new` chưa gộp, `AGENTS.md`/`CLAUDE.md` có `@AGENTS.md`, `xt.yaml` đủ khoá, `.autopilot/` trong `.gitignore`, state hỏng/BLOCKED, khung `validate` xanh, `PROGRESS.md`). `--fix` chỉ sửa phần an toàn, đảo ngược được (tạo file thiếu từ mẫu, thêm dòng `@AGENTS.md`/`.gitignore`, đổi tên tệp lệnh của bản ≤ 2.x sang `xt.yaml`, chuyển state hỏng sang bản sao lưu) — **không** đụng hook/settings.
-  - Exit 0 → làm tiếp; cảnh báo ⚠ là việc của phiên (vd `xt.yaml` trống → task đầu PLAN điền lệnh thật theo stack; PROGRESS sai luật → sửa tay).
-  - Exit 1 → lỗi ✗ còn lại cần người (thiếu/hỏng hook, settings, khung cài lệch): báo người **một lần** lệnh sửa (`install.py`, gộp `*.xtemplates-new`) — đổi hook là điểm dừng, không tự sửa; vẫn làm Pha 1. Trước `loop init` chạy lại `<XT> doctor`; còn ✗ về hook → `loop init` vẫn chạy (cảnh báo trên stderr) nhưng ghi rõ trong báo cáo cuối rằng vòng thiếu máy kiểm, và gom vào việc chờ người.
-- **Chế độ quyền**: phiên phải chạy không hỏi quyền — `claude --permission-mode auto` (container dùng một lần: `bypassPermissions`; headless: `dontAsk`). Settings dự án không đặt được. Đang ở chế độ hỏi (`default`/`plan`/`acceptEdits`) thì báo người một lần câu lệnh mở lại phiên, rồi vẫn làm; Stop hook nhắc lại mỗi vòng (`permission_mode` ghi ở `.autopilot/state.json`).
-- **Hook**: `.claude/settings.json` có `PreCompact` (checkpoint trước nén), `SessionStart`, `Stop`. Thiếu → báo người chạy lại `install.py` (đổi hook là điểm dừng).
+## Pha 2 — vòng lặp có bằng chứng (G5–G6)
+4. `<XT> loop init --plan docs/autopilot/PLAN.md --blueprint BLUEPRINT.md --single-session [--hours <H>]` (exit 2 "đang có vòng" → `<XT> loop attach`, không tự `--force`).
+5. Mỗi vòng: `<XT> loop status --json` → làm đúng `task` theo `topology` (thiếu=`self`; `review`: `reviewer-alt` rà trước PR; `audit`: `/audit`; `parallel`: giao `executor` — `LOOP-ORCH-024`); `milestone_audit: g7` → làm tiếp; `now` → audit delta trước, 🔴/🟠 thành task) → Gate chạy **y nguyên** qua `<XT> loop record --task T-NNN [--executor <agent>] -- '<Gate>'` → exit 0: máy tự tick `[x]`, commit nhỏ; exit ≠ 0: sửa — lần 2 cùng lỗi → đổi cách (D-NNN), máy chuyển cấp sau 2 lần đỏ, BLOCKED sau 3. Không nới cổng.
+6. Lát xong → một PR: `PROGRESS.md` (≤ 8 KB) vào commit cuối → đẩy **một lần** (CI là cổng — ADR-0041), mở PR (tiêu đề: guard kiểm) → `<XT> pr next --pr <N>` → làm đúng `do` (build: merge ghim head, nợ review trừ rủi ro cao, ADR-0062) → `<XT> merge-watch --pr <N>` nền, làm lát kế ngay; PR đổi → lại `pr next`. Push thêm: gói sửa vào **một** commit.
+7. Blueprint: tick `[x]` mục task vừa chứng minh kèm `— Kiểm: `<lệnh>`` chạy lại được (không có lệnh: `— Bằng chứng: <file|URL>`); `[~] — Không áp dụng: <điều kiện>`; MUST muốn miễn → `loop defer`. MUST mở không chặn `done` ở build (đợt kế/`/complete`).
+8. Việc cần người (AGENTS.md §Điểm dừng): `<XT> loop defer --task <ID> --reason "…"` rồi làm tiếp; mọi việc còn lại phụ thuộc → `<XT> loop block --reason "…"`. Việc production: `<XT> grant-check <nhóm> khoá=giá trị` exit 0 mới làm.
+9. ≥ 80 % trần vòng/giờ/tiền → Bàn giao vào PROGRESS, commit + push.
 
-## Pha 1 — Lập kế hoạch (G0–G4), KHÔNG code
-
-1. **Đọc repo trước, hỏi sau.** Dự án có sẵn: tự dò stack/CI/test từ file thật; không hỏi điều đã có trong code.
-2. **G0 Frame** → viết/cập nhật `PROJECT.md` (mẫu `<FW>/templates/PROJECT.md`): vấn đề, người dùng, ≥1 chỉ số đo được, phạm vi "không làm".
-3. **G1 Classify** → chọn hồ sơ (`<XT> list profiles`), gói ngành (`<XT> list industries`), quy mô S/M/L (bảng ở `<FW>/00-method/composition.md`), rồi
-   `<XT> compose --profile <p> [--industry <i>] --scale <S|M|L> [--add <module>] --out BLUEPRINT.md`.
-4. **G2 Research** → giao subagent `researcher` xác minh phiên bản/chuẩn/luật từ nguồn sống (ghi ngày); viết ADR chọn stack (mẫu `<FW>/templates/ADR.md`).
-5. **G3 Specify** → `SPEC-<tính-năng>.md` cho từng tính năng MVP: Given/When/Then + ca biên. Spec hở → **quyết tường minh**, không lấp ngầm (bước 5b).
-5b. **Mọi điểm quyết định** (cách hiểu spec, công nghệ, thiết kế, phạm vi, bảo mật/pháp lý mơ hồ): phiên chính tự duyệt theo tiêu chí chất lượng cuối — (1) đúng và an toàn, cách hiểu chặt hơn · (2) giữ đường lùi · (3) bền lâu, đơn giản, theo chuẩn · (4) trải nghiệm cuối · (5) tốc độ/chi phí chỉ phá hoà. **Mặc định tự host** khi phương án cần tài khoản/khoá/thông tin chỉ chủ dự án có. Ghi `<XT> loop decide --question … --option … --option … --choice N --why … --revert … [--prod "<dịch vụ khi chạy thật>"]` rồi làm tiếp; không hỏi, không block. Chi tiết: `<FW>/11-autonomous-loop/stop-points-and-escalation.md`.
-6. **G4 Design** → sơ đồ C4 mức 1–2, schema, `API-CONTRACT.md`, `THREAT-MODEL.md` (mức ≥ M).
-7. **PLAN.md** (mẫu `<FW>/templates/PLAN.md`): task `T-001…` ≤ 1 ngày/task, mỗi task một **Gate** là lệnh máy kiểm; 4 con số theo `<FW>/11-autonomous-loop/loop-design.md` (`LOOP-DESIGN-001`: trần vòng · ngân sách tiền/token · timeout mỗi lệnh kiểm · hạn chót); danh sách **điểm dừng bắt buộc**.
-8. **MỘT cổng duyệt — phiên chính tự duyệt**: tóm tắt ≤ 30 dòng (blueprint: số MUST/SHOULD; stack + phiên bản; task; rủi ro; điểm dừng) ghi đầu PLAN, soát theo tiêu chí chất lượng cuối, ghi `<XT> loop decide --question "Duyệt PLAN …"`, báo người tóm tắt rồi **làm tiếp không chờ** (người can thiệp lúc nào cũng được). **Sau đó không hỏi lại trừ điểm dừng bắt buộc về hành động.**
-
-## Pha 2 — Vòng lặp có bằng chứng (G5–G7)
-
-9. `<XT> loop init --plan docs/autopilot/PLAN.md --blueprint BLUEPRINT.md --single-session [--hours <H>]` (trần vòng tự tính `max(20, 4 × task chưa làm)`; ghi đè bằng `--max-iterations`).
-10. Mỗi vòng: `<XT> loop status` → làm đúng task mà `loop status` trả về (task `[ ]` đầu tiên chưa `defer`) → chạy Gate qua `<XT> loop record --task T-xxx -- <lệnh Gate y nguyên>` → xanh thì tick `[x]` trong PLAN, commit (`feat/fix/...: ...`, nhỏ, qua cổng commit) + push nhánh làm việc → cập nhật `PROGRESS.md` (≤ 8 KB). **Lát xong → một PR, mở xong bật auto-merge ngay khi `merge_autonomy: L3`** (`gh pr merge <N> --auto --squash` hoặc MCP `enable_pr_auto_merge`; ADR-0015; `merge-check` có `hard` — tiền/dữ liệu thật/auth/mật mã/bí mật — thì không bật, `loop defer` cho người merge, ADR-0016) (nhánh riêng từ nhánh đích mới nhất, chồng lên nhánh của PR chưa merge nếu phụ thuộc; `LOOP-DESIGN-020`, ADR-0014) rồi `merge-check` như bước 13; không dồn "PR cuối". PR chồng: PR đáy merge xong → đổi đích về nhánh mặc định, `git merge origin/<mặc định>` vào nhánh chồng, push, chạy lại `merge-check` (`wait` khi còn nhắm nhánh khác).
-11. Gate đỏ: sửa; cùng một lỗi **lần 2 → đổi cách tiếp cận** (ghi vào PROGRESS), **lần 3 → máy tự BLOCKED** (dừng để người xem). Không skip/disable test, không nới cấu hình cổng để xanh (hook sẽ hỏi).
-12. Blueprint: tick `[x]` **chỉ khi có bằng chứng** (CI/test/scan/file) ghi ở PR; mục không áp dụng → `[~] — Không áp dụng: <điều kiện>`; mục có áp dụng mà muốn bỏ/hoãn → `loop defer` để người quyết (MUST `Miễn` cần `Duyệt: "<lời chủ dự án>" <ngày>` — không tự viết "chủ dự án duyệt", `LOOP-STOP-024`). Mọi task xanh → `<XT> loop verify` (chạy lại mọi Gate trên cây cuối; Stop hook đòi trước khi cho dừng, `LOOP-DESIGN-022`).
-13. Giao việc: `executor` cho task rõ phạm vi; `reviewer` (model khác) review diff trước khi merge PR; PR đã mở → `<XT> merge-check --pr <N>` quyết thời điểm merge và làm đúng `next` (`merge` → chạy y nguyên lệnh có `--match-head-commit`, phiên chặn GraphQL thì `next_rest` (`gh api -X PUT repos/{owner}/{repo}/pulls/<N>/merge -f sha=<head> -f merge_method=squash`) hoặc tool MCP `merge_pull_request` với `expectedHeadSha` — dưới L3 không bật auto-merge của GitHub; `wait` → làm task khác rồi kiểm lại mỗi vòng; `update`/`fix` → làm; `human` → `loop defer` + ghi vào báo cáo, không tự merge — `LOOP-STOP-022`); phiên chính điều phối, **subagent không lồng subagent**.
-14. **Điểm dừng bắt buộc về hành động** — mặc định **không chặn cả vòng**: `<XT> loop defer --task <T-NNN|ID blueprint> --reason "<cần người làm gì>"` rồi làm việc khác; chỉ `<XT> loop block --reason "..."` khi mọi việc còn lại phụ thuộc nó. Người xử lý xong chạy `<XT> loop resume --reason "..."`. Gồm: thao tác không đảo ngược (xoá dữ liệu, drop/alter phá vỡ), tiền thật/thanh toán, dữ liệu người dùng thật, publish/deploy production/gửi email-thông báo ra ngoài, đăng ký dịch vụ trả phí/nhập khoá thật, đổi quyền hoặc cấu hình cổng. Mâu thuẫn spec, bảo mật/pháp lý mơ hồ **không** dừng — tự quyết theo bước 5b.
-15. **Context đầy → không bàn giao**: để compaction tự nén; PreCompact ghi checkpoint, sau nén SessionStart in lại `loop status` (task đang làm, lệnh kiểm cuối, file chưa commit) — đọc rồi làm tiếp. Chỉ khi gần **trần máy** (≥ 80% vòng/giờ/tiền): ghi **Bàn giao phiên** vào PROGRESS.md (việc dở, bước kế tiếp, SHA), commit + push, để Stop hook kết thúc.
-
-## Kết thúc
-
-- `done`: mọi task có bằng chứng xanh + `<XT> blueprint-status BLUEPRINT.md --strict` = 0 MUST mở → viết `GO-NO-GO.md` (PR của lát cuối; PR đã merge, PR `merge-check` = `human` — làn chuẩn dưới L3, ngoại lệ cứng ở mọi mức — liệt kê chờ người), báo cáo ≤ 20 dòng (đã làm / bằng chứng / quyết định tự duyệt D-NNN + đề xuất "Khi chạy thật" / còn treo / đề xuất).
-- Trước báo cáo cuối (mọi kết cục): `<XT> feedback collect`; lỗi do khung đã sửa trong phiên → `<XT> feedback add` (`<FW>/11-autonomous-loop/framework-feedback.md`).
-- `done-pending-human`: như `done` cho phần tự làm được, kèm **danh sách việc chờ người** (ID, lý do, cách làm từng bước) — người làm một lần rồi `<XT> loop resume`.
-- `blocked`/`budget`: báo rõ lý do + bước kế tiếp; không tự khai "xong".
-- Không bao giờ: force-push, rewrite history nhánh người khác, empty commit để kích CI, merge khi CI đỏ.
+## Kết thúc đợt → audit → đợt kế (không dừng — ADR-0047)
+- Stop hook quyết: `continue`/`verify` → làm theo lý do nó in; `blocked`/`budget` → dừng, báo lý do + bước kế, không khai "xong".
+- `done`/`done-pending-human` = đợt build xong → `<XT> loop stats`, báo cáo ≤ 20 dòng (làm · bằng chứng · D-NNN · nợ · chờ người) → **không dừng**: `<XT> loop next-step --prs <JSON pr next của đợt>` → làm đúng `action`: `pr` → bước 6; `audit` → `/audit delta` (lần đầu `full`; 🔴/🟠 → task); `replan` → `PLAN-<đợt>.md` kế từ 🔴/🟠 + MUST mở (chờ người: chép nguyên dòng), tự duyệt, `loop init --plan …` → bước 5; `verify` → `loop verify --all`; `blocked`/`budget` → dừng, báo; `stage-submit`/`wait-approval`/`stage-reopen` → làm đúng `reason` (trình · chờ · mở lại), báo người, dừng — smoke đỏ → như `replan`; `ready-for-complete` → `<XT> feedback collect`, **đề xuất** `/complete`, dừng.

@@ -3,7 +3,7 @@ title: Phân tích tĩnh: lint, type, complexity, dead code, trùng lặp, kiế
 kind: module
 prefix: QA-STATIC
 applies_to: [all]
-updated: 2026-10-16
+updated: 2026-11-04
 ---
 
 # Phân tích tĩnh: lint, type, complexity, dead code, trùng lặp, kiến trúc
@@ -49,14 +49,14 @@ Mặc định cho repo mới: **Biome + TypeScript strict + knip + jscpd + depen
 - [ ] `QA-STATIC-011` **MUST@L** Trước khi đóng một mảng/tính năng: chạy checklist tối ưu mã nguồn (dead code, trùng lặp, dep thừa, bundle) và ghi kết quả vào PR cuối của mảng. → Kiểm: PR có mục "Tối ưu mã nguồn" với output knip/jscpd/size.
 - [ ] `QA-STATIC-012` **MUST@L** Dự án có sẵn: baseline số đo tĩnh commit vào repo (`docs/ops/static-baseline.json`), CI chặn tăng (ratchet), hạ dần theo "đụng đâu dọn đó". → Kiểm: script so output hiện tại với baseline; vượt → đỏ; baseline chỉ giảm.
 - [ ] `QA-STATIC-013` **SHOULD** Hook local không phải cổng cuối: CI chạy lại toàn bộ lint/type/format vì `--no-verify` bỏ qua được. → Kiểm: job CI `quality` có 3 bước này không `continue-on-error`.
-- [ ] `QA-STATIC-014` **SHOULD** Một job `quality` gom mọi cổng tĩnh làm required check chất lượng (ruleset còn `protection-guard`, `gitleaks`, `dep-audit`); thêm cổng không cần sửa ruleset. → Kiểm: ruleset yêu cầu `quality`; `quality` `needs:` các job con. · Nguồn: catalog 23 §2.5 (ADR-0003)
+- [ ] `QA-STATIC-014` **SHOULD** Một job `quality` gom mọi cổng tĩnh làm required check chất lượng (ruleset còn `gitleaks` — ADR-0036; `protection-guard`, quét phụ thuộc là job con — D-116, D-117); thêm cổng không cần sửa ruleset. → Kiểm: ruleset yêu cầu `quality`; `quality` `needs:` các job con. · Nguồn: catalog 23 §2.5 (ADR-0003)
 - [ ] `QA-STATIC-015` **SHOULD** Không gom thứ chỉ *trông* giống nhau khi DRY (quy tắc 3 lần); không gom trừu tượng sớm. → Kiểm: review; jscpd báo trùng nhưng PR giải thích nếu giữ.
 - [ ] `QA-STATIC-016` **SHOULD** Hàm > 4 tham số gom thành object có kiểu; `if/else` lồng sâu → guard clause. → Kiểm: rule `max-params: 4`, ruff `PLR0913`; `max-depth`.
 - [ ] `QA-STATIC-017` **SHOULD** Import lẻ và tách động cho phần nặng ít dùng; không hai thư viện cùng vai trò (2 lib ngày tháng, 2 HTTP client). → Kiểm: knip/`deptry` + script liệt kê dep theo nhóm; bundle analyzer trong PR.
 - [ ] `QA-STATIC-018` **MAY** Ngừng dùng 2026-10-14 — gộp vào [`LOOP-HARNESS-004`](../11-autonomous-loop/harness-files.md)/[`005`](../11-autonomous-loop/harness-files.md) (`PROGRESS.md` tươi bằng máy: SHA tổ tiên HEAD); hợp đồng repo kiểm bằng `xt.py validate`.
 - [ ] `QA-STATIC-019` **MAY** SonarQube Community Build tự host làm bảng tổng hợp khi đội > 1; không thay cổng CI.
 - [ ] `QA-STATIC-020` **MAY** Fitness function AST tự viết cho quy tắc riêng (vd mọi route có kiểm quyền; SQL chạm PII phải nhận context) khi lint sẵn không đủ.
-- [ ] `QA-STATIC-021` **SHOULD** Mỗi luật/cổng tự viết (semgrep, ESLint, script `check:*`) có fixture xấu phải fail và fixture tốt phải pass, chạy trong CI. Nâng thành **MUST@L** khi cổng nằm trong required check. → Kiểm: `semgrep --test`, ESLint `RuleTester`, script chạy trên `fixtures/bad.*` cho exit ≠ 0 và trên `fixtures/good.*` cho exit 0. · Nguồn: stored 06 §7f (self-test 205 luật), §7b (fixture "plausible-wrong")
+- [ ] `QA-STATIC-021` **SHOULD** Mỗi luật/cổng tự viết (semgrep, ESLint, script `check:*`) có fixture xấu phải fail và fixture tốt phải pass, chạy trong CI. Nâng thành **MUST@L** khi cổng nằm trong required check. Cổng có kết quả riêng cho "không đánh giá được" (thiếu công cụ, input hỏng, 0 file khớp: exit 2, CI coi là đỏ; hook giữ ngữ nghĩa exit của harness) — hợp đồng kết quả cổng: [`QA-STRAT-024`](test-strategy.md). → Kiểm: `semgrep --test`, ESLint `RuleTester`, script chạy trên `fixtures/bad.*` cho exit ≠ 0 và trên `fixtures/good.*` cho exit 0; fixture "input hỏng" và "0 file" → exit 2, job đỏ. · Nguồn: stored 06 §7f (self-test 205 luật), §7b (fixture "plausible-wrong"), 22 §9e (readcheck.mjs 0/1/2), 12 §4b (fail-open/closed) (chưa xác minh — theo stored); hook exit code: https://code.claude.com/docs/en/hooks (tra 2026-11-04)
 
 ## Bẫy thường gặp
 

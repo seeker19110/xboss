@@ -62,3 +62,18 @@ npm run test:e2e
 
 Test DB dùng PostgreSQL disposable. Thay đổi migration phải kiểm số thứ tự, chạy mới/chạy lặp,
 ERD, verify query, rollout tương thích ngược và recovery.
+
+## Khung X-Templates (`.xtemplates/`)
+
+- Khung cài ở `.xtemplates/` (chỉ đọc, bản ghi ở `.xtemplates/VERSION`); nâng bản = chạy lại `install.py` của bản khung
+  mới trong một PR riêng. `<XT>` = `python3 .xtemplates/scripts/xt.py` (`doctor` audit bản cài, `validate`).
+- Lệnh chuẩn và cấu hình thật (`merge_*`, `commit_gate`…) ở `xt.yaml` — không suy diễn lệnh từ văn xuôi.
+- Hàng rào thật là `.claude/settings.json` (`deny`) + hook guard của khung (`.claude/hooks/guard.py`, chặn không hỏi
+  người) cùng các hook riêng của XBoss. **Bị chặn là kết luận** (`LOOP-STOP-025` của khung): không thử lệnh/tool khác cho
+  cùng hiệu ứng; viết lại theo dòng `viết lại:` của guard (vd ghi tệp và chạy tệp đó tách thành hai lệnh Bash).
+- Luật khung và luật XBoss khác nhau thì **luật XBoss chặt hơn thắng**: người merge mọi PR (`merge_autonomy: L1`),
+  không merge/deploy/sửa production khi chưa được người dùng cấp quyền (khung xếp deploy vào nhóm "cho chạy" — ở XBoss vẫn
+  cần quyền), mọi capability mới qua Feature gate ở trên.
+- Commit và tiêu đề PR: conventional, dòng đầu ≤ 100 ký tự (`commitlint.config.cjs`; guard khung kiểm cùng ngưỡng —
+  `LOOP-HARNESS-029`).
+- Tên phiên agent: `<Tên repo> — <tên nhánh>` (`LOOP-HARNESS-028`).

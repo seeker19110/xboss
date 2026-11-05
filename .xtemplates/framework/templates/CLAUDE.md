@@ -1,18 +1,16 @@
 ---
 title: Mẫu CLAUDE.md cho dự án
 kind: template
-updated: 2026-10-16
+updated: 2026-10-24
 ---
 
 # CLAUDE.md
 
 @AGENTS.md
 
-<!-- Claude Code chỉ đọc CLAUDE.md khi có cả hai file; dòng import trên nạp AGENTS.md (nguồn sự thật duy nhất cho mọi harness).
-     Chỉ ghi ở đây những gì RIÊNG cho Claude Code. File do install.py của khung X-Templates tạo (copy-if-absent). -->
-
 ## Riêng cho Claude Code
-- Hook (`.claude/settings.json`): SessionStart nạp PROGRESS + trạng thái autopilot (cả sau compaction); PreCompact ghi checkpoint (`xt.py loop checkpoint`, luôn exit 0); PreToolUse chặn lệnh phá huỷ/`curl|sh` (cả lồng trong `sh -c`/heredoc), chặn ghi file bí mật, hỏi khi deploy/publish/push nhánh chính/merge PR (kể cả `gh api` ghi và tool MCP merge — chỉ tự merge khi `xt.py merge-check` cho phép), khi sửa cấu hình cổng/CI/hook/migration đã có, khi làm yếu/xoá test đã có, khi ghi tay `.autopilot/` (cả qua `python -c`/heredoc), khi tự thêm MCP/plugin/skill (`claude mcp add`, `.mcp.json`…), khi xoá đệ quy ngoài thư mục dự án, khi cập nhật snapshot, khi ra khỏi máy dev (`ssh`/`scp`/`rsync` tới máy khác, `psql`/`mysql`/`redis-cli` tới máy chủ không cục bộ, `curl`/`wget` gửi dữ liệu ra ngoài), khi thêm phụ thuộc mới (`pnpm add`, `pip install <gói>`…), khi chạy container có quyền máy chủ (`--privileged`, namespace host, mount `/`/home/socket) hoặc trên daemon máy khác; chặn gửi file bí mật/biến môi trường ra mạng; quét cả `eval`, backtick, `{ …; }`, `find -exec/-delete`; chạy cổng chất lượng trước `git commit` (commit vào repo ngoài dự án thì hỏi); PostToolUse format file vừa sửa; Stop đọc bằng chứng autopilot (`xt.py loop hook-stop`).
-- `permissions.defaultMode` ở settings dự án bị bỏ qua với `auto`/`bypassPermissions`; muốn chạy không hỏi quyền: bật ở settings người dùng hoặc `--permission-mode` — autopilot một phiên: `claude --permission-mode auto`. Hook `deny` vẫn chặn kể cả ở bypass.
+- Hook (`.claude/settings.json`): SessionStart nạp PROGRESS + trạng thái autopilot (cả sau compaction); PreCompact ghi checkpoint; PreToolUse là guard **không hỏi người** (ADR-0018 của khung) — chặn hành động không đảo ngược, lộ bí mật, tắt/bỏ qua hook, ghi tay `.autopilot/`, dấu review đăng tay, merge chưa đủ điều kiện, commit ghi tên model/URL phiên (`ai_attribution`); còn lại cho chạy (deploy, sửa cổng kèm lý do, thêm phụ thuộc…). Nhóm và lý do: `.xtemplates/framework/11-autonomous-loop/stop-points-and-escalation.md` §Điểm dừng; luật đầy đủ nằm trong `.claude/hooks/guard.py`. Lệnh Gate/`xt.yaml` do harness chạy cũng qua guard. Bị chặn là kết luận (AGENTS.md §4).
+- Quyền: `permissions.allow` có `Bash`, `ask` rỗng — Bash chạy không hỏi; hàng rào là `deny` của settings + guard. Muốn lớp hỏi: `XT_GUARD_POLICY=strict` và/hoặc thay `Bash` bằng danh sách `Bash(...)` cụ thể.
+- Chế độ quyền chọn theo phiên (`defaultMode` ở settings dự án bị bỏ qua với `auto`/`bypassPermissions`): phiên cloud chọn **Auto** ở bộ chọn chế độ quyền; CLI `claude --permission-mode auto`. Autopilot một phiên cần Auto (Stop hook cảnh báo khi phiên ở chế độ hỏi). Ở Auto bộ phân loại vẫn có thể chặn thêm — bị chặn là kết luận.
 - Headless: không dùng `--bare` (mất hook/skill/CLAUDE.md).
-- Model/effort: [ĐIỀN nếu dự án quy định — vd phiên chính opus/sonnet, subagent sonnet/haiku].
+- Model/effort: phiên chính (điều phối — lập PLAN, viết SPEC) = model cao nhất sẵn có theo thứ tự **Fable → Opus → Sonnet** (`LOOP-ORCH-019`) — chọn lúc mở phiên/`--model`, không ghi vào artefact commit; subagent theo frontmatter `.claude/agents/*.md`. [ĐIỀN nếu dự án đổi]
