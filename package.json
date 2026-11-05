@@ -65,7 +65,7 @@
     "exceljs": "^4.4.0",
     "google-auth-library": "^11.1.0",
     "lucide-react": "^1.55.0",
-    "next": "^16.4.2",
+    "next": "^16.4.3",
     "nodemailer": "10.1.4",
     "openid-client": "^6.8.4",
     "otplib": "^13.4.1",
