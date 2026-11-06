@@ -589,7 +589,7 @@ export async function upsertEngineeringRelationFromExternal(
 
 // Chuyển status: chỉ pending_review/approved/rejected <-> nhau (KHÔNG đụng 'void' — soft-
 // delete là thao tác riêng, ngoài phạm vi PR1). Ném lỗi nếu object không tồn tại/không
-// thuộc projectId (cách ly đa dự án, pattern billBelongsToProject ở lib/finance.ts) — route
+// thuộc projectId (cách ly đa dự án: lọc theo project_id, không thấy = lỗi) — route
 // gọi hàm này tự bắt lỗi để trả 404. Ghi lịch sử qua createObjectRevision thay vì thêm cột
 // reviewed_by/reviewed_at riêng (tránh 2 nơi lưu cùng 1 sự thật — xem mục 4 đặc tả).
 export async function reviewEngineeringObject(

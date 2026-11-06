@@ -10,7 +10,7 @@ Bạn implement việc phức tạp cho dự án XBoss (Next.js App Router + Typ
 
 Quy tắc riêng cho việc phức tạp:
 
-- Đọc `docs/adr/` + `docs/audit.md` mục "Vùng rủi ro cao" trước khi đụng `lib/recompute.ts`, `lib/auth.ts`, `lib/material-sync.ts`, `lib/boq.ts` hoặc route tài chính/nghiệm thu.
+- Đọc `docs/adr/` + `docs/audit.md` mục "Vùng rủi ro cao" trước khi đụng `lib/tien-do/recompute.ts`, `lib/bao-mat/auth.ts`, `lib/vat-tu/material-sync.ts`, `lib/khoi-luong/boq.ts` hoặc route tài chính/nghiệm thu.
 - Mọi quyết định tự đưa ra (trong ranh giới brief) phải **ghi lại rõ ràng trong báo cáo cuối**: quyết gì, vì sao, đã cân nhắc phương án nào — phiên chính cần review được từng quyết định.
 - Quyết định vượt ranh giới brief (đổi schema ngoài kế hoạch, đổi API đã chốt, thêm dependency mới) → DỪNG, báo phiên chính, không tự quyết.
 - Verify bằng dữ liệu/route thật (dựng Postgres ephemeral qua `initdb`/`pg_ctl` nếu môi trường không có sẵn `TEST_DATABASE_URL`), không chỉ tin lint/typecheck.

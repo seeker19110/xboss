@@ -39,7 +39,7 @@ function fmtVND(n: number) {
   return Math.round(n).toLocaleString("vi-VN") + " đ";
 }
 
-// ===== Kiểu dữ liệu (client) — mirror lib/finance.ts =====
+// ===== Kiểu dữ liệu (client) — mirror lib/tai-chinh/finance.ts =====
 
 // Tổng hợp dòng tiền/công nợ/VAT: bigint đồng×100 (S10c) — xem ./_components/tongHopTien.ts.
 

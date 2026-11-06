@@ -399,8 +399,8 @@ pm2 start npm -i 2 --name xboss -- start
   (M53 PR4, `lib/ha-tang/sync-locks.ts`) chống gửi email/Telegram trùng nếu 2 request chạm gần như
   đồng thời; `refresh-views` tự an toàn vì Postgres chặn `REFRESH CONCURRENTLY` trùng view.
 
-**Giới hạn đã biết khi chạy nhiều instance (chấp nhận ở quy mô hiện tại, xem `PROGRESS.md`
-mục Nợ kỹ thuật nếu cần nâng cấp):**
+**Giới hạn đã biết khi chạy nhiều instance (chấp nhận ở quy mô hiện tại, xem bảng nợ cuối
+`docs/ops/technical-debt-2026-10-26.md` nếu cần nâng cấp):**
 
 - Trang **Traffic monitor** (`/admin/traffic`, SSE) chỉ thấy traffic của đúng instance bạn
   đang kết nối — không gộp traffic toàn cluster.
