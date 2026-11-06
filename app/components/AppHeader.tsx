@@ -380,19 +380,23 @@ export default function AppHeader({
               <LinkNoiBo
                 href="/account"
                 title={`Tài khoản: ${me.name} (${ROLE_LABELS[me.role as Role] ?? me.role})`}
-                aria-label={`Tài khoản — ${me.name}`}
+                // Tên chứa đúng chữ hiển thị (tên + vai trò ở màn rộng); chữ cái avatar vẽ bằng
+                // CSS `content` để không lọt vào "chữ hiển thị" (axe label-content-name-mismatch).
+                aria-label={`Tài khoản — ${me.name} ${ROLE_LABELS[me.role as Role] ?? me.role}`}
                 className="flex items-center gap-2 ml-1 pl-2.5 py-1 min-h-[40px] border-l border-zinc-800 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900/60 transition group"
               >
                 <div className="relative">
-                  <span className="w-7 h-7 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xs font-bold text-emerald-400 group-hover:border-emerald-500/50 transition-colors shrink-0 shadow-xs">
-                    {me.name.trim().charAt(0).toUpperCase()}
-                  </span>
+                  <span
+                    aria-hidden="true"
+                    data-chu={me.name.trim().charAt(0).toUpperCase()}
+                    className="w-7 h-7 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xs font-bold text-emerald-400 group-hover:border-emerald-500/50 transition-colors shrink-0 shadow-xs after:content-[attr(data-chu)]"
+                  />
                   <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-zinc-950" />
                 </div>
                 <div className="hidden xl:flex flex-col text-left leading-tight">
                   <span className="text-xs font-semibold text-zinc-200 group-hover:text-white truncate max-w-[120px]">
                     {me.name}
-                  </span>
+                  </span>{" "}
                   <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider">
                     {ROLE_LABELS[me.role as Role] ?? me.role}
                   </span>

@@ -146,12 +146,13 @@ export default function HomeHienTruong({
         <span className="flex min-w-0 flex-wrap items-center justify-center gap-x-1 whitespace-normal leading-5">
           <span>Thông báo</span>
           {notificationsReady && unread > 0 && (
+            // Số vẽ bằng CSS `content` (tên link đã có số thật): chữ "99+" trong DOM không khớp
+            // tên "… 123 chưa đọc" → vi phạm axe label-content-name-mismatch.
             <span
-              className="bg-red-600 text-on-accent text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center shrink-0 tabular-nums"
-              aria-label={`${unread} thông báo chưa đọc`}
-            >
-              {unread > 99 ? "99+" : unread}
-            </span>
+              aria-hidden="true"
+              data-so={unread > 99 ? "99+" : String(unread)}
+              className="bg-red-600 text-on-accent text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center shrink-0 tabular-nums after:content-[attr(data-so)]"
+            />
           )}
         </span>
       </ButtonLink>

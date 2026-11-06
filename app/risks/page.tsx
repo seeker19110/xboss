@@ -137,7 +137,7 @@ export default function RisksPage() {
               aria-label="Ghi nhận rủi ro"
               className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Rủi ro mới</span>
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Ghi nhận rủi ro</span>
             </button>
           ) : undefined
         }

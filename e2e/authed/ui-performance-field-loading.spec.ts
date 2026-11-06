@@ -441,7 +441,8 @@ for (const width of [360, 393, 1280]) {
         }
         if (width >= 768) await expect(link.locator("svg")).toBeVisible();
       }
-      await expect(group.getByText("99+", { exact: true })).toBeVisible();
+      // Badge vẽ số bằng CSS `content` (axe label-content-name-mismatch) — kiểm qua data-so.
+      await expect(group.locator('[data-so="99+"]')).toBeVisible();
     }
 
     const kpis = main.locator(".grid.grid-cols-3").first();
