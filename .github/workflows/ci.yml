@@ -233,6 +233,9 @@ jobs:
           sudo apt-get install -y postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y postgresql-client-16
+          # Image có sẵn client mới hơn: wrapper /usr/bin/pg_dump chọn bản cao nhất → ghim 16.
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/pg_dump --version
 
       - name: Gắn marker cho PostgreSQL disposable của CI
         run: |
@@ -341,6 +344,9 @@ jobs:
           sudo apt-get install -y postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y postgresql-client-16
+          # Image có sẵn client mới hơn: wrapper /usr/bin/pg_dump chọn bản cao nhất → ghim 16.
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/pg_dump --version
 
       - name: Gắn marker cho PostgreSQL disposable của CI
         run: |
