@@ -205,9 +205,29 @@ export function useTrackingData(sheet: string) {
     // S05: tab khác đổi ngữ cảnh → đóng SSE/poll NGAY, không áp version của dự án cũ nữa.
     const goDangKy = dangKyKetNoiSong(dungHan);
 
+    // Tab ẩn → đóng SSE + dừng poll (trước đây giữ kết nối mở suốt lúc ẩn: mỗi tab nền
+    // chiếm 1 stream + 1 truy vấn watermark/3s trên server mà không dùng tới — applyVersion
+    // vốn đã bỏ qua khi ẩn). Hiện lại → mở lại SSE; server gửi version ngay khi kết nối nên
+    // versionRef so khớp và tự tải lại nếu người khác đã sửa trong lúc ẩn.
+    const tamDung = () => {
+      es?.close();
+      es = null;
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = null;
+      stopPolling();
+    };
+    const doiHienThi = () => {
+      if (stopped) return;
+      if (document.hidden) tamDung();
+      else if (!es && !pollTimer) moKetNoi();
+    };
+    document.addEventListener("visibilitychange", doiHienThi);
+
+    // Luôn mở lần đầu (kể cả tab mở nền) để có version gốc khớp dữ liệu vừa tải.
     moKetNoi();
 
     return () => {
+      document.removeEventListener("visibilitychange", doiHienThi);
       goDangKy();
       dungHan();
     };
