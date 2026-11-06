@@ -680,7 +680,9 @@ export default function DiaryEditorModal({
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={`/api/photos/${p.id}`}
+                        src={`/api/photos/${p.id}?w=320`}
+                        srcSet={`/api/photos/${p.id}?w=320 320w, /api/photos/${p.id}?w=640 640w`}
+                        sizes="(min-width: 640px) 110px, 25vw"
                         alt={`Ảnh task ${p.taskCode}`}
                         loading="lazy"
                         decoding="async"

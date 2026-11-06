@@ -1118,7 +1118,9 @@ function AlbumGalleryModal({
                   {/* Ảnh động qua route /api/photos/:id (kiểm quyền server) — grid đơn giản, không lightbox. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`/api/photos/${p.id}`}
+                    src={`/api/photos/${p.id}?w=640`}
+                    srcSet={`/api/photos/${p.id}?w=320 320w, /api/photos/${p.id}?w=640 640w`}
+                    sizes="(min-width: 640px) 33vw, 50vw"
                     alt={p.caption ?? p.originalName ?? "Ảnh album"}
                     loading="lazy"
                     className="w-full h-28 object-cover rounded-lg border border-zinc-800"

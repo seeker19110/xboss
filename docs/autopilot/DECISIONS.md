@@ -58,3 +58,10 @@
 - Chọn: Giữ nguyên đường dẫn thực; chỉ bỏ navigation gồm toàn dấu chấm, dùng regression cho file thật và thư mục trung gian
 - Lý do (tiêu chí chất lượng cuối): Review độc lập tái hiện missing/../guard.py bị báo xanh khi thiếu thư mục trung gian; đường dẫn gốc giữ đúng filesystem và không che guard thiếu/sai cú pháp. Thay cách tiếp cận sau hai blind spot, không hạ policy/hook.
 - Đường lùi: Revert bản vá checker và test/docs liên quan; giữ nguyên toàn bộ hook, settings, merge L1
+
+### D-009 · 2026-11-06T11:24:22+00:00 · Duyệt kế hoạch sửa audit 2026-11-06 (1 🟠, 16 🟢, 8 nhóm chưa quét)
+
+- Phương án: (1) 4 đợt: (1) PROGRESS/xt.yaml/đường dẫn cũ, (2) axe /finance/cash + cookie OIDC + env, (3) một nguồn màu trạng thái, (4) quét lại sâu 8 nhóm chưa quét · (2) Chỉ sửa 🟠 rồi dừng · (3) Quét lại sâu 8 nhóm trước, chưa sửa gì
+- Chọn: 4 đợt: (1) PROGRESS/xt.yaml/đường dẫn cũ, (2) axe /finance/cash + cookie OIDC + env, (3) một nguồn màu trạng thái, (4) quét lại sâu 8 nhóm chưa quét
+- Lý do (tiêu chí chất lượng cuối): Đúng và an toàn trước: 🟠 duy nhất (PROGRESS bị cắt khi nạp phiên) sửa ngay vì gây mất bàn giao; 🟢 rẻ gom theo cụm file; đợt 4 lấp phần INCONCLUSIVE để không khai sạch khi chưa đo. Mỗi đợt 1 PR, đảo ngược được.
+- Đường lùi: Đóng PR đợt chưa merge hoặc revert commit; sổ AUDIT-STATUS giữ dòng phát hiện

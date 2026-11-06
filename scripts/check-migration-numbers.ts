@@ -58,7 +58,7 @@ if (duplicates.length) {
     `\n[LỖI] Nhiều file migration cùng số thứ tự:\n  - ${lines.join(
       "\n  - ",
     )}\n\nĐổi tên file mới sang số CHƯA dùng (số lớn nhất hiện có + 1). File đã áp production` +
-      ` chỉ đổi tên khi DDL idempotent và có ghi chú (xem PROGRESS.md mục Nợ kỹ thuật).`,
+      ` chỉ đổi tên khi DDL idempotent và có ghi chú (xem bảng nợ cuối docs/ops/technical-debt-2026-10-26.md).`,
   );
 }
 
