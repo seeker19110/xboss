@@ -8,6 +8,8 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { taskProjectId } from "@/lib/tien-do/workpackages";
 import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
+import { THUMB_WIDTHS, parseThumbWidth, taoThumbnail } from "@/lib/nen/thumbnail";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 
@@ -50,8 +52,9 @@ async function thuocDuAnDangChon(
 }
 
 // GET /api/photos/:id → trả về nội dung file ảnh (cần đăng nhập + có quyền xem task).
+// `?w=320|640` → bản thu nhỏ WebP cho lưới ảnh (cùng kiểm quyền; lỗi giải mã thì trả ảnh gốc).
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
   const params = await paramsP;
@@ -64,6 +67,13 @@ export async function GET(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const thumbW = parseThumbWidth(req.nextUrl.searchParams.get("w"));
+  if (thumbW === "invalid")
+    return NextResponse.json(
+      { error: `Kích thước thumbnail chỉ nhận: ${THUMB_WIDTHS.join(", ")}` },
+      { status: 400 },
+    );
 
   const photo = await queryOne<PhotoRow>(
     `SELECT id, file_name, mime_type, uploaded_by, task_id, album_id FROM task_photos WHERE id = ?`,
@@ -79,6 +89,26 @@ export async function GET(
 
   const buf = await storageGet(user.orgId, photo.file_name);
   if (!buf) return NextResponse.json({ error: "File ảnh không còn trên đĩa" }, { status: 404 });
+
+  if (thumbW != null) {
+    try {
+      const thumb = await taoThumbnail(buf, thumbW);
+      return new NextResponse(new Uint8Array(thumb), {
+        headers: {
+          "Content-Type": "image/webp",
+          "X-Content-Type-Options": "nosniff",
+          "Cache-Control": "private, max-age=31536000, immutable",
+        },
+      });
+    } catch (e) {
+      // Định dạng sharp không đọc được (vd HEIC không kèm codec) → trả ảnh gốc, không vỡ ô ảnh.
+      log.warn("Không tạo được thumbnail ảnh, trả ảnh gốc", {
+        photoId: id,
+        mime: photo.mime_type,
+        err: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
 
   return new NextResponse(new Uint8Array(buf), {
     headers: {
