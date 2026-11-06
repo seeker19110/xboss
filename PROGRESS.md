@@ -2,9 +2,9 @@
 
 ## Đang làm
 
-- **Audit full 06/11 + đợt sửa 1 — branch `claude/zen-lovelace-n3t0t7`** (owner chọn "Audit trước, chưa đổi pha" khi gọi `/complete`): sổ `docs/ops/AUDIT-STATUS.md` + báo cáo `docs/ops/AUDIT-REPORT-2026-11-06.md` — 0 🔴, 1 🟠, 16 🟢; 8/13 nhóm `chưa quét` (cụm INCONCLUSIVE), kế hoạch 4 đợt D-009. Đợt 1: PROGRESS.md rút về dưới 8 KB (lịch sử → `docs/ops/progress-history.md`, bảng nợ → `docs/ops/technical-debt-2026-10-26.md`), `xt.yaml` khai `format_check`/`coverage`, sửa đường dẫn cũ.
+- **Audit D-009 đợt 2 — branch `claude/zen-lovelace-n3t0t7`**: spec e2e `finance-cash` (2 tab, `?tab=advances`, axe cả hai tab, desktop+mobile 7/7) cho trang tài chính `/finance/cash` chưa từng có spec (AUD-A11Y-001); khai `XBOSS_PG_ALLOW_EXIT_ON_IDLE` (`"0"|"1"`) trong schema `lib/nen/env.ts` (AUD-CFG-001). Cookie OIDC (AUD-SEC-001) để lại: dính TD-004 "chờ spec M49" — cần owner chốt.
 
-- **Thumbnail ảnh hiện trường #711 — chờ owner merge** (CI xanh 06/11): `GET /api/photos/:id?w=320|640` trả WebP thu nhỏ bằng `sharp` (`lib/nen/thumbnail.ts`), kiểm quyền chạy trước; lưới ảnh dùng `srcSet`. Còn hoãn: cache ảnh SW, LIMIT ảnh prefill nhật ký.
+- **Audit full 06/11 + đợt 1 — MERGED qua #711** `dd40b5b`: sổ `docs/ops/AUDIT-STATUS.md` + báo cáo `docs/ops/AUDIT-REPORT-2026-11-06.md` (0 🔴, 1 🟠 đã sửa, 16 🟢; 8/13 nhóm `chưa quét`); PROGRESS.md < 8 KB, `xt.yaml` khai `format_check`/`coverage`. Thumbnail ảnh hiện trường cùng PR.
 
 ## Tiếp theo
 

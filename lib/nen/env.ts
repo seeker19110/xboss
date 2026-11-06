@@ -111,6 +111,9 @@ const serverSchema = z
     XBOSS_PG_STMT_TIMEOUT_MS: z.string().optional(),
     // Ngưỡng cảnh báo query chậm (ms) — mặc định 500, 0 = tắt hẳn (M53 PR1, lib/db/index.ts).
     XBOSS_SLOW_QUERY_MS: z.string().optional(),
+    // Chỉ cho test/script ngắn: "1" = pool cho phép tiến trình thoát khi mọi kết nối rảnh
+    // (pg `allowExitOnIdle`, lib/db/index.ts). Không đặt ở production (AUD-CFG-001).
+    XBOSS_PG_ALLOW_EXIT_ON_IDLE: z.enum(["0", "1"]).optional(),
     // Khoảng tối thiểu (ms) giữa 2 lần đồng bộ cảnh báo on-fetch của chuông thông báo cho cùng
     // (tổ chức, user, vai trò, dự án) — mặc định 120000, 0 = đồng bộ mọi request (lib/dich-vu/thong-bao.ts).
     XBOSS_NOTIF_SYNC_TTL_MS: z.string().optional(),
