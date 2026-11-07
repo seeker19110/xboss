@@ -37,9 +37,9 @@
     "xt.yaml": "sha256:9379e2efcc5a5f553541ed361094eebd463affad18420b527377d4490185e448"
   },
   "git_hooks": [
-    ".husky/_/commit-msg",
-    ".husky/_/pre-commit",
-    ".husky/_/pre-push"
+    ".git/hooks/commit-msg",
+    ".git/hooks/pre-commit",
+    ".git/hooks/pre-push"
   ],
   "policy": {
     "ask_removal": "manifest-only"
