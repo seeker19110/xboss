@@ -44,6 +44,22 @@ export function checkCronSecret(authHeader: string | null): boolean {
   return safeEqual(authHeader.slice(prefix.length), secret);
 }
 
+// Chạy tay route cron bằng phiên đăng nhập (ngoài Bearer CRON_SECRET). AUD-SEC-010: các route này
+// là GET có tác dụng phụ (xoá dữ liệu hết hạn, gửi báo cáo, đồng bộ Sheet) nên:
+// - cần quyền GHI editStructure (Admin/PM) — trước đây là CAN.export, một quyền XEM mà ma trận
+//   /admin/permissions mở được cho viewer/cdt;
+// - từ chối điều hướng từ site khác (Sec-Fetch-Site cross-site/same-site): cookie sameSite=lax vẫn
+//   đi kèm GET top-level nên trang lạ dẫn admin tới /api/cron/retention?apply=1 là chạy được.
+//   Thiếu header (curl, test) hoặc same-origin/none (gõ thẳng URL) vẫn cho qua.
+export function chayCronBangPhien(
+  req: { headers: { get(name: string): string | null } },
+  role: Role | undefined,
+): boolean {
+  const site = req.headers.get("sec-fetch-site");
+  if (site === "cross-site" || site === "same-site") return false;
+  return CAN.editStructure(role);
+}
+
 // ===== Mật khẩu (scrypt) =====
 export function hashPassword(pw: string): string {
   const salt = randomBytes(16).toString("hex");

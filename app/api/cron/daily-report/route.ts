@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN, chayCronBangPhien, checkCronSecret } from "@/lib/bao-mat/auth";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
 import {
   buildDailyReport,
@@ -28,7 +28,7 @@ const LOCK_NAME = "cron:daily-report";
 export async function GET(req: NextRequest) {
   const bySecret = checkCronSecret(req.headers.get("authorization"));
   const user = bySecret ? null : await getCurrentUser();
-  const bySession = CAN.export(user?.role ?? undefined);
+  const bySession = chayCronBangPhien(req, user?.role ?? undefined);
   if (!bySecret && !bySession)
     return NextResponse.json(
       { error: "Không có quyền (cần CRON_SECRET hoặc đăng nhập Admin/PM)" },

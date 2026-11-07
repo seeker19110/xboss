@@ -149,6 +149,23 @@ for (const r of CAC_ROUTE_CRON) {
       restore();
     }
   });
+
+  test(
+    `GET ${r.path}: phiên Admin nhưng điều hướng từ trang khác (Sec-Fetch-Site cross-site) → 401 (AUD-SEC-010)`,
+    S,
+    async () => {
+      const restore = datCronSecret("secret-that-toi-that-dai-32-ky-tu");
+      try {
+        const admin = await taoUser("admin", `${r.ten}-csrf`);
+        dangNhap({ id: admin.id, passwordHash: admin.passwordHash });
+        const { GET } = await r.import();
+        const res = await GET(req(r.path, { "sec-fetch-site": "cross-site" }));
+        assert.equal(res.status, 401);
+      } finally {
+        restore();
+      }
+    },
+  );
 }
 
 test(

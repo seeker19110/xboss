@@ -34,7 +34,9 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 // Nhóm route KHÔNG dùng cookie phiên nên nằm ngoài mô hình đe doạ CSRF, và chính đáng
 // được gọi từ origin khác (hoặc không có Origin):
 //   - /api/v1/*        API mở đọc-only, xác thực bằng API key qua header Bearer.
-//   - /api/cron/*      cron ngoài, xác thực bằng CRON_SECRET qua header Bearer.
+//   - /api/cron/*      cron ngoài, xác thực bằng CRON_SECRET qua header Bearer. Admin/PM cũng
+//                      chạy tay được bằng phiên (GET) — đường đó tự chặn điều hướng khác site
+//                      qua chayCronBangPhien (lib/bao-mat/auth.ts, AUD-SEC-010).
 //   - /api/admin/traffic/  proxy tự gọi fire-and-forget bằng token nội bộ.
 // Lưu ý: /api/admin/webhooks (CRUD webhook của Admin) KHÔNG nằm trong danh sách này —
 // đó là route dùng cookie phiên, phải được kiểm như mọi route mutating khác.

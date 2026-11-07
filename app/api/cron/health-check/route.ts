@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { query, insertId, withOrgScope } from "@/lib/db";
-import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN, chayCronBangPhien, checkCronSecret } from "@/lib/bao-mat/auth";
 import { sendTelegram } from "@/lib/tien-do/report";
 import {
   runHealthChecks,
@@ -21,7 +21,7 @@ const LOCK_NAME = "cron:health-check";
 // phiền, chỉ ghi log vào health_check_runs để xem lịch sử trên /tech.
 export async function GET(req: NextRequest) {
   const bySecret = checkCronSecret(req.headers.get("authorization"));
-  const bySession = CAN.export((await getCurrentUser())?.role ?? undefined);
+  const bySession = chayCronBangPhien(req, (await getCurrentUser())?.role ?? undefined);
   if (!bySecret && !bySession)
     return NextResponse.json(
       { error: "Không có quyền (cần CRON_SECRET hoặc đăng nhập Admin/PM)" },
