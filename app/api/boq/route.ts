@@ -151,16 +151,34 @@ export async function GET(req: NextRequest) {
     ]),
   );
 
+  // AUD-SEC-009: đơn giá/đơn giá thầu phụ/tổng tiền là thông tin thương mại — vai trò thiếu
+  // viewPayments chỉ thấy khối lượng (đồng bộ /api/boq/export đã che cột tiền). % thực hiện
+  // (không phải số tiền) vẫn trả qua executedPct để giữ KPI cho kỹ sư.
+  const xemTien = CAN.viewPayments(user.role);
   const items = rows.map((r) => {
     const executedFraction = r.map.reduce(
       (sum, m) => sum + Number(m.weight) * Number(m.progressPercent ?? 0),
       0,
     );
     const executedQty = Number(r.qtyContract) * executedFraction;
-    return { ...r, executedQty };
+    return xemTien
+      ? { ...r, executedQty }
+      : { ...r, unitPrice: null, subUnitPrice: null, executedQty };
   });
 
   const t = totalsRows[0];
+  const hopDong = parseMoneyExact(t.contractValue);
+  const thucHien = parseMoneyExact(t.executedValue);
+  const executedPct = hopDong > 0n ? Number((thucHien * 100n + hopDong / 2n) / hopDong) : 0;
+  if (!xemTien)
+    return NextResponse.json(
+      {
+        items,
+        totals: { contractValue: null, subValue: null, executedValue: null, executedPct },
+        ...nhanDinhDangTien(format),
+      },
+      { headers: HEADERS_API_TIEN },
+    );
   try {
     const totals = moneyFieldsToWire(
       {
@@ -172,7 +190,7 @@ export async function GET(req: NextRequest) {
       format,
     );
     return NextResponse.json(
-      { items, totals, ...nhanDinhDangTien(format) },
+      { items, totals: { ...totals, executedPct }, ...nhanDinhDangTien(format) },
       { headers: HEADERS_API_TIEN },
     );
   } catch (err) {

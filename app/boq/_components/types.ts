@@ -24,9 +24,10 @@ export type BoqItem = {
   systemName: string | null;
   systemColor: string | null;
   qtyContract: number;
-  unitPrice: number;
+  // null = vai trò thiếu quyền xem tài chính (API che — AUD-SEC-009).
+  unitPrice: number | null;
   qtySub: number;
-  subUnitPrice: number;
+  subUnitPrice: number | null;
   note: string | null;
   sortOrder: number;
   voId: number | null;
@@ -93,7 +94,7 @@ export const NGUONG_TICK_SAN = 0.5;
  */
 export const NGUONG_LECH_WEIGHT = 0.01;
 
-export function fmtVND(n: number) {
+export function fmtVND(n: number | null) {
   if (!n) return "—";
   return Math.round(n).toLocaleString("vi-VN") + " đ";
 }
