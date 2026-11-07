@@ -89,6 +89,16 @@ test("ma trận mặc định: evaluateSuppliers giữ đúng Admin/PM/Kỹ sư 
   assert.equal(typeof validatePermOverride("subcon", "evaluateSuppliers", true), "string");
 });
 
+test("ma trận mặc định: viewNormsOver giữ đúng check inline cũ của /api/norms/over (AUD-XFEAT-003)", async () => {
+  const { permDefaultsMatrix, LOCKED_PERMS } = await import("@/lib/bao-mat/auth");
+  const m = permDefaultsMatrix().viewNormsOver;
+  for (const role of ["admin", "pm", "engineer", "subcon", "bch"] as const)
+    assert.equal(m[role], true, role);
+  for (const role of ["cdt", "viewer"] as const) assert.equal(m[role], false, role);
+  // Quyền xem: không bị khoá, ma trận /admin/permissions được mở/siết.
+  assert.ok(!LOCKED_PERMS.includes("viewNormsOver"));
+});
+
 // ── Lớp tích hợp: cache + CAN + audit (cần Postgres) ─────────────────────────────
 test(
   "override: default → siết pm.approve → xoá về default; mở viewer.viewPayments; audit ghi",

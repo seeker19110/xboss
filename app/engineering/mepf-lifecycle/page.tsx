@@ -30,6 +30,7 @@ import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
+import { showToast } from "@/app/components/Toast";
 
 type TabMode = "floorplan" | "takeoff" | "hydraulic" | "nesting" | "routing" | "variance" | "tc";
 
@@ -150,8 +151,8 @@ export default function MepfLifecyclePage() {
         const data = await resTc.json();
         setTcMatrices(data.matrices || []);
       }
-    } catch (err) {
-      console.error("Lỗi khi tải dữ liệu MEPF Lifecycle:", err);
+    } catch {
+      showToast("Lỗi khi tải dữ liệu MEPF Lifecycle — kiểm tra mạng rồi thử lại", "error");
     } finally {
       setLoading(false);
     }
@@ -261,8 +262,8 @@ export default function MepfLifecyclePage() {
         await fetchData();
         setActiveTab("takeoff");
       }
-    } catch (err) {
-      console.error("Lỗi khi chạy AI Takeoff:", err);
+    } catch {
+      showToast("Lỗi khi chạy AI Takeoff — kiểm tra mạng rồi thử lại", "error");
     } finally {
       setRunningTakeoff(false);
     }
@@ -295,8 +296,8 @@ export default function MepfLifecyclePage() {
         const data = await res.json();
         setRoutingResult(data.solution);
       }
-    } catch (err) {
-      console.error("Lỗi khi chạy Generative Routing:", err);
+    } catch {
+      showToast("Lỗi khi chạy Generative Routing — kiểm tra mạng rồi thử lại", "error");
     } finally {
       setRunningRouting(false);
     }
@@ -320,8 +321,8 @@ export default function MepfLifecyclePage() {
         const data = await res.json();
         setHydraulicResult(data.analysis);
       }
-    } catch (err) {
-      console.error("Lỗi tính thủy lực:", err);
+    } catch {
+      showToast("Lỗi tính thủy lực — kiểm tra mạng rồi thử lại", "error");
     } finally {
       setRunningHydraulic(false);
     }
@@ -349,8 +350,8 @@ export default function MepfLifecyclePage() {
         const data = await res.json();
         setNestingResult(data.plan);
       }
-    } catch (err) {
-      console.error("Lỗi tối ưu cắt phôi:", err);
+    } catch {
+      showToast("Lỗi tối ưu cắt phôi — kiểm tra mạng rồi thử lại", "error");
     } finally {
       setRunningNesting(false);
     }
@@ -376,8 +377,8 @@ export default function MepfLifecyclePage() {
         const data = await res.json();
         setTcResult(data.evaluation);
       }
-    } catch (err) {
-      console.error("Lỗi khi đánh giá T&C:", err);
+    } catch {
+      showToast("Lỗi khi đánh giá T&C — kiểm tra mạng rồi thử lại", "error");
     } finally {
       setRunningTcEval(false);
     }

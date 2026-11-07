@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Send,
 } from "lucide-react";
+import { showToast } from "@/app/components/Toast";
 
 interface Signatory {
   id: string;
@@ -59,8 +60,8 @@ export default function EsignStudioPage() {
           setSelectedEnv(json.data[0]);
         }
       }
-    } catch (err) {
-      console.error("Lỗi tải envelopes:", err);
+    } catch {
+      showToast("Không tải được danh sách phong bì ký — kiểm tra mạng rồi thử lại", "error");
     } finally {
       setLoading(false);
     }

@@ -131,7 +131,8 @@ export default function ProposalsPage() {
       : canApprove && (addKind === "advance" || addKind === "payment")
         ? contractSource
         : null;
-  const proposals = source.snapshot?.items ?? [];
+  const proposalsSnapshot = source.snapshot;
+  const proposals = useMemo(() => proposalsSnapshot?.items ?? [], [proposalsSnapshot]);
   const contracts = contractSource.snapshot?.items ?? [];
   const materials = materialSource.snapshot?.items ?? [];
   const [meError, setMeError] = useState("");
@@ -148,9 +149,11 @@ export default function ProposalsPage() {
       setTab("inbox");
   }, []);
   useEffect(() => {
+    // Counter (không phải ref DOM): tăng khi unmount để bỏ kết quả fetchMe đang bay.
+    const req = authRequest;
     void loadMe();
     return () => {
-      authRequest.current++;
+      req.current++;
     };
   }, [loadMe]);
   async function refresh() {

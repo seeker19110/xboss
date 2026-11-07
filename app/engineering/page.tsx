@@ -144,8 +144,8 @@ export default function EngineeringApexCockpitPage() {
         const objJson = await objRes.json();
         setObjects(objJson.objects || []);
       }
-    } catch (err) {
-      console.error("Lỗi khi tải dữ liệu Apex Cockpit:", err);
+    } catch {
+      showToast("Lỗi khi tải dữ liệu Apex Cockpit — kiểm tra mạng rồi thử lại", "error");
     } finally {
       setLoading(false);
     }
