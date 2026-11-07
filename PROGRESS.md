@@ -2,7 +2,7 @@
 
 ## Đang làm
 
-- **Audit D-009 đợt 4b — branch `claude/zen-lovelace-n3t0t7`** (owner "làm hết đi" 07/11): vá 9 🟠 kèm test đỏ-trước — NCR chặn vai trò chỉ-xem + khoá NCR đã đóng + kiểm tham chiếu (SEC-004/005); materials POST chỉ nhận sheet của dự án (SEC-006); user-projects PUT chỉ xoá membership trong phạm vi (SEC-007); presence lọc org (SEC-008); BOQ che đơn giá/lịch sử giá theo viewPayments (SEC-009); upload tracking không hạ task nghiem_thu (CODE-003) và không ép lỗi hệ thống thành 400 (CODE-004); gỡ chu trình lib tien-do↔tai-chinh, check:lib-layers bắt dynamic import (ARCH-001). Còn 🟠: cron GET bằng phiên (SEC-010), scan-local (SEC-011), test materials/import (TEST-001), environment deploy (CI-002 — cần owner trong Settings).
+- **Audit D-009 đợt 4b — branch `claude/zen-lovelace-n3t0t7`** (owner "làm hết đi" 07/11): vá 13 🟠 kèm test đỏ-trước (PR #715) — NCR chặn vai trò chỉ-xem/khoá NCR đóng/kiểm tham chiếu (SEC-004/005); materials POST + import chỉ nhận sheet của dự án (SEC-006, SEC-014); user-projects PUT chỉ xoá trong phạm vi (SEC-007); presence lọc org (SEC-008); BOQ che đơn giá theo viewPayments (SEC-009); cron GET bằng phiên cần quyền ghi + chặn điều hướng khác site (SEC-010); quét bản vẽ không gắn rev chéo dự án, rev tự duyệt chỉ Admin/PM (SEC-011); upload tracking không hạ nghiem_thu + lỗi hệ thống không thành 400 (CODE-003/004); gỡ chu trình lib, cổng bắt dynamic import (ARCH-001); test materials/import + reports (TEST-001). Còn 🟠 duy nhất: CI-002 — owner tạo environment `production` có người duyệt trong Settings, chuyển secret VPS vào đó.
 
 - **Audit D-009 đợt 4 — MERGED qua #713** `f036768`: 3 🔴 (payroll/:id lộ lương, YCNT bỏ kiểm dự án khi null, deploy chạy cho PR từ fork) + 3 🟢. #710 (khung 3.31.0) merged `163625b`.
 
