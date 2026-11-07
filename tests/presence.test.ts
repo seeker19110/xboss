@@ -66,3 +66,17 @@ test("hết hạn TTL (>2 phút không heartbeat): user không còn xuất hiệ
     mock.timers.reset();
   }
 });
+
+test("getOnlineUsers(orgId): admin tổ chức A không thấy user online tổ chức B (AUD-SEC-008)", () => {
+  clearPresenceStore();
+  heartbeat({ id: 11, name: "Người org A", role: "engineer", orgId: 1 });
+  heartbeat({ id: 12, name: "Người org B", role: "pm", orgId: 2 });
+  assert.deepEqual(
+    getOnlineUsers(1).map((u) => u.userId),
+    [11],
+  );
+  assert.deepEqual(
+    getOnlineUsers(2).map((u) => u.userId),
+    [12],
+  );
+});

@@ -17,5 +17,5 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (user.role !== "admin") return NextResponse.json({ error: "Không có quyền" }, { status: 403 });
-  return NextResponse.json({ users: getOnlineUsers() });
+  return NextResponse.json({ users: getOnlineUsers(user.orgId) });
 }

@@ -979,6 +979,33 @@ test("PUT /api/user-projects: PM gán dự án mình thấy cho engineer → 200
   await run(`DELETE FROM user_projects WHERE user_id IN (?, ?)`, pm.id, eng.id);
 });
 
+test(
+  "PUT /api/user-projects: PM không xoá được membership ở dự án PM không thấy (AUD-SEC-007)",
+  S,
+  async () => {
+    const { query, run } = await import("@/lib/db");
+    const p1 = await taoDuAn("s7-p1");
+    const p2 = await taoDuAn("s7-p2");
+    const pm = await taoUser("pm", "s7");
+    const eng = await taoUser("engineer", "s7Eng");
+    await run(`INSERT INTO user_projects (user_id, project_id) VALUES (?, ?)`, eng.id, p2);
+    await dangNhapDuAn(pm, p1);
+    const { PUT } = await import("@/app/api/user-projects/route");
+    const res = await PUT(jreq("/x", { userId: eng.id, projectIds: [p1] }, "PUT"));
+    assert.equal(res.status, 200);
+    const rows = await query<{ project_id: number }>(
+      `SELECT project_id FROM user_projects WHERE user_id = ? ORDER BY project_id`,
+      eng.id,
+    );
+    assert.deepEqual(
+      rows.map((r) => r.project_id).sort((a, b) => a - b),
+      [p1, p2].sort((a, b) => a - b),
+      "membership dự án p2 (PM không thấy) phải còn",
+    );
+    await run(`DELETE FROM user_projects WHERE user_id IN (?, ?)`, pm.id, eng.id);
+  },
+);
+
 test("PUT /api/user-projects: PM gán dự án cho user admin → 403", S, async () => {
   const { run } = await import("@/lib/db");
   const p1 = await taoDuAn("s1-ac4-p1");
