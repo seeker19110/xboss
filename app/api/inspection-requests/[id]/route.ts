@@ -60,7 +60,9 @@ export async function GET(
     return NextResponse.json({ error: "Không tìm thấy phiếu YCNT" }, { status: 404 });
 
   const projectId = await getCurrentProjectId(user);
-  if (projectId != null && !(await requestInProject(id, projectId)))
+  // AUD-SEC F1: fail-closed — không dự án khả kiến thì không có phiếu nào thuộc về user
+  // (bảng inspection_requests không có RLS theo org; trước đây null = bỏ qua kiểm).
+  if (projectId == null || !(await requestInProject(id, projectId)))
     return NextResponse.json({ error: "Không tìm thấy phiếu YCNT" }, { status: 404 });
 
   const tasks = await query<TaskRow>(
@@ -99,7 +101,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Trạng thái không hợp lệ" }, { status: 422 });
 
   const projectId = await getCurrentProjectId(user);
-  if (projectId != null && !(await requestInProject(id, projectId)))
+  if (projectId == null || !(await requestInProject(id, projectId)))
     return NextResponse.json({ error: "Không tìm thấy phiếu YCNT" }, { status: 404 });
 
   try {
