@@ -4,6 +4,7 @@ import { Link2, X, Ban, Activity } from "lucide-react";
 import { slugFromCode } from "@/lib/nen/sheets";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/tien-do/status";
 import AppHeader from "@/app/components/AppHeader";
+import { STATUS_BAR } from "@/app/components/StatusBadge";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Modal, appAlert } from "@/app/components/dialogs";
@@ -30,13 +31,6 @@ type Blocked = { id: number; preds: string[] };
 type Me = { role: string };
 type Arrow = { id: number; x1: number; y1: number; x2: number; y2: number; critical: boolean };
 
-const STATUS_BAR: Record<string, string> = {
-  chuan_bi: "bg-zinc-600",
-  dang_thi_cong: "bg-blue-600",
-  hoan_thanh: "bg-emerald-600",
-  nghiem_thu: "bg-teal-500",
-  tre: "bg-orange-600",
-};
 const DAY = 86400_000;
 const d2n = (s: string) => new Date(s + "T00:00:00Z").getTime();
 const fmt = (s: string) => formatDateVN(s);
@@ -226,7 +220,7 @@ export default function GanttPage() {
       <div className="px-3 sm:px-6 py-2 flex flex-wrap gap-3 text-xs text-zinc-400 border-b border-zinc-800/60">
         {Object.entries(STATUS_LABEL).map(([k, v]) => (
           <span key={k} className="flex items-center gap-1.5">
-            <span className={`w-3 h-2 rounded-sm ${STATUS_BAR[k]}`} /> {v}
+            <span className={`w-3 h-2 rounded-sm ${STATUS_BAR[k as StatusSlug]}`} /> {v}
           </span>
         ))}
         <span className="flex items-center gap-1.5">
@@ -359,7 +353,7 @@ export default function GanttPage() {
                               (preds ? `\n⛔ Chờ việc trước: ${preds.join(", ")}` : "")
                             }
                             className={
-                              `absolute top-0.5 bottom-0.5 rounded-sm ${STATUS_BAR[b.status] ?? "bg-zinc-600"} opacity-80 hover:opacity-100 transition` +
+                              `absolute top-0.5 bottom-0.5 rounded-sm ${STATUS_BAR[b.status as StatusSlug] ?? STATUS_BAR.chuan_bi} opacity-80 hover:opacity-100 transition` +
                               (preds ? " ring-1 ring-rose-400" : "") +
                               (isCritical ? " outline outline-1 outline-amber-400" : "")
                             }
