@@ -337,7 +337,7 @@ test(
 );
 
 test(
-  "syncDrawingsFromDisk: code trùng bản vẽ đã thuộc DỰ ÁN KHÁC — bám vào bản ghi cũ, không vi phạm UNIQUE(code)",
+  "syncDrawingsFromDisk: code trùng bản vẽ đã thuộc DỰ ÁN KHÁC — bỏ qua tệp, không gắn revision chéo dự án, không vi phạm UNIQUE(code) (AUD-SEC-011)",
   S,
   async () => {
     // BOQCODE/`drawings.code` là duy nhất TOÀN HỆ THỐNG (UNIQUE trên cột code, không kèm
@@ -359,7 +359,10 @@ test(
       writeFileSync(join(dir, `${maDungChung}.dwg`), "noi dung");
 
       const kq = await syncDrawingsFromDisk({ projectId: projectB, userId: null });
-      assert.ok(kq.newlySyncedRevisions >= 1);
+      assert.ok(
+        kq.failedFiles.includes(`${maDungChung}.dwg`),
+        "tệp mang mã của dự án khác phải bị bỏ qua và báo lỗi",
+      );
 
       const ds = await query<{ id: number; project_id: number }>(
         `SELECT id, project_id FROM drawings WHERE code = ?`,
@@ -369,12 +372,12 @@ test(
       assert.equal(ds[0].id, drawingIdA);
       assert.equal(ds[0].project_id, projectA, "quyền sở hữu bản ghi KHÔNG đổi sang dự án B");
 
-      const revs = await query<{ uploaded_by: number | null }>(
-        `SELECT uploaded_by FROM drawing_revisions WHERE drawing_id = ?`,
+      // AUD-SEC-011: quét ở dự án B KHÔNG được gắn revision (approved) vào bản vẽ của dự án A.
+      const revs = await query<{ id: number }>(
+        `SELECT id FROM drawing_revisions WHERE drawing_id = ?`,
         drawingIdA,
       );
-      assert.equal(revs.length, 1, "revision mới vẫn được đăng ký vào ĐÚNG drawing đã có");
-      assert.equal(revs[0].uploaded_by, null, "userId null khi chạy CLI thì uploaded_by null");
+      assert.equal(revs.length, 0, "không gắn revision chéo dự án");
     } finally {
       rmSync(dir, { recursive: true, force: true });
       await run(`DELETE FROM drawing_revisions WHERE drawing_id = ?`, drawingIdA);
