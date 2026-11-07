@@ -6,8 +6,8 @@ import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 
-// PATCH /api/ncrs/:id — cập nhật NCR (mọi vai trò sửa mô tả/gán/hạn/chuyển trạng thái
-// open→fixing→recheck; đóng (status=closed) chỉ Admin/PM).
+// PATCH /api/ncrs/:id — cập nhật NCR (vai trò thao tác — CAN.editProgress — sửa mô tả/gán/hạn/
+// chuyển trạng thái open→fixing→recheck; đóng, sửa hoặc mở lại NCR đã đóng chỉ Admin/PM).
 export async function PATCH(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -29,6 +29,17 @@ export async function PATCH(
         )
       : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy NCR" }, { status: 404 });
+  // AUD-SEC-004: vai trò chỉ-xem (bch/cdt/viewer) chỉ xem + bình luận, không sửa NCR.
+  if (!CAN.editProgress(user.role))
+    return NextResponse.json({ error: "Không có quyền sửa NCR" }, { status: 403 });
+  // NCR đã đóng là hồ sơ chất lượng đã chốt: mọi thay đổi (kể cả mở lại) cần Admin/PM —
+  // trước đây kỹ sư/thầu phụ gửi status=open là mở lại được và xoá luôn closed_at.
+  const dangDong = existing.status === "closed";
+  if (dangDong && !CAN.approve(user.role))
+    return NextResponse.json(
+      { error: "NCR đã đóng — chỉ Admin/PM được sửa hoặc mở lại" },
+      { status: 403 },
+    );
 
   const body = await req.json().catch(() => null);
   const sets: string[] = [];
@@ -66,9 +77,9 @@ export async function PATCH(
 
   // D01: tái kiểm quyền với dữ liệu có hiệu lực ngay trước ghi (snapshot lúc xác thực có thể stale).
   // Chỉ nhánh đóng NCR đi qua cổng CAN.approve; sửa thường không có cổng CAN để tái kiểm.
-  const dongNcr = body?.status === "closed";
+  const canDuyet = body?.status === "closed" || dangDong;
   const kq = await ghiNeuConQuyen(
-    () => !dongNcr || CAN.approve(user.role),
+    () => CAN.editProgress(user.role) && (!canDuyet || CAN.approve(user.role)),
     () => run(`UPDATE ncrs SET ${sets.join(", ")} WHERE id = ?`, ...values, id),
   );
   if (!kq.ok) return NextResponse.json({ error: "Chỉ Admin/PM được đóng NCR" }, { status: 403 });
