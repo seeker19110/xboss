@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storageDelete, storagePut } from "@/lib/nen/storage";
+import { storagePut, storageDeleteBestEffort } from "@/lib/nen/storage";
 import { query, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId, visibleProjectIds } from "@/lib/ha-tang/projects";
@@ -91,7 +91,7 @@ export async function POST(
       ),
   );
   if (!kq.ok) {
-    await storageDelete(user.orgId, fileName).catch(() => {});
+    await storageDeleteBestEffort(user.orgId, fileName);
     return NextResponse.json(
       { error: "Bạn không có quyền upload biên bản mặt bằng (chỉ Admin/PM/kỹ sư)" },
       { status: 403 },

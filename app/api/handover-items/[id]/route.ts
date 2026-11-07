@@ -1,6 +1,6 @@
 import { laLoiKhoaNgoai, phanHoiLoiCoStatus, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut, storageDelete } from "@/lib/nen/storage";
+import { storagePut, storageDelete, storageDeleteBestEffort } from "@/lib/nen/storage";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { ghiNeuConQuyen, kiemQuyenTaiLucGhi } from "@/lib/bao-mat/permissions";
@@ -198,7 +198,7 @@ export async function PATCH(
     // Bị thu hồi quyền lúc ghi ⇒ DB không trỏ tới file mới — dọn file vừa lưu.
     const status = (err as { status?: unknown } | null)?.status;
     if (status === 403 && file && minutesFile)
-      await storageDelete(user.orgId, minutesFile).catch(() => {});
+      await storageDeleteBestEffort(user.orgId, minutesFile);
     return phanHoiLoiCoStatus(err);
   }
   // File biên bản cũ chỉ xoá sau khi DB đã commit tên file mới.

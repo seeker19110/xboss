@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchPackage } from "@/lib/bao-mat/auth";
 import { newDrawingFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
-import { storagePut, storageGet, storageDelete } from "@/lib/nen/storage";
+import { storagePut, storageGet, storageDelete, storageDeleteBestEffort } from "@/lib/nen/storage";
 import { visibleProjectIds } from "@/lib/ha-tang/projects";
 import { packageProjectId } from "@/lib/tien-do/workpackages";
 import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
@@ -127,7 +127,7 @@ export async function POST(
       ),
   );
   if (!kq.ok) {
-    await storageDelete(user.orgId, fileName).catch(() => {});
+    await storageDeleteBestEffort(user.orgId, fileName);
     return NextResponse.json({ error: "Không có quyền" }, { status: 403 });
   }
 

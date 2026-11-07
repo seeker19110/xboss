@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { resolveSystemId } from "@/lib/tien-do/systems";
 import { getScheduleControlData } from "@/lib/tien-do/schedule-control";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -19,5 +19,13 @@ export async function GET(req: NextRequest) {
   if (projectId == null)
     return NextResponse.json({ critical: [], delayed: [], delayPareto: [], groupProgress: {} });
   const data = await getScheduleControlData(systemId, projectId);
+  // AUD-SEC-012: thầu phụ vẫn xem danh sách trễ (đọc thuần) nhưng không thấy ghi chú trễ
+  // tự do do Admin/PM/thầu khác ghi — cùng chuẩn /api/dashboard* (subcon bị chặn ở đó).
+  if (!CAN.viewDashboard(user.role)) {
+    return NextResponse.json({
+      ...data,
+      delayed: data.delayed.map((t) => ({ ...t, delayNote: null })),
+    });
+  }
   return NextResponse.json(data);
 }

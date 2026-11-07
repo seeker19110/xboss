@@ -7,6 +7,7 @@ import {
   storagePut,
   storageGet,
   storageDelete,
+  storageDeleteBestEffort,
   __resetStorageBackendCache,
 } from "@/lib/nen/storage";
 
@@ -73,4 +74,20 @@ test("path traversal: tên file chứa '/', '..' hoặc '\\' bị chặn ở c�
       `storageDelete phải chặn: ${JSON.stringify(name)}`,
     );
   }
+});
+
+test("storageDeleteBestEffort: dọn hỏng không ném nhưng GHI LOG cảnh báo (AUD-CODE-005)", async (t) => {
+  const warn = t.mock.method(console, "warn", () => {});
+  await storageDeleteBestEffort(ORG, "../evil.bin"); // storageDelete ném vì tên không hợp lệ
+  assert.ok(
+    warn.mock.calls.some((c) => c.arguments.map(String).join(" ").includes("Không dọn được file")),
+    "phải ghi log khi dọn file thất bại",
+  );
+});
+
+test("storageDeleteBestEffort: file hợp lệ vẫn bị xoá", async () => {
+  const name = `${randomBytes(8).toString("hex")}.bin`;
+  await storagePut(ORG, name, Buffer.from("x"));
+  await storageDeleteBestEffort(ORG, name);
+  assert.equal(await storageGet(ORG, name), null);
 });
