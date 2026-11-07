@@ -12,6 +12,17 @@ import {
   type DimRow,
 } from "@/lib/tien-do/excel-tracking";
 import { toISO } from "@/lib/tien-do/import";
+import { loiDauVao } from "@/lib/nen/loi";
+
+// AUD-CODE-004: lỗi do FILE (hỏng, sai mẫu) là lỗi đầu vào 400; mọi lỗi khác (DB, storage) để
+// route trả 500 qua phanHoiLoi (có log) — trước đây route ép tất cả về 400 kèm thông điệp thô.
+function docWorkbook(buffer: Buffer): XLSX.WorkBook {
+  try {
+    return XLSX.read(buffer, { type: "buffer", cellDates: true, raw: true });
+  } catch {
+    throw loiDauVao("Không đọc được file Excel (file hỏng hoặc sai định dạng)");
+  }
+}
 
 export type UploadKind = "ke_hoach" | "tracking";
 export type UploadResult = {
@@ -185,15 +196,15 @@ export async function parsePlanUpload(
   buffer: Buffer,
   changedBy: string,
 ): Promise<UploadResult> {
-  const wb = XLSX.read(buffer, { type: "buffer", cellDates: true, raw: true });
+  const wb = docWorkbook(buffer);
   if (wb.SheetNames.length === 0) {
-    throw new Error("File rỗng hoặc không có worksheet");
+    throw loiDauVao("File rỗng hoặc không có worksheet");
   }
 
   const ws = wb.Sheets[wb.SheetNames[0]];
   const sheetData = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 });
   if (sheetData.length === 0) {
-    throw new Error("File rỗng");
+    throw loiDauVao("File rỗng");
   }
 
   const headers = (sheetData[0] as unknown[]).map((h) => String(h || "").trim());
@@ -201,9 +212,9 @@ export async function parsePlanUpload(
   const startIdx = headers.indexOf("Ngày bắt đầu KH");
   const endIdx = headers.indexOf("Ngày kết thúc KH");
 
-  if (boqIdx === -1) throw new Error("File không đúng mẫu — thiếu cột BOQCODE");
-  if (startIdx === -1) throw new Error("File không đúng mẫu — thiếu cột Ngày bắt đầu KH");
-  if (endIdx === -1) throw new Error("File không đúng mẫu — thiếu cột Ngày kết thúc KH");
+  if (boqIdx === -1) throw loiDauVao("File không đúng mẫu — thiếu cột BOQCODE");
+  if (startIdx === -1) throw loiDauVao("File không đúng mẫu — thiếu cột Ngày bắt đầu KH");
+  if (endIdx === -1) throw loiDauVao("File không đúng mẫu — thiếu cột Ngày kết thúc KH");
 
   const { projectJoin, projectFilter, projectParam } = locDuAn(projectId);
 
@@ -304,9 +315,9 @@ export async function parseTrackingUpload(
   // Tuỳ chọn để đường gọi cũ (test/script) không phải sửa; NULL thì ô chỉ có mốc thời gian.
   uploadedBy?: number | null,
 ): Promise<UploadResult> {
-  const wb = XLSX.read(buffer, { type: "buffer", cellDates: true, raw: true });
+  const wb = docWorkbook(buffer);
   if (wb.SheetNames.length === 0) {
-    throw new Error("File rỗng hoặc không có worksheet");
+    throw loiDauVao("File rỗng hoặc không có worksheet");
   }
 
   const { projectJoin, projectFilter, projectParam } = locDuAn(projectId);
@@ -340,7 +351,7 @@ export async function parseTrackingUpload(
 
       const headers = (sheetData[0] as unknown[]).map((h) => String(h || "").trim());
       if (headers[0] !== "BOQCODE") {
-        throw new Error(`Tab "${sheetName}" không đúng mẫu — thiếu cột BOQCODE ở cột đầu tiên`);
+        throw loiDauVao(`Tab "${sheetName}" không đúng mẫu — thiếu cột BOQCODE ở cột đầu tiên`);
       }
 
       totalRows += sheetData.length - 1;
@@ -417,8 +428,26 @@ export async function parseTrackingUpload(
     // (đã lắp / chưa lắp) thay vì 1 câu mỗi ô. Ghi + tính lại task vẫn theo thứ tự dòng file
     // (dòng trùng task: dòng sau thắng, lịch sử % y như trước); nhóm tính 1 lần ở cuối.
     await khoaTaskTheoId(canGhi.map((g) => g.taskId));
+    // AUD-CODE-003 (TRAPS §5): bất biến nghiem_thu ⇒ progress = 1 giữ ở MỌI đường làm giảm %.
+    // Task đã nghiệm thu mà file bỏ tick ô nào thì giữ NGUYÊN dòng đó (cùng luật import Excel
+    // lib/tien-do/import.ts) — đọc status SAU khi khoá để không đua với /approve.
+    const daNghiemThu = new Set(
+      (
+        await query<{ id: number }>(
+          `SELECT id FROM tasks WHERE id = ANY(?) AND status = 'nghiem_thu'`,
+          canGhi.map((g) => g.taskId),
+        )
+      ).map((r) => r.id),
+    );
     const nhom = new Set<number>();
     for (const g of canGhi) {
+      if (daNghiemThu.has(g.taskId) && g.chuaLap.length > 0) {
+        warnings.push(
+          `Task #${g.taskId}: đã nghiệm thu nhưng file bỏ tick ${g.chuaLap.length} ô — giữ nguyên, ` +
+            `huỷ nghiệm thu trước nếu muốn ghi đè`,
+        );
+        continue;
+      }
       // Dữ liệu sự kiện (M120 FR4) — cùng lib dùng chung với tick từ lưới: đã lắp thì
       // đóng dấu thời điểm upload + người upload, chưa lắp thì xoá sạch dấu vết lắp (D2).
       await ghiDauVetTick(g.daLap, true, { userId: uploadedBy ?? null });
