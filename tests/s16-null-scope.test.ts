@@ -920,3 +920,39 @@ test(
     );
   },
 );
+
+test(
+  "AUD-SEC F1: GET/PATCH /api/inspection-requests/[id] — không dự án → 404, không đọc/sửa YCNT org B",
+  S,
+  async () => {
+    const { insertId, queryOne, run } = await import("@/lib/db");
+    const ycnt = await insertId(
+      `INSERT INTO inspection_requests (code, scheduled_at, created_by) VALUES (?, NOW(), NULL)`,
+      `YCNT-B-${RUN}`,
+    );
+    await run(
+      `INSERT INTO inspection_request_tasks (request_id, task_id) VALUES (?, ?)`,
+      ycnt,
+      ids.taskB,
+    );
+    const { GET, PATCH } = await import("@/app/api/inspection-requests/[id]/route");
+    dangNhap(pm0);
+    const g = await GET(req(`/api/inspection-requests/${ycnt}`), p({ id: String(ycnt) }));
+    assert.equal(g.status, 404);
+    khongLoBiMat(await g.json(), "inspection-requests GET");
+    const u = await PATCH(
+      req(`/api/inspection-requests/${ycnt}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "passed" }),
+        headers: { "content-type": "application/json" },
+      }),
+      p({ id: String(ycnt) }),
+    );
+    assert.equal(u.status, 404);
+    const row = await queryOne<{ status: string }>(
+      `SELECT status FROM inspection_requests WHERE id = ?`,
+      ycnt,
+    );
+    assert.notEqual(row?.status, "passed");
+  },
+);

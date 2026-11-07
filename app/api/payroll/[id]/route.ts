@@ -5,6 +5,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { parsePayrollBody, validatePayrollInput, type PayrollInput } from "@/lib/tai-chinh/finance";
 import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
+import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,10 @@ export async function GET(
   const payroll = await withProjectScope(projectId, () => loadExisting(id, projectId));
   if (!payroll) return NextResponse.json({ error: "Không tìm thấy kỳ lương" }, { status: 404 });
 
-  return NextResponse.json({ payroll: { ...payroll, id } });
+  // AUD-SEC S-1: che số tiền như GET /api/payroll (bch vào được nhờ viewPayments nhưng thiếu
+  // viewPayroll) — trước đây route chi tiết trả nguyên đơn giá/gộp/khấu trừ/thực nhận.
+  const [an] = stripSensitive("payroll", [{ ...payroll, id }], user);
+  return NextResponse.json({ payroll: an });
 }
 
 // PATCH /api/payroll/:id — sửa số liệu hoặc đổi trạng thái draft→approved→paid

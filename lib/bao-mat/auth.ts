@@ -268,6 +268,9 @@ const CAN_DEFAULT = {
   manageEquipment: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
   // Định mức thi công theo hạng mục (M18): tạo/sửa Admin/PM (đồng bộ editStructure).
   manageNorms: (r?: Role) => r === "admin" || r === "pm",
+  // Cảnh báo vượt định mức vật tư (/api/norms/over): cảnh báo vận hành công trường, không phải
+  // số tiền — mọi vai trò thao tác vật tư + BCH (chỉ huy hiện trường); CĐT/viewer không thấy.
+  viewNormsOver: (r?: Role) => !!r && r !== "cdt" && r !== "viewer",
   // HSE (M11): mọi vai trò thao tác tạo được (kể cả subcon báo near-miss); sửa/đóng action Admin/PM/kỹ sư.
   manageHse: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
   // Họp + action item (M13): tạo/sửa biên bản họp và action Admin/PM/kỹ sư

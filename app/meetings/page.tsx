@@ -90,7 +90,8 @@ export default function MeetingsPage() {
     isAdminOrPm && openId !== null && tab === "meetings",
     true,
   );
-  const meetings = source.snapshot?.items ?? [];
+  const meetingsSnapshot = source.snapshot;
+  const meetings = useMemo(() => meetingsSnapshot?.items ?? [], [meetingsSnapshot]);
   const users = usersSource.snapshot?.items ?? [];
   const refresh = source.reload;
   const [meError, setMeError] = useState("");
@@ -105,9 +106,11 @@ export default function MeetingsPage() {
     if (!data) setMeError("Không xác minh được quyền thao tác. Hãy thử lại.");
   }, []);
   useEffect(() => {
+    // Counter (không phải ref DOM): tăng khi unmount để bỏ kết quả fetchMe đang bay.
+    const req = authRequest;
     void loadMe();
     return () => {
-      authRequest.current++;
+      req.current++;
     };
   }, [loadMe]);
   const pending = useRef(false);

@@ -24,7 +24,14 @@ permissions:
 
 jobs:
   deploy:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    # AUD-CI-001: chỉ deploy CI chạy do PUSH lên main CỦA CHÍNH repo này. Thiếu 2 điều kiện
+    # cuối thì PR từ fork có nhánh tên "main" (CI chạy theo pull_request) cũng kích hoạt job
+    # này trong ngữ cảnh repo gốc — đủ secret VPS — và checkout/chạy mã của fork.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     env:
       # Đường dẫn app trên VPS. Runner build NGAY TẠI đường dẫn này (xem bước bên dưới) —

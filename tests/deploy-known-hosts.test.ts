@@ -14,6 +14,16 @@ test("deploy.yml không còn ssh-keyscan (không tin lần đầu)", () => {
   assert.doesNotMatch(workflow.replace(/^\s*#.*$/gm, ""), /ssh-keyscan/);
 });
 
+test("deploy.yml chỉ chạy cho CI do push lên main của chính repo, không cho PR từ fork (AUD-CI-001)", () => {
+  const job = workflow.slice(workflow.indexOf("  deploy:"), workflow.indexOf("runs-on:"));
+  const dieuKien = job.replace(/^\s*#.*$/gm, "");
+  assert.match(dieuKien, /github\.event\.workflow_run\.event\s*==\s*'push'/);
+  assert.match(
+    dieuKien,
+    /github\.event\.workflow_run\.head_repository\.full_name\s*==\s*github\.repository/,
+  );
+});
+
 test("deploy.yml không tắt kiểm host key", () => {
   assert.doesNotMatch(workflow, /StrictHostKeyChecking[=\s]+(no|accept-new|off)/i);
   assert.doesNotMatch(workflow, /UserKnownHostsFile[=\s]+\/dev\/null/);

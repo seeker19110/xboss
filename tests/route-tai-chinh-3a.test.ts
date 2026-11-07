@@ -2220,6 +2220,37 @@ test("GET /api/payroll/:id: kỳ lương thuộc dự án khác → 404 (cách l
   assert.equal(res.status, 404);
 });
 
+test(
+  "GET /api/payroll/:id: bch (thiếu viewPayroll) bị che số tiền như route danh sách (AUD-SEC S-1)",
+  S,
+  async () => {
+    const { insertId } = await import("@/lib/db");
+    const project = await taoDuAn("prid-strip");
+    const bch = await taoUser("bch", "prid-strip");
+    const pm = await taoUser("pm", "prid-strip");
+    const pr = await insertId(
+      `INSERT INTO payroll (project_id, period, personnel_id, workdays, rate, gross, deductions, net)
+     VALUES (?, '2026-10', NULL, 20, 500000, 10000000, 1000000, 9000000)`,
+      project,
+    );
+    const { GET } = await import("@/app/api/payroll/[id]/route");
+    const goi = async () =>
+      (
+        await GET(jreq("/x", undefined, "GET"), { params: Promise.resolve({ id: String(pr) }) })
+      ).json();
+
+    await dangNhapDuAn(bch, project);
+    const anDi = (await goi()).payroll;
+    for (const k of ["rate", "gross", "deductions", "net"])
+      assert.equal(anDi[k], null, `bch thấy ${k}`);
+    assert.equal(anDi.workdays, 20);
+
+    await dangNhapDuAn(pm, project);
+    const day = (await goi()).payroll;
+    assert.equal(Number(day.net), 9000000);
+  },
+);
+
 test("PATCH /api/payroll/:id: chưa đăng nhập → 401", S, async () => {
   dangXuat();
   const { PATCH } = await import("@/app/api/payroll/[id]/route");

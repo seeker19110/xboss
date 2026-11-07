@@ -12,6 +12,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
+import { showToast } from "@/app/components/Toast";
 
 interface ForecastRun {
   id: string;
@@ -48,8 +49,8 @@ export default function CashflowCockpitPage() {
       if (json.success) {
         setForecasts(json.data);
       }
-    } catch (err) {
-      console.error("Lỗi tải forecasts:", err);
+    } catch {
+      showToast("Không tải được dự báo dòng tiền — kiểm tra mạng rồi thử lại", "error");
     } finally {
       setLoading(false);
     }

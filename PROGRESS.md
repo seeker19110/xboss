@@ -1,10 +1,12 @@
-# Tiến độ — 06/11/2026
+# Tiến độ — 07/11/2026
 
 ## Đang làm
 
-- **Audit D-009 đợt 3 (cùng PR #712)** — owner giao "theo phương án chất lượng" 07/11: D-011 màu trạng thái một nguồn `STATUS_CLS`/`STATUS_BAR`/`STATUS_TEXT` trong `app/components/StatusBadge.tsx` (trễ = cam, /my-tasks hết đỏ, đang thi công thống nhất blue), test `status-mau-thong-nhat` khoá cùng sắc độ; D-012 compose lại BLUEPRINT theo khung 3.30.1 (1170 MUST/741 SHOULD, 0 tick — đối soát ở đợt 4); D-010 giữ cookie OIDC theo spec M49, AUD-SEC-001 `chấp nhận` tới M138 (hạn 31/12).
+- **Audit D-009 đợt 4 — branch `claude/zen-lovelace-n3t0t7`** (owner "làm hết đi" 07/11): AUD-CODE-001 hết 5 cảnh báo exhaustive-deps (meetings/proposals); AUD-CODE-002 lỗi tải trang engineering/SystemUploadPanel hiện toast thay vì `console.error` im lặng; AUD-XFEAT-003 `/api/norms/over` kiểm qua `CAN.viewNormsOver` (giữ hành vi, test ma trận). Quét sâu 8 nhóm bằng 4 agent ra 3 🔴 đã vá kèm test đỏ-trước: AUD-SEC-002 `/api/payroll/:id` lộ lương cho bch (nay `stripSensitive`); AUD-SEC-003 `/api/inspection-requests/:id` bỏ kiểm dự án khi `projectId` null (nay 404); AUD-CI-001 deploy.yml chạy được cho PR từ fork tên nhánh `main` (nay bắt `event == 'push'` + cùng repo). #710 (khung 3.31.0) đã merge `163625b`. Còn 🟠: ncrs PATCH/POST, materials POST `sheetTypeId`, user-projects PUT, presence chéo org, boq lộ đơn giá, cron GET phiên, scan-local, upload tracking hạ `nghiem_thu`, chu trình lib tien-do↔tai-chinh — xem `docs/ops/AUDIT-STATUS.md`.
 
-- **Audit D-009 đợt 2 — branch `claude/zen-lovelace-n3t0t7`**: spec e2e `finance-cash` (2 tab, `?tab=advances`, axe cả hai tab, desktop+mobile 7/7) cho trang tài chính `/finance/cash` chưa từng có spec (AUD-A11Y-001); khai `XBOSS_PG_ALLOW_EXIT_ON_IDLE` (`"0"|"1"`) trong schema `lib/nen/env.ts` (AUD-CFG-001). Cookie OIDC (AUD-SEC-001) để lại: dính TD-004 "chờ spec M49" — cần owner chốt.
+- **Audit D-009 đợt 2–3 — MERGED qua #712** `2978a61` — owner giao "theo phương án chất lượng" 07/11: D-011 màu trạng thái một nguồn `STATUS_CLS`/`STATUS_BAR`/`STATUS_TEXT` trong `app/components/StatusBadge.tsx` (trễ = cam, /my-tasks hết đỏ, đang thi công thống nhất blue), test `status-mau-thong-nhat` khoá cùng sắc độ; D-012 compose lại BLUEPRINT theo khung 3.30.1 (1170 MUST/741 SHOULD, 0 tick — đối soát ở đợt 4); D-010 giữ cookie OIDC theo spec M49, AUD-SEC-001 `chấp nhận` tới M138 (hạn 31/12).
+
+- **Đợt 2 (#712)**: spec e2e `finance-cash` (2 tab, `?tab=advances`, axe cả hai tab, desktop+mobile 7/7) cho trang tài chính `/finance/cash` chưa từng có spec (AUD-A11Y-001); khai `XBOSS_PG_ALLOW_EXIT_ON_IDLE` (`"0"|"1"`) trong schema `lib/nen/env.ts` (AUD-CFG-001). Cookie OIDC (AUD-SEC-001) để lại: dính TD-004 "chờ spec M49" — cần owner chốt.
 
 - **Audit full 06/11 + đợt 1 — MERGED qua #711** `dd40b5b`: sổ `docs/ops/AUDIT-STATUS.md` + báo cáo `docs/ops/AUDIT-REPORT-2026-11-06.md` (0 🔴, 1 🟠 đã sửa, 16 🟢; 8/13 nhóm `chưa quét`); PROGRESS.md < 8 KB, `xt.yaml` khai `format_check`/`coverage`. Thumbnail ảnh hiện trường cùng PR.
 

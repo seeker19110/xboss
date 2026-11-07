@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   CheckCircle,
 } from "lucide-react";
+import { showToast } from "@/app/components/Toast";
 
 type UploadHistoryItem = {
   id: number;
@@ -52,8 +53,8 @@ function SystemUploadSection({ systemCode, kind, title, icon, canUpload }: Secti
         const data = await res.json();
         setHistory(data.slice(0, 5)); // Lấy tối đa 5 bản ghi đầu
       }
-    } catch (err) {
-      console.error("Lỗi fetch lịch sử:", err);
+    } catch {
+      showToast("Không tải được lịch sử tải lên — kiểm tra mạng rồi thử lại", "error");
     } finally {
       setLoadingHistory(false);
     }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { CAN, getCurrentUser } from "@/lib/bao-mat/auth";
 import { NORM_OVER_THRESHOLD_PCT, overNormItems } from "@/lib/khoi-luong/norms";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (user.role === "cdt" || user.role === "viewer")
+  if (!CAN.viewNormsOver(user.role))
     return NextResponse.json({ error: "Không có quyền xem" }, { status: 403 });
 
   const raw = req.nextUrl.searchParams.get("thresholdPct");
