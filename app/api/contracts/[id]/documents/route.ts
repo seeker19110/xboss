@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storageDelete, storagePut } from "@/lib/nen/storage";
+import { storagePut, storageDeleteBestEffort } from "@/lib/nen/storage";
 import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -112,7 +112,7 @@ export async function POST(
       ),
   );
   if (!kq.ok) {
-    await storageDelete(user.orgId, fileName).catch(() => {});
+    await storageDeleteBestEffort(user.orgId, fileName);
     return NextResponse.json(
       { error: "Bạn không có quyền upload file hợp đồng (chỉ Admin/PM)" },
       { status: 403 },
