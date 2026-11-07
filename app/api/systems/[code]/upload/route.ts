@@ -7,6 +7,7 @@ import { parsePlanUpload, parseTrackingUpload } from "@/lib/tien-do/system-uploa
 import { isContentTooLarge, newSystemUploadFileName } from "@/lib/nen/photos";
 import { storagePut } from "@/lib/nen/storage";
 import { query } from "@/lib/db";
+import { phanHoiLoi } from "@/lib/nen/loi";
 
 export const dynamic = "force-dynamic";
 
@@ -105,7 +106,9 @@ export async function POST(
       warnings: result.warnings,
       uploadId: insertRes[0]?.id,
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Lỗi xử lý file upload" }, { status: 400 });
+  } catch (err) {
+    // AUD-CODE-004: lỗi file (LoiNghiepVu 400 từ lib) giữ thông điệp; lỗi DB/storage → 500 chung
+    // có log — trước đây mọi lỗi thành 400 kèm thông điệp thô, không log.
+    return phanHoiLoi(err, "Lỗi xử lý file upload");
   }
 }

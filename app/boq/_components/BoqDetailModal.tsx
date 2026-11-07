@@ -29,9 +29,9 @@ export default function BoqDetailModal({
   onDelete: () => void;
 }) {
   const [qtyContract, setQtyContract] = useState(String(item.qtyContract));
-  const [unitPrice, setUnitPrice] = useState(String(item.unitPrice));
+  const [unitPrice, setUnitPrice] = useState(String(item.unitPrice ?? ""));
   const [qtySub, setQtySub] = useState(String(item.qtySub));
-  const [subUnitPrice, setSubUnitPrice] = useState(String(item.subUnitPrice));
+  const [subUnitPrice, setSubUnitPrice] = useState(String(item.subUnitPrice ?? ""));
   const [savingFields, setSavingFields] = useState(false);
   const [fieldsErr, setFieldsErr] = useState("");
 

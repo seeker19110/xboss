@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { CAN, getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { lichSuBoq } from "@/lib/khoi-luong/boq-history";
 
 export const dynamic = "force-dynamic";
+
+const TRUONG_GIA = new Set(["unit_price", "sub_unit_price"]);
 
 // GET /api/boq/:id/history — lịch sử thay đổi 1 dòng BOQ (M124 việc 3). Mọi vai trò đăng
 // nhập xem được BOQ (không cần quyền sửa) đều xem được lịch sử, tối đa 100 dòng gần nhất.
@@ -33,6 +35,11 @@ export async function GET(
       : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
 
+  // AUD-SEC-009: lịch sử đổi đơn giá cũng là thông tin thương mại — che theo viewPayments
+  // giống GET /api/boq.
   const rows = await lichSuBoq(id);
-  return NextResponse.json({ rows });
+  const xemTien = CAN.viewPayments(user.role);
+  return NextResponse.json({
+    rows: xemTien ? rows : rows.filter((r) => !TRUONG_GIA.has(r.field)),
+  });
 }

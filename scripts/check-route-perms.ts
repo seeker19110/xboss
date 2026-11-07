@@ -72,11 +72,6 @@ const WHITELIST: Record<string, string> = {
   "project/select:POST":
     "Có kiểm quyền thật: đối chiếu projectId với visibleProjectIds(user), trả 403 nếu " +
     "không nằm trong danh sách dự án user được thấy — chỉ khác tên hàm so với CAN.*.",
-
-  // ── Thiết kế nghiệp vụ cố ý mở cho mọi vai trò đã đăng nhập (không phải lỗ hổng).
-  "ncrs:POST":
-    "Ghi nhận điểm không phù hợp (NCR) mở cho MỌI vai trò đã đăng nhập theo đúng comment " +
-    "trong route — ai phát hiện lỗi hiện trường cũng phải báo được, không giới hạn vai trò.",
 };
 
 console.log("=== Kiểm route ghi có kiểm quyền (app/api/**) ===");

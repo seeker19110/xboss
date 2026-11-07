@@ -297,6 +297,26 @@ export async function taskInProject(taskId: number, projectId: number): Promise<
   return !!row;
 }
 
+// Lần kiểm tra thuộc dự án nếu task hoặc nhóm công việc nó gắn thuộc dự án (CHECK bảng buộc
+// có ít nhất một trong hai). Dùng chặn NCR tham chiếu inspection của dự án/org khác.
+export async function inspectionInProject(
+  inspectionId: number,
+  projectId: number,
+): Promise<boolean> {
+  const row = await queryOne<{ id: number }>(
+    `SELECT i.id
+       FROM qc_inspections i
+       LEFT JOIN tasks t ON t.id = i.task_id
+       JOIN work_packages wp ON wp.id = COALESCE(i.work_package_id, t.package_id)
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       JOIN towers tw ON tw.id = st.tower_id
+      WHERE i.id = ? AND tw.project_id = ?`,
+    inspectionId,
+    projectId,
+  );
+  return !!row;
+}
+
 export async function workPackageInProject(
   workPackageId: number,
   projectId: number,

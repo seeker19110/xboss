@@ -92,16 +92,22 @@ export async function POST(req: NextRequest) {
   let defaultSheetId: number | null = null;
 
   if (system) {
+    // AUD-SEC-006b: sheet mặc định phải thuộc dự án đang chọn — trước đây lấy sheet đầu tiên
+    // của hệ TOÀN hệ thống (có thể là dự án/org khác) rồi gắn vào vật tư import.
     const defaultSheet = await queryOne<{ id: number }>(
-      `SELECT id FROM sheet_types WHERE system_id = ? ORDER BY id LIMIT 1`,
+      `SELECT st.id FROM sheet_types st JOIN towers tw ON tw.id = st.tower_id
+        WHERE st.system_id = ? AND tw.project_id = ? ORDER BY st.id LIMIT 1`,
       system.id,
+      projectId,
     );
     defaultSheetId = defaultSheet?.id ?? null;
   } else {
     // Fallback: nếu truyền sheet_type_id
     const st = await queryOne<{ id: number; name: string; system_id: number | null }>(
-      `SELECT id, name, system_id FROM sheet_types WHERE id = ?`,
+      `SELECT st.id, st.name, st.system_id FROM sheet_types st JOIN towers tw ON tw.id = st.tower_id
+        WHERE st.id = ? AND tw.project_id = ?`,
       targetSystemId,
+      projectId,
     );
     if (!st) {
       return NextResponse.json(

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
-import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN, chayCronBangPhien, checkCronSecret } from "@/lib/bao-mat/auth";
 import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ const VIEWS = ["mv_progress_daily", "mv_cost_by_month"] as const;
 // dữ liệu cũ trong lúc refresh). Xác thực: Authorization: Bearer <CRON_SECRET> | session Admin/PM.
 export async function GET(req: NextRequest) {
   const bySecret = checkCronSecret(req.headers.get("authorization"));
-  const bySession = CAN.export((await getCurrentUser())?.role ?? undefined);
+  const bySession = chayCronBangPhien(req, (await getCurrentUser())?.role ?? undefined);
   if (!bySecret && !bySession)
     return NextResponse.json(
       { error: "Không có quyền (cần CRON_SECRET hoặc đăng nhập Admin/PM)" },

@@ -60,6 +60,10 @@ export async function PUT(req: NextRequest) {
 
   // PM (không phải admin) chỉ được gán trong phạm vi dự án mình thấy, không tự gán mình,
   // không đụng vào Admin — chặn đường leo quyền qua route này (audit 2026-09-22).
+  // Phạm vi người gọi được QUẢN LÝ membership: Admin = mọi dự án của org; PM = dự án PM thấy.
+  // AUD-SEC-007: trước đây DELETE cả bảng theo user_id nên PM xoá luôn membership của user ở
+  // dự án PM không thấy (không có quyền gì ở đó).
+  let phamViXoa: number[] | null = null;
   if (user.role !== "admin") {
     if (userId === user.id)
       return NextResponse.json({ error: "Không thể tự gán dự án cho chính mình" }, { status: 403 });
@@ -71,6 +75,7 @@ export async function PUT(req: NextRequest) {
     const visible = await visibleProjectIds(user);
     if (projectIds.some((id: number) => !visible.includes(id)))
       return NextResponse.json({ error: "Chỉ gán được dự án bạn đang được thấy" }, { status: 403 });
+    phamViXoa = visible;
   }
 
   // Mọi projectIds phải tồn tại thật, cùng org với người gọi — kể cả Admin (chặn gán vào
@@ -89,7 +94,19 @@ export async function PUT(req: NextRequest) {
   const kq = await ghiNeuConQuyen(
     () => CAN.assign(user.role),
     async () => {
-      await run(`DELETE FROM user_projects WHERE user_id = ?`, userId);
+      if (phamViXoa)
+        await run(
+          `DELETE FROM user_projects WHERE user_id = ? AND project_id = ANY(?)`,
+          userId,
+          phamViXoa,
+        );
+      else
+        await run(
+          `DELETE FROM user_projects
+            WHERE user_id = ? AND project_id IN (SELECT id FROM projects WHERE org_id = ?)`,
+          userId,
+          user.orgId,
+        );
       for (const projectId of projectIds) {
         await run(
           `INSERT INTO user_projects (user_id, project_id) VALUES (?, ?) ON CONFLICT DO NOTHING`,

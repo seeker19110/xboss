@@ -243,5 +243,74 @@ if (HAS_TEST_DB) {
       );
       assert.equal(task?.progress_percent, 0.5); // 1/2 dimension đã tick — recomputeTask chạy thật
     });
+
+    test("parseTrackingUpload: task đã nghiệm thu không bị bỏ tick/hạ % (AUD-CODE-003, TRAPS §5)", async () => {
+      const { sheetCode, workPackageId, projectId } = await setupSystemFixture();
+      const st = await queryOne<{ system_id: number }>(
+        `SELECT st.system_id FROM sheet_types st
+           JOIN work_packages wp ON wp.sheet_type_id = st.id
+          WHERE wp.id = ?`,
+        workPackageId,
+      );
+      const testBoq = `M64_NT_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+      const taskId = await insertId(
+        `INSERT INTO tasks (package_id, code, name, boq_code, start_date, end_date, progress_percent, status)
+         VALUES (?, 'M64N', 'Task đã nghiệm thu', ?, '2026-08-01', '2026-08-10', 1, 'nghiem_thu')`,
+        workPackageId,
+        testBoq,
+      );
+      await query(
+        `INSERT INTO progress_dimensions (task_id, dimension_label, installed, value, sort_order)
+         VALUES (?, 'Ống D20', 1, 0, 1), (?, 'Ống D25', 1, 0, 2)`,
+        taskId,
+        taskId,
+      );
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet(sheetCode);
+      ws.addRow([
+        "BOQCODE",
+        "Mã",
+        "Chi tiết công việc",
+        "Tầng",
+        "Người phụ trách",
+        "Bắt đầu",
+        "Kết thúc",
+        "% Tiến độ",
+        "Trạng thái",
+        "Ống D20",
+        "Ống D25",
+      ]);
+      ws.addRow([
+        testBoq,
+        "M64N",
+        "Task đã nghiệm thu",
+        "T1",
+        "",
+        "2026-08-01",
+        "2026-08-10",
+        "50%",
+        "Đang thi công",
+        "x",
+        "○",
+      ]);
+      const buffer = (await wb.xlsx.writeBuffer()) as any;
+
+      const res = await parseTrackingUpload(st!.system_id, projectId, buffer, "M64_Test_Admin");
+      assert.ok(
+        res.warnings.some((w) => w.includes("nghiệm thu")),
+        "phải cảnh báo dòng task đã nghiệm thu bị bỏ qua",
+      );
+      const task = await queryOne<{ progress_percent: number; status: string }>(
+        `SELECT progress_percent, status FROM tasks WHERE id = ?`,
+        taskId,
+      );
+      assert.equal(task?.status, "nghiem_thu");
+      assert.equal(task?.progress_percent, 1);
+      const chua = await queryOne<{ c: number }>(
+        `SELECT COUNT(*)::int AS c FROM progress_dimensions WHERE task_id = ? AND installed = 0`,
+        taskId,
+      );
+      assert.equal(chua?.c, 0);
+    });
   });
 }

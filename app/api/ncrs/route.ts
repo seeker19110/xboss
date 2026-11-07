@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId } from "@/lib/db";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { insertId, queryOne } from "@/lib/db";
+import { CAN, getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import { listNcrs } from "@/lib/ky-thuat/qaqc";
+import { inspectionInProject, listNcrs, taskInProject } from "@/lib/ky-thuat/qaqc";
 import { nextSeqCode, withUniqueRetry } from "@/lib/ha-tang/seqcode";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +36,10 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
+  // AUD-SEC-004: vai trò chỉ-xem không ghi nhận NCR (đối xứng PATCH /api/ncrs/:id).
+  if (!CAN.editProgress(user.role))
+    return NextResponse.json({ error: "Không có quyền ghi nhận NCR" }, { status: 403 });
+
   const projectId = await getCurrentProjectId(user);
   if (projectId == null)
     return NextResponse.json({ error: "Chưa có dự án nào để ghi nhận NCR" }, { status: 422 });
@@ -48,6 +52,30 @@ export async function POST(req: NextRequest) {
   const inspectionId = body?.inspectionId != null ? Number(body.inspectionId) : null;
   const assignedTo = body?.assignedTo != null ? Number(body.assignedTo) : null;
   const dueDate = typeof body?.dueDate === "string" && body.dueDate ? body.dueDate : null;
+
+  // AUD-SEC-005: tham chiếu phải thuộc dự án/tổ chức đang chọn — trước đây ghi thẳng id client
+  // gửi, GET /api/ncrs JOIN tasks trả về mã task của dự án/org khác (dò được bằng id tăng dần).
+  if (taskId != null && !(Number.isSafeInteger(taskId) && (await taskInProject(taskId, projectId))))
+    return NextResponse.json({ error: "Công việc không thuộc dự án đang chọn" }, { status: 422 });
+  if (
+    inspectionId != null &&
+    !(Number.isSafeInteger(inspectionId) && (await inspectionInProject(inspectionId, projectId)))
+  )
+    return NextResponse.json(
+      { error: "Lần kiểm tra không thuộc dự án đang chọn" },
+      { status: 422 },
+    );
+  if (assignedTo != null) {
+    const nguoi = Number.isSafeInteger(assignedTo)
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM users WHERE id = ? AND org_id = ?`,
+          assignedTo,
+          user.orgId,
+        )
+      : undefined;
+    if (!nguoi)
+      return NextResponse.json({ error: "Người được giao không thuộc tổ chức" }, { status: 422 });
+  }
 
   const id = await withUniqueRetry(async () => {
     const code = await nextSeqCode("ncrs", "code", "NCR-", 4);

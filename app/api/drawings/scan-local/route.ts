@@ -28,7 +28,13 @@ export async function POST(_req: NextRequest) {
   if (projectId == null)
     return NextResponse.json({ error: "Không tìm thấy dự án" }, { status: 404 });
   // S16 (D01): tái kiểm quyền lúc ghi cho TỪNG tệp — mất quyền giữa chừng thì dừng, giữ tệp đã ghi.
-  const res = await syncDrawingsFromDisk({ projectId, userId: user.id, kiemQuyen: coQuyen });
+  const res = await syncDrawingsFromDisk({
+    projectId,
+    userId: user.id,
+    kiemQuyen: coQuyen,
+    // AUD-SEC-011: chỉ người có quyền duyệt rev mới tạo thẳng rev 'approved'.
+    tuDuyet: CAN.decideDrawingRevision(user.role),
+  });
   if (res.stoppedByPermission) {
     if (res.newlySyncedRevisions === 0) return khongCoQuyen();
     return NextResponse.json({

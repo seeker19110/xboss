@@ -51,7 +51,9 @@ for (const f of files) {
     continue;
   }
   for (const m of readFileSync(join(root, f), "utf8").matchAll(
-    /from\s+["']@\/lib\/([^"']+)["']/g,
+    // AUD-ARCH-001: bắt cả dynamic import("@/lib/…") — trước đây chỉ khớp `from "…"` nên
+    // chu trình tien-do ↔ tai-chinh qua await import() lọt cổng.
+    /(?:from\s+|import\s*\(\s*)["']@\/lib\/([^"']+)["']/g,
   )) {
     const to = m[1].split("/")[0];
     if (!(to in layers) || to === from) continue;

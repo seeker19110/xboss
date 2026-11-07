@@ -4,6 +4,7 @@ import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { boqTakenBy } from "@/lib/khoi-luong/boq";
+import { sheetTypeProjectId } from "@/lib/tien-do/workpackages";
 import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
@@ -85,6 +86,10 @@ export async function POST(req: NextRequest) {
   const sheetTypeId = Number(body.sheetTypeId);
   if (!name) return NextResponse.json({ error: "Thiếu tên vật tư" }, { status: 400 });
   if (isNaN(sheetTypeId)) return NextResponse.json({ error: "Thiếu sheet" }, { status: 400 });
+  // AUD-SEC-006: sheet phải thuộc dự án đang chọn — trước đây tin id client, dịch sort_order
+  // vật tư của dự án/org khác và ghi vật tư mang sheet lạ (GET lộ tên/mã sheet đó).
+  if (!Number.isSafeInteger(sheetTypeId) || (await sheetTypeProjectId(sheetTypeId)) !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
 
   // BOQCODE duy nhất toàn hệ thống (nhóm + task + vật tư) — chống đặt hàng nhầm mã.
   const boqCode = String(body.boqCode ?? "").trim() || null;
@@ -103,21 +108,25 @@ export async function POST(req: NextRequest) {
 
   if (afterId) {
     const after = await queryOne<{ sort_order: number }>(
-      `SELECT sort_order FROM materials WHERE id = ? AND sheet_type_id = ?`,
+      `SELECT sort_order FROM materials WHERE id = ? AND sheet_type_id = ? AND project_id = ?`,
       afterId,
       sheetTypeId,
+      projectId,
     );
     if (!after) return NextResponse.json({ error: "afterId không hợp lệ" }, { status: 400 });
     sortOrder = after.sort_order + 1;
     await run(
-      `UPDATE materials SET sort_order = sort_order + 1 WHERE sheet_type_id = ? AND sort_order >= ?`,
+      `UPDATE materials SET sort_order = sort_order + 1
+        WHERE sheet_type_id = ? AND project_id = ? AND sort_order >= ?`,
       sheetTypeId,
+      projectId,
       sortOrder,
     );
   } else {
     const maxRow = await queryOne<{ m: number | null }>(
-      `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ?`,
+      `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ? AND project_id = ?`,
       sheetTypeId,
+      projectId,
     );
     sortOrder = (maxRow?.m ?? 0) + 1;
   }

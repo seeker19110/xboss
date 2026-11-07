@@ -6,6 +6,8 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { query, queryOne, run } from "@/lib/db";
 import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
+import { log } from "@/lib/nen/log";
+import { todayISO } from "@/lib/nen/date";
 import type { DrawingKind } from "@/lib/ky-thuat/drawings";
 
 export const DRAWINGS_DIR = join(process.cwd(), "data", "uploads", "drawings");
@@ -187,6 +189,12 @@ export type ScanSyncOptions = {
    * ⇒ hành vi cũ, không transaction theo tệp.
    */
   kiemQuyen?: () => boolean;
+  /**
+   * AUD-SEC-011: revision mới có được đặt thẳng 'approved' không. Route truyền theo
+   * CAN.decideDrawingRevision (Admin/PM) — người không có quyền duyệt chỉ đăng ký 'submitted'
+   * để PM duyệt như upload tay. Không truyền (CLI vận hành) ⇒ 'approved' như cũ.
+   */
+  tuDuyet?: boolean;
 };
 
 /**
@@ -196,6 +204,7 @@ export type ScanSyncOptions = {
  */
 export async function syncDrawingsFromDisk(opts: ScanSyncOptions): Promise<ScanSyncResult> {
   const { projectId, userId, onProgress } = opts;
+  const tuDuyet = opts.tuDuyet ?? true;
   const files = getAllDrawingFilesRecursively(DRAWINGS_DIR);
   const failedFiles: string[] = [];
   let synced = 0;
@@ -210,7 +219,10 @@ export async function syncDrawingsFromDisk(opts: ScanSyncOptions): Promise<ScanS
       } else if (await dongBoMotTep(item)) synced++;
     } catch (fileErr) {
       failedFiles.push(item.fileName);
-      console.error(`Lỗi đồng bộ tệp ${item.fileName}:`, fileErr);
+      log.warn("Lỗi đồng bộ tệp bản vẽ", {
+        file: item.fileName,
+        err: fileErr instanceof Error ? fileErr.message : String(fileErr),
+      });
     }
     if (!tiepTuc)
       return {
@@ -236,14 +248,15 @@ export async function syncDrawingsFromDisk(opts: ScanSyncOptions): Promise<ScanS
     );
 
     if (!drawing) {
-      // BOQCODE/`code` là duy nhất toàn hệ thống — bám vào bản ghi sẵn có nếu
-      // mã đã thuộc dự án khác thay vì INSERT gây vi phạm ràng buộc unique.
+      // `code` là duy nhất toàn hệ thống. Mã đã thuộc dự án khác → BỎ QUA tệp (báo failedFiles).
+      // AUD-SEC-011: trước đây bám vào bản ghi của dự án khác và gắn revision 'approved' vào đó
+      // — người dự án A ghi được hồ sơ bản vẽ của dự án/tổ chức B.
       const existingByCode = await queryOne<{ id: number }>(
         `SELECT id FROM drawings WHERE code = ?`,
         info.code,
       );
       if (existingByCode) {
-        drawing = existingByCode;
+        throw new Error(`Mã bản vẽ ${info.code} đã thuộc dự án khác — bỏ qua tệp`);
       } else {
         const res = await query<{ id: number }>(
           `INSERT INTO drawings (project_id, code, name, kind, system_group, floor_label, created_by, created_at)
@@ -276,13 +289,15 @@ export async function syncDrawingsFromDisk(opts: ScanSyncOptions): Promise<ScanS
       `INSERT INTO drawing_revisions (
            drawing_id, rev, status, file_name, original_name, mime_type, size_bytes,
            submitted_at, decided_at, decision_note, uploaded_by, created_at
-         ) VALUES (?, ?, 'approved', ?, ?, ?, ?, CURRENT_DATE, CURRENT_DATE, 'Đồng bộ tự động từ thư mục dự án', ?, NOW())`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_DATE, ?, 'Đồng bộ tự động từ thư mục dự án', ?, NOW())`,
       drawing.id,
       info.rev,
+      tuDuyet ? "approved" : "submitted",
       `drawings/${item.relativePath.replace(/\\/g, "/")}`,
       item.fileName,
       mimeFromExt(info.ext),
       stat.size,
+      tuDuyet ? todayISO() : null,
       userId,
     );
     onProgress?.(

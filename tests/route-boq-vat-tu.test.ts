@@ -119,6 +119,51 @@ test("GET /api/boq: chỉ thấy dòng BOQ của đúng dự án đang chọn �
 });
 
 test(
+  "GET /api/boq + /history: vai trò thiếu viewPayments không thấy đơn giá/tổng tiền (AUD-SEC-009)",
+  S,
+  async () => {
+    const { insertId, query } = await import("@/lib/db");
+    const ctx = await dungDuLieu("engineer", `boqgia${RUN}`);
+    const boqId = await insertId(
+      `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price, qty_sub, sub_unit_price, project_id)
+     VALUES (?, 'Ống giá kín', 'm', 10, 50000, 10, 40000, ?)`,
+      `BOQGIA-${RUN}`,
+      ctx.projectId,
+    );
+    await insertId(
+      `INSERT INTO boq_item_history (boq_item_id, field, old_value, new_value) VALUES (?, 'unit_price', '45000', '50000')`,
+      boqId,
+    );
+    await insertId(
+      `INSERT INTO boq_item_history (boq_item_id, field, old_value, new_value) VALUES (?, 'name', 'cũ', 'Ống giá kín')`,
+      boqId,
+    );
+    await dangNhapDuAn({ id: ctx.userId, passwordHash: ctx.pwHash }, ctx.projectId);
+    const { GET } = await import("@/app/api/boq/route");
+    const json = await (await GET(req("http://localhost/api/boq", undefined, "GET"))).json();
+    const dong = json.items.find((i: { code: string }) => i.code === `BOQGIA-${RUN}`);
+    assert.equal(dong.unitPrice, null);
+    assert.equal(dong.subUnitPrice, null);
+    assert.equal(json.totals.contractValue, null);
+    assert.equal(json.totals.subValue, null);
+    assert.equal(json.totals.executedValue, null);
+    assert.equal(typeof json.totals.executedPct, "number");
+
+    const { GET: lichSu } = await import("@/app/api/boq/[id]/history/route");
+    const ls = await (
+      await lichSu(req("http://localhost/x", undefined, "GET"), {
+        params: Promise.resolve({ id: String(boqId) }),
+      })
+    ).json();
+    assert.deepEqual(
+      ls.rows.map((r: { field: string }) => r.field),
+      ["name"],
+    );
+    await query(`DELETE FROM boq_item_history WHERE boq_item_id = ?`, boqId);
+  },
+);
+
+test(
   "GET /api/boq: lọc theo hệ (?system=) + tổng executedValue tính từ boq_task_map",
   S,
   async () => {
@@ -968,6 +1013,36 @@ test("POST /api/materials: thiếu tên hoặc sheet → 400", S, async () => {
   const r2 = await POST(req("http://localhost/api/materials", { name: "X" }));
   assert.equal(r2.status, 400);
 });
+
+test(
+  "POST /api/materials: sheetTypeId của dự án khác → 404, không dịch sort_order dự án đó (AUD-SEC-006)",
+  S,
+  async () => {
+    const { insertId, queryOne } = await import("@/lib/db");
+    const a = await dungDuLieu("engineer", `matsheetA${RUN}`);
+    const b = await dungDuLieu("engineer", `matsheetB${RUN}`);
+    const vatTuB = await insertId(
+      `INSERT INTO materials (sheet_type_id, name, unit, sort_order, project_id) VALUES (?, 'Của B', 'kg', 5, ?)`,
+      b.sheetTypeId,
+      b.projectId,
+    );
+    await dangNhapDuAn({ id: a.userId, passwordHash: a.pwHash }, a.projectId);
+    const { POST } = await import("@/app/api/materials/route");
+    const res = await POST(
+      req("http://localhost/api/materials", {
+        name: "Chèn lậu",
+        sheetTypeId: b.sheetTypeId,
+        afterId: vatTuB,
+      }),
+    );
+    assert.equal(res.status, 404);
+    const row = await queryOne<{ sort_order: number }>(
+      `SELECT sort_order FROM materials WHERE id = ?`,
+      vatTuB,
+    );
+    assert.equal(row?.sort_order, 5);
+  },
+);
 
 test("POST /api/materials: trùng BOQCODE với dòng BOQ đã có → 409", S, async () => {
   const { insertId } = await import("@/lib/db");

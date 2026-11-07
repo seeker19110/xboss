@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN, chayCronBangPhien, checkCronSecret } from "@/lib/bao-mat/auth";
 import { deliverDueWebhooks } from "@/lib/bao-mat/webhooks";
 import { log } from "@/lib/nen/log";
 import { theoTungToChuc } from "@/lib/ha-tang/to-chuc";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // query param) — y hệt /api/cron/sync-sheets.
 export async function GET(req: NextRequest) {
   const bySecret = checkCronSecret(req.headers.get("authorization"));
-  const bySession = CAN.export((await getCurrentUser())?.role ?? undefined);
+  const bySession = chayCronBangPhien(req, (await getCurrentUser())?.role ?? undefined);
   if (!bySecret && !bySession)
     return NextResponse.json(
       { error: "Không có quyền (cần CRON_SECRET hoặc đăng nhập Admin/PM)" },

@@ -23,28 +23,44 @@ import {
   type SystemOption,
 } from "./_components/types";
 
-type TotalsWire = { contractValue: string; subValue: string; executedValue: string };
-type Totals = { contractValue: bigint; subValue: bigint; executedValue: bigint };
-const TOTALS_RONG: Totals = { contractValue: 0n, subValue: 0n, executedValue: 0n };
+// Tiền null = vai trò thiếu quyền xem tài chính (API che — AUD-SEC-009); executedPct luôn có.
+type TotalsWire = {
+  contractValue: string | null;
+  subValue: string | null;
+  executedValue: string | null;
+  executedPct?: number;
+};
+type Totals = {
+  contractValue: bigint | null;
+  subValue: bigint | null;
+  executedValue: bigint | null;
+  executedPct: number;
+};
+const TOTALS_RONG: Totals = { contractValue: 0n, subValue: 0n, executedValue: 0n, executedPct: 0 };
+
+const tuWire = (v: string | null) => (v == null ? null : minorTuWire(v));
 
 // Tổng tiền từ API v1 (chuỗi canonical) → bigint đồng×100; không cộng/chia float.
 function totalsTuWire(t: TotalsWire | undefined): Totals {
   if (!t) return TOTALS_RONG;
   return {
-    contractValue: minorTuWire(t.contractValue),
-    subValue: minorTuWire(t.subValue),
-    executedValue: minorTuWire(t.executedValue),
+    contractValue: tuWire(t.contractValue),
+    subValue: tuWire(t.subValue),
+    executedValue: tuWire(t.executedValue),
+    executedPct: t.executedPct ?? 0,
   };
 }
 
-// % thực hiện / hợp đồng, làm tròn nguyên, tính trên bigint (không float cho tiền).
+// % thực hiện / hợp đồng, làm tròn nguyên, tính trên bigint (không float cho tiền); khi tiền bị
+// che thì dùng % máy chủ đã tính.
 function phanTramThucHien(t: Totals): number {
+  if (t.contractValue == null || t.executedValue == null) return t.executedPct;
   if (t.contractValue <= 0n) return 0;
   return Number((t.executedValue * 100n + t.contractValue / 2n) / t.contractValue);
 }
 
-// Giữ quy ước fmtVND: 0 → "—".
-const fmtTong = (m: bigint) => (m === 0n ? "—" : fmtDongMinor(m));
+// Giữ quy ước fmtVND: 0 → "—"; bị che (null) → "—".
+const fmtTong = (m: bigint | null) => (m == null || m === 0n ? "—" : fmtDongMinor(m));
 
 type LocOption = "all" | "chua-map" | "lech";
 type SapOption = "boq" | "gia-tri" | "thuc-hien";
@@ -165,7 +181,9 @@ export default function BoqPage() {
     }
     const sorted = [...list];
     if (sap === "gia-tri") {
-      sorted.sort((a, b) => b.qtyContract * b.unitPrice - a.qtyContract * a.unitPrice);
+      sorted.sort(
+        (a, b) => b.qtyContract * (b.unitPrice ?? 0) - a.qtyContract * (a.unitPrice ?? 0),
+      );
     } else if (sap === "thuc-hien") {
       sorted.sort((a, b) => {
         const pa = a.qtyContract > 0 ? a.executedQty / a.qtyContract : 0;
@@ -440,7 +458,9 @@ export default function BoqPage() {
                                   {fmtVND(it.unitPrice)}
                                 </td>
                                 <td className="p-3 hidden sm:table-cell text-right font-medium">
-                                  {fmtVND(it.qtyContract * it.unitPrice)}
+                                  {fmtVND(
+                                    it.unitPrice == null ? null : it.qtyContract * it.unitPrice,
+                                  )}
                                 </td>
                                 <td className="p-3 hidden sm:table-cell text-right">
                                   {fmtQty(it.qtySub)}

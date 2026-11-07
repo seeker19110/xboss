@@ -844,6 +844,97 @@ test("PATCH /api/ncrs/:id: PM đóng NCR → status=closed và closed_at đượ
   assert.ok(row?.closed_at != null);
 });
 
+test(
+  "PATCH /api/ncrs/:id: vai trò chỉ-xem bị 403; mở lại NCR đã đóng cần Admin/PM (AUD-SEC-004)",
+  S,
+  async () => {
+    const { queryOne } = await import("@/lib/db");
+    const projectId = await taoDuAn("ncreopen");
+    const pm = await taoUser("pm", "ncreopen");
+    const eng = await taoUser("engineer", "ncreopen");
+    const viewer = await taoUser("viewer", "ncreopen");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/ncrs/route");
+    const { id } = await (await POST(jreq("/api/ncrs", { description: "NCR mở lại" }))).json();
+    const { PATCH } = await import("@/app/api/ncrs/[id]/route");
+    const goi = (body: unknown) =>
+      PATCH(jreq("/x", body, "PATCH"), { params: Promise.resolve({ id: String(id) }) });
+
+    await dangNhapDuAn(viewer, projectId);
+    assert.equal((await goi({ description: "viewer sửa" })).status, 403);
+
+    await dangNhapDuAn(pm, projectId);
+    assert.equal((await goi({ status: "closed" })).status, 200);
+
+    await dangNhapDuAn(eng, projectId);
+    assert.equal((await goi({ status: "open" })).status, 403);
+    const row = await queryOne<{ status: string; closed_at: string | null }>(
+      `SELECT status, closed_at FROM ncrs WHERE id = ?`,
+      id,
+    );
+    assert.equal(row?.status, "closed");
+    assert.ok(row?.closed_at != null);
+    assert.equal((await goi({ description: "sửa NCR đã đóng" })).status, 403);
+
+    await dangNhapDuAn(pm, projectId);
+    assert.equal((await goi({ status: "open" })).status, 200);
+  },
+);
+
+test(
+  "POST /api/ncrs: viewer 403; taskId/inspectionId dự án khác, người giao org khác → 422 (AUD-SEC-005)",
+  S,
+  async () => {
+    const { insertId, queryOne } = await import("@/lib/db");
+    const duAnA = await taoDuAn("ncrrefA");
+    const duAnB = await taoDuAn("ncrrefB");
+    const pmA = await taoUser("pm", "ncrrefA");
+    const viewer = await taoUser("viewer", "ncrrefA");
+    const sys = await queryOne<{ id: number }>(`SELECT id FROM systems ORDER BY id LIMIT 1`);
+    const towerB = await insertId(`INSERT INTO towers (project_id, name) VALUES (?, 'B')`, duAnB);
+    const sheetB = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name, slug, system_id) VALUES (?, ?, 'S', ?, ?)`,
+      towerB,
+      uniq("NCRB"),
+      uniq("ncrb").toLowerCase(),
+      sys?.id ?? null,
+    );
+    const wpB = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'WB', 'Nhóm B')`,
+      sheetB,
+    );
+    const taskB = await insertId(
+      `INSERT INTO tasks (package_id, code, name) VALUES (?, 'TB', 'Task bí mật B')`,
+      wpB,
+    );
+    const { POST } = await import("@/app/api/ncrs/route");
+
+    await dangNhapDuAn(viewer, duAnA);
+    assert.equal((await POST(jreq("/api/ncrs", { description: "x" }))).status, 403);
+
+    await dangNhapDuAn(pmA, duAnA);
+    assert.equal((await POST(jreq("/api/ncrs", { description: "x", taskId: taskB }))).status, 422);
+    const nguoiOrgKhac = await insertId(
+      `INSERT INTO organizations (name) VALUES (?)`,
+      uniq("Org NCR khác"),
+    );
+    const uKhac = await insertId(
+      `INSERT INTO users (name, email, password_hash, role, org_id) VALUES ('K', ?, 'x', 'engineer', ?)`,
+      `${uniq("ncrk")}@x.vn`,
+      nguoiOrgKhac,
+    );
+    assert.equal(
+      (await POST(jreq("/api/ncrs", { description: "x", assignedTo: uKhac }))).status,
+      422,
+    );
+    const n = await queryOne<{ c: number }>(
+      `SELECT COUNT(*)::int AS c FROM ncrs WHERE task_id = ?`,
+      taskB,
+    );
+    assert.equal(n?.c, 0);
+  },
+);
+
 // ============================================================================
 // GET/POST /api/equipment
 // ============================================================================
