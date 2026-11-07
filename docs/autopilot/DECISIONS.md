@@ -65,3 +65,24 @@
 - Chọn: 4 đợt: (1) PROGRESS/xt.yaml/đường dẫn cũ, (2) axe /finance/cash + cookie OIDC + env, (3) một nguồn màu trạng thái, (4) quét lại sâu 8 nhóm chưa quét
 - Lý do (tiêu chí chất lượng cuối): Đúng và an toàn trước: 🟠 duy nhất (PROGRESS bị cắt khi nạp phiên) sửa ngay vì gây mất bàn giao; 🟢 rẻ gom theo cụm file; đợt 4 lấp phần INCONCLUSIVE để không khai sạch khi chưa đo. Mỗi đợt 1 PR, đảo ngược được.
 - Đường lùi: Đóng PR đợt chưa merge hoặc revert commit; sổ AUDIT-STATUS giữ dòng phát hiện
+
+### D-010 · 2026-11-07T00:01:05+00:00 · AUD-SEC-001: cookie OIDC đặt secure theo NODE_ENV thay vì isSecureCookie(req)
+
+- Phương án: (1) Giữ nguyên, chấp nhận nợ theo M49/M138 · (2) Đổi sang isSecureCookie(req) ngay
+- Chọn: Giữ nguyên, chấp nhận nợ theo M49/M138
+- Lý do (tiêu chí chất lượng cuối): Đúng spec M49 (§3 'secure theo production'); TD-004 ghi chưa sửa auth khi M138 (cookie consistency) chưa duyệt; vùng lib/bao-mat/route auth là rủi ro cao — không đổi khi chưa có spec duyệt
+- Đường lùi: Làm theo M138 khi được duyệt
+
+### D-011 · 2026-11-07T00:01:06+00:00 · AUD-XFEAT-001: màu trạng thái trễ cam hay đỏ
+
+- Phương án: (1) Cam, một nguồn trong StatusBadge.tsx (STATUS_CLS/BAR/TEXT) · (2) Đỏ, sửa CLAUDE.md
+- Chọn: Cam, một nguồn trong StatusBadge.tsx (STATUS_CLS/BAR/TEXT)
+- Lý do (tiêu chí chất lượng cuối): CLAUDE.md quy định cam; chip và Gantt đã cam, chỉ my-tasks lệch; đỏ để dành cho lỗi/nguy hiểm; một nguồn có kiểu StatusSlug + test khoá sắc độ chặn lệch lại
+- Đường lùi: Đổi 3 giá trị tre trong StatusBadge.tsx + test
+
+### D-012 · 2026-11-07T00:01:07+00:00 · AUD-DOC-001: blueprint lệch khung 3.30.1, 0 tick
+
+- Phương án: (1) Compose lại theo khung đang cài, đối soát ở đợt 4 · (2) ADR: XBoss không dùng blueprint
+- Chọn: Compose lại theo khung đang cài, đối soát ở đợt 4
+- Lý do (tiêu chí chất lượng cuối): 0 tick nên compose lại không mất gì; giữ blueprint khớp khung đang cài là điều kiện để /complete và release-check đọc đúng; ADR bỏ blueprint khó đảo hơn
+- Đường lùi: git revert commit compose; hoặc ADR sau nếu đối soát cho thấy không đáng

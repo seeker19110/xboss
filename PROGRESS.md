@@ -2,14 +2,16 @@
 
 ## Đang làm
 
-- **Audit full 06/11 + đợt sửa 1 — branch `claude/zen-lovelace-n3t0t7`** (owner chọn "Audit trước, chưa đổi pha" khi gọi `/complete`): sổ `docs/ops/AUDIT-STATUS.md` + báo cáo `docs/ops/AUDIT-REPORT-2026-11-06.md` — 0 🔴, 1 🟠, 16 🟢; 8/13 nhóm `chưa quét` (cụm INCONCLUSIVE), kế hoạch 4 đợt D-009. Đợt 1: PROGRESS.md rút về dưới 8 KB (lịch sử → `docs/ops/progress-history.md`, bảng nợ → `docs/ops/technical-debt-2026-10-26.md`), `xt.yaml` khai `format_check`/`coverage`, sửa đường dẫn cũ.
+- **Audit D-009 đợt 3 (cùng PR #712)** — owner giao "theo phương án chất lượng" 07/11: D-011 màu trạng thái một nguồn `STATUS_CLS`/`STATUS_BAR`/`STATUS_TEXT` trong `app/components/StatusBadge.tsx` (trễ = cam, /my-tasks hết đỏ, đang thi công thống nhất blue), test `status-mau-thong-nhat` khoá cùng sắc độ; D-012 compose lại BLUEPRINT theo khung 3.30.1 (1170 MUST/741 SHOULD, 0 tick — đối soát ở đợt 4); D-010 giữ cookie OIDC theo spec M49, AUD-SEC-001 `chấp nhận` tới M138 (hạn 31/12).
 
-- **Thumbnail ảnh hiện trường #711 — chờ owner merge** (CI xanh 06/11): `GET /api/photos/:id?w=320|640` trả WebP thu nhỏ bằng `sharp` (`lib/nen/thumbnail.ts`), kiểm quyền chạy trước; lưới ảnh dùng `srcSet`. Còn hoãn: cache ảnh SW, LIMIT ảnh prefill nhật ký.
+- **Audit D-009 đợt 2 — branch `claude/zen-lovelace-n3t0t7`**: spec e2e `finance-cash` (2 tab, `?tab=advances`, axe cả hai tab, desktop+mobile 7/7) cho trang tài chính `/finance/cash` chưa từng có spec (AUD-A11Y-001); khai `XBOSS_PG_ALLOW_EXIT_ON_IDLE` (`"0"|"1"`) trong schema `lib/nen/env.ts` (AUD-CFG-001). Cookie OIDC (AUD-SEC-001) để lại: dính TD-004 "chờ spec M49" — cần owner chốt.
+
+- **Audit full 06/11 + đợt 1 — MERGED qua #711** `dd40b5b`: sổ `docs/ops/AUDIT-STATUS.md` + báo cáo `docs/ops/AUDIT-REPORT-2026-11-06.md` (0 🔴, 1 🟠 đã sửa, 16 🟢; 8/13 nhóm `chưa quét`); PROGRESS.md < 8 KB, `xt.yaml` khai `format_check`/`coverage`. Thumbnail ảnh hiện trường cùng PR.
 
 ## Tiếp theo
 
 - Lịch sử các mục đã merge/deploy: `docs/ops/progress-history.md`. Bảng nợ kỹ thuật TD-xxx: `docs/ops/technical-debt-2026-10-26.md` (mục cuối). Phát hiện audit: `docs/ops/AUDIT-STATUS.md`.
-- Audit D-009 đợt 2–4: axe `/finance/cash` + cookie OIDC + khai biến env; một nguồn màu trạng thái; quét sâu lại 8 nhóm `chưa quét`.
+- Audit D-009 đợt 4: quét sâu lại 8 nhóm `chưa quét` (đọc từng route theo `docs/audit.md` §3/§8) + đối soát 1170 MUST blueprint.
 - M136: owner bố trí UAT 3–5 người và Safari/cảm ứng thật theo runbook; operator xác nhận nguồn/coverage/thời điểm thu usage trước pilot. PR đối soát và vá Zod **#676** đã merge/deploy; F4 VERIFIED; plan `docs/autopilot/M136-RELEASE-PLAN.md`; public smoke chưa chứng minh lỗi app mới; bản vá dependency phát sinh được ghi riêng ở trên.
 - A2 còn mở: Safari/iOS thiết bị thật (cần người); ảnh mồ côi giữ P/H S06.
 - Chọn lát S15 tiếp theo hoặc audit 1152 MUST/639 SHOULD.
