@@ -27,7 +27,7 @@
 
 ## 4. Tech stack, thiết kế dữ liệu & kiến trúc
 
-Xem đầy đủ ở `spec.md` §3 (schema/migrate), §9 (tech stack) và `docs/ERD.md` (bảng/cột/FK) — không lặp lại ở đây để tránh 2 nguồn trôi khỏi nhau. Tóm tắt: Next.js 16.2 + React 19.2 + TypeScript strict + Tailwind 4.3, PostgreSQL qua `pg` raw SQL với hệ migrate nhẹ (ADR-0003, **không** auto-init/ORM/Supabase), **119 nhóm route** trong `app/api/*` (361 file `route.ts`), kiểm soát quyền ở tầng API (`CAN`/`canTouchTask`, `lib/bao-mat/auth.ts`) **cộng RLS Postgres làm phòng tuyến thứ 2** trên các bảng tài chính/tổ chức **và `engineering_*`** (ADR-0005, `lib/db/index.ts::withProjectScope`).
+Xem đầy đủ ở `spec.md` §3 (schema/migrate), §9 (tech stack) và `docs/ERD.md` (bảng/cột/FK) — không lặp lại ở đây để tránh 2 nguồn trôi khỏi nhau. Tóm tắt: Next.js 16.4 + React 19 + TypeScript strict + Tailwind 4, PostgreSQL qua `pg` raw SQL với hệ migrate nhẹ (ADR-0003, **không** auto-init/ORM/Supabase), **122 nhóm route** trong `app/api/*` (397 file `route.ts`, đếm 06/11/2026), kiểm soát quyền ở tầng API (`CAN`/`canTouchTask`, `lib/bao-mat/auth.ts`) **cộng RLS Postgres làm phòng tuyến thứ 2** trên các bảng tài chính/tổ chức **và `engineering_*`** (ADR-0005, `lib/db/index.ts::withProjectScope`).
 
 - **Luồng:** client (`'use client'`) → `/api/*` (route handler, `force-dynamic`) → `lib/*` → `lib/db` → Postgres.
 - **Chuỗi tính toán:** tick dimension → `recomputeTask` → `deriveStatus` → `recomputePackage` → ghi `task_history` (`lib/tien-do/recompute.ts`, xem `spec.md` §7).

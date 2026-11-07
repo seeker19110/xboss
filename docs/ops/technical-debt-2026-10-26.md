@@ -141,3 +141,18 @@ cookie, tarball hoặc log lớn. Đây là kết quả nhánh, chưa phải mã
   bằng chứng mạng. Required checks đã có qua ruleset, không cần xin bật lại.
 - [Người dùng] UAT người thật/thiết bị Safari/cảm ứng và nguồn/cửa sổ usage; test tự động
   không thay thế nghiệm thu hay xác nhận Product Complete.
+
+## Bảng nợ (dời từ PROGRESS.md ngày 06/11/2026)
+
+Nguồn ban đầu: audit chỉ đọc 25/10/2026 trên main `0f5cef55`; đã kiểm chứng lại ngày26/10.
+Chi tiết, nguồn và giới hạn ở các mục phía trên của báo cáo này.
+
+| ID     | Mức                  | Nợ                                                                                                                       | Vị trí                    | Việc cần làm                                                                                         |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| TD-001 | Có điều kiện         | XFF đầu dùng cho rate-limit; e-sign lấy nguyên header. Chưa kiểm firewall/proxy production.                              | Auth/API key/e-sign, PM2  | DEPLOY đã làm rõ contract; M138 In review, cần chốt topology trước code.                             |
+| TD-002 | Một phần đã sửa      | CSP inline có quyết định chấp nhận; HSTS hiện có trên HTTPS ngày26/10.                                                   | `next.config.mjs`, DEPLOY | XSS Auditor đã đổi sang `0` (#687); CSP nonce cần spec riêng.                                        |
+| TD-003 | Đã đối soát          | Bỏ typecheck trong build có chủ đích; ruleset main active yêu cầu PR và ci/e2e/gitleaks/metadata, không có bypass actor. | CI/GitHub ruleset22365300 | ci tổng hợp static/typecheck, test, coverage, build; đã sửa hướng dẫn cũ, không đổi Settings.        |
+| TD-004 | Chờ spec             | CSRF thiếu Origin có chủ đích và test; cookie OIDC theo spec M49. Chưa đủ căn cứ gọi cookie xoá là lỗ hổng.              | CSRF/OIDC/logout          | M138 In review; giữ policy hiện hành.                                                                |
+| TD-005 | Đã đối soát artifact | Mirror `@e965/xlsx@0.20.3` vì CDN bị chặn ở #23; 24/26 file giống upstream, chỉ README/package metadata khác.            | Dependency/lock           | Đã ghi nguồn/hash/maintainer và giới hạn; không đổi dependency.                                      |
+| TD-006 | Bảo trì              | 0 ts-ignore/ts-nocheck; 49 ngoại lệ ESLint, bốn page1.881–2.017 dòng.                                                    | app/lib                   | Đã sửa phân loại; refactor theo miền có regression, không dọn hàng loạt theo số đếm.                 |
+| TD-007 | PARTIAL              | Quét lại396 route/631 handler/171 migration; mẫu SQL động dùng whitelist/params, chưa xác nhận injection.                | API/auth/DB/deploy        | Sửa mô tả DB/bootstrap và rollback build khi reload lỗi,51/51 deploy tests; audit toàn authz còn mở. |

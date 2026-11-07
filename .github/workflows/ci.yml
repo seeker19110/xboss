@@ -224,10 +224,18 @@ jobs:
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
+      # Client phải cùng major với server 16 (pg_dump 17+ sinh `SET transaction_timeout`,
+      # pg_restore vào server 16 sẽ lỗi). Image ubuntu-latest mới không còn gói 16 trong kho
+      # mặc định → thêm kho PGDG chính thức qua script của postgresql-common.
       - name: Cài PostgreSQL client cho restore smoke
         run: |
           sudo apt-get update -qq
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y postgresql-client-16
+          # Image có sẵn client mới hơn: wrapper /usr/bin/pg_dump chọn bản cao nhất → ghim 16.
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/pg_dump --version
 
       - name: Gắn marker cho PostgreSQL disposable của CI
         run: |
@@ -327,10 +335,18 @@ jobs:
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
+      # Client phải cùng major với server 16 (pg_dump 17+ sinh `SET transaction_timeout`,
+      # pg_restore vào server 16 sẽ lỗi). Image ubuntu-latest mới không còn gói 16 trong kho
+      # mặc định → thêm kho PGDG chính thức qua script của postgresql-common.
       - name: Cài PostgreSQL client cho restore smoke
         run: |
           sudo apt-get update -qq
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y postgresql-client-16
+          # Image có sẵn client mới hơn: wrapper /usr/bin/pg_dump chọn bản cao nhất → ghim 16.
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/pg_dump --version
 
       - name: Gắn marker cho PostgreSQL disposable của CI
         run: |

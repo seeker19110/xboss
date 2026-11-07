@@ -29,6 +29,7 @@ import { formatDateVN } from "@/lib/nen/date";
 import { PAYMENT_VIEW_ROLES, type Role } from "@/lib/nen/roles";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import AppHeader from "@/app/components/AppHeader";
+import { STATUS_TEXT } from "@/app/components/StatusBadge";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import ChuaGanDuAn from "@/app/components/ChuaGanDuAn";
 import { useChuaGanDuAn } from "@/app/lib/duAnKhaKien";
@@ -140,14 +141,6 @@ function daysOverdue(dateStr: string) {
 function trackingHref(slug: string | null, code: string) {
   return slug ? `/tracking/${slug}?search=${encodeURIComponent(code)}` : "#";
 }
-
-const STATUS_COLOR: Record<string, string> = {
-  tre: "text-red-400",
-  hoan_thanh: "text-emerald-400",
-  nghiem_thu: "text-teal-400",
-  dang_thi_cong: "text-sky-400",
-  chuan_bi: "text-zinc-400",
-};
 
 const EVENT_ICON: Record<EventType, React.ReactNode> = {
   progress: <TrendingUp className="w-3.5 h-3.5" />,
@@ -801,7 +794,7 @@ export default function MyTasksPage() {
                               </a>
                               <div className="shrink-0 flex items-center gap-2">
                                 <span
-                                  className={`text-xs font-medium ${STATUS_COLOR[t.status] ?? "text-zinc-500"}`}
+                                  className={`text-xs font-medium ${STATUS_TEXT[t.status as StatusSlug] ?? "text-zinc-500"}`}
                                 >
                                   {STATUS_LABEL[t.status as StatusSlug] ?? t.status}
                                 </span>

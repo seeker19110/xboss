@@ -356,7 +356,9 @@ export function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => 
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`/api/photos/${p.id}`}
+                    src={`/api/photos/${p.id}?w=640`}
+                    srcSet={`/api/photos/${p.id}?w=320 320w, /api/photos/${p.id}?w=640 640w`}
+                    sizes="(min-width: 640px) 220px, 50vw"
                     alt={p.caption ?? p.originalName ?? `Ảnh #${p.id}`}
                     className="w-full h-32 object-cover"
                     loading="lazy"

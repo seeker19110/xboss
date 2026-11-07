@@ -2105,6 +2105,105 @@ test("GET /api/photos/:id: thành công → trả đúng byte ảnh đã upload"
   assert.deepEqual(buf, PNG_1X1);
 });
 
+// Thumbnail (?w=): lưới ảnh tải bản WebP thu nhỏ thay vì ảnh gốc tới 10MB.
+async function uploadAnh(slug: string, bytes: Buffer): Promise<number> {
+  const { projectId, sheetTypeId } = await dungSheet(slug);
+  const pm = await taoUser("pm", slug);
+  const pkgId = await taoNhom(sheetTypeId, "P1");
+  const taskId = await taoTask(pkgId, "T1");
+  await dangNhapDuAn(pm, projectId);
+  const form = new FormData();
+  form.set("file", new File([new Uint8Array(bytes)], "a.png", { type: "image/png" }));
+  const { POST } = await import("@/app/api/tasks/[id]/photos/route");
+  const created = await POST(formReq("/x", form), {
+    params: Promise.resolve({ id: String(taskId) }),
+  });
+  assert.equal(created.status, 201);
+  return (await created.json()).id;
+}
+
+test("GET /api/photos/:id?w=320: trả WebP thu nhỏ đúng bề rộng, giữ tỉ lệ", S, async () => {
+  const sharp = (await import("sharp")).default;
+  const goc = await sharp({
+    create: { width: 1600, height: 1000, channels: 3, background: { r: 200, g: 80, b: 40 } },
+  })
+    .png()
+    .toBuffer();
+  const photoId = await uploadAnh("photothumb", goc);
+  const { GET } = await import("@/app/api/photos/[id]/route");
+  const res = await GET(jreq("/x?w=320", undefined, "GET"), {
+    params: Promise.resolve({ id: String(photoId) }),
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "image/webp");
+  const thumb = Buffer.from(await res.arrayBuffer());
+  const meta = await sharp(thumb).metadata();
+  assert.equal(meta.format, "webp");
+  assert.equal(meta.width, 320);
+  assert.equal(meta.height, 200);
+  assert.ok(thumb.length < goc.length);
+});
+
+test("GET /api/photos/:id?w=: ảnh nhỏ hơn bề rộng không bị phóng to", S, async () => {
+  const photoId = await uploadAnh("photothumbnho", PNG_1X1);
+  const { GET } = await import("@/app/api/photos/[id]/route");
+  const res = await GET(jreq("/x?w=640", undefined, "GET"), {
+    params: Promise.resolve({ id: String(photoId) }),
+  });
+  assert.equal(res.status, 200);
+  const sharp = (await import("sharp")).default;
+  const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
+  assert.equal(meta.width, 1);
+});
+
+test("GET /api/photos/:id?w=: bề rộng ngoài danh sách → 400", S, async () => {
+  const photoId = await uploadAnh("photothumb400", PNG_1X1);
+  const { GET } = await import("@/app/api/photos/[id]/route");
+  for (const w of ["100", "abc", "", "640.5"]) {
+    const res = await GET(jreq(`/x?w=${w}`, undefined, "GET"), {
+      params: Promise.resolve({ id: String(photoId) }),
+    });
+    assert.equal(res.status, 400, `w=${w}`);
+  }
+});
+
+test("GET /api/photos/:id?w=: ảnh hỏng không giải mã được → trả ảnh gốc", S, async () => {
+  // Đúng magic byte PNG (qua được kiểm mime lúc upload) nhưng thân cụt.
+  const hong = Buffer.concat([PNG_1X1.subarray(0, 24), Buffer.from("cut")]);
+  const photoId = await uploadAnh("photothumbhong", hong);
+  const { GET } = await import("@/app/api/photos/[id]/route");
+  const res = await GET(jreq("/x?w=320", undefined, "GET"), {
+    params: Promise.resolve({ id: String(photoId) }),
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "image/png");
+  assert.deepEqual(Buffer.from(await res.arrayBuffer()), hong);
+});
+
+test(
+  "GET /api/photos/:id?w=: subcon task không được giao vẫn 403 (kiểm quyền trước khi resize)",
+  S,
+  async () => {
+    const { projectId, sheetTypeId } = await dungSheet("photothumb403");
+    const pm = await taoUser("pm", "photothumb403");
+    const sub = await taoUser("subcon", "photothumb403sub");
+    const pkgId = await taoNhom(sheetTypeId, "P1");
+    const taskId = await taoTask(pkgId, "T1");
+    await dangNhapDuAn(pm, projectId);
+    const { POST } = await import("@/app/api/tasks/[id]/photos/route");
+    const created = await POST(formReq("/x", pngForm()), {
+      params: Promise.resolve({ id: String(taskId) }),
+    });
+    const { id: photoId } = await created.json();
+    await dangNhapDuAn(sub, projectId);
+    const { GET } = await import("@/app/api/photos/[id]/route");
+    const res = await GET(jreq("/x?w=320", undefined, "GET"), {
+      params: Promise.resolve({ id: String(photoId) }),
+    });
+    assert.equal(res.status, 403);
+  },
+);
+
 test("DELETE /api/photos/:id: không phải người upload/không phải Admin-PM → 403", S, async () => {
   const { projectId, sheetTypeId } = await dungSheet("photodel403");
   const pm = await taoUser("pm", "photodel403");
