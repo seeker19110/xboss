@@ -2,7 +2,7 @@
 
 ## Đang làm
 
-- **Audit D-009 đợt 4d — branch `claude/zen-lovelace-n3t0t7`** (PR #717): 🟢 SEC-013 — /api/project lộ tên tháp dự án khác (đã vá, test đỏ-trước), DELETE NCC/PO trả 401 khi chưa đăng nhập, NCC + BOQ export kiểm qua `CAN`; 🟢 CI-003 — bước npm audit dev thử lại thay vì nuốt mã thoát.
+- **Audit D-009 đợt 4d — branch `claude/zen-lovelace-n3t0t7`** (PR #718): 🟢 SEC-013 — /api/project lộ tên tháp dự án khác (đã vá, test đỏ-trước), DELETE NCC/PO trả 401 khi chưa đăng nhập, NCC + BOQ export kiểm qua `CAN`; 🟢 CI-003 — bước npm audit dev thử lại thay vì nuốt mã thoát.
 
 - **Audit D-009 đợt 4c — MERGED qua #716** `6534d02`: 🟢 SEC-012 — /api/schedule-control che `delayNote` với thầu phụ (giữ thiết kế xem đường găng); 🟢 CODE-005 phần lưu trữ — 18 route dọn file lỗi qua `storageDeleteBestEffort` (ghi log, không nuốt im lặng). Còn 🟢 mở: xem sổ `docs/ops/AUDIT-STATUS.md`.
 
