@@ -23,6 +23,20 @@ test("encryptTotpSecret/decryptTotpSecret: round-trip đúng, ciphertext khác n
   assert.equal(decryptTotpSecret(enc2), secret);
 });
 
+test("encryptTotpSecret: production với XBOSS_SECRET chỉ khoảng trắng → throw như session-token (AUD-CFG-002)", async () => {
+  const { encryptTotpSecret } = await import("@/lib/bao-mat/totp");
+  const cu = { secret: process.env.XBOSS_SECRET, env: process.env.NODE_ENV };
+  const env = process.env as Record<string, string | undefined>;
+  try {
+    env.NODE_ENV = "production";
+    env.XBOSS_SECRET = "   ";
+    assert.throws(() => encryptTotpSecret("JBSWY3DPEHPK3PXP"), /XBOSS_SECRET/);
+  } finally {
+    env.NODE_ENV = cu.env;
+    env.XBOSS_SECRET = cu.secret;
+  }
+});
+
 test("generateNewTotpSecret: sinh secret khác nhau mỗi lần", async () => {
   const { generateNewTotpSecret } = await import("@/lib/bao-mat/totp");
   const a = generateNewTotpSecret();

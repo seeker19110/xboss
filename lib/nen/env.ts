@@ -52,6 +52,10 @@ const serverSchema = z
     // docs/nang-cap/AUDIT-S16-MEMBERSHIP-CUTOVER.md (dry-run → gán → staging → production).
     XBOSS_STRICT_MEMBERSHIP: coBatTat.optional(),
     APP_URL: z.string().min(1).optional(),
+    // Cổng Next lắng nghe; proxy.ts dùng làm đích loopback gửi traffic khi thiếu APP_URL (mặc
+    // định 3000). Không validate chặt ở đây — proxy tự kiểm và bỏ gửi traffic khi sai, không chặn
+    // request gốc (AUD-CFG-002: khai cho đủ danh sách biến app/lib đọc).
+    PORT: z.string().optional(),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
     // Email (SMTP) — báo cáo trễ hạn

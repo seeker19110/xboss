@@ -11,7 +11,10 @@ const DIGITS = 6;
 
 function getSecretKey(): string {
   const s = process.env.XBOSS_SECRET;
-  if (s) return s;
+  // AUD-CFG-002: cùng điều kiện với session-token.ts — chuỗi chỉ khoảng trắng coi như thiếu
+  // (trước đây "   " được dùng làm khoá AES ở production). Không trim giá trị hợp lệ để khoá
+  // dẫn xuất không đổi với các totp_secret đã mã hoá.
+  if (s && s.trim()) return s;
   if (process.env.NODE_ENV === "production")
     throw new Error("XBOSS_SECRET chưa được cấu hình — bắt buộc khi chạy production.");
   return "xboss-dev-secret-change-me";

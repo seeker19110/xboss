@@ -2,7 +2,9 @@
 
 ## Đang làm
 
-- **Audit D-009 đợt 4e — branch `claude/zen-lovelace-n3t0t7`** (PR #721): 🟢 XFEAT-002 — 11 trang hiển thị tiền dùng chung `fmtVndSo` (số 0 hiện "—" thống nhất, rút gọn tỷ/tr cả số âm).
+- **Audit D-009 đợt 4f — branch `claude/zen-lovelace-n3t0t7`**: 🟢 CFG-002 (một phần) — khoá TOTP không còn nhận `XBOSS_SECRET` chỉ khoảng trắng ở production; khai `PORT` trong schema env.
+
+- **Audit D-009 đợt 4e — MERGED qua #721** `9b78718`: 🟢 XFEAT-002 — 11 trang hiển thị tiền dùng chung `fmtVndSo` (số 0 hiện "—" thống nhất, rút gọn tỷ/tr cả số âm).
 
 - **Audit D-009 đợt 4d — MERGED qua #718** `84adc90`: 🟢 SEC-013 — /api/project lộ tên tháp dự án khác (đã vá, test đỏ-trước), DELETE NCC/PO trả 401 khi chưa đăng nhập, NCC + BOQ export kiểm qua `CAN`; 🟢 CI-003 — bước npm audit dev thử lại thay vì nuốt mã thoát.
 
