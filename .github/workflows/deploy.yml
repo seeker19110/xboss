@@ -17,10 +17,10 @@ concurrency:
   group: deploy-main
   cancel-in-progress: false
 
-# Chỉ cần đọc code để checkout đúng commit đã qua CI. Không cần quyền ghi nào
-# (least-privilege theo docs/audit.md §6) — thao tác trên VPS đi bằng SSH key riêng.
+# Đọc mã của workflow và artifact của CI. Thao tác trên VPS dùng SSH key riêng.
 permissions:
   contents: read
+  actions: read
 
 jobs:
   deploy:
@@ -35,73 +35,69 @@ jobs:
     runs-on: ubuntu-latest
     environment: Production
     env:
-      # Đường dẫn app trên VPS. Runner build NGAY TẠI đường dẫn này (xem bước bên dưới) —
-      # không phải chuyện làm cho đẹp: `.next` có nhúng đường dẫn tuyệt đối của lúc build
-      # (required-server-files.json, các file trace *.nft.json). Build ở /home/runner/... rồi
-      # chạy ở /var/www/xboss là một lớp lệch âm thầm không đáng phải gánh.
       APP_DIR: /var/www/xboss
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+      CI_RUN_ID: ${{ github.event.workflow_run.id }}
+      CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
     steps:
-      # Checkout ĐÚNG commit đã chạy CI, không phải HEAD của main lúc job này khởi động:
-      # hai push sát nhau sẽ khiến bản build lệch với commit mà deploy.sh reset về trên VPS
-      # (deploy.sh có cổng đối chiếu SHA, sẽ dừng deploy — nhưng tốt nhất là đừng tạo ra
-      # tình huống đó ngay từ đầu).
+      # Dùng công cụ kiểm của chính phiên bản workflow. VPS lấy deploy.sh từ SOURCE_SHA.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-
-      - name: Dựng thư mục build khớp đường dẫn production
-        run: |
-          set -e
-          sudo mkdir -p "$APP_DIR"
-          sudo chown -R "$USER" "$(dirname "$APP_DIR")"
-          rsync -a --delete "$GITHUB_WORKSPACE/" "$APP_DIR/"
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: package-lock.json
 
-      - name: Cài dependencies
-        working-directory: ${{ env.APP_DIR }}
-        run: npm ci
-
-      # ── Build ở runner, KHÔNG build trên VPS ──────────────────────────────
-      # Lý do (PROGRESS.md 2026-07-19): `next build` trên VPS chạy 20-23 phút vì RAM thiếu
-      # phải bù bằng swap đĩa, có lúc bị OOM-kill (exit 137), có lúc vượt command_timeout
-      # của ssh-action và bị cắt ngang đúng lúc build vừa xong ⇒ commit mới nhất không lên
-      # được production. Runner GitHub có RAM/CPU dư nên build vài phút; VPS chỉ còn việc
-      # nhận file, áp migration, swap và reload.
-      - name: Build production (thư mục .next-ci)
-        working-directory: ${{ env.APP_DIR }}
-        run: NEXT_DIST_DIR=.next-ci npm run build
+      - name: Xác định artifact từ đúng run và attempt của CI main
+        id: resolve
         env:
-          # Build không kết nối DB (Pool khởi tạo lazy) — chỉ cần biến tồn tại.
-          DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_build
-          # BIẾN NÀY ĐƯỢC NHÚNG VÀO BUNDLE LÚC BUILD, không đọc lúc chạy: trước đây build
-          # diễn ra trên VPS nên nó lấy từ .env.local ở đó. Build ở runner mà không truyền
-          # vào thì Sentry phía TRÌNH DUYỆT tự tắt (SDK no-op) — hỏng âm thầm, không có lỗi.
-          # Khai secret cùng tên trong repo nếu đang dùng Sentry client; bỏ trống thì hành vi
-          # đúng như khi VPS không đặt biến. Sentry phía server đọc SENTRY_DSN lúc chạy nên
-          # không bị ảnh hưởng.
-          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
-
-      # Kèm phiếu thông tin để deploy.sh kiểm chéo trước khi swap: SHA phải khớp commit VPS
-      # reset về (chống deploy nhầm bản build của commit khác) và Node major phải khớp bản
-      # trên VPS (lệch major = nguy cơ lệch native module/runtime, DEPLOY.md mục "Build ở
-      # máy khác" đã nêu điều kiện này).
-      - name: Đóng gói bản build
-        working-directory: ${{ env.APP_DIR }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          set -e
-          {
-            echo "sha=${{ github.event.workflow_run.head_sha }}"
-            echo "node=$(node -p 'process.versions.node.split(".")[0]')"
-          } > .next-ci.info
-          tar -czf .next-ci.tar.gz .next-ci .next-ci.info
-          ls -lh .next-ci.tar.gz
+          set -o pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CI_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$CI_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          name="xboss-vps-$CI_RUN_ID-$CI_RUN_ATTEMPT-$SOURCE_SHA"
+          artifact=$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/$CI_RUN_ID/artifacts" \
+            -f name="$name" | jq -ce --arg name "$name" --arg sha "$SOURCE_SHA" \
+            --arg run "$CI_RUN_ID" --arg repo "$GITHUB_REPOSITORY_ID" '
+              [.artifacts[] | select(.name == $name and .expired == false)]
+              | select(length == 1) | .[0]
+              | select((.id | tostring | test("^[1-9][0-9]*$")) and
+                  (.digest | test("^sha256:[0-9a-f]{64}$")) and
+                  (.workflow_run.id | tostring) == $run and .workflow_run.head_sha == $sha and
+                  .workflow_run.head_branch == "main" and (.workflow_run.repository_id | tostring) == $repo and
+                  (.workflow_run.head_repository_id | tostring) == $repo)
+            ') || {
+              echo "::error::Thiếu artifact hợp lệ cho CI run/attempt này. Nếu vừa chạy lại các job lỗi, hãy chạy lại toàn bộ CI."
+              exit 1
+            }
+          printf 'artifact-id=%s\nartifact-digest=%s\n' \
+            "$(jq -r .id <<<"$artifact")" "$(jq -r .digest <<<"$artifact")" >> "$GITHUB_OUTPUT"
+
+      - name: Tải artifact của CI và kiểm digest GitHub
+        id: download
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          artifact-ids: ${{ steps.resolve.outputs.artifact-id }}
+          path: ${{ runner.temp }}/xboss-vps-artifact
+          digest-mismatch: error
+
+      - name: Kiểm SHA-256 archive, metadata và Build ID
+        id: verify
+        run: |
+          metadata="$RUNNER_TEMP/xboss-vps-verified.json"
+          node scripts/ops/vps-artifact.mjs verify "$RUNNER_TEMP/xboss-vps-artifact" \
+            "$GITHUB_REPOSITORY" "$SOURCE_SHA" "$CI_RUN_ID" "$CI_RUN_ATTEMPT" > "$metadata"
+          archive_sha=$(jq -er '.archive_sha256 | select(test("^[0-9a-f]{64}$"))' "$metadata")
+          printf 'archive-sha256=%s\n' "$archive_sha" >> "$GITHUB_OUTPUT"
 
       - name: Chuẩn bị SSH
+        id: ssh
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -129,40 +125,71 @@ jobs:
           fi
 
       - name: Gửi bản build sang VPS
-        working-directory: ${{ env.APP_DIR }}
+        id: transfer
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          ARCHIVE_SHA: ${{ steps.verify.outputs.archive-sha256 }}
         run: |
-          set -e
-          # Gửi vào tên tạm rồi đổi tên trên VPS: deploy.sh chỉ thấy ".next-ci.tar.gz" khi
-          # file đã sang trọn vẹn, không bao giờ đọc phải gói còn dở nếu mạng đứt giữa chừng.
+          [[ "$ARCHIVE_SHA" =~ ^[0-9a-f]{64}$ ]]
+          # Chỉ đổi tên khi SHA-256 của gói tạm trên VPS khớp gói CI đã xác minh.
           rsync -az --timeout=120 -e "ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o StrictHostKeyChecking=yes" \
-            .next-ci.tar.gz "$VPS_USER@$VPS_HOST:$APP_DIR/.next-ci.tar.gz.part"
+            "$RUNNER_TEMP/xboss-vps-artifact/xboss-vps.tar.gz" \
+            "$VPS_USER@$VPS_HOST:$APP_DIR/.next-ci.tar.gz.part"
           ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" \
-            "mv '$APP_DIR/.next-ci.tar.gz.part' '$APP_DIR/.next-ci.tar.gz'"
+            "cd '$APP_DIR' && printf '%s  %s\n' '$ARCHIVE_SHA' '.next-ci.tar.gz.part' | sha256sum --check --status && mv .next-ci.tar.gz.part .next-ci.tar.gz"
 
       - name: Chạy deploy trên VPS
+        id: deploy
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
-          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+          ARCHIVE_SHA: ${{ steps.verify.outputs.archive-sha256 }}
         run: |
-          set -e
           # Chạy script từ đúng commit đã qua CI, không dùng bản deploy.sh còn sót ở checkout cũ.
-          # SHA chỉ nhận dạng hex trước khi đưa vào chuỗi lệnh SSH; không có secret trong lệnh.
-          if [[ ! "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "DEPLOY_SHA không hợp lệ." >&2
-            exit 1
-          fi
-          # Đọc script đã ghim vào file tạm ngoài checkout; chưa reset khi preflight chưa đạt.
-          # Trap dọn cả khi git show/script lỗi; không dùng pipeline che mất exit code của git.
-          REMOTE_COMMAND="cd '$APP_DIR' && git fetch origin '$DEPLOY_SHA' && deploy_script=\$(mktemp /tmp/xboss-deploy.XXXXXX) && trap 'rm -f \"\$deploy_script\"' EXIT && git show '$DEPLOY_SHA:deploy.sh' > \"\$deploy_script\" && EXPECTED_DEPLOY_SHA='$DEPLOY_SHA' bash \"\$deploy_script\""
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ARCHIVE_SHA" =~ ^[0-9a-f]{64}$ ]]
+          # Kiểm lại archive cuối ngay trước deploy.sh để lỗi checksum dừng trước migration.
+          REMOTE_COMMAND="cd '$APP_DIR' && git fetch origin '$SOURCE_SHA' && deploy_script=\$(mktemp /tmp/xboss-deploy.XXXXXX) && trap 'rm -f \"\$deploy_script\"' EXIT && git show '$SOURCE_SHA:deploy.sh' > \"\$deploy_script\" && printf '%s  %s\n' '$ARCHIVE_SHA' '.next-ci.tar.gz' | sha256sum --check --status && EXPECTED_DEPLOY_SHA='$SOURCE_SHA' bash \"\$deploy_script\""
           # Không còn build trên VPS nên các bước còn lại (npm ci, migrate, swap, reload,
           # health-check) chỉ mất vài phút — 15m là dư, không cần 40m như trước.
           timeout 15m ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 \
             "$VPS_USER@$VPS_HOST" "$REMOTE_COMMAND"
 
+      - name: Xác minh Build ID production và ghi biên nhận
+        if: always()
+        env:
+          CI_ARTIFACT_ID: ${{ steps.resolve.outputs.artifact-id }}
+          CI_ARTIFACT_DIGEST: ${{ steps.resolve.outputs.artifact-digest }}
+          RESOLVE_OUTCOME: ${{ steps.resolve.outcome }}
+          DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+          TRANSFER_OUTCOME: ${{ steps.ssh.outcome == 'success' && steps.transfer.outcome || steps.ssh.outcome }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+        run: |
+          receipt="$RUNNER_TEMP/xboss-vps-receipt/receipt.json"
+          mkdir -p "$(dirname "$receipt")"
+          if [ -f scripts/ops/vps-production-receipt.mjs ] && command -v node >/dev/null; then
+            node scripts/ops/vps-production-receipt.mjs "$RUNNER_TEMP/xboss-vps-verified.json" "$receipt"
+          else
+            jq -n --arg repo "$GITHUB_REPOSITORY" --arg sha "$SOURCE_SHA" \
+              --arg ci "$CI_RUN_ID" --arg ci_attempt "$CI_RUN_ATTEMPT" \
+              --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" \
+              '{schema: 1, status: "failed", failed_phase: "setup", deployment_activated: false,
+                repository: $repo, source_sha: $sha, ci_run_id: $ci, ci_run_attempt: $ci_attempt,
+                deploy_run_id: $run, deploy_run_attempt: $attempt, observed_at: (now | todateiso8601)}' > "$receipt"
+            exit 1
+          fi
+
       - name: Dọn khoá SSH
         if: always()
         run: rm -f ~/.ssh/id_deploy
+
+      - name: Lưu biên nhận deploy VPS
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: xboss-vps-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/xboss-vps-receipt/receipt.json
+          if-no-files-found: error
+          retention-days: 30
