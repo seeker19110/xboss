@@ -5,6 +5,7 @@ import { Scale } from "lucide-react";
 import { Skeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { formatDateVN } from "@/lib/nen/date";
+import { fmtVndSo } from "@/lib/nen/money-dto";
 
 export default function ClaimsTab() {
   const [claims, setClaims] = useState<any[]>([]);
@@ -20,10 +21,7 @@ export default function ClaimsTab() {
   }, []);
 
   function fmtVND(n: number) {
-    if (!n) return "0 đ";
-    if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)} tỷ`;
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} tr`;
-    return Math.round(n).toLocaleString("vi-VN") + " đ";
+    return fmtVndSo(n, true);
   }
 
   return (

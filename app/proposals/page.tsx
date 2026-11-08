@@ -21,6 +21,7 @@ import { Modal, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, invalidateMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/nen/date";
+import { fmtVndSo } from "@/lib/nen/money-dto";
 
 // Nhân bản label từ lib/proposals.ts — không import trực tiếp vì lib đó kéo theo
 // lib/db (chỉ chạy server), giống pattern trang HSE.
@@ -91,8 +92,7 @@ type ContractOpt = { id: number; code: string; title: string };
 type MaterialOpt = { id: number; name: string; unit: string | null };
 
 function fmtVND(n: number | null): string {
-  if (n == null) return "—";
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
+  return fmtVndSo(n);
 }
 
 type Tab = "inbox" | ProposalKind;

@@ -16,6 +16,7 @@ import {
 import { Skeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { formatDateVN } from "@/lib/nen/date";
+import { fmtVndSo } from "@/lib/nen/money-dto";
 
 export default function FinanceCashflowTab() {
   const [summary, setSummary] = useState<any | null>(null);
@@ -37,10 +38,7 @@ export default function FinanceCashflowTab() {
   }, []);
 
   function fmtVND(n: number) {
-    if (!n) return "0 đ";
-    if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)} tỷ`;
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} tr`;
-    return Math.round(n).toLocaleString("vi-VN") + " đ";
+    return fmtVndSo(n, true);
   }
 
   return (

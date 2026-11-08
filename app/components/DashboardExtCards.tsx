@@ -3,6 +3,7 @@ import { ShieldAlert, FilePlus2, MapPinned, Inbox } from "lucide-react";
 import EditableText from "@/app/components/EditableText";
 import { Card, Chip, StatCard } from "@/app/components/ui";
 import { systemColorClasses } from "@/lib/nen/systemColors";
+import { fmtVndSo } from "@/lib/nen/money-dto";
 
 export type QualityBlock = {
   ncrOpen: number;
@@ -23,8 +24,7 @@ export type SystemCrossRow = {
 };
 
 function fmtVND(n: number) {
-  if (!n) return "0 đ";
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
+  return fmtVndSo(n);
 }
 
 export default function DashboardExtCards({

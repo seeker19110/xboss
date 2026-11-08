@@ -30,6 +30,7 @@ import {
   type DocTotalRow,
 } from "@/app/components/ui";
 import type { ChipTone } from "@/app/components/ui/Chip";
+import { fmtVndSo } from "@/lib/nen/money-dto";
 
 // Khối "chứng từ" của một claim (M126) — tách ra từ hộp thoại chi tiết cũ trong
 // `app/claims/page.tsx`: cùng dữ liệu, cùng các hàm gọi API, nhưng hiển thị TOÀN TRANG ở
@@ -96,8 +97,7 @@ export type ClaimDocumentFile = {
 };
 
 export function fmtVND(n: number) {
-  if (!n) return "—";
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
+  return fmtVndSo(n);
 }
 
 /** Chênh lệch tiền — luôn kèm dấu để đọc được hướng lệch mà không cần suy từ màu. */

@@ -1,4 +1,5 @@
 // Type + helper dùng chung giữa trang /boq và các modal đã tách (M124 việc 2).
+import { fmtVndSo } from "@/lib/nen/money-dto";
 
 export type NormResourceType = "material" | "labor" | "equipment";
 export const NORM_RESOURCE_TYPE_LABEL: Record<NormResourceType, string> = {
@@ -95,8 +96,7 @@ export const NGUONG_TICK_SAN = 0.5;
 export const NGUONG_LECH_WEIGHT = 0.01;
 
 export function fmtVND(n: number | null) {
-  if (!n) return "—";
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
+  return fmtVndSo(n);
 }
 export function fmtQty(n: number) {
   return n.toLocaleString("vi-VN", { maximumFractionDigits: 3 });
