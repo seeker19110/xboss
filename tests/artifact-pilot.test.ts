@@ -8,6 +8,7 @@ import {
   readdirSync,
   readFileSync,
   readlinkSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -162,6 +163,7 @@ test("pilot chỉ nhận symlink dependency chuẩn của Next", async (t) => {
     [pgLink, "../../../node_modules/pg"],
     [pgLink, "../../node_modules/ngoai/../pg"],
     ["public/pg", "../node_modules/pg"],
+    [".next-ci/BUILD_ID", "/tmp/build-id"],
   ];
   for (const [path, target] of cases) {
     const link = join(f.project, path);
@@ -173,6 +175,31 @@ test("pilot chỉ nhận symlink dependency chuẩn của Next", async (t) => {
     });
     rmSync(link);
   }
+});
+
+test("pilot từ chối thư mục public và manifest là symlink", async (t) => {
+  const f = await fixture(t);
+  const outside = join(f.root, "outside");
+  mkdirSync(outside);
+  const publicDir = join(f.project, "public");
+  rmSync(publicDir, { recursive: true });
+  symlinkSync(outside, publicDir);
+  assert.deepEqual(await cli(["pack", f.project, sourceSha, f.archive, f.metadata]), {
+    code: 1,
+    stderr: "invalid_tree_directory",
+  });
+  assert.deepEqual(readdirSync(outside), []);
+
+  assert.equal((await cli(["install", f.archive, f.metadata, f.release])).code, 0);
+  const manifest = join(f.release, ".next-ci.pilot.json");
+  const manifestCopy = join(outside, "manifest.json");
+  renameSync(manifest, manifestCopy);
+  symlinkSync(manifestCopy, manifest);
+  const { base, visited } = await serve(t, f);
+  const result = await verify(f, base);
+  assert.equal(result.code, 1);
+  assert.equal(result.receipt.error, "unsupported_artifact_entry");
+  assert.deepEqual(visited, []);
 });
 
 test("pilot từ chối symlink đã cài bị đổi đích dù đích mới là dependency hợp lệ", async (t) => {

@@ -98,9 +98,9 @@ function parseJson(bytes, errorCode) {
 async function pack(project, sourceSha, archive, metadataPath) {
   if (!sourceShaPattern.test(sourceSha)) throw new PilotError("invalid_source_sha");
 
+  const buildFiles = await fileHashes(project, buildDir);
   const buildId = readFileSync(join(project, buildDir, "BUILD_ID"), "utf8").trim();
   if (!buildIdPattern.test(buildId)) throw new PilotError("invalid_build_id");
-  const buildFiles = await fileHashes(project, buildDir);
   const staticAssets = buildFiles.filter(({ path }) => staticAssetPattern.test(path));
   const staticAsset =
     staticAssets.find(({ path }) => path === `${buildDir}/static/${buildId}/_buildManifest.js`) ??
@@ -108,9 +108,11 @@ async function pack(project, sourceSha, archive, metadataPath) {
   if (!staticAsset) throw new PilotError("missing_next_static_asset");
 
   // Marker chỉ được sinh trong gói pilot. public/ của checkout vẫn là đầu vào chỉ đọc.
+  const publicDir = join(project, "public");
+  if (!lstatSync(publicDir).isDirectory()) throw new PilotError("invalid_tree_directory");
   const scratch = mkdtempSync(join(tmpdir(), "xboss-artifact-pilot-"));
   try {
-    cpSync(join(project, "public"), join(scratch, "public"), {
+    cpSync(publicDir, join(scratch, "public"), {
       recursive: true,
       verbatimSymlinks: true,
     });
@@ -188,7 +190,9 @@ async function verifyArchive(archive, metadata) {
 }
 
 async function verifyInstalled(releaseDir, metadata) {
-  const manifestBytes = readFileSync(join(releaseDir, manifestFile));
+  const manifestPath = join(releaseDir, manifestFile);
+  if (!lstatSync(manifestPath).isFile()) throw new PilotError("unsupported_artifact_entry");
+  const manifestBytes = readFileSync(manifestPath);
   const actualDigest = digest(manifestBytes);
   if (actualDigest !== metadata.manifest_sha256) throw new PilotError("manifest_digest_mismatch");
   const manifest = parseJson(manifestBytes, "invalid_artifact_manifest");
