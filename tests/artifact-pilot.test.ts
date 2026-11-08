@@ -13,7 +13,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { createServer, type ServerResponse } from "node:http";
+import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -78,25 +78,34 @@ async function fixture(t: TestContext) {
 }
 
 type Fixture = Awaited<ReturnType<typeof fixture>>;
-type Handler = (response: ServerResponse) => void;
+type PilotFault = "stale-marker" | "wrong-static-asset" | "unready" | "redirect" | "timeout";
 
-async function serve(t: TestContext, f: Fixture, overrides: Record<string, Handler> = {}) {
+async function serve(t: TestContext, f: Fixture, fault?: PilotFault) {
   const visited: string[] = [];
-  const handlers = new Map(Object.entries(overrides));
   const server = createServer((request, response) => {
     const path = request.url?.split("?")[0] ?? "";
     visited.push(path);
-    const handler = handlers.get(path);
-    if (handler) {
-      handler(response);
-    } else if (path === "/__xboss-pilot-build.json") {
-      response.end(readFileSync(join(f.release, marker)));
+    if (path === "/__xboss-pilot-build.json") {
+      if (fault === "stale-marker") {
+        response.end('{"build_id":"build-cu"}');
+      } else if (fault === "redirect") {
+        response.writeHead(302, { Location: "/api/health" }).end();
+      } else if (fault === "timeout") {
+        // Chỉ gửi header để kiểm timeout áp dụng cho cả lúc đọc body.
+        response.writeHead(200).flushHeaders();
+      } else {
+        response.end(readFileSync(join(f.release, marker)));
+      }
     } else if (path === staticUrl) {
-      response.end(readFileSync(join(f.release, asset)));
+      response.end(
+        fault === "wrong-static-asset" ? "JS từ bản khác" : readFileSync(join(f.release, asset)),
+      );
     } else if (path === "/api/health") {
       response.end(JSON.stringify({ status: "ok", db: true }));
     } else if (path === "/api/ready") {
-      response.end(JSON.stringify({ ready: true, schema: "ok" }));
+      response.end(
+        fault === "unready" ? '{"ready":false}' : JSON.stringify({ ready: true, schema: "ok" }),
+      );
     } else {
       response.writeHead(404).end();
     }
@@ -239,15 +248,13 @@ test("pilot phát hiện route còn phục vụ marker cũ hoặc static asset k
   const f = await fixture(t);
   assert.equal((await cli(["install", f.archive, f.metadata, f.release])).code, 0);
 
-  const stale = await serve(t, f, {
-    "/__xboss-pilot-build.json": (response) => response.end('{"build_id":"build-cu"}'),
-  });
+  const stale = await serve(t, f, "stale-marker");
   const staleResult = await verify(f, stale.base, "stale");
   assert.equal(staleResult.code, 1);
   assert.equal(staleResult.receipt.observed_build_id, "build-cu");
   assert.equal(staleResult.receipt.error, "runtime_marker_mismatch");
 
-  const mixed = await serve(t, f, { [staticUrl]: (response) => response.end("JS từ bản khác") });
+  const mixed = await serve(t, f, "wrong-static-asset");
   const mixedResult = await verify(f, mixed.base, "mixed");
   assert.equal(mixedResult.code, 1);
   assert.equal(mixedResult.receipt.error, "runtime_static_asset_mismatch");
@@ -257,17 +264,12 @@ test("pilot từ chối readiness lỗi, redirect và đích ngoài loopback", a
   const f = await fixture(t);
   assert.equal((await cli(["install", f.archive, f.metadata, f.release])).code, 0);
 
-  const notReady = await serve(t, f, {
-    "/api/ready": (response) => response.end('{"ready":false}'),
-  });
+  const notReady = await serve(t, f, "unready");
   const readinessResult = await verify(f, notReady.base, "not-ready");
   assert.equal(readinessResult.code, 1);
   assert.equal(readinessResult.receipt.probes.at(-1).error, "readiness_failed");
 
-  const redirected = await serve(t, f, {
-    "/__xboss-pilot-build.json": (response) =>
-      response.writeHead(302, { Location: "/api/health" }).end(),
-  });
+  const redirected = await serve(t, f, "redirect");
   const redirectResult = await verify(f, redirected.base, "redirected");
   assert.equal(redirectResult.code, 1);
   assert.equal(redirectResult.receipt.probes[0].http_status, 302);
@@ -281,10 +283,7 @@ test("pilot từ chối readiness lỗi, redirect và đích ngoài loopback", a
 test("pilot ghi inconclusive khi probe hết giờ", { timeout: 18_000 }, async (t) => {
   const f = await fixture(t);
   assert.equal((await cli(["install", f.archive, f.metadata, f.release])).code, 0);
-  const { base } = await serve(t, f, {
-    // Chỉ gửi header để kiểm timeout áp dụng cho cả lúc đọc body.
-    "/__xboss-pilot-build.json": (response) => response.writeHead(200).flushHeaders(),
-  });
+  const { base } = await serve(t, f, "timeout");
   const { code, receipt } = await verify(f, base, "timeout");
   assert.equal(code, 1);
   assert.equal(receipt.status, "inconclusive");
