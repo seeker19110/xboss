@@ -300,20 +300,20 @@ async function drill(baseline, candidate, runtime, evidence) {
     report.failure_injection = { action: "stop_candidate_B", at: new Date().toISOString() };
     faultTime = performance.now();
     await stopApp(appB);
-    report.failure_injection.routed_readiness_http_status = await readinessStatus(appOrigin);
-    if (report.failure_injection.routed_readiness_http_status !== 502) {
+    if ((await readinessStatus(appOrigin)) !== 502) {
       throw new RollbackError("missing_candidate_outage");
     }
+    report.failure_injection.routed_readiness_http_status = 502;
 
     report.phase = "recover_route";
     activePort = baselinePort;
-    report.routing_recovery = {
-      readiness_http_status: await readinessStatus(appOrigin),
-      elapsed_ms: Math.ceil(performance.now() - faultTime),
-    };
-    if (report.routing_recovery.readiness_http_status !== 200) {
+    if ((await readinessStatus(appOrigin)) !== 200) {
       throw new RollbackError("baseline_route_not_ready");
     }
+    report.routing_recovery = {
+      readiness_http_status: 200,
+      elapsed_ms: Math.ceil(performance.now() - faultTime),
+    };
     const remainingMs = Math.floor(rtoLimitMs - (performance.now() - faultTime));
     if (remainingMs < 1) throw new RollbackError("rollback_rto_exceeded");
 
