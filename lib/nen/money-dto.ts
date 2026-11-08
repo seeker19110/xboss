@@ -152,6 +152,20 @@ export function fmtDongGonMinor(minor: bigint): string {
   return mulRatio(minor, 1n, 100n).toLocaleString("vi-VN");
 }
 
+/**
+ * Hiển thị tiền từ `number` (API legacy chưa chuyển decimal-string-v1) — CHỈ để hiển thị, không
+ * cộng/nhân tiếp. Một nguồn cho mọi trang (AUD-XFEAT-002): 0/null/không hữu hạn → "—" (cùng quy
+ * ước với đường exact `fmtVND(0n)`), `gon` → "1,23 tỷ"/"5,6 tr" theo trị tuyệt đối (số âm cũng
+ * gọn), còn lại đồng nguyên "1.234.567 đ".
+ */
+export function fmtVndSo(n: number | null | undefined, gon = false): string {
+  if (n == null || !Number.isFinite(n) || n === 0) return "—";
+  const abs = Math.abs(n);
+  if (gon && abs >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)} tỷ`;
+  if (gon && abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} tr`;
+  return `${Math.round(n).toLocaleString("vi-VN")} đ`;
+}
+
 /** Đồng đầy đủ kiểu vi-VN, giữ xu khi khác 0: 123456789n → "1.234.567,89"; 100n → "1". */
 export function fmtDongDayDuMinor(minor: bigint): string {
   return thapPhanVi(minor, 2);

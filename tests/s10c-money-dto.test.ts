@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   fmtDongGonMinor,
   fmtDongMinor,
+  fmtVndSo,
   minorTuWire,
   moneyFieldsToWire,
   moneyOrNullToWire,
@@ -91,4 +92,18 @@ test("docTongHopTaiChinh + kpiTaiChinh: bigint exact, response không phải v1 
   assert.equal(docTongHopTaiChinh({ ...body, moneyFormat: undefined }), null);
   assert.equal(docTongHopTaiChinh({ ...body, payables: 0.03 }), null);
   assert.deepEqual(kpiTaiChinh(null), { fundBalance: 0n, netDebt: 0n, advanceOutstanding: 0n });
+});
+
+test("fmtVndSo: một quy ước hiển thị cho mọi trang tiền number (AUD-XFEAT-002)", () => {
+  // 0 / null / không hữu hạn → "—", cùng quy ước với đường exact fmtVND(0n).
+  for (const v of [0, null, undefined, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.equal(fmtVndSo(v), "—");
+    assert.equal(fmtVndSo(v, true), "—");
+  }
+  assert.equal(fmtVndSo(1234567.4), "1.234.567 đ");
+  assert.equal(fmtVndSo(1234567.4, true), "1.2 tr");
+  assert.equal(fmtVndSo(2_500_000_000, true), "2.50 tỷ");
+  // Số âm (hoàn ứng, điều chỉnh) cũng được rút gọn theo trị tuyệt đối — bản cũ không gọn.
+  assert.equal(fmtVndSo(-2_500_000_000, true), "-2.50 tỷ");
+  assert.equal(fmtVndSo(-1500), "-1.500 đ");
 });

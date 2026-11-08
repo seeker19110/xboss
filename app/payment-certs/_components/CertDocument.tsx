@@ -52,6 +52,7 @@ import {
 import XacNhanCanhBaoDialog from "./XacNhanCanhBaoDialog";
 import DanhDauDaChiDialog from "./DanhDauDaChiDialog";
 import DieuChinhDot from "./DieuChinhDot";
+import { fmtVndSo } from "@/lib/nen/money-dto";
 
 // Khối "chứng từ" của một đợt thanh toán (IPC) — M124. Tách ra từ hộp thoại chi tiết đợt
 // cũ trong `app/payment-certs/page.tsx`: cùng dữ liệu, cùng các hàm gọi API, nhưng hiển thị
@@ -121,8 +122,7 @@ export type Cert = {
 export type { CertTotalsView, DongVuot };
 
 export function fmtVND(n: number) {
-  if (!n) return "—";
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
+  return fmtVndSo(n);
 }
 
 // Cột DATE của Postgres về đây vẫn là chuỗi 'YYYY-MM-DD' (parser riêng trong lib/db) —

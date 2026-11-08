@@ -21,6 +21,7 @@ import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/nen/date";
 import { isExpired, isExpiringSoon } from "@/lib/nen/han-hieu-luc";
+import { fmtVndSo } from "@/lib/nen/money-dto";
 
 type InsuranceKind =
   | "car"
@@ -76,8 +77,7 @@ type InsuranceBond = {
 type Contract = { id: number; code: string; title: string };
 
 function fmtVND(n: number | null) {
-  if (!n) return "—";
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
+  return fmtVndSo(n);
 }
 
 export default function InsurancePage() {

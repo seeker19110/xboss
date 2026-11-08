@@ -24,7 +24,7 @@ import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { formatDateVN, todayISO } from "@/lib/nen/date";
-import { HEADER_TIEN_V1, fmtDongMinor, soXapXiChoBieuDo } from "@/lib/nen/money-dto";
+import { HEADER_TIEN_V1, fmtDongMinor, soXapXiChoBieuDo, fmtVndSo } from "@/lib/nen/money-dto";
 import {
   VAT_RONG,
   docTongHopTaiChinh,
@@ -35,8 +35,7 @@ import {
 } from "./_components/tongHopTien";
 
 function fmtVND(n: number) {
-  if (!n) return "0 đ";
-  return Math.round(n).toLocaleString("vi-VN") + " đ";
+  return fmtVndSo(n);
 }
 
 // ===== Kiểu dữ liệu (client) — mirror lib/tai-chinh/finance.ts =====
