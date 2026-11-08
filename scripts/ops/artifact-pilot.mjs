@@ -2,10 +2,14 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import {
+  closeSync,
+  constants,
   cpSync,
   createReadStream,
+  fstatSync,
   lstatSync,
   mkdtempSync,
+  openSync,
   readdirSync,
   readFileSync,
   readlinkSync,
@@ -95,11 +99,30 @@ function parseJson(bytes, errorCode) {
   }
 }
 
+function readArtifactFile(path) {
+  let fd;
+  try {
+    // Mở đích không theo symlink rồi kiểm loại tệp trên chính descriptor sẽ đọc.
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  } catch (error) {
+    if (error.code === "ELOOP") throw new PilotError("unsupported_artifact_entry");
+    throw error;
+  }
+  try {
+    if (!fstatSync(fd).isFile()) throw new PilotError("unsupported_artifact_entry");
+    return readFileSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 async function pack(project, sourceSha, archive, metadataPath) {
   if (!sourceShaPattern.test(sourceSha)) throw new PilotError("invalid_source_sha");
 
   const buildFiles = await fileHashes(project, buildDir);
-  const buildId = readFileSync(join(project, buildDir, "BUILD_ID"), "utf8").trim();
+  const buildId = readArtifactFile(join(project, buildDir, "BUILD_ID"))
+    .toString("utf8")
+    .trim();
   if (!buildIdPattern.test(buildId)) throw new PilotError("invalid_build_id");
   const staticAssets = buildFiles.filter(({ path }) => staticAssetPattern.test(path));
   const staticAsset =
@@ -190,9 +213,7 @@ async function verifyArchive(archive, metadata) {
 }
 
 async function verifyInstalled(releaseDir, metadata) {
-  const manifestPath = join(releaseDir, manifestFile);
-  if (!lstatSync(manifestPath).isFile()) throw new PilotError("unsupported_artifact_entry");
-  const manifestBytes = readFileSync(manifestPath);
+  const manifestBytes = readArtifactFile(join(releaseDir, manifestFile));
   const actualDigest = digest(manifestBytes);
   if (actualDigest !== metadata.manifest_sha256) throw new PilotError("manifest_digest_mismatch");
   const manifest = parseJson(manifestBytes, "invalid_artifact_manifest");

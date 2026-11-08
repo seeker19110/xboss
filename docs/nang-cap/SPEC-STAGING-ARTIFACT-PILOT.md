@@ -1,12 +1,12 @@
 # Đặc tả pilot xác minh artifact trên staging cô lập
 
-| Thuộc tính | Giá trị |
-| ---------- | ------- |
-| Issue / Goal | X-Templates T-3712 và T-3713, pilot artifact của xboss |
-| Spec owner | Chủ repo xboss |
-| State | **Approved for implementation** |
+| Thuộc tính       | Giá trị                                                              |
+| ---------------- | -------------------------------------------------------------------- |
+| Issue / Goal     | X-Templates T-3712 và T-3713, pilot artifact của xboss               |
+| Spec owner       | Chủ repo xboss                                                       |
+| State            | **Approved for implementation**                                      |
 | Người/ngày duyệt | Chủ dự án, yêu cầu triển khai và chọn staging cô lập ngày 2026-11-08 |
-| Cập nhật | 2026-11-08 |
+| Cập nhật         | 2026-11-08                                                           |
 
 ## 1. Vấn đề và bằng chứng
 
@@ -21,11 +21,11 @@ Workflow VPS ghim SHA của CI và chuyển archive, còn health check hiện ch
 
 ## 3. Phương án
 
-| Phương án | Lợi ích | Đánh đổi |
-| --------- | ------- | -------- |
-| Dùng SHA hoặc HTTP health | Tận dụng luồng hiện có | Không đủ chứng minh bytes và bản đang phục vụ |
-| Chạy app thật trong job staging tách khỏi job build | Đối chiếu archive đã tải, filesystem đã cài và HTTP qua tuyến thực | Chỉ xác nhận runtime cô lập của pilot |
-| Gắn ngay vào VPS | Đo trực tiếp tuyến VPS | Cần đích và quyền staging tách riêng |
+| Phương án                                           | Lợi ích                                                            | Đánh đổi                                      |
+| --------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------- |
+| Dùng SHA hoặc HTTP health                           | Tận dụng luồng hiện có                                             | Không đủ chứng minh bytes và bản đang phục vụ |
+| Chạy app thật trong job staging tách khỏi job build | Đối chiếu archive đã tải, filesystem đã cài và HTTP qua tuyến thực | Chỉ xác nhận runtime cô lập của pilot         |
+| Gắn ngay vào VPS                                    | Đo trực tiếp tuyến VPS                                             | Cần đích và quyền staging tách riêng          |
 
 Chọn chạy app thật trong staging cô lập theo lựa chọn của chủ dự án. Hai job liên kết qua artifact của cùng workflow run.
 
@@ -40,13 +40,13 @@ Chọn chạy app thật trong staging cô lập theo lựa chọn của chủ d
 
 ## 5. Nghiệm thu
 
-| ID | Given / When / Then | Bằng chứng |
-| -- | ------------------- | ---------- |
-| AC1 | CI build gói, staging tải và cài đúng gói, app thật trả marker và asset đã đóng gói | Hai run khác nhau có exit 0, biên nhận `verified` và link artifact |
-| AC2 | Archive hoặc tệp bất biến đã cài bị đổi | Hash check thất bại, không công nhận bản đang phục vụ |
-| AC3 | Verifier trỏ vào app cũ hoặc marker/asset trả sai, redirect hay quá hạn | Exit khác 0, biên nhận ghi kết quả probe tương ứng |
-| AC4 | App vẫn trả health nhưng readiness lỗi hoặc sai SHA workflow | Exit khác 0 và trạng thái khác `verified` |
-| AC5 | Chạy job pilot trên nhánh của nó | Workflow pilot không đổi pipeline VPS, quyền hoặc bí mật production |
+| ID  | Given / When / Then                                                                 | Bằng chứng                                                          |
+| --- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| AC1 | CI build gói, staging tải và cài đúng gói, app thật trả marker và asset đã đóng gói | Hai run khác nhau có exit 0, biên nhận `verified` và link artifact  |
+| AC2 | Archive hoặc tệp bất biến đã cài bị đổi                                             | Hash check thất bại, không công nhận bản đang phục vụ               |
+| AC3 | Verifier trỏ vào app cũ hoặc marker/asset trả sai, redirect hay quá hạn             | Exit khác 0, biên nhận ghi kết quả probe tương ứng                  |
+| AC4 | App vẫn trả health nhưng readiness lỗi hoặc sai SHA workflow                        | Exit khác 0 và trạng thái khác `verified`                           |
+| AC5 | Chạy job pilot trên nhánh của nó                                                    | Workflow pilot không đổi pipeline VPS, quyền hoặc bí mật production |
 
 ## 6. Kiến trúc và quyền
 

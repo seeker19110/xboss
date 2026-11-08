@@ -82,11 +82,13 @@ type Handler = (response: ServerResponse) => void;
 
 async function serve(t: TestContext, f: Fixture, overrides: Record<string, Handler> = {}) {
   const visited: string[] = [];
+  const handlers = new Map(Object.entries(overrides));
   const server = createServer((request, response) => {
     const path = request.url?.split("?")[0] ?? "";
     visited.push(path);
-    if (overrides[path]) {
-      overrides[path](response);
+    const handler = handlers.get(path);
+    if (handler) {
+      handler(response);
     } else if (path === "/__xboss-pilot-build.json") {
       response.end(readFileSync(join(f.release, marker)));
     } else if (path === staticUrl) {
