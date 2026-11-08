@@ -172,6 +172,23 @@ export async function storageDelete(orgId: number, fileName: string): Promise<vo
   });
 }
 
+/**
+ * Dọn file best-effort ở nhánh lỗi/rollback (vd ghi DB thất bại sau khi đã lưu file): không
+ * ném để giữ lỗi gốc cho caller, nhưng GHI LOG khi dọn hỏng — file mồ côi phải truy được
+ * (AUD-CODE-005, thay cho `.catch(() => {})` nuốt im lặng).
+ */
+export async function storageDeleteBestEffort(orgId: number, fileName: string): Promise<void> {
+  try {
+    await storageDelete(orgId, fileName);
+  } catch (err) {
+    log.warn("Không dọn được file lưu trữ — có thể còn file mồ côi", {
+      orgId,
+      fileName,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 /** Chỉ dùng trong test — reset cache backend để đọc lại env giữa các ca. */
 export function __resetStorageBackendCache(): void {
   s3State = undefined;

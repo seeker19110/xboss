@@ -1688,6 +1688,38 @@ test("GET /api/schedule-control: subcon vẫn xem được (đọc thuần) → 
   assert.equal(res.status, 200);
 });
 
+test(
+  "GET /api/schedule-control: subcon không thấy ghi chú trễ (delayNote) của thầu khác; PM vẫn thấy (AUD-SEC-012)",
+  S,
+  async () => {
+    const { run } = await import("@/lib/db");
+    const projectId = await taoDuAn("scnote");
+    const taskId = await taoTask(projectId, "scnote");
+    const ghiChu = `Ghi chú nội bộ ${uniq("n")}`;
+    await run(
+      `UPDATE tasks SET end_date = '2020-01-01', progress_percent = 0, status = 'tre',
+              delay_reason = 'khac', delay_note = ? WHERE id = ?`,
+      ghiChu,
+      taskId,
+    );
+    const { GET } = await import("@/app/api/schedule-control/route");
+
+    const pm = await taoUser("pm", "scnote");
+    await dangNhapDuAn(pm, projectId);
+    const resPm = await GET(getReq("/api/schedule-control"));
+    assert.equal(resPm.status, 200);
+    assert.ok(JSON.stringify(await resPm.json()).includes(ghiChu), "PM phải thấy ghi chú trễ");
+
+    const sub = await taoUser("subcon", "scnote");
+    await dangNhapDuAn(sub, projectId);
+    const resSub = await GET(getReq("/api/schedule-control"));
+    assert.equal(resSub.status, 200);
+    const body = await resSub.json();
+    assert.equal(body.delayed.length > 0, true, "subcon vẫn thấy danh sách trễ");
+    assert.ok(!JSON.stringify(body).includes(ghiChu), "subcon không được thấy ghi chú trễ");
+  },
+);
+
 test("GET /api/dashboard/evm: chưa đăng nhập → 401", S, async () => {
   dangXuat();
   const { GET } = await import("@/app/api/dashboard/evm/route");

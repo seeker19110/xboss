@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storageDelete, storagePut } from "@/lib/nen/storage";
+import { storagePut, storageDeleteBestEffort } from "@/lib/nen/storage";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
@@ -118,7 +118,7 @@ export async function POST(
       ),
   );
   if (!kq.ok) {
-    await storageDelete(user.orgId, fileName).catch(() => {});
+    await storageDeleteBestEffort(user.orgId, fileName);
     return NextResponse.json({ error: "Không có quyền upload tài liệu" }, { status: 403 });
   }
   const id = kq.value;

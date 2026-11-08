@@ -5,7 +5,7 @@ import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { getEquipment } from "@/lib/vat-tu/equipment";
 import { newEquipmentCertFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
-import { storagePut, storageGet, storageDelete } from "@/lib/nen/storage";
+import { storagePut, storageGet, storageDelete, storageDeleteBestEffort } from "@/lib/nen/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -96,7 +96,7 @@ export async function POST(
       ),
   );
   if (!kq.ok) {
-    await storageDelete(user.orgId, fileName).catch(() => {});
+    await storageDeleteBestEffort(user.orgId, fileName);
     return NextResponse.json(
       { error: "Bạn không có quyền upload giấy kiểm định (chỉ Admin/PM/kỹ sư)" },
       { status: 403 },

@@ -1,6 +1,6 @@
 import { laLoiKhoaNgoai, phanHoiXungDotPhuThuoc } from "@/lib/nen/loi";
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut, storageDelete } from "@/lib/nen/storage";
+import { storagePut, storageDelete, storageDeleteBestEffort } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { ghiNeuConQuyen } from "@/lib/bao-mat/permissions";
@@ -190,7 +190,7 @@ export async function PATCH(
     },
   );
   if (!kq.ok) {
-    if (fileCols?.fileName) await storageDelete(user.orgId, fileCols.fileName).catch(() => {});
+    if (fileCols?.fileName) await storageDeleteBestEffort(user.orgId, fileCols.fileName);
     return NextResponse.json(
       { error: "Bạn không có quyền sửa hồ sơ môi trường (chỉ Admin/PM/kỹ sư)" },
       { status: 403 },
