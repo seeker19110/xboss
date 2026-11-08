@@ -2,13 +2,15 @@
 
 ## Đang làm
 
-- **Audit D-009 đợt 4e — branch `claude/zen-lovelace-n3t0t7`** (PR #721): 🟢 XFEAT-002 — 11 trang hiển thị tiền dùng chung `fmtVndSo` (số 0 hiện "—" thống nhất, rút gọn tỷ/tr cả số âm).
+- **Audit D-009 đợt 4f — branch `claude/zen-lovelace-n3t0t7`**: 🟢 CFG-002 (một phần) — khoá TOTP không còn nhận `XBOSS_SECRET` chỉ khoảng trắng ở production; khai `PORT` trong schema env.
+
+- **Audit D-009 đợt 4e — MERGED qua #721** `9b78718`: 🟢 XFEAT-002 — 11 trang hiển thị tiền dùng chung `fmtVndSo` (số 0 hiện "—" thống nhất, rút gọn tỷ/tr cả số âm).
 
 - **Audit D-009 đợt 4d — MERGED qua #718** `84adc90`: 🟢 SEC-013 — /api/project lộ tên tháp dự án khác (đã vá, test đỏ-trước), DELETE NCC/PO trả 401 khi chưa đăng nhập, NCC + BOQ export kiểm qua `CAN`; 🟢 CI-003 — bước npm audit dev thử lại thay vì nuốt mã thoát.
 
 - **Audit D-009 đợt 4c — MERGED qua #716** `6534d02`: 🟢 SEC-012 — /api/schedule-control che `delayNote` với thầu phụ (giữ thiết kế xem đường găng); 🟢 CODE-005 phần lưu trữ — 18 route dọn file lỗi qua `storageDeleteBestEffort` (ghi log, không nuốt im lặng). Còn 🟢 mở: xem sổ `docs/ops/AUDIT-STATUS.md`.
 
-- **Audit D-009 đợt 4b — MERGED qua #715** `a0dad71`: vá 14 🟠 kèm test đỏ-trước — NCR chặn vai trò chỉ-xem/khoá NCR đóng/kiểm tham chiếu (SEC-004/005); materials POST + import chỉ nhận sheet của dự án (SEC-006, SEC-014); user-projects PUT chỉ xoá trong phạm vi (SEC-007); presence lọc org (SEC-008); BOQ che đơn giá theo viewPayments (SEC-009); cron GET bằng phiên cần quyền ghi + chặn điều hướng khác site (SEC-010); quét bản vẽ không gắn rev chéo dự án, rev tự duyệt chỉ Admin/PM (SEC-011); upload tracking không hạ nghiem_thu + lỗi hệ thống không thành 400 (CODE-003/004); gỡ chu trình lib, cổng bắt dynamic import (ARCH-001); test materials/import + reports (TEST-001). Còn 🟠 duy nhất: CI-002 — owner tạo environment `production` có người duyệt trong Settings, chuyển secret VPS vào đó.
+- **Audit D-009 đợt 4b — MERGED qua #715** `a0dad71`: vá 14 🟠 kèm test đỏ-trước — NCR chặn vai trò chỉ-xem/khoá NCR đóng/kiểm tham chiếu (SEC-004/005); materials POST + import chỉ nhận sheet của dự án (SEC-006, SEC-014); user-projects PUT chỉ xoá trong phạm vi (SEC-007); presence lọc org (SEC-008); BOQ che đơn giá theo viewPayments (SEC-009); cron GET bằng phiên cần quyền ghi + chặn điều hướng khác site (SEC-010); quét bản vẽ không gắn rev chéo dự án, rev tự duyệt chỉ Admin/PM (SEC-011); upload tracking không hạ nghiem_thu + lỗi hệ thống không thành 400 (CODE-003/004); gỡ chu trình lib, cổng bắt dynamic import (ARCH-001); test materials/import + reports (TEST-001). CI-002 owner xử lý qua #720 (`environment: Production` cho job deploy).
 
 - **Audit D-009 đợt 4 — MERGED qua #713** `f036768`: 3 🔴 (payroll/:id lộ lương, YCNT bỏ kiểm dự án khi null, deploy chạy cho PR từ fork) + 3 🟢. #710 (khung 3.31.0) merged `163625b`.
 
