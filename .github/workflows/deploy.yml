@@ -137,7 +137,7 @@ jobs:
             "$RUNNER_TEMP/xboss-vps-artifact/xboss-vps.tar.gz" \
             "$VPS_USER@$VPS_HOST:$APP_DIR/.next-ci.tar.gz.part"
           ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" \
-            "cd '$APP_DIR' && printf '%s  %s\n' '$ARCHIVE_SHA' '.next-ci.tar.gz.part' | sha256sum --check --status && mv .next-ci.tar.gz.part .next-ci.tar.gz"
+            "cd '$APP_DIR' && printf '%s  %s\n' '$ARCHIVE_SHA' '.next-ci.tar.gz.part' | sha256sum --check && mv .next-ci.tar.gz.part .next-ci.tar.gz"
 
       - name: Chạy deploy trên VPS
         id: deploy
@@ -146,11 +146,12 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           ARCHIVE_SHA: ${{ steps.verify.outputs.archive-sha256 }}
         run: |
+          set -e
           # Chạy script từ đúng commit đã qua CI, không dùng bản deploy.sh còn sót ở checkout cũ.
-          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$ARCHIVE_SHA" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "SOURCE_SHA không hợp lệ." >&2; exit 1; }
+          [[ "$ARCHIVE_SHA" =~ ^[0-9a-f]{64}$ ]] || { echo "ARCHIVE_SHA không hợp lệ." >&2; exit 1; }
           # Kiểm lại archive cuối ngay trước deploy.sh để lỗi checksum dừng trước migration.
-          REMOTE_COMMAND="cd '$APP_DIR' && git fetch origin '$SOURCE_SHA' && deploy_script=\$(mktemp /tmp/xboss-deploy.XXXXXX) && trap 'rm -f \"\$deploy_script\"' EXIT && git show '$SOURCE_SHA:deploy.sh' > \"\$deploy_script\" && printf '%s  %s\n' '$ARCHIVE_SHA' '.next-ci.tar.gz' | sha256sum --check --status && EXPECTED_DEPLOY_SHA='$SOURCE_SHA' bash \"\$deploy_script\""
+          REMOTE_COMMAND="cd '$APP_DIR' && git fetch origin '$SOURCE_SHA' && deploy_script=\$(mktemp /tmp/xboss-deploy.XXXXXX) && trap 'rm -f \"\$deploy_script\"' EXIT && git show '$SOURCE_SHA:deploy.sh' > \"\$deploy_script\" && printf '%s  %s\n' '$ARCHIVE_SHA' '.next-ci.tar.gz' | sha256sum --check && EXPECTED_DEPLOY_SHA='$SOURCE_SHA' bash \"\$deploy_script\""
           # Không còn build trên VPS nên các bước còn lại (npm ci, migrate, swap, reload,
           # health-check) chỉ mất vài phút — 15m là dư, không cần 40m như trước.
           timeout 15m ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 \
