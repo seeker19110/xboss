@@ -32,8 +32,15 @@ test("encryptTotpSecret: production với XBOSS_SECRET chỉ khoảng trắng �
     env.XBOSS_SECRET = "   ";
     assert.throws(() => encryptTotpSecret("JBSWY3DPEHPK3PXP"), /XBOSS_SECRET/);
   } finally {
-    env.NODE_ENV = cu.env;
-    env.XBOSS_SECRET = cu.secret;
+    // Gán `undefined` vào process.env tạo chuỗi "undefined" — phải xoá khi giá trị gốc vắng,
+    // nếu không mọi test DB sau trong cùng tiến trình hỏng ở schema env (NODE_ENV lạ).
+    for (const [k, v] of [
+      ["NODE_ENV", cu.env],
+      ["XBOSS_SECRET", cu.secret],
+    ] as const) {
+      if (v === undefined) delete env[k];
+      else env[k] = v;
+    }
   }
 });
 
