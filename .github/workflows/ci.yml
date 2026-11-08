@@ -67,10 +67,20 @@ jobs:
       # Lỗ hổng ở dev-dependency (toolchain build, playwright, eslint…) là bề mặt
       # supply-chain thật của runner CI nhưng bước audit trên chỉ quét --omit=dev. Ở đây
       # quét CẢ dev, chỉ chặn mức `critical` để không nhiễu vì lỗ hổng dev mức high
-      # thường không khai thác được trong CI. Lỗi mạng không làm đỏ job (audit đã có
-      # bước quét production ở trên với retry).
+      # thường không khai thác được trong CI. npm audit trả exit 1 cho CẢ lỗ hổng lẫn lỗi
+      # mạng, nên dùng cùng vòng thử lại như bước production (AUD-CI-003) thay vì đoán
+      # theo mã thoát.
       - name: Kiểm lỗ hổng dependencies (gồm dev, chỉ chặn critical)
-        run: npm audit --audit-level=critical --fetch-timeout=30000 || test $? -ne 1
+        run: |
+          for i in 1 2 3; do
+            if npm audit --audit-level=critical --fetch-timeout=30000; then
+              exit 0
+            fi
+            echo "npm audit (gồm dev) lần $i thất bại, thử lại sau $((i * 20))s…" >&2
+            sleep $((i * 20))
+          done
+          echo "npm audit (gồm dev) thất bại cả 3 lần." >&2
+          exit 1
 
       # Cổng format: husky/lint-staged chỉ chạy ở máy dev và bị bỏ qua khi commit
       # `--no-verify` (hoặc commit tạo từ web/agent) — CI là chốt chặn cuối. Bật được sau khi

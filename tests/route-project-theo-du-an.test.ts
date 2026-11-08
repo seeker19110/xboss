@@ -243,6 +243,25 @@ test(
 );
 
 test(
+  "GET /api/project: tên tháp lấy từ dự án đang chọn, không phải tháp đầu tiên của DB (AUD-SEC-013)",
+  S,
+  async () => {
+    const { insertId } = await import("@/lib/db");
+    const duAnA = await taoDuAn("TwA");
+    const duAnB = await taoDuAn("TwB");
+    const tenA = `Tháp A ${Date.now()}`;
+    const tenB = `Tháp B ${Date.now()}`;
+    await insertId(`INSERT INTO towers (project_id, name) VALUES (?, ?)`, duAnA, tenA);
+    await insertId(`INSERT INTO towers (project_id, name) VALUES (?, ?)`, duAnB, tenB);
+    const pm = await taoUser("pm", "pmTw");
+    await dangNhapDuAn(pm, duAnB);
+    const { GET } = await import("@/app/api/project/route");
+    const body = await (await GET()).json();
+    assert.equal(body.tower, tenB);
+  },
+);
+
+test(
   "GET /api/project: có phiên nhưng chưa chọn được dự án → fallback dự án đầu tiên",
   S,
   async () => {

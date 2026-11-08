@@ -159,7 +159,8 @@ export async function DELETE(
   try {
     const params = await paramsP;
     const user = await getCurrentUser();
-    if (!user || user.role !== "admin")
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (user.role !== "admin")
       return NextResponse.json({ error: "Chỉ Admin được xoá đơn hàng" }, { status: 403 });
 
     const id = parseInt(params.id);
