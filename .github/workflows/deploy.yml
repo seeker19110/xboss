@@ -1,7 +1,7 @@
 name: Deploy to VPS
+run-name: VPS production · CI ${{ github.event.workflow_run.id }} · ${{ github.event.workflow_run.head_sha }}
 
-# Deploy khi workflow CI trên main hoàn tất VÀ pass — loại bỏ phụ thuộc ngầm vào
-# branch-protection setting ngoài repo.
+# Deploy khi CI của main đạt và reviewer duyệt environment Production.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -33,6 +33,7 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
+    environment: Production
     env:
       # Đường dẫn app trên VPS. Runner build NGAY TẠI đường dẫn này (xem bước bên dưới) —
       # không phải chuyện làm cho đẹp: `.next` có nhúng đường dẫn tuyệt đối của lúc build
