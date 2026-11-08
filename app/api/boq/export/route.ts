@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { query, queryOne, todayISO, withProjectScope } from "@/lib/db";
-import { getCurrentUser, PAYMENT_VIEW_ROLES } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { styleHeader } from "@/lib/tien-do/excel-tracking";
@@ -25,7 +25,7 @@ type BoqExportRow = {
 
 // GET /api/boq/export → file .xlsx 1 sheet "BOQ" (mã · hệ · mô tả · ĐVT · KL HĐ · đơn giá ·
 // thành tiền · KL thực hiện · % thực hiện · số task map · Σ tỷ trọng). Mọi vai trò xem được
-// BOQ đều tải được; vai trò ngoài PAYMENT_VIEW_ROLES chỉ không thấy cột Đơn giá/Thành tiền.
+// BOQ đều tải được; vai trò thiếu CAN.viewPayments chỉ không thấy cột Đơn giá/Thành tiền.
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -35,7 +35,8 @@ export async function GET() {
   const blocked = await assertModuleEnabled("materials", projectId);
   if (blocked) return blocked;
 
-  const showMoney = PAYMENT_VIEW_ROLES.includes(user.role);
+  // AUD-SEC-013: cùng cổng với GET /api/boq (CAN.viewPayments, tôn trọng override quyền).
+  const showMoney = CAN.viewPayments(user.role);
 
   const rows = await withProjectScope(projectId, () =>
     query<BoqExportRow>(

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, insertId } from "@/lib/db";
-import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN, type Role } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 
-const canManage = (r?: Role) => r === "admin" || r === "pm";
+// AUD-SEC-013: qua CAN để override quyền (ma trận /admin/permissions) có hiệu lực.
+const canManage = (r?: Role) => CAN.manageSuppliers(r);
 
 const ALL_FIELDS = [
   "name",

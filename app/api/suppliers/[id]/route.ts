@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN, type Role } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 
-const canManage = (r?: Role) => r === "admin" || r === "pm";
+// AUD-SEC-013: qua CAN để override quyền (ma trận /admin/permissions) có hiệu lực.
+const canManage = (r?: Role) => CAN.manageSuppliers(r);
 
 const FIELD_MAP: Record<string, string> = {
   name: "name",
@@ -89,7 +90,8 @@ export async function DELETE(
 ) {
   const params = await paramsP;
   const user = await getCurrentUser();
-  if (!user || user.role !== "admin")
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (user.role !== "admin")
     return NextResponse.json({ error: "Chỉ Admin được xoá nhà cung cấp" }, { status: 403 });
 
   const id = parseInt(params.id);
