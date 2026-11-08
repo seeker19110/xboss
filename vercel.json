@@ -1,0 +1,7 @@
+{
+  "git": {
+    "deploymentEnabled": {
+      "ci/staging-artifact-pilot": false
+    }
+  }
+}
