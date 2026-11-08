@@ -62,3 +62,11 @@ Script Node dùng thư viện chuẩn và công cụ tar của runner. Build và
 
 **Kết luận:** Approved for implementation
 **Người/ngày duyệt:** Chủ dự án, 2026-11-08, phạm vi pilot staging cô lập.
+
+## 9. Tự động hóa diễn tập phục hồi
+
+**Approved for implementation** · Chủ dự án, 2026-11-08. Điều kiện mở là CI tổng hợp của #719 đạt trên `7e831ce1`. Hai phép thử cục bộ đã xác nhận đổi tuyến về bản giữ sẵn và restore vào PostgreSQL mới, đồng thời phát hiện policy RLS cần role cấp cluster. [CI tổng hợp](https://github.com/seeker19110/xboss/actions/runs/42438780309)
+
+- **Rollback.** Build hai lần từ cùng SHA và lockfile. Staging tải hai archive theo ID và kiểm metadata đã băm ở job build. Xác minh bản A rồi B qua cùng tuyến loopback. Dừng B, xác nhận readiness 502, đổi về A đang chạy sẵn và xác minh lại digest, Build ID cùng bốn probe. RTO tính từ lúc bơm lỗi đến khi xác minh xong A, giới hạn 60 giây. Hai build có digest và Build ID khác nhau. Phạm vi là đổi tuyến nóng cùng schema.
+- **Restore.** Chụp archive logic từ PostgreSQL nguồn có dữ liệu giả rồi restore sang dịch vụ PostgreSQL riêng. Đích chuẩn bị role tối thiểu cho policy RLS, kiểm danh sách migration, dữ liệu mốc trước và sau backup, cách ly tenant và app khởi động từ chính archive CI đã xác minh. RTO đo từ sự cố mô phỏng đến khi app đích sẵn sàng và dữ liệu qua kiểm, giới hạn 180 giây. RPO đo khoảng cách từ mốc commit gần nhất đã phục hồi đến lúc mô phỏng sự cố, giới hạn 60 giây. Các mốc commit dùng thời điểm quan sát ngay sau commit. Đây là số đo staging dùng một lần đã dựng sẵn dịch vụ, tách khỏi mục tiêu production, PITR và uploads.
+- **Bằng chứng.** Mỗi diễn tập lưu JSON có run/attempt, SHA, trạng thái, mốc đo, điều kiện kiểm và digest liên quan. Lỗi hoặc thiếu biên nhận làm workflow đỏ. Job vẫn tải bằng chứng đã ghi nếu có lỗi. Workflow giữ quyền đọc và chạy trên nhánh pilot với dữ liệu giả. Production tiếp tục dùng bước duyệt hiện hành.
