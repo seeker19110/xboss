@@ -56,7 +56,15 @@ export async function GET() {
               `SELECT name, code, heatmap_title, investor, contractor, logo FROM projects ORDER BY id LIMIT 1`,
             ),
           );
-    const tower = await queryOne<{ name: string }>(`SELECT name FROM towers ORDER BY id LIMIT 1`);
+    // AUD-SEC-013: tháp của ĐÚNG dự án đang chọn — trước đây lấy tháp đầu tiên toàn DB (lộ tên
+    // tháp dự án/tổ chức khác). Nhánh fallback không có dự án thì không trả tháp.
+    const tower =
+      projectId != null
+        ? await queryOne<{ name: string }>(
+            `SELECT name FROM towers WHERE project_id = ? ORDER BY id LIMIT 1`,
+            projectId,
+          )
+        : null;
     return NextResponse.json(
       {
         name: project?.name ?? null,

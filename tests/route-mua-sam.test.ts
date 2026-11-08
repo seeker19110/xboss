@@ -428,6 +428,20 @@ test(
   },
 );
 
+test("DELETE PO/NCC: chưa đăng nhập → 401, không phải 403 (AUD-SEC-013)", S, async () => {
+  dangXuat();
+  const po = await import("@/app/api/purchase-orders/[id]/route");
+  const resPo = await po.DELETE(jreq("/x", undefined, "DELETE"), {
+    params: Promise.resolve({ id: "1" }),
+  });
+  assert.equal(resPo.status, 401);
+  const ncc = await import("@/app/api/suppliers/[id]/route");
+  const resNcc = await ncc.DELETE(jreq("/x", undefined, "DELETE"), {
+    params: Promise.resolve({ id: "1" }),
+  });
+  assert.equal(resNcc.status, 401);
+});
+
 test("DELETE /api/purchase-orders/:id: chỉ Admin được xoá — PM bị 403", S, async () => {
   const projectId = await taoDuAn("pdel403");
   const pm = await taoUser("pm", "pdel403");
