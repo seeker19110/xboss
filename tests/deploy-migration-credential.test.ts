@@ -47,16 +47,31 @@ test("bootstrap staging từ chối URL cũ trước khi source và gỡ biến 
 });
 
 test("workflow đọc script đúng SHA nhưng để preflight quyết định trước reset", () => {
-  assert.match(workflow, /DEPLOY_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
-  assert.match(workflow, /\[\[ ! "\$DEPLOY_SHA" =~ \^\[0-9a-f\]\{40\}\$ \]\]/);
-  const fetchCommit = workflow.indexOf("git fetch origin '$DEPLOY_SHA'");
-  const readScript = workflow.indexOf("git show '$DEPLOY_SHA:deploy.sh'");
-  const runScript = workflow.indexOf("EXPECTED_DEPLOY_SHA='$DEPLOY_SHA' bash", fetchCommit);
-  assert.ok(fetchCommit >= 0 && fetchCommit < readScript && readScript < runScript);
-  assert.doesNotMatch(workflow, /git reset --hard '\$DEPLOY_SHA'/);
-  assert.match(workflow, /mktemp \/tmp\/xboss-deploy\.XXXXXX/);
-  assert.match(workflow, /trap 'rm -f/);
-  assert.match(readFileSync("deploy.sh", "utf8"), /CI_SHA.*HEAD_SHA|CI_SHA=\$\(grep/);
+  assert.match(workflow, /SOURCE_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+  assert.match(workflow, /ARCHIVE_SHA: \$\{\{ steps\.verify\.outputs\.archive-sha256 \}\}/);
+  const remote = workflow
+    .split("\n")
+    .find((line) => line.trimStart().startsWith('REMOTE_COMMAND="'));
+  assert.ok(remote);
+  const commandStart = workflow.indexOf(remote);
+  const runStart = workflow.lastIndexOf("\n        run: |", commandStart);
+  assert.ok(runStart >= 0);
+  const preflight = workflow.slice(runStart, commandStart);
+  assert.match(preflight, /\[\[ "\$SOURCE_SHA" =~ \^\[0-9a-f\]\{40\}\$ \]\]/);
+  assert.match(preflight, /\[\[ "\$ARCHIVE_SHA" =~ \^\[0-9a-f\]\{64\}\$ \]\]/);
+
+  const fetchCommit = remote.indexOf("git fetch origin '$SOURCE_SHA'");
+  const readScript = remote.indexOf("git show '$SOURCE_SHA:deploy.sh'");
+  const verifyArchive = remote.indexOf(
+    "printf '%s  %s\\n' '$ARCHIVE_SHA' '.next-ci.tar.gz' | sha256sum --check &&",
+  );
+  const runScript = remote.indexOf("EXPECTED_DEPLOY_SHA='$SOURCE_SHA' bash");
+  assert.ok(fetchCommit >= 0 && fetchCommit < readScript);
+  assert.ok(readScript < verifyArchive && verifyArchive < runScript);
+  assert.doesNotMatch(remote, /git reset\b/);
+  assert.match(remote, /mktemp \/tmp\/xboss-deploy\.XXXXXX/);
+  assert.match(remote, /trap 'rm -f/);
+  assert.match(deploy, /CI_SHA.*HEAD_SHA|CI_SHA=\$\(grep/);
 });
 
 test("deploy ghim commit CI và dừng trước migration nếu main đã đổi", () => {

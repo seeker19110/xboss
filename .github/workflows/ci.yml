@@ -377,30 +377,67 @@ jobs:
   build:
     name: build
     runs-on: ubuntu-latest
+    env:
+      APP_DIR: /var/www/xboss
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
 
+      - name: Dựng thư mục build khớp đường dẫn production
+        run: |
+          # Next ghi đường dẫn tuyệt đối vào required-server-files.json và trace.
+          sudo install -d -o "$(id -u)" -g "$(id -g)" "$APP_DIR"
+          rsync -a --delete "$GITHUB_WORKSPACE/" "$APP_DIR/"
+
       - name: Cache node_modules
         id: cache-node-modules
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: node_modules
+          path: ${{ env.APP_DIR }}/node_modules
           key: node24-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Cài dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        working-directory: ${{ env.APP_DIR }}
         run: npm ci
 
+      - name: Kiểm bàn giao artifact VPS
+        run: node --test tests/vps-artifact.test.mjs tests/vps-production-receipt.test.mjs
+
       - name: Build
+        working-directory: ${{ env.APP_DIR }}
         run: npm run build
         env:
           # Build không kết nối DB (Pool khởi tạo lazy) — chỉ cần biến tồn tại.
-          DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
+          DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_build
+          NEXT_DIST_DIR: .next-ci
+          # DSN client công khai được nhúng lúc build production.
+          NEXT_PUBLIC_SENTRY_DSN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.NEXT_PUBLIC_SENTRY_DSN || '' }}
+
+      - name: Đóng gói và kiểm lại bản build VPS
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          artifact="$RUNNER_TEMP/xboss-vps-artifact"
+          node scripts/ops/vps-artifact.mjs pack "$artifact" "$GITHUB_REPOSITORY" \
+            "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
+          node scripts/ops/vps-artifact.mjs verify "$artifact" "$GITHUB_REPOSITORY" \
+            "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
+
+      - name: Xuất bản artifact VPS của CI main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: xboss-vps-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          path: ${{ runner.temp }}/xboss-vps-artifact/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
 
   # ── E2E, chia 4 shard chạy song song ──
   #

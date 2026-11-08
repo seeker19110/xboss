@@ -24,13 +24,11 @@ bỏ kiểm host key. N05/N12 vẫn mở, xem [checkpoint thực thi](docs/ops/q
 
 **Node ≥ 24** (đúng version CI dùng, `.github/workflows/ci.yml`) và tối thiểu **1 CPU**.
 
-> **Cập nhật 2026-08-26 — deploy tự động KHÔNG còn build trên VPS.**
-> [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml) build trên runner GitHub
-> rồi `rsync` gói `.next-ci.tar.gz` sang VPS; `deploy.sh` chỉ giải nén, áp migration, swap
-> atomic và reload. Đỉnh tải RAM khi deploy vì thế **biến mất** ở cấu hình mặc định. Bảng
-> RAM dưới đây vẫn đúng cho đường dự phòng `bash deploy.sh --build-local` (build tại chỗ) —
-> `next build` là tiến trình Node ngốn RAM nhất trong vòng đời deploy, nặng hơn hẳn lúc
-> `next start` phục vụ request.
+> Job build của [CI](./.github/workflows/ci.yml) xuất bản gói từ push lên `main`.
+> Sau khi `Production` được duyệt, [workflow VPS](./.github/workflows/deploy.yml) tải đúng gói,
+> đối chiếu SHA-256 rồi chuyển sang VPS. `deploy.sh` áp migration, giải nén, swap và reload.
+> Bảng RAM dưới đây áp dụng cho đường dự phòng `bash deploy.sh --build-local`, khi `next build`
+> và app đang phục vụ cùng chạy trên VPS.
 
 | Cấu hình                    | RAM                 | Ổ đĩa | Ghi chú                                                                                                                                                                                                                                                                                               |
 | --------------------------- | ------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -74,9 +72,8 @@ tại đúng đường dẫn `/var/www/xboss` vì `.next` có nhúng đường d
 
 **Secrets repo mà workflow deploy cần:** `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (đã có từ
 trước), `VPS_SSH_KNOWN_HOSTS` (**bắt buộc** — host key VPS đã ghim; thiếu thì deploy dừng trước mọi kết nối SSH, xem mục ngay dưới),
-và `NEXT_PUBLIC_SENTRY_DSN` (**tuỳ chọn nhưng bắt buộc nếu đang dùng Sentry phía trình
-duyệt**: biến `NEXT_PUBLIC_*` được nhúng vào bundle LÚC BUILD, trước đây lấy từ `.env.local`
-trên VPS; build ở runner mà thiếu nó thì Sentry client tự tắt, không có lỗi nào báo ra).
+CI `main` đọc `NEXT_PUBLIC_SENTRY_DSN` nếu dùng Sentry phía trình duyệt. Biến `NEXT_PUBLIC_*`
+được nhúng vào bundle lúc build.
 
 **Lấy `VPS_SSH_KNOWN_HOSTS` qua kênh tin cậy** (không bao giờ lấy bằng `ssh-keyscan` rồi tin luôn — đó là
 tin lần đầu, dễ bị MITM): (1) vào VPS bằng console của nhà cung cấp, chạy
@@ -208,7 +205,8 @@ cd xboss
 bash deploy.sh
 ```
 
-Workflow lấy `deploy.sh` từ đúng SHA đã qua CI vào file tạm ngoài checkout. Script kiểm
+Workflow kiểm SHA-256 trên runner, trên archive tạm lúc tới VPS và trên archive cuối ngay trước
+khi gọi `deploy.sh` của đúng SHA đã qua CI. Script kiểm
 credential migrator và các file env runtime **trước** reset/clean/npm; thiếu điều kiện phải
 dừng mà không đổi checkout. Sau kiểm tra, script xác nhận main còn đúng SHA CI rồi mới làm:
 `git fetch` + `reset --hard` tới SHA đã xác nhận (VPS luôn chạy nhánh
@@ -235,7 +233,7 @@ hoàn tác source, dependency hoặc migration; người vận hành vẫn phả
 
 | Lệnh                           | Bản build lấy từ đâu                     | Dùng khi                                                       |
 | ------------------------------ | ---------------------------------------- | -------------------------------------------------------------- |
-| `bash deploy.sh`               | Gói `.next-ci.tar.gz` GitHub Actions gửi | Mặc định — chính là đường auto-deploy chạy sau mỗi lần CI xanh |
+| `bash deploy.sh`               | Gói `.next-ci.tar.gz` GitHub Actions gửi | Mặc định sau khi CI `main` xanh và `Production` được duyệt     |
 | `bash deploy.sh --build-local` | Tự `npm run build` trên VPS              | Dự phòng: GitHub Actions không dùng được, hoặc deploy khẩn cấp |
 | `bash deploy.sh --staging`     | Tự build tại chỗ (luôn luôn)             | Staging deploy tay — không có workflow nào gửi gói sang        |
 
@@ -244,6 +242,11 @@ SHA trong gói phải khớp `git rev-parse HEAD` (chống chạy bundle của c
 migration vừa áp — thường do có push chen vào giữa; lần CI kế tiếp sẽ gửi gói đúng), và Node
 major lúc build phải khớp Node trên VPS. Gói chỉ bị xoá sau khi health-check pass, nên deploy
 hỏng giữa chừng vẫn chạy lại được `bash deploy.sh` ngay mà không phải chờ CI build lại.
+
+Sau khi deploy hoàn tất, workflow đối chiếu Build ID trên trang đăng nhập và hash manifest qua
+HTTPS. Artifact `xboss-vps-receipt-<run>-<attempt>` lưu kết quả trong 30 ngày. Nếu probe lỗi,
+biên nhận ghi rõ app đã kích hoạt và workflow báo lỗi để người vận hành kiểm tra. Khi CI chạy
+lại riêng các job lỗi và attempt mới thiếu gói, chọn **Re-run all jobs** để tạo gói cùng attempt.
 
 > ⚠️ `reset --hard` sẽ **xoá mọi sửa đổi cục bộ** trên VPS để khớp đúng
 > `origin/main` — đừng sửa file trực tiếp trên server, hãy đổi cấu hình qua

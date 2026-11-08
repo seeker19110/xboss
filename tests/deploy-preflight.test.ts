@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 
 const deploy = readFileSync("deploy.sh", "utf8");
 const workflow = readFileSync(".github/workflows/deploy.yml", "utf8");
@@ -29,6 +30,13 @@ function fixture(t: TestContext) {
   const bin = join(root, "bin");
   const temp = join(root, "scripts-tam");
   for (const dir of [app, bin, temp]) mkdirSync(dir);
+  const payload = join(root, "payload");
+  mkdirSync(join(payload, ".next-ci"), { recursive: true });
+  writeFileSync(join(payload, ".next-ci", "BUILD_ID"), "fixture-build\n");
+  writeFileSync(join(payload, ".next-ci.info"), `sha=${sha}\nnode=24\n`);
+  const archive = join(app, ".next-ci.tar.gz");
+  execFileSync("tar", ["-czf", archive, "-C", payload, ".next-ci", ".next-ci.info"]);
+  const archiveSha = createHash("sha256").update(readFileSync(archive)).digest("hex");
   const log = join(root, "calls.log");
   const credential = join(root, "migrate.env");
   const pinned = join(root, "pinned.sh");
@@ -76,7 +84,8 @@ esac`,
     PATH: `${bin}:/usr/bin:/bin`,
     HOME: root,
     APP_DIR: app,
-    DEPLOY_SHA: sha,
+    SOURCE_SHA: sha,
+    ARCHIVE_SHA: archiveSha,
     MIGRATION_ENV_FILE: credential,
     FAKE_LOG: log,
     FAKE_PINNED: pinned,
@@ -113,7 +122,7 @@ esac`,
     assert.doesNotMatch(result.calls, /^git (reset|clean)|^npm |^pm2 /m);
     return result;
   }
-  return { app, env, credentials, run, rejected };
+  return { app, archive, env, credentials, run, rejected };
 }
 
 test("bootstrap thiếu credential không reset checkout và không chạy script cũ", (t) => {
@@ -156,9 +165,22 @@ test("bootstrap từ chối main khác SHA CI trước reset và vẫn dọn scr
 
 test("bootstrap từ chối SHA sai trước khi gọi git", (t) => {
   const f = fixture(t);
-  f.env.DEPLOY_SHA = "khong-phai-sha";
-  const result = f.rejected(/DEPLOY_SHA không hợp lệ/);
+  f.env.SOURCE_SHA = "khong-phai-sha";
+  const result = f.rejected(/SOURCE_SHA không hợp lệ/);
   assert.equal(result.calls, "");
+});
+
+test("bootstrap từ chối gói cuối bị sửa trước khi chạy deploy.sh", (t) => {
+  const f = fixture(t);
+  f.credentials();
+  const modified = Buffer.concat([readFileSync(f.archive), Buffer.from("fixture-tampered")]);
+  writeFileSync(f.archive, modified);
+  const before = readdirSync(f.app);
+
+  const result = f.rejected(/\.next-ci\.tar\.gz: FAILED/);
+  assert.equal(result.calls, `git fetch origin ${sha}\ngit show ${sha}:deploy.sh\n`);
+  assert.deepEqual(readdirSync(f.app), before);
+  assert.deepEqual(readFileSync(f.archive), modified);
 });
 
 test("bootstrap fetch lỗi không reset, không migrate", (t) => {
