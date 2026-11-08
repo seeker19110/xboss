@@ -7,7 +7,9 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createServer, type ServerResponse } from "node:http";
@@ -23,6 +25,8 @@ const buildId = "build-pilot";
 const marker = "public/__xboss-pilot-build.json";
 const asset = `.next-ci/static/${buildId}/_buildManifest.js`;
 const staticUrl = `/_next/static/${buildId}/_buildManifest.js`;
+const pgLink = ".next-ci/node_modules/pg-next";
+const sentryLink = ".next-ci/node_modules/@sentry/server-runtime-injection-next";
 const env = {
   ...process.env,
   XT_PILOT_SOURCE_SHA: sourceSha,
@@ -56,12 +60,15 @@ async function fixture(t: TestContext) {
   const metadata = join(root, "metadata.json");
   mkdirSync(join(project, ".next-ci", "static", buildId), { recursive: true });
   mkdirSync(join(project, ".next-ci", "cache"));
+  mkdirSync(join(project, ".next-ci", "node_modules", "@sentry"), { recursive: true });
   mkdirSync(join(project, "public"));
   mkdirSync(release);
   writeFileSync(join(project, ".next-ci", "BUILD_ID"), buildId);
   writeFileSync(join(project, ".next-ci", "cache", "ignored"), "cache");
   writeFileSync(join(project, "public", "fixture.txt"), "public");
   writeFileSync(join(project, asset), "window.__fixture = true;");
+  symlinkSync("../../node_modules/pg", join(project, pgLink));
+  symlinkSync("../../../node_modules/@sentry/server-runtime-injection", join(project, sentryLink));
   assert.deepEqual(await cli(["pack", project, sourceSha, archive, metadata]), {
     code: 0,
     stderr: "",
@@ -110,6 +117,12 @@ test("pilot xác minh đúng gói và bản đang trả lời qua HTTP", async (
   assert.equal(existsSync(join(f.project, marker)), false);
   assert.equal((await cli(["install", f.archive, f.metadata, f.release])).code, 0);
   assert.equal(existsSync(join(f.release, ".next-ci", "cache")), false);
+  assert.equal(readlinkSync(join(f.release, pgLink)), "../../node_modules/pg");
+  assert.equal(
+    readlinkSync(join(f.release, sentryLink)),
+    "../../../node_modules/@sentry/server-runtime-injection",
+  );
+  assert.equal(existsSync(join(f.release, "node_modules")), false);
   const { base, visited } = await serve(t, f);
   const { code, receipt } = await verify(f, base);
   const metadata = JSON.parse(readFileSync(f.metadata, "utf8"));
@@ -140,6 +153,40 @@ test("pilot từ chối archive bị đổi trước khi giải nén", async (t)
     stderr: "archive_digest_mismatch",
   });
   assert.deepEqual(readdirSync(f.release), []);
+});
+
+test("pilot chỉ nhận symlink dependency chuẩn của Next", async (t) => {
+  const f = await fixture(t);
+  const cases = [
+    [pgLink, "/tmp/pg"],
+    [pgLink, "../../../node_modules/pg"],
+    [pgLink, "../../node_modules/ngoai/../pg"],
+    ["public/pg", "../node_modules/pg"],
+  ];
+  for (const [path, target] of cases) {
+    const link = join(f.project, path);
+    rmSync(link, { force: true });
+    symlinkSync(target, link);
+    assert.deepEqual(await cli(["pack", f.project, sourceSha, f.archive, f.metadata]), {
+      code: 1,
+      stderr: "unsupported_artifact_entry",
+    });
+    rmSync(link);
+  }
+});
+
+test("pilot từ chối symlink đã cài bị đổi đích dù đích mới là dependency hợp lệ", async (t) => {
+  const f = await fixture(t);
+  assert.equal((await cli(["install", f.archive, f.metadata, f.release])).code, 0);
+  const { base, visited } = await serve(t, f);
+  const link = join(f.release, pgLink);
+  rmSync(link);
+  symlinkSync("../../node_modules/sharp", link);
+  const result = await verify(f, base);
+  assert.equal(result.code, 1);
+  assert.equal(result.receipt.status, "failed");
+  assert.equal(result.receipt.error, "installed_tree_mismatch");
+  assert.deepEqual(visited, []);
 });
 
 test("pilot từ chối thay đổi cây đã cài và SHA của workflow sai", async (t) => {

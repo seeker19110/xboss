@@ -8,11 +8,12 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, posix, resolve } from "node:path";
 
 const buildDir = ".next-ci";
 const cacheDir = `${buildDir}/cache`;
@@ -22,6 +23,9 @@ const sourceShaPattern = /^[a-f0-9]{40}$/;
 const digestPattern = /^[a-f0-9]{64}$/;
 const buildIdPattern = /^[a-zA-Z0-9_-]{1,128}$/;
 const staticAssetPattern = /^\.next-ci\/static\/(?:[a-zA-Z0-9_.-]+\/)*[a-zA-Z0-9_.-]+\.js$/;
+const dependencyLinkPattern =
+  /^\.next-ci\/node_modules\/(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
+const dependencyTargetPattern = /^node_modules\/(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
 
 class PilotError extends Error {
   constructor(code, status = "failed") {
@@ -40,6 +44,22 @@ async function fileDigest(file) {
   return hash.digest("hex");
 }
 
+// Next tạo liên kết đến dependency từ lockfile. Kiểm chính đích ghi trong liên kết,
+// kể cả trước khi npm ci có thư mục đích. Dạng chuẩn loại các đường vòng qua thư mục khác.
+function dependencyLink(file, path) {
+  const target = readlinkSync(file);
+  const directory = posix.dirname(path);
+  const dependency = posix.normalize(posix.join(directory, target));
+  if (
+    !dependencyLinkPattern.test(path) ||
+    !dependencyTargetPattern.test(dependency) ||
+    target !== posix.relative(directory, dependency)
+  ) {
+    throw new PilotError("unsupported_artifact_entry");
+  }
+  return { path, link_target: target };
+}
+
 // Cùng thứ tự ở lúc đóng gói và kiểm. Cache do Next ghi lúc chạy nằm ngoài gói.
 async function fileHashes(root, path) {
   const directory = join(root, path);
@@ -53,6 +73,7 @@ async function fileHashes(root, path) {
     if (relative === cacheDir && stat.isDirectory()) continue;
     if (stat.isDirectory()) files.push(...(await fileHashes(root, relative)));
     else if (stat.isFile()) files.push({ path: relative, sha256: await fileDigest(file) });
+    else if (stat.isSymbolicLink()) files.push(dependencyLink(file, relative));
     else throw new PilotError("unsupported_artifact_entry");
   }
   return files;
